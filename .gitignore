@@ -21,3 +21,4 @@ pc_storage/
 .vscode/
 .idea/
 Thumbs.db
+*.bak*
