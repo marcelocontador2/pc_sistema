@@ -3,15 +3,16 @@ import re
 import json
 import datetime
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
+from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 import os
 
 router = APIRouter()
 
-# Caminho do banco de dados SQLite
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 
-# Cria a tabela no banco assim que o modulo for carregado
-def criar_tabela():
+def criar_tabelas():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
@@ -22,20 +23,28 @@ def criar_tabela():
             resultado_json TEXT NOT NULL
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS historico_matriz_integridade (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            periodo TEXT NOT NULL,
+            data_geracao TEXT NOT NULL,
+            resultado_json TEXT NOT NULL
+        )
+    ''')
     conn.commit()
     conn.close()
 
-criar_tabela()
+criar_tabelas()
 
-
+# ==========================================
+# ROTAS DA CONFERÊNCIA (MANTIDAS ORIGINAIS)
+# ==========================================
 @router.get("/salvar_integridade/{periodo}")
 async def salvar_integridade(periodo: str):
     try:
-        # 1. VALIDAÇÃO: Verifica se todos os arquivos obrigatórios existem
-        import os, glob
+        import os
         pecas_obrigatorias = ["BALANCETE", "BALANCO_PATRIMONIAL", "BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]
         pecas_faltando = []
-        
         pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
         p_limpo = re.sub(r'[^A-Z0-9]', '_', str(periodo).upper()).strip('_')
         
@@ -47,7 +56,6 @@ async def salvar_integridade(periodo: str):
         if pecas_faltando:
             return {"erro": "faltando", "pecas": pecas_faltando}
 
-        # 2. Se passou, calcula e salva
         from integridade import analise_integridade
         dados = await analise_integridade(periodo)
         
@@ -56,16 +64,13 @@ async def salvar_integridade(periodo: str):
         
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO historico_integridade (periodo, data_geracao, resultado_json)
-            VALUES (?, ?, ?)
-        ''', (periodo, data_agora, json_resultado))
+        cursor.execute('''INSERT INTO historico_integridade (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)''', (periodo, data_agora, json_resultado))
         conn.commit()
         conn.close()
-        
         return {"mensagem": "Integridade salva com sucesso!", "dados": dados}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/historico_integridade")
 async def listar_historico():
     conn = sqlite3.connect(DB_PATH)
@@ -73,7 +78,6 @@ async def listar_historico():
     cursor.execute('''SELECT id, periodo, data_geracao FROM historico_integridade ORDER BY id DESC''')
     rows = cursor.fetchall()
     conn.close()
-    
     return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
 
 @router.get("/historico_integridade/{id}")
@@ -83,27 +87,123 @@ async def buscar_historico(id: int):
     cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = ?''', (id,))
     row = cursor.fetchone()
     conn.close()
-    
-    if not row:
-        raise HTTPException(status_code=404, detail="Historico nao encontrado")
-        
+    if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
     return json.loads(row[0])
 
 @router.delete("/excluir_integridade/{id}")
 async def excluir_historico(id: int):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM historico_integridade WHERE id = ?', (id,))
-        conn.commit()
-        conn.close()
-        return {"mensagem": "Historico excluido com sucesso!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM historico_integridade WHERE id = ?', (id,))
+    conn.commit()
+    conn.close()
+    return {"mensagem": "Historico excluido com sucesso!"}
 
 @router.get("/salvar_integridade_cruzada/{periodo}")
 async def salvar_integridade_cruzada(periodo: str):
-    # Por enquanto ele chama a mesma funcao da conferencia. 
-    # Amanha alteramos a regra de calculo aqui.
     return await salvar_integridade(periodo)
+
+# ==========================================
+# ROTAS DA MATRIZ (NOVA TABELA SEPARADA)
+# ==========================================
+@router.get("/salvar_matriz_historico/{periodo}")
+async def salvar_matriz_historico(periodo: str):
+    try:
+        from matriz_integridade import gerar_matriz
+        dados = await gerar_matriz(periodo)
+        if isinstance(dados, dict) and dados.get("erro") == "faltando": return dados
+
+        json_resultado = json.dumps(dados)
+        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO historico_matriz_integridade (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)''', (periodo, data_agora, json_resultado))
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Sucesso", "dados": dados}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historico_matriz")
+async def listar_historico_matriz():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''SELECT id, periodo, data_geracao FROM historico_matriz_integridade ORDER BY id DESC''')
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@router.get("/historico_matriz/{id}")
+async def buscar_historico_matriz(id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''SELECT resultado_json FROM historico_matriz_integridade WHERE id = ?''', (id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+    return json.loads(row[0])
+
+@router.delete("/excluir_matriz/{id}")
+async def excluir_historico_matriz(id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM historico_matriz_integridade WHERE id = ?', (id,))
+    conn.commit()
+    conn.close()
+    return {"mensagem": "Historico excluido!"}
+
+@router.get("/gerar_pdf_integridade/{id}")
+async def gerar_pdf_integridade(id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('SELECT periodo, data_geracao, resultado_json FROM historico_matriz_integridade WHERE id = ?', (id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+
+        periodo, data_geracao, resultado_json = row
+        dados = json.loads(resultado_json)
+        matriz = dados.get("matriz", [])
+
+        pdf = FPDF(orientation='L', unit='mm', format='A4')
+        pdf.add_page()
+        pdf.set_font("helvetica", "B", 16)
+        pdf.cell(0, 10, f"Matriz de Integridade - {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font("helvetica", "I", 10)
+        pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(5)
+
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_fill_color(0, 86, 179)
+        pdf.set_text_color(255, 255, 255)
+        colunas = ["NOMENCLATURA", "BALANCETE", "BP", "BF", "BO", "DFC", "DVP", "DMPL", "CONF."]
+        # Larguras ajustadas: A primeira coluna ficou maior (95) e as outras diminuíram um pouco
+        larguras = [80, 26, 26, 26, 26, 26, 26, 26, 15]
+        for i, col in enumerate(colunas): pdf.cell(larguras[i], 8, col, border=1, align="C", fill=True)
+        pdf.ln()
+
+        pdf.set_text_color(0, 0, 0)
+        for linha in matriz:
+            # Fonte menor para a Nomenclatura (para não sobrepor)
+            pdf.set_font("helvetica", "", 6.5)
+            pdf.cell(larguras[0], 7, str(linha.get('item', '')), border=1, align="L")
+            
+            # Fonte um pouco menor para os valores
+            pdf.set_font("helvetica", "", 7.5)
+            for key, index in zip(["balancete", "bp", "bf", "bo", "dfc", "dvp", "dmpl"], range(1, 8)):
+                pdf.cell(larguras[index], 7, str(linha.get(key, '-')), border=1, align="R")
+            
+            # Conferência
+            conf = str(linha.get('conf', ''))
+            pdf.set_text_color(0, 128, 0) if conf == "OK" else pdf.set_text_color(255, 0, 0) if conf == "ERRO" else pdf.set_text_color(0, 0, 0)
+            pdf.cell(larguras[8], 7, conf, border=1, align="C")
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln()
+
+        pdf_bytes = pdf.output()
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Matriz_{periodo}.pdf"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

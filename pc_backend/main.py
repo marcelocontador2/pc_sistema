@@ -24,6 +24,9 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 app = FastAPI(title="PC - Prestacao de Contas API")
+
+
+
 # Conecta as rotas do historico de integridade
 app.include_router(historico_router)
 
@@ -1323,6 +1326,11 @@ async def ler_relatorio_csv(tipo: str):
         return {"erro": str(e)}
     return {"tipo": tipo, "arquivo": os.path.basename(arquivo), "dados": dados}
 
+
+# --- CONEXAO DA MATRIZ DE INTEGRIDADE ---
+from matriz_integridade import router as matriz_router
+app.include_router(matriz_router)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
@@ -1405,3 +1413,5 @@ async def painel_integridade_html(periodo: str):
         return HTMLResponse(content=html)
     except Exception as e:
         return HTMLResponse(content=f"<h3>Erro ao carregar integridade: {e}</h3>", status_code=500)
+
+

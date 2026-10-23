@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -13,17 +13,20 @@
         .flex-layout { display: flex; gap: 20px; }
         .sidebar { width: 300px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; height: fit-content; }
         .main-content { flex: 1; }
-        .card { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .card h3 { margin-top: 0; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-        .card p { color: #666; font-size: 14px; margin-bottom: 15px; }
-        .card table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-        .card td { padding: 10px 0; border-bottom: 1px solid #eee; color: #444; font-size: 15px; }
-        .card td:last-child { text-align: right; font-weight: bold; color: #333; }
-        .status-box { padding: 12px; border-radius: 4px; font-size: 14px; }
+        
+        /* Estilo da Tabela Matriz */
+        .matriz-tabela { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .matriz-tabela th { padding: 10px; text-align: left; background: #0056b3; color: white; border: 1px solid #004494; }
+        .matriz-tabela td { padding: 8px; border: 1px solid #ddd; }
+        .matriz-tabela tr:nth-child(even) { background-color: #f8fbff; }
+        .status-ok { color: green; font-weight: bold; }
+        .status-erro { color: red; font-weight: bold; }
+        
         .btn-acao { border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; color: white; font-weight: bold; margin-right: 5px; }
         .btn-exibir { background: #28a745; }
         .btn-excluir { background: #dc3545; }
-        @media print { #btn-voltar, #btn-pdf, .header, .sidebar, .btn-acao { display: none !important; } body { background: white !important; padding: 0 !important; } .flex-layout { display: block !important; } .main-content { width: 100% !important; } .card { break-inside: avoid; border: 1px solid #ccc !important; box-shadow: none !important; } }
+        
+        @media print { #btn-voltar, #btn-pdf, .header, .sidebar, .btn-acao { display: none !important; } body { background: white !important; padding: 0 !important; } .flex-layout { display: block !important; } .main-content { width: 100% !important; } .matriz-tabela { box-shadow: none !important; } }
     </style>
 </head>
 <body>
@@ -61,7 +64,8 @@
                 <option value="3">3º Trimestre</option><option value="4">4º Trimestre</option>
             </select>
         </div>
-        <button class="btn" onclick="verificarEGerar()">Verificar e Gerar Integridade</button>
+        <button class="btn" onclick="verificarEGerar()">Verificar Matriz</button>
+        <button class="btn" id="btn-salvar-matriz" onclick="salvarMatriz()" style="background: #28a745; display: none;">Confirmar e Salvar</button>
     </div>
 
     <div class="flex-layout">
@@ -70,7 +74,7 @@
             <ul id="lista-historico" style="list-style: none; padding: 0;">Carregando...</ul>
         </div>
         <div class="main-content">
-            <div id="integridade-cards"><p>Selecione o período para gerar a integridade.</p></div>
+            <div id="integridade-cards"><p>Selecione o período para gerar a matriz.</p></div>
         </div>
     </div>
 
@@ -91,7 +95,7 @@
             
             cards.innerHTML = '<p>Verificando...</p>';
             
-            fetch('/salvar_integridade_cruzada/' + periodoFormatado)
+            fetch('/gerar_matriz/' + periodoFormatado)
                 .then(r => r.json())
                 .then(data => {
                     if (data.erro === 'faltando') {
@@ -101,27 +105,43 @@
                         cards.innerHTML = msg;
                         return;
                     }
-                    if (data.dados && data.dados.analises) {
-                        let html = '';
-                        data.dados.analises.forEach(function(a) {
-                            const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
-                            let linhas = '';
-                            a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
-                            html += '<div class="card" style="border-left:5px solid ' + cor + ';">';
-                            html += '<h3>' + a.titulo + '</h3><p>' + a.conceito + '</p>';
-                            html += '<table>' + linhas + '</table>';
-                            html += '<div class="status-box" style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + ';">' + a.mensagem + '</div></div>';
-                        });
-                        cards.innerHTML = html;
+                    if (data.matriz) {
+                        renderizarTabela(data.matriz); document.getElementById("btn-salvar-matriz").style.display = "inline-block"; document.getElementById("btn-salvar-matriz").setAttribute("data-periodo", periodoFormatado);
                         carregarHistorico();
                     }
                 })
                 .catch(err => cards.innerHTML = '<p style="color:red;">Erro ao gerar.</p>');
         }
 
-        
-function carregarHistorico() {
-            fetch('/historico_integridade').then(r => r.json()).then(data => {
+        function renderizarTabela(matriz) {
+            let html = '<div style="overflow-x: auto;">';
+            html += '<table class="matriz-tabela">';
+            html += '<thead><tr>';
+            html += '<th style="padding: 10px; text-align: left;">NOMENCLATURA</th>';
+            html += '<th>BALANCETE</th><th>BP</th><th>BF</th><th>BO</th><th>DFC</th><th>DVP</th><th>DMPL</th><th>CONFERÊNCIA</th>';
+            html += '</tr></thead><tbody>';
+            
+            matriz.forEach(row => {
+                const statusClass = row.conf === 'OK' ? 'status-ok' : (row.conf === 'ERRO' ? 'status-erro' : '');
+                html += '<tr>';
+                html += `<td style="text-align: left; font-weight: bold; color: #333;">${row.item}</td>`;
+                html += `<td>${row.balancete}</td>`;
+                html += `<td>${row.bp}</td>`;
+                html += `<td>${row.bf}</td>`;
+                html += `<td>${row.bo}</td>`;
+                html += `<td>${row.dfc}</td>`;
+                html += `<td>${row.dvp}</td>`;
+                html += `<td>${row.dmpl}</td>`;
+                html += `<td class="${statusClass}">${row.conf}</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table></div>';
+            document.getElementById('integridade-cards').innerHTML = html;
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_matriz').then(r => r.json()).then(data => {
                 let html = '';
                 if(data.length === 0) html = '<li>Nenhum histórico.</li>';
                 data.forEach(item => {
@@ -143,57 +163,74 @@ function carregarHistorico() {
             });
         }
 
-
         function abrirHistorico(id) {
             const cards = document.getElementById('integridade-cards');
             cards.innerHTML = '<p>Carregando histórico...</p>';
-            fetch('/historico_integridade/' + id).then(r => r.json()).then(data => {
-                let html = '';
-                data.analises.forEach(function(a) {
-                    const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
-                    let linhas = '';
-                    a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
-                    html += '<div class="card" style="border-left:5px solid ' + cor + ';">';
-                    html += '<h3>' + a.titulo + '</h3><p>' + a.conceito + '</p>';
-                    html += '<table>' + linhas + '</table>';
-                    html += '<div class="status-box" style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + ';">' + a.mensagem + '</div></div>';
-                });
-                cards.innerHTML = html;
+            fetch('/historico_matriz/' + id).then(r => r.json()).then(data => {
+                if (data.matriz) {
+                    renderizarTabela(data.matriz);
+                } else if (data.analises) {
+                    let html = '';
+                    data.analises.forEach(function(a) {
+                        const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
+                        let linhas = '';
+                        a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
+                        html += '<div style="border-left:5px solid ' + cor + '; padding: 15px; margin-bottom: 15px; border: 1px solid #ddd; background: #fff;">';
+                        html += '<h3>' + a.titulo + '</h3><p>' + a.conceito + '</p>';
+                        html += '<table style="width:100%; border-collapse:collapse;">' + linhas + '</table>';
+                        html += '<div style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + '; padding:10px;">' + a.mensagem + '</div></div>';
+                    });
+                    cards.innerHTML = html;
+                } else {
+                    cards.innerHTML = '<p>Dados não encontrados.</p>';
+                }
             });
         }
 
         function excluirHistorico(id) {
             if(confirm("Tem certeza que deseja excluir?")) {
-                fetch('/excluir_integridade/' + id, { method: 'DELETE' }).then(r => {
+                fetch('/excluir_matriz/' + id, { method: 'DELETE' }).then(r => {
                     if(r.ok) { alert("Excluído!"); carregarHistorico(); }
                 });
             }
         }
 
-        
-
-function gerarPDF() {
-            // REGRA DE OURO: Obrigatoriamente tem que ter um item do histórico marcado!
+        function gerarPDF() {
             const selecionados = document.querySelectorAll('.check-historico:checked');
-            
             if (selecionados.length === 0) {
-                alert("Atenção: Você precisa marcar (selecionar) um relatório no 'Histórico Salvo' antes de gerar o PDF!");
-                return; // Bloqueia a impressão
+                alert("Atenção: Marque um relatório no 'Histórico Salvo' antes de gerar o PDF!");
+                return; 
             }
-
-            // Se chegou aqui, tem caixinha marcada. Carrega e imprime.
             const id = selecionados[0].value;
-            abrirHistorico(id);
-            
-            // Espera carregar e imprime
-            setTimeout(function() { 
-                window.print(); 
-            }, 500);
+            // Abre o download do PDF gerado pelo servidor
+            window.open('/gerar_pdf_integridade/' + id, '_blank');
         }
 
+        
+        function salvarMatriz() {
+            const btn = document.getElementById('btn-salvar-matriz');
+            const periodo = btn.getAttribute('data-periodo');
+            btn.innerText = "Salvando...";
+            btn.disabled = true;
 
+            fetch('/salvar_matriz_historico/' + periodo)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.erro) {
+                        alert("Erro ao salvar: " + data.erro);
+                    } else {
+                        alert("Matriz salva no histórico com sucesso!"); setTimeout(() => { carregarHistorico(); }, 500);
+                        btn.style.display = "none"; // Esconde o botão após salvar
+                    }
+                })
+                .catch(err => alert("Erro de conexão ao salvar."))
+                .finally(() => {
+                    btn.innerText = "Confirmar e Salvar";
+                    btn.disabled = false;
+                });
+        }
 
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener('DOMContentLoaded', function() {
             ajustarPeriodo();
             carregarHistorico();
         });
