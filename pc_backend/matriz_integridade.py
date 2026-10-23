@@ -1,4 +1,4 @@
-
+﻿
 import os
 import re
 import csv
@@ -16,15 +16,15 @@ def _get_csv(tipo, periodo):
 def _ler_linhas(caminho):
     if not caminho: return []
     with open(caminho, 'r', encoding='latin-1', errors='ignore') as f:
-        return [ [col.strip().replace('"', '') for col in row] for row in csv.reader(f, delimiter=';') if row ]
+        return [ [col.strip().replace(chr(34), '') for col in row] for row in csv.reader(f, delimiter=';') if row ]
 
 def _limpar_valor(valor):
     if not valor: return 0.0
-    v = str(valor).upper().replace("R$", "").replace(" ", "").replace("
-", "").replace("", "").strip()
+    v = str(valor).upper().replace("R$", "").replace(" ", "").strip()
     if not v or v == '-': return 0.0
     mult = -1.0 if v.endswith('C') else 1.0
     v = v.replace("C", "").replace("D", "")
+    v = v.replace(chr(10), "").replace(chr(13), "")
     if ',' in v and '.' in v: v = v.replace(".", "").replace(",", ".")
     elif ',' in v: v = v.replace(",", ".")
     try: return float(v) * mult
@@ -33,7 +33,6 @@ def _limpar_valor(valor):
 @router.get("/gerar_matriz/{periodo}")
 async def gerar_matriz(periodo: str):
     try:
-        # 1. VALIDAÇÃO: Verifica se todos os arquivos obrigatórios existem
         pecas_obrigatorias = ["BALANCETE", "BALANCO_PATRIMONIAL", "BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]
         pecas_faltando = []
         
@@ -44,7 +43,6 @@ async def gerar_matriz(periodo: str):
         if pecas_faltando:
             return {"erro": "faltando", "pecas": pecas_faltando}
 
-        # 2. Se passou, lê os arquivos
         l_bal = _ler_linhas(_get_csv("BALANCETE", periodo))
         l_bp  = _ler_linhas(_get_csv("BALANCO_PATRIMONIAL", periodo))
         l_bf  = _ler_linhas(_get_csv("BALANCO_FINANCEIRO", periodo))
@@ -56,9 +54,14 @@ async def gerar_matriz(periodo: str):
         matriz = []
 
         def add_linha(nome, bal=0, bp=0, bf=0, bo=0, dfc=0, dvp=0, dmpl=0):
-            valores = [v for v in [bal, bp, bf, bo, dfc, dvp, dmpl] if abs(v) > 0.001]
+            valores_brutos = [bal, bp, bf, bo, dfc, dvp, dmpl]
+            valores = [v for v in valores_brutos if abs(v) > 0.001]
+            
             if len(valores) >= 2:
-                conf = "OK" if all(abs(v - valores[0]) < 0.05 for v in valores) else "ERRO"
+                if all(abs(abs(v) - abs(valores[0])) < 0.05 for v in valores):
+                    conf = "OK"
+                else:
+                    conf = "ERRO"
             elif len(valores) == 1:
                 conf = "N/A"
             else:
@@ -71,21 +74,93 @@ async def gerar_matriz(periodo: str):
                 "bo": fmt(bo), "dfc": fmt(dfc), "dvp": fmt(dvp), "dmpl": fmt(dmpl), "conf": conf
             })
 
-        # Lógica do teste (Ativo)
-        def _get_val_bal(linhas, termo):
-            for p in linhas:
-                if len(p) > 4 and termo in p[0].upper(): return _limpar_valor(p[4])
-            return 0.0
-        def _get_val_bp(linhas, termo, is_passivo=False):
-            for p in linhas:
-                if len(p) >= 4:
-                    txt = p[2].upper() if is_passivo else p[0].upper()
-                    if termo in txt: return _limpar_valor(p[3] if is_passivo else p[1])
+        # Balancete: Varre da direita para a esquerda (Saldo)
+        def get_bal(termo):
+            for p in l_bal:
+                if termo in p[0].upper():
+                    for val in reversed(p):
+                        v_limpo = val.strip().replace(" ", "").replace("\ufeff", "")
+                        if v_limpo and any(c.isdigit() for c in v_limpo):
+                            return _limpar_valor(v_limpo)
+                    return 0.0
             return 0.0
 
-        add_linha("ATIVO", _get_val_bal(l_bal, "1 - ATIVO"), _get_val_bp(l_bp, "TOTAL"))
-        add_linha("ATIVO CIRCULANTE", _get_val_bal(l_bal, "1.1 - ATIVO CIRCULANTE"), _get_val_bp(l_bp, "ATIVO CIRCULANTE"))
+        # Balancete Movimento (coluna específica: 2=Debito, 3=Credito)
+        def get_bal_movimento(termo, coluna):
+            for p in l_bal:
+                if termo in p[0].upper():
+                    if len(p) > coluna:
+                        return _limpar_valor(p[coluna])
+            return 0.0
+            
+        # BP: Coluna 1 (Ativo) e Coluna 3 (Passivo)
+        def get_bp(termo, is_passivo=False):
+            for p in l_bp:
+                if len(p) >= 4:
+                    txt = p[2].upper() if is_passivo else p[0].upper()
+                    if termo in txt: 
+                        return _limpar_valor(p[3] if is_passivo else p[1])
+            return 0.0
+
+        def get_val(linhas, termo, col):
+            for p in linhas:
+                if len(p) > col and termo in p[0].upper(): return _limpar_valor(p[col])
+            return 0.0
+
+        # ==========================================
+        # PREENCHENDO TODOS OS ITENS
+        # ==========================================
         
+        add_linha("ATIVO", get_bal("1 - ATIVO"), get_bp("TOTAL"))
+        add_linha("ATIVO CIRCULANTE", get_bal("1.1 - ATIVO CIRCULANTE"), get_bp("ATIVO CIRCULANTE"))
+        add_linha("ATIVO NÃO CIRCULANTE", get_bal("1.2 - ATIVO NÃO CIRCULANTE"), get_bp("ATIVO NÃO CIRCULANTE"))
+        add_linha("IMOBILIZADO", get_bal("1.2.3 - IMOBILIZADO"), get_bp("IMOBILIZADO"))
+        add_linha("INTANGÍVEIS", get_bal("1.2.4 - INTANGÍVEL"), get_bp("INTANGÍVEL"))
+        
+        add_linha("PASSIVO CIRCULANTE", get_bal("2.1 - PASSIVO CIRCULANTE"), get_bp("PASSIVO CIRCULANTE", True))
+        
+        # --- VALORES RESTITUÍVEIS AJUSTADOS ---
+        # DISPÊNDIOS: coluna 2 (Débito)
+        add_linha("VALORES RESTITUÍVEIS - DISPÊNDIOS", get_bal_movimento("2.1.8.8 - VALORES RESTITUÍVEIS", 3), bf=get_val(l_bf, "Depósitos Restituíveis e Valores Vinculados", 3))
+        # INGRESSOS: coluna 3 (Crédito)
+        add_linha("VALORES RESTITUÍVEIS - INGRESSOS", get_bal_movimento("2.1.8.8 - VALORES RESTITUÍVEIS", 4), bf=get_val(l_bf, "Depósitos Restituíveis e Valores Vinculados", 1))
+
+        add_linha("PASSIVO NÃO CIRCULANTE", get_bal("2.2 - PASSIVO NAO-CIRCULANTE"), get_bp("PASSIVO NAO-CIRCULANTE", True))
+
+        # --- PATRIMÔNIO LÍQUIDO COM SINAIS CONTÁBEIS ---
+        v23 = get_bal("2.3 - PATRIMÔNIO LIQUIDO")
+        v4_vpa = get_bal("4 - VARIAÇÃO PATRIMONIAL AUMENTATIVA")
+        v3_vpd = get_bal("3 - VARIAÇÃO PATRIMONIAL DIMINUTIVA")
+        pl_balancete = v23 + v4_vpa + v3_vpd
+        
+        pl_bp = get_bp("TOTAL DO PATRIMÔNIO LÍQUIDO", True)
+        pl_dmpl = get_val(l_dmpl, "SALDOS FINAIS", 3)
+        add_linha("PATRIMÔNIO LÍQUIDO", pl_balancete, pl_bp, dmpl=pl_dmpl)
+        
+        # --- VPA E VPD ---
+        vpa_dvp = get_val(l_dvp, "TOTAL DAS VARIA", 2)
+        add_linha("VPA", v4_vpa, dvp=vpa_dvp)
+        
+        vpd_dvp = get_val(l_dvp, "TOTAL DAS VARIA", 4)
+        add_linha("VPD", v3_vpd, dvp=vpd_dvp)
+
+        # --- RECEITAS E DESPESAS ---
+        rec_bal = get_bal("6.2.1.2.1 - RECEITAS CORRENTE")
+        rec_bf = get_val(l_bf, "RECEITAS CORRENTE", 1)
+        rec_bo = get_val(l_bo, "RECEITAS CORRENTE", 6)
+        rec_dfc = get_val(l_dfc, "RECEITAS CORRENTE", 2)
+        add_linha("RECEITA CORRENTE REALIZADA", rec_bal, bf=rec_bf, bo=rec_bo, dfc=rec_dfc)
+
+        desp_bal = get_bal("6.2.2.1.3.01.01 - CREDITO EMPENHADO A LIQUIDAR - DESPESA CORRENTE") + get_bal("6.2.2.1.3.04.01 - CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CORRENTE") + get_bal("6.2.2.1.3.03 - CREDITO EMPENHADO LIQUIDADO A PAGAR")
+        desp_bo = get_val(l_bo, "CREDITO DISPONIVEL - DESPESA CORRENTE", 4)
+        add_linha("DESPESAS CORRENTE EMPENHADAS", desp_bal, bo=desp_bo)
+
+        cred_bal = get_bal("6.2.2.1.3.04.01 - CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CORRENTE")
+        cred_bf = get_val(l_bf, "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CORRENTE", 3)
+        cred_bo = get_val(l_bo, "CREDITO DISPONIVEL - DESPESA CORRENTE", 6)
+        cred_dfc = get_val(l_dfc, "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CORRENTE", 2)
+        add_linha("CRÉDITO EMPENHADO LIQUIDADO PAGO - DESPESAS CORRENTE", cred_bal, bf=cred_bf, bo=cred_bo, dfc=cred_dfc)
+
         return {"matriz": matriz}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
