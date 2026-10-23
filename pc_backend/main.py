@@ -1,4 +1,10 @@
-﻿from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response
+﻿from fastapi import FastAPI
+from historico_integridade import router as historico_router
+from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
+from fastapi.staticfiles import StaticFiles
+from historico_integridade import router as historico_router
+from fastapi.staticfiles import StaticFiles
 import sqlite3
 import os
 import shutil
@@ -18,6 +24,15 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 app = FastAPI(title="PC - Prestacao de Contas API")
+# Conecta as rotas do historico de integridade
+app.include_router(historico_router)
+
+# Liberar acesso aos arquivos HTML/CSS/JS do Frontend
+import os
+pasta_frontend = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend")
+if os.path.exists(pasta_frontend):
+    app.mount("/pc_frontend", StaticFiles(directory=pasta_frontend), name="pc_frontend")
+
 from integridade import router as integridade_router
 app.include_router(integridade_router)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -1162,6 +1177,114 @@ async def upload_arquivo(file: UploadFile = File(...)):
     caminho = os.path.join(UPLOAD_DIR, file.filename)
     with open(caminho, "wb") as b: shutil.copyfileobj(file.file, b)
     return {"filename": file.filename, "status": "sucesso"}
+
+
+import json
+@app.on_event("startup")
+async def criar_tabela_integridade():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS historico_integridade (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            periodo TEXT NOT NULL,
+            data_geracao TEXT NOT NULL,
+            resultado_json TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+
+# Rota que CHAMA a analise, pega o resultado e SALVA no banco
+@app.get("/salvar_integridade/{periodo}")
+async def salvar_integridade(periodo: str):
+    try:
+        # Chama a função do integridade.py
+        from integridade import analise_integridade
+        dados = await analise_integridade(periodo)
+        
+        # Converte para JSON para salvar no banco
+        json_resultado = json.dumps(dados)
+        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO historico_integridade (periodo, data_geracao, resultado_json)
+            VALUES (?, ?, ?)
+        ''', (periodo, data_agora, json_resultado))
+        conn.commit()
+        conn.close()
+        
+        return {"mensagem": "Integridade gerada e salva com sucesso!", "dados": dados}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Rota que LISTA todos os históricos salvos
+@app.get("/historico_integridade")
+async def listar_historico():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, periodo, data_geracao FROM historico_integridade
+            ORDER BY id DESC
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+        
+        historico = []
+        for r in rows:
+            historico.append({"id": r[0], "periodo": r[1], "data_geracao": r[2]})
+        return historico
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Rota que abre um histórico especifico pelo ID
+@app.get("/historico_integridade/{id}")
+async def buscar_historico(id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = ?''', (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Historico nao encontrado")
+            
+        return json.loads(row[0])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/lista_periodos")
+async def lista_periodos():
+    import glob, os
+    periodos = []
+    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    
+    if os.path.exists(pasta):
+        arquivos = glob.glob(os.path.join(pasta, "*BALANCO_PATRIMONIAL*.csv"))
+        for arq in arquivos:
+            partes = os.path.basename(arq).replace(".csv", "").split("_")
+            ano = 2026
+            p_tipo = "TRIMESTRE"
+            p_valor = "1"
+            for i, p in enumerate(partes):
+                if len(p) == 4 and p.isdigit():
+                    ano = int(p)
+                    if i + 2 < len(partes):
+                        p_tipo = partes[i+1]
+                        p_valor = partes[i+2]
+                    break
+            label = f"{ano} - {p_tipo} {p_valor}"
+            valor = f"{ano}-{p_tipo}-{p_valor}"
+            periodos.append({"ano": ano, "label": label, "valor": valor})
+            
+    unicos = list({v['label']:v for v in periodos}.values())
+    return sorted(unicos, key=lambda x: x["ano"], reverse=True)
 
 if __name__ == "__main__":
     import uvicorn

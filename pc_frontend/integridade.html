@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Integridade entre Demonstrações</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; margin: 0; }
+        .header { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .form-group { display: flex; align-items: center; gap: 5px; }
+        label { font-weight: bold; color: #444; }
+        select, input { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        .btn { border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #fff; background: #0056b3; }
+        .main-content { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
+        th { padding: 10px; text-align: left; background: #0056b3; color: #fff; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="form-group">
+            <label>Ano:</label>
+            <select id="select-ano"><option value="2026">2026</option><option value="2025">2025</option></select>
+        </div>
+        
+        <div class="form-group">
+            <label>Tipo:</label>
+            <select id="select-tipo" onchange="atualizarValores()">
+                <option value="MES">Mensal</option>
+                <option value="TRIMESTRE">Trimestral</option>
+                <option value="ANO">Anual</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Período:</label>
+            <select id="select-valor"></select>
+        </div>
+
+        <button class="btn" onclick="verificarEGerar()">Verificar e Gerar Matriz</button>
+    </div>
+
+    <div class="main-content">
+        <h2 style="margin-top:0; color:#333;">Integridade entre Demonstrações Contábeis</h2>
+        <div id="matriz-cards"><p>Selecione o período e clique em Verificar e Gerar.</p></div>
+    </div>
+
+    <script>
+        function atualizarValores() {
+            const tipo = document.getElementById('select-tipo').value;
+            const selectValor = document.getElementById('select-valor');
+            selectValor.innerHTML = '';
+            
+            let opcoes = [];
+            if (tipo === 'MES') {
+                opcoes = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+            } else if (tipo === 'TRIMESTRE') {
+                opcoes = ['1','2','3','4'];
+            } else if (tipo === 'ANO') {
+                opcoes = ['1'];
+            }
+
+            opcoes.forEach(op => {
+                let opt = document.createElement('option');
+                opt.value = op;
+                opt.textContent = op;
+                selectValor.appendChild(opt);
+            });
+        }
+
+        function verificarEGerar() {
+            const ano = document.getElementById('select-ano').value;
+            const tipo = document.getElementById('select-tipo').value;
+            const valor = document.getElementById('select-valor').value;
+            const cards = document.getElementById('matriz-cards');
+            
+            const periodoFormatado = ano + '-' + tipo + '-' + valor;
+            
+            cards.innerHTML = '<p>Verificando peças contábeis para o período ' + periodoFormatado + '...</p>';
+            
+            fetch('/gerar_matriz/' + periodoFormatado)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.erro === 'faltando') {
+                        let msg = '<h3 style="color: #dc3545; margin-top: 0;">Peças Contábeis Pendentes!</h3>';
+                        msg += '<p>Para gerar a integridade do período <b>' + periodoFormatado + '</b>, faça o upload das seguintes peças:</p>';
+                        msg += '<ul style="text-align: left; margin: 15px auto; width: fit-content;">';
+                        data.pecas.forEach(p => { msg += '<li><b>' + p + '</b></li>'; });
+                        msg += '</ul>';
+                        msg += '<button onclick="fecharAviso()" style="background: #0056b3; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px;">Ir para Importação</button>';
+                        
+                        let modal = document.getElementById('modal-aviso');
+                        if (!modal) {
+                            modal = document.createElement('div');
+                            modal.id = 'modal-aviso';
+                            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; justify-content: center; align-items: center;';
+                            document.body.appendChild(modal);
+                        }
+                        modal.innerHTML = '<div style="background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); text-align: center; font-family: Arial;">' + msg + '</div>';
+                        modal.style.display = 'flex';
+                        
+                        cards.innerHTML = '<p>Selecione o período e clique em Verificar e Gerar.</p>';
+                        return;
+                    }
+
+                    if (data.matriz) {
+                        let html = '<table>';
+                        html += '<thead><tr>';
+                        html += '<th style="padding:10px; text-align:left;">NOMENCLATURA</th>';
+                        html += '<th>BALANCETE</th><th>BP</th><th>BF</th><th>BO</th><th>DFC</th><th>DVP</th><th>DMPL</th><th>CONFERÊNCIA</th>';
+                        html += '</tr></thead><tbody>';
+                        
+                        data.matriz.forEach(row => {
+                            const cor = row.conf === 'OK' ? '#e8f5e9' : (row.conf === 'ERRO' ? '#ffebee' : '#fff');
+                            html += `<tr style="background:${cor}; border-bottom:1px solid #ddd;">`;
+                            html += `<td style="padding:10px; text-align:left; font-weight:bold;">${row.item}</td>`;
+                            html += `<td>${row.balancete}</td><td>${row.bp}</td><td>${row.bf}</td><td>${row.bo}</td><td>${row.dfc}</td><td>${row.dvp}</td><td>${row.dmpl}</td>`;
+                            html += `<td style="font-weight:bold; color:${row.conf === 'OK' ? 'green' : (row.conf === 'ERRO' ? 'red' : 'gray')};">${row.conf}</td>`;
+                            html += '</tr>';
+                        });
+                        html += '</tbody></table>';
+                        cards.innerHTML = html;
+                    }
+                })
+                .catch(err => cards.innerHTML = '<p style="color:red;">Erro ao gerar matriz.</p>');
+        }
+
+        function fecharAviso() {
+            const modal = document.getElementById('modal-aviso');
+            if (modal) modal.style.display = 'none';
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            atualizarValores();
+        });
+    </script>
+</body>
+</html>

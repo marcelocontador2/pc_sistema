@@ -69,10 +69,16 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
         <li><a id="submenu-dfc" onclick="mostrarTela('demonstracoes','DFC')">DFC</a></li>
         <li><a id="submenu-dvp" onclick="mostrarTela('demonstracoes','DVP')">DVP</a></li>
         <li><a id="submenu-dmpl" onclick="mostrarTela('demonstracoes','DMPL')">DMPL</a></li>
-      </ul>
+      
+        <li><a href="#" onclick="abrirTelaIntegridade('conferencia', 'Conferência das Demonstrações', event)">Conferência das Demonstrações</a></li>
+        <li><a href="#" onclick="abrirTelaIntegridade('integridade', 'Integridade entre Demonstrações', event)">Integridade entre Demonstrações</a></li>
+</ul>
     </li>
     <li><a id="menu-upload" onclick="mostrarTela('upload')">Importar Relatórios</a></li>
-  </ul>
+  
+        <li><a href="#" onclick="abrirTelaIntegridade('conferencia', 'Conferência das Demonstrações', event)">Conferência das Demonstrações</a></li>
+        <li><a href="#" onclick="abrirTelaIntegridade('integridade', 'Integridade entre Demonstrações', event)">Integridade entre Demonstrações</a></li>
+</ul>
 </aside>
 <main class="main-content">
   <header class="header">
@@ -232,18 +238,9 @@ function mostrarTela(tela, tipo=null) {
     }
 }
 
-function carregarPeriodos() {
-    const select = document.getElementById('filtro-periodo');
-    const reportsDiv = document.getElementById('reports-list');
-    
-    select.innerHTML = '<option value="">Carregando...</option>';
-    if (reportsDiv) reportsDiv.innerHTML = '';
-    
-    fetch('/periodos_importados/' + currentTipo)
-        .then(res => {
-            if (!res.ok) throw new Error('Falha na resposta');
-            return res.json();
-        })
+
+
+)
         .then(data => {
             select.innerHTML = '';
             if (!data || !data.periodos || data.periodos.length === 0) {
@@ -574,6 +571,80 @@ function abrirIntegridade(e) {
         .catch(function(err) {
             document.getElementById('integridade-cards').innerHTML = '<p style="color:red;">Erro ao carregar os dados.</p>';
         });
+}
+</script>
+
+
+
+
+
+
+
+
+
+        
+
+
+
+<script>
+function abrirTelaIntegridade(pasta, titulo, e) {
+    if (e) e.preventDefault();
+    
+    let overlay = document.getElementById('overlay-integridade');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'overlay-integridade';
+        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:#f4f6f9; z-index:9999; display:none; box-sizing:border-box;';
+        
+        let conteudo = '<div style="padding:10px 20px; background:#fff; border-bottom:1px solid #ddd; display:flex; align-items:center;">';
+        conteudo += '<button onclick="document.getElementById(\'overlay-integridade\').style.display=\'none\'" style="background:#fff; border:1px solid #ccc; padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:bold;">&larr; Voltar ao Sistema</button>';
+        conteudo += '<h3 id="titulo-overlay" style="margin-left: 20px; margin-top: 0; margin-bottom: 0;">Título</h3>';
+        conteudo += '</div>';
+        conteudo += '<iframe id="iframe-integridade" src="" style="width:100%; height:calc(100% - 50px); border:none;"></iframe>';
+        
+        overlay.innerHTML = conteudo;
+        document.body.appendChild(overlay);
+    }
+    
+    document.getElementById('titulo-overlay').innerText = titulo;
+    document.getElementById('iframe-integridade').src = '/pc_frontend/' + pasta + '.html';
+    overlay.style.display = 'block';
+}
+</script>
+
+</body></html>
+    `);
+    janelaImpressao.document.close();
+}
+</script>
+
+
+
+
+
+<script>
+function abrirTelaIntegridade(pasta, titulo, e) {
+    if (e) e.preventDefault();
+    
+    let overlay = document.getElementById('overlay-integridade');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'overlay-integridade';
+        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:#f4f6f9; z-index:9999; display:none; box-sizing:border-box;';
+        
+        let conteudo = '<div style="padding:10px 20px; background:#fff; border-bottom:1px solid #ddd; display:flex; align-items:center;">';
+        conteudo += '<button onclick="document.getElementById(\'overlay-integridade\').style.display=\'none\'" style="background:#fff; border:1px solid #ccc; padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:bold;">&larr; Voltar ao Sistema</button>';
+        conteudo += '<h3 id="titulo-overlay" style="margin-left: 20px; margin-top: 0; margin-bottom: 0;">Título</h3>';
+        conteudo += '</div>';
+        conteudo += '<iframe id="iframe-integridade" src="" style="width:100%; height:calc(100% - 50px); border:none;"></iframe>';
+        
+        overlay.innerHTML = conteudo;
+        document.body.appendChild(overlay);
+    }
+    
+    document.getElementById('titulo-overlay').innerText = titulo;
+    document.getElementById('iframe-integridade').src = '/pc_frontend/' + pasta + '.html';
+    overlay.style.display = 'block';
 }
 </script>
 
