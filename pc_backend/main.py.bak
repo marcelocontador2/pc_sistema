@@ -1,0 +1,2631 @@
+﻿import os
+import sqlite3
+import shutil
+import datetime
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, File, UploadFile, Form
+# =======================================================
+# CONFIGURAÇÃO DE CAMINHOS (GLOBAIS)
+# =======================================================
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+import shutil
+import datetime
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+import os, shutil, io, glob, csv
+import psycopg2
+import pandas as pd
+from fpdf import FPDF
+from fpdf.enums import XPos, YPos
+from pptx import Presentation
+from pptx.util import Inches
+from pptx.enum.text import PP_ALIGN
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
+app = FastAPI(title="PC - Prestacao de Contas API")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+DB_CONFIG = {"host": "localhost", "port": 5433, "database": "pc_database",
+             "user": "postgres", "password": "pc_admin_2026"}
+
+UPLOAD_DIR = r"C:\Users\Marcelo Medeiros\pc_sistema\pc_storage\uploads_raw"
+FRONTEND_DIR = r"C:\Users\Marcelo Medeiros\pc_sistema\pc_frontend"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_frontend():
+    with open(os.path.join(FRONTEND_DIR, "index.html"), encoding="utf-8") as f:
+        return f.read()
+
+@app.get("/analise")
+async def obter_analise():
+    return {"ativo_total": 616607030.65, "passivo_total": 12238786.04,
+            "patrimonio_liquido": 604368244.61, "superavit_orcamentario": -70944403.02}
+
+@app.get("/periodos")
+async def obter_periodos():
+    try:
+        conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT p.ano, p.periodo_acumulado
+            FROM periodo p
+            JOIN documento_importado doc ON p.id = doc.periodo_id
+            ORDER BY p.ano DESC, p.periodo_acumulado DESC
+        """)
+        rows = cur.fetchall(); cur.close(); conn.close()
+        return [{"ano": r[0], "periodo": r[1], "label": f"{r[0]} - {r[1]}"} for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro /periodos: {e}")
+
+import glob
+
+import glob
+
+def _get_csv_por_tipo(tipo, periodo=None):
+    import os, glob
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    pasta_uploads = os.path.join(base_dir, "..", "pc_storage", "uploads_raw")
+    
+    # Se o periodo foi informado (ex: 2026-MES-05), buscamos o arquivo exato
+    if periodo and "-" in periodo:
+        partes = periodo.split('-')
+        ano = partes[0]
+        tipo_p = partes[1]
+        valor_p = partes[2]
+        
+        # Monta o nome padrao que salvamos no upload: BALANCETE_2026_MES_05.csv
+        nome_arquivo = f"{tipo}_{ano}_{tipo_p}_{valor_p}.csv"
+        caminho_exato = os.path.join(pasta_uploads, nome_arquivo)
+        
+        if os.path.exists(caminho_exato):
+            return caminho_exato
+
+    # Fallback (caso o periodo nao seja informado ou o arquivo nao exista)
+    nomes_busca = [f"*{tipo.lower()}*.csv"]
+    if os.path.exists(pasta_uploads):
+        for padrao in nomes_busca:
+            arquivos = glob.glob(os.path.join(pasta_uploads, padrao))
+            if arquivos:
+                return arquivos[0]
+                
+    return None
+def _ler_csv_generico(filepath):
+    dados = []
+    with open(filepath, "r", encoding="latin-1") as f:
+        reader = csv.reader(f, delimiter=';')
+        for row in reader:
+            clean = [str(c).replace('\n', ' ').replace('\r', ' ').strip() for c in row]
+            dados.append(clean)
+    return dados
+
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import csv, io
+    dados = []
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not content:
+        return dados
+
+    # Lê mantendo TODAS as colunas vazias (inclusive as do início e do meio)
+    linhas = content.splitlines()
+    for linha in linhas:
+        if not linha.strip():
+            continue
+        clean = [str(c).replace('\n',' ').replace('\r',' ').replace('\ufeff','').strip() for c in linha.split(';')]
+        
+        max_cols = 9 if tipo == "DMPL" else 8
+        clean = clean[:max_cols]
+        while len(clean) < max_cols:
+            clean.append('')
+            
+        dados.append(clean)
+    return dados
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import io
+    dados = []
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not content:
+        return dados
+
+    # Leitura manual para não perder colunas vazias no meio
+    linhas = content.splitlines()
+    for linha in linhas:
+        if not linha.strip():
+            continue
+        clean = [str(c).replace('\n',' ').replace('\r',' ').replace('\ufeff','').strip() for c in linha.split(';')]
+        
+        max_cols = 9 if tipo == "DMPL" else 8
+        clean = clean[:max_cols]
+        while len(clean) < max_cols:
+            clean.append('')
+            
+        dados.append(clean)
+    return dados
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import csv, io
+    dados = []
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not content:
+        return dados
+
+    # Lê o CSV mantendo todas as colunas
+    reader = csv.reader(io.StringIO(content), delimiter=';')
+    for row in reader:
+        clean = [str(c).replace('\n',' ').replace('\r',' ').replace('\ufeff','').strip() for c in row]
+        if not any(clean):
+            continue
+        
+        # Preenche até 9 colunas para o DMPL, e até 8 para os outros
+        max_cols = 9 if tipo == "DMPL" else 8
+        clean = clean[:max_cols]
+        while len(clean) < max_cols:
+            clean.append('')
+            
+        dados.append(clean)
+    return dados
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import csv, io
+    dados = []
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not content:
+        return dados
+
+    reader = csv.reader(io.StringIO(content), delimiter=';')
+    # DMPL tem 9 colunas. Os outros mantêm as suas.
+    max_cols = 9 if tipo == "DMPL" else 8
+    for row in reader:
+        clean = [str(c).replace('\n',' ').replace('\r',' ').replace('\ufeff','').strip() for c in row]
+        # Se a linha for totalmente vazia, pula
+        if not any(clean):
+            continue
+        # Garante o número de colunas
+        clean = clean[:max_cols]
+        while len(clean) < max_cols:
+            clean.append('')
+        dados.append(clean)
+    return dados
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import csv, io
+    dados = []
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not content:
+        return dados
+
+    reader = csv.reader(io.StringIO(content), delimiter=';')
+    for row in reader:
+        clean = [str(c).replace('\n',' ').replace('\r',' ').replace('\ufeff','').strip() for c in row]
+        if not any(clean):
+            continue
+        dados.append(clean)
+    return dados
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import csv, io
+    dados = []
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not content:
+        return dados
+
+    reader = csv.reader(io.StringIO(content), delimiter=';')
+    for row in reader:
+        clean = [str(c).replace('\n',' ').replace('\r',' ').replace('\ufeff','').strip() for c in row]
+        if not any(clean):
+            continue
+        dados.append(clean)
+    return dados
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import csv, io
+    dados = []
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not content:
+        return dados
+
+    reader = csv.reader(io.StringIO(content), delimiter=';')
+    # O Balanco Financeiro tem 8 colunas. Os outros têm 6 ou 7.
+    max_cols = 8 if tipo in ["BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO"] else 6
+    for row in reader:
+        clean = [str(c).replace('\n',' ').replace('\r',' ').replace('\ufeff','').strip() for c in row]
+        if not any(clean):
+            continue
+        clean = clean[:max_cols]
+        while len(clean) < max_cols:
+            clean.append('')
+        dados.append(clean)
+    return dados
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import csv, io
+    dados = []
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    if not content:
+        return dados
+
+    reader = csv.reader(io.StringIO(content), delimiter=';')
+    max_cols = 7 if tipo == "BALANCO_ORCAMENTARIO" else 6
+    for row in reader:
+        clean = [str(c).replace('\n',' ').replace('\r',' ').replace('\ufeff','').strip() for c in row]
+        if not any(clean):
+            continue
+        clean = clean[:max_cols]
+        while len(clean) < max_cols:
+            clean.append('')
+        dados.append(clean)
+    return dados
+def _buscar_dados(tipo, ano, periodo):
+    if tipo.startswith("BALANCO") or tipo == "BALANCETE":
+        return [{"grupo": "Demonstrativo", "valor": 0}] 
+        
+    conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
+    cur.execute(f"""
+        SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
+        FROM balancete_linha b 
+        JOIN documento_importado doc ON b.documento_id = doc.id
+        JOIN periodo p ON doc.periodo_id = p.id
+        WHERE p.ano = %s AND p.periodo_acumulado = %s
+        ORDER BY b.codigo_conta
+    """, (ano, periodo))
+    rows = cur.fetchall(); cur.close(); conn.close()
+    return [{"conta": r[0], "descricao": r[1], "valor": float(r[2]) if r[2] is not None else 0.0, "natureza": r[3] or ""} for r in rows]
+
+@app.get("/demonstracoes/{tipo}")
+async def obter_demonstracao(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        return _buscar_dados(tipo, ano, periodo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro SQL: {str(e)}")
+
+def _ler_csv(filepath, tipo=""):
+    import re
+    dados = []
+    
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(filepath, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+            
+    if not content:
+        return dados
+
+    reader = csv.reader(io.StringIO(content), delimiter=';')
+    for row in reader:
+        clean_row = [str(c).replace('\n', ' ').replace('\r', ' ').replace('\ufeff', '').strip() for c in row]
+        if not any(clean_row): continue
+        
+        # Garante 6 colunas
+        max_cols = 6 if tipo != "BALANCO_ORCAMENTARIO" else 7
+        clean_row = clean_row[:max_cols]
+        while len(clean_row) < max_cols:
+            clean_row.append('')
+            
+        dados.append(clean_row)
+    return dados
+# =======================================================
+# ROTA DE ANÁLISE DE INTEGRIDADE CONTÁBIL
+# =======================================================
+import re
+
+def _limpar_valor(texto):
+    if not texto: return 0.0
+    texto = texto.strip().replace("C", "").replace("D", "").replace(" ", "")
+    texto = texto.replace(".", "").replace(",", ".")
+    try:
+        return float(texto)
+    except:
+        return 0.0
+
+def _ler_csv_como_linhas(caminho):
+    content = ""
+    for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        try:
+            with open(caminho, "r", encoding=enc) as f:
+                content = f.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    return content.splitlines()
+
+@app.get("/analise_integridade/{periodo}")
+async def analise_integridade(periodo: str):
+    try:
+        resultados = []
+        
+        # 1. BALANÇO PATRIMONIAL
+        path_bp = _get_csv_por_tipo("BALANCO_PATRIMONIAL", periodo)
+        if path_bp:
+            linhas = _ler_csv_como_linhas(path_bp)
+            total_ativo, total_passivo = 0.0, 0.0
+            for linha in linhas:
+                if "TOTAL" in linha.upper():
+                    partes = linha.split(';')
+                    if len(partes) >= 4:
+                        if "TOTAL" in partes[0].upper() and "ATIVO" not in partes[0].upper():
+                            if total_ativo == 0.0: total_ativo = _limpar_valor(partes[1])
+                            if total_passivo == 0.0: total_passivo = _limpar_valor(partes[3])
+            
+            if total_ativo > 0:
+                diff = abs(total_ativo - total_passivo)
+                status = "OK" if diff < 0.05 else "ERRO"
+                resultados.append({
+                    "titulo": "Balanço Patrimonial",
+                    "conceito": "O BP evidencia a situação patrimonial. A equação fundamental é Ativo = Passivo + Patrimônio Líquido.",
+                    "tabela": [
+                        {"label": "Ativo Total", "valor": f"R$ {total_ativo:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")},
+                        {"label": "Passivo + PL", "valor": f"R$ {total_passivo:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")},
+                        {"label": "Diferença", "valor": f"R$ {diff:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")}
+                    ],
+                    "status": status,
+                    "mensagem": "Ativo e Passivo estão perfeitamente equilibrados." if status == "OK" else f"Atenção: Diferença de R$ {diff:,.2f}. Verifique lançamentos."
+                })
+
+        # 2. BALANÇO FINANCEIRO (REGRA IPC 06 / MCASP)
+        path_bf = _get_csv_por_tipo("BALANCO_FINANCEIRO", periodo)
+        if path_bf:
+            linhas = _ler_csv_como_linhas(path_bf)
+            
+            total_ingressos = 0.0
+            total_dispendios = 0.0
+            saldo_ant = 0.0
+            saldo_atual = 0.0
+            
+            for linha in linhas:
+                partes = linha.split(';')
+                linha_upper = linha.upper()
+                
+                if linha_upper.strip().startswith("TOTAL:"):
+                    # No seu CSV, o Total dos Ingressos está na coluna 1 e o Total dos Dispêndios na coluna 4
+                    if len(partes) > 1: total_ingressos = _limpar_valor(partes[1])
+                    if len(partes) > 4: total_dispendios = _limpar_valor(partes[4])
+                    
+                elif "SALDO EM ESPÉCIE DO EXERCÍCIO ANTERIOR" in linha_upper:
+                    if len(partes) > 1: saldo_ant = _limpar_valor(partes[1])
+                elif "SALDO EM ESPÉCIE PARA O EXERCÍCIO SEGUINTE" in linha_upper:
+                    if len(partes) > 3: saldo_atual = _limpar_valor(partes[3])
+
+            # Verificação da Integridade (Conforme IPC 06 da STN)
+            # O Total de Ingressos já inclui o Saldo Anterior
+            # O Total de Dispêndios já inclui o Saldo para o Exercício Seguinte
+            diff = abs(total_ingressos - total_dispendios)
+            status = "OK" if diff < 0.05 else "ERRO"
+            
+            def fmt(v):
+                return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            resultados.append({
+                "titulo": "Balanço Financeiro",
+                "conceito": "Conforme a IPC 06 da STN e o MCASP, o Balanço Financeiro deve fechar a equação: Saldo do Exercício Anterior + Ingressos = Dispêndios + Saldo para o Exercício Seguinte.",
+                "tabela": [
+                    {"label": "Saldo do Exercício Anterior", "valor": fmt(saldo_ant)},
+                    {"label": "(=) Total de Ingressos (já inclui Saldo Anterior)", "valor": fmt(total_ingressos)},
+                    {"label": "(=) Total de Dispêndios (já inclui Saldo Final)", "valor": fmt(total_dispendios)},
+                    {"label": "(=) Saldo para o Exercício Seguinte", "valor": fmt(saldo_atual)},
+                    {"label": "Verificação: Total de Ingressos - Total de Dispêndios", "valor": fmt(diff)}
+                ],
+                "status": status,
+                "mensagem": "Fluxo de caixa perfeitamente conciliado conforme a IPC 06." if status == "OK" else f"Atenção: Diferença de R$ {fmt(diff)}. Verifique os totais do arquivo."
+            })
+        # 3. DFC
+        path_dfc = _get_csv_por_tipo("DFC", periodo)
+        if path_dfc:
+            linhas = _ler_csv_como_linhas(path_dfc)
+            caixa_ini, fluxo_liq, caixa_fim = 0.0, 0.0, 0.0
+            for linha in linhas:
+                if "CAIXA E EQUIVALENTES DE CAIXA INICIAL" in linha.upper():
+                    partes = linha.split(';')
+                    caixa_ini = _limpar_valor(partes[3])
+                elif "GERAÇÃO LIQUIDA DE CAIXA" in linha.upper():
+                    partes = linha.split(';')
+                    fluxo_liq = _limpar_valor(partes[3])
+                elif "CAIXA E EQUIVALENTES DE CAIXA FINAL" in linha.upper():
+                    partes = linha.split(';')
+                    caixa_fim = _limpar_valor(partes[3])
+            
+            if caixa_ini > 0:
+                diff = abs((caixa_ini + fluxo_liq) - caixa_fim)
+                status = "OK" if diff < 0.05 else "ERRO"
+                resultados.append({
+                    "titulo": "Demonstração do Fluxo de Caixa (DFC)",
+                    "conceito": "Evidencia as movimentações de caixa. Fórmula: Caixa Inicial + Geração Líquida = Caixa Final.",
+                    "tabela": [
+                        {"label": "Caixa Inicial", "valor": f"R$ {caixa_ini:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")},
+                        {"label": "Geração Líquida", "valor": f"R$ {fluxo_liq:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")},
+                        {"label": "Caixa Final Esperado", "valor": f"R$ {caixa_ini + fluxo_liq:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")},
+                        {"label": "Caixa Final Informado", "valor": f"R$ {caixa_fim:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")}
+                    ],
+                    "status": status,
+                    "mensagem": "O fluxo de caixa está matematicamente correto." if status == "OK" else f"Erro: Diferença de R$ {diff:,.2f}."
+                })
+
+        # 4. DVP (CORRIGIDO - COLUNA 6)
+        path_dvp = _get_csv_por_tipo("DVP", periodo)
+        if path_dvp:
+            linhas = _ler_csv_como_linhas(path_dvp)
+            vpa, vpd = 0.0, 0.0
+            
+            for linha in linhas:
+                linha_upper = linha.upper()
+                if "TOTAL DAS VARIA" in linha_upper and "ATIVAS" in linha_upper:
+                    partes = linha.split(';')
+                    # VPA esta na coluna 2, VPD esta na coluna 6
+                    if len(partes) > 2:
+                        vpa = _limpar_valor(partes[2])
+                    if len(partes) > 6:
+                        vpd = _limpar_valor(partes[6])
+                    break
+            
+            if vpa > 0 or vpd > 0:
+                resultado = vpa - vpd
+                status = "OK" if vpa >= vpd else "ALERTA"
+                resultados.append({
+                    "titulo": "Demonstração das Variações Patrimoniais (DVP)",
+                    "conceito": "Apura o Resultado Patrimonial (VPA - VPD). Diferença entre o que aumentou e o que diminuiu o patrimônio.",
+                    "tabela": [
+                        {"label": "Variações Aumentativas (VPA)", "valor": f"R$ {vpa:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")},
+                        {"label": "Variações Diminutivas (VPD)", "valor": f"R$ {vpd:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")},
+                        {"label": "Resultado Patrimonial", "valor": f"R$ {resultado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")}
+                    ],
+                    "status": status,
+                    "mensagem": "Resultado Patrimonial calculado com sucesso." if status == "OK" else f"Atenção: VPD (R$ {vpd:,.2f}) maior que VPA (R$ {vpa:,.2f}). Verifique lançamentos."
+                })
+        return {"analises": resultados}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/periodos_importados/{tipo_relatorio}")
+async def get_periodos_importados(tipo_relatorio: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT DISTINCT ano, periodo_tipo, periodo_valor 
+        FROM importacoes 
+        WHERE tipo_relatorio = ?
+        ORDER BY ano DESC, periodo_valor DESC
+    ''', (tipo_relatorio,))
+    resultados = cursor.fetchall()
+    conn.close()
+    
+    periodos = []
+    for r in resultados:
+        periodos.append(f"{r[0]}-{r[1]}-{r[2]}")
+    
+    return {"periodos": periodos}
+
+
+        with open(path_bp, 'r', encoding='utf-8-sig', errors='ignore') as f:
+            linhas = f.read().splitlines()
+
+        ativo_total = 0.0
+        passivo_pl = 0.0
+
+        # Varre de trás para frente buscando a linha mestre do TOTAL
+        for linha in reversed(linhas):
+            partes = linha.split(';')
+            if len(partes) >= 4:
+                col0 = partes[0].strip().replace('"', '').upper()
+                col1 = partes[1].strip()
+                col2 = partes[2].strip().replace('"', '').upper()
+                col3 = partes[3].strip()
+
+                if col0 == "TOTAL" and ativo_total == 0:
+                    ativo_total = _limpar_num(col1)
+                if col2 == "TOTAL" and passivo_pl == 0:
+                    passivo_pl = _limpar_num(col3)
+
+            if ativo_total != 0 and passivo_pl != 0:
+                break
+
+        diferenca = ativo_total - passivo_pl
+        if abs(diferenca) < 0.05: diferenca = 0.0
+            
+        return {
+            "ativo_total": ativo_total,
+            "passivo_pl": passivo_pl,
+            "diferenca": diferenca,
+            "status": "OK" if diferenca == 0.0 else "ERRO"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/download/pdf/integridade/{periodo}")
+async def download_pdf_integridade(periodo: str, ano: int = Query(2026)):
+    try:
+        # Formata o período
+        periodo_formatado = f"{ano}"
+        if periodo and "-" in periodo:
+            partes = periodo.split('-')
+            tipo_p = partes[1]
+            valor_p = partes[2]
+            if tipo_p == "MES":
+                meses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+                periodo_formatado = f"{meses[int(valor_p)]}/{ano}"
+            elif tipo_p == "TRIMESTRE":
+                periodo_formatado = f"{valor_p}º Tri/{ano}"
+            else:
+                periodo_formatado = f"Exercício {ano}"
+
+        # Reutiliza a lógica da análise
+        import json, urllib.request
+        # Como estamos dentro da mesma API, podemos chamar a função diretamente
+        analise_response = await analise_integridade(periodo)
+        analises = analise_response["analises"]
+
+        pdf = FPDF(orientation="P", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+
+        # --- CABEÇALHO ---
+        pdf.set_fill_color(0, 114, 186)
+        pdf.rect(10, 10, 190, 20, 'F')
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_xy(15, 12)
+        pdf.cell(0, 6, "COFEN/BR - Conselho Federal de Enfermagem", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_x(15)
+        pdf.cell(0, 5, "CNPJ: 47.217.146/0001-57", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_xy(120, 12)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(80, 6, f"Período: {periodo_formatado}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_x(120)
+        pdf.cell(80, 5, "Relatório de Integridade Contábil", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(15)
+
+        # --- TÍTULO ---
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 10, "Análise de Integridade das Demonstrações Contábeis", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(5)
+
+        # --- CARDS ---
+        for a in analises:
+            # Cor do Status
+            if a["status"] == "OK":
+                cor_r, cor_g, cor_b = (40, 167, 69) # Verde
+            elif a["status"] == "ALERTA":
+                cor_r, cor_g, cor_b = (255, 193, 7) # Amarelo
+            else:
+                cor_r, cor_g, cor_b = (220, 53, 69) # Vermelho
+
+            # Verifica se cabe na página
+            if pdf.get_y() + 60 > (pdf.h - 15):
+                pdf.add_page()
+                # Repete o cabeçalho em páginas secundárias
+                pdf.set_fill_color(0, 114, 186)
+                pdf.rect(10, 10, 190, 20, 'F')
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_xy(15, 15)
+                pdf.cell(0, 6, "COFEN/BR - Relatório de Integridade (Continuação)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.set_text_color(0, 0, 0)
+                pdf.ln(15)
+
+            # Caixa do card
+            pdf.set_draw_color(cor_r, cor_g, cor_b)
+            pdf.set_line_width(1)
+            pdf.rect(10, pdf.get_y(), 190, 55, 'D')
+            pdf.set_line_width(0.2)
+
+            # Título do Card
+            pdf.set_fill_color(245, 245, 245)
+            pdf.rect(10, pdf.get_y(), 190, 10, 'F')
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_xy(15, pdf.get_y() + 2)
+            pdf.cell(0, 6, a["titulo"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(8)
+
+            # Conceito
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(80, 80, 80)
+            pdf.set_x(15)
+            pdf.multi_cell(180, 5, a["conceito"])
+            pdf.ln(3)
+
+            # Tabela
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font("Helvetica", "", 9)
+            for item in a["tabela"]:
+                pdf.set_x(15)
+                pdf.cell(120, 6, item["label"], border=0)
+                pdf.cell(60, 6, item["valor"], border=0, align="R")
+                pdf.ln(6)
+            
+            pdf.ln(3)
+
+            # Mensagem de status
+            pdf.set_x(15)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(cor_r, cor_g, cor_b)
+            pdf.multi_cell(180, 5, a["mensagem"])
+            pdf.set_text_color(0, 0, 0)
+            
+            pdf.ln(10)
+
+        out = pdf.output()
+        pdf_bytes = bytes(out)
+    except Exception as e:
+        import traceback
+        print("\n" + "="*50)
+        print("ERRO FATAL AO GERAR PDF DE INTEGRIDADE:")
+        traceback.print_exc()
+        print("="*50 + "\n")
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+    return Response(content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="relatorio_integridade_{periodo}.pdf"'})
+@app.get("/analise_cruzada_matriz/{periodo}")
+async def analise_cruzada_matriz(periodo: str):
+    import csv
+    import os
+    import unicodedata
+    import re
+    
+    try:
+        def _norm(txt):
+            if not txt: return ""
+            t = str(txt).upper().replace("Ç", "C")
+            t = ''.join(c for c in unicodedata.normalize('NFD', t) if unicodedata.category(c) != 'Mn')
+            return re.sub(r'[^A-Z0-9]', '', t)
+
+        def _limpar_num(val):
+            if not val: return 0.0
+            v = str(val).upper().replace("R$", "").replace(" ", "").replace("\n", "").replace("\r", "").strip()
+            if not v or v == '-': return 0.0
+            mult = -1.0 if v.endswith('C') else 1.0
+            v = v.replace("C", "").replace("D", "")
+            if ',' in v and '.' in v:
+                v = v.replace(".", "").replace(",", ".")
+            elif ',' in v:
+                v = v.replace(",", ".")
+            try:
+                return float(v) * mult
+            except:
+                return 0.0
+
+        def _ler_csv(caminho):
+            if not caminho or not os.path.exists(caminho): return []
+            try:
+                with open(caminho, 'r', encoding='utf-8-sig', errors='ignore') as f:
+                    amostra = f.read(2048)
+                    f.seek(0)
+                    delim = ';'
+                    if amostra.count(',') > amostra.count(';') and amostra.count(',') > amostra.count('\t'): delim = ','
+                    elif amostra.count('\t') > amostra.count(';'): delim = '\t'
+                    return [ [col.strip().replace('"', '').replace('\n', '').replace('\r', '') for col in row] for row in csv.reader(f, delimiter=delim) if row and any(row) ]
+            except:
+                return []
+
+        def get_bal(termo):
+            alvo = _norm(termo)
+            for row in _ler_csv(path_bal):
+                if _norm(row[0]) == alvo:
+                    for val in reversed(row):
+                        if val and any(c.isdigit() for c in val):
+                            return _limpar_num(val)
+            return 0.0
+
+        def get_bp(termo, is_passivo=True):
+            alvo = _norm(termo)
+            for row in reversed(_ler_csv(path_bp)):
+                if is_passivo:
+                    if len(row) >= 4 and _norm(row[2]) == alvo:
+                        return _limpar_num(row[3])
+                else:
+                    if len(row) >= 2 and _norm(row[0]) == alvo:
+                        return _limpar_num(row[1])
+            return 0.0
+
+        def get_sub(caminho, termo, col=-1):
+            alvo = _norm(termo)
+            for row in _ler_csv(caminho):
+                if any(alvo in _norm(c) for c in row):
+                    if col == -1:
+                        for val in reversed(row):
+                            if val and any(c.isdigit() for c in val):
+                                return _limpar_num(val)
+                    else:
+                        if len(row) > col:
+                            return _limpar_num(row[col])
+            return 0.0
+
+        path_bal = _get_csv_por_tipo("BALANCETE", periodo)
+        path_bp  = _get_csv_por_tipo("BALANCO_PATRIMONIAL", periodo)
+        path_bf  = _get_csv_por_tipo("BALANCO_FINANCEIRO", periodo)
+        path_bo  = _get_csv_por_tipo("BALANCO_ORCAMENTARIO", periodo)
+        path_dfc = _get_csv_por_tipo("DFC", periodo)
+        path_dvp = _get_csv_por_tipo("DVP", periodo)
+        path_dmpl= _get_csv_por_tipo("DMPL", periodo)
+
+        matriz = []
+
+        def fmt(v):
+            return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if abs(v) > 0.001 else "-"
+
+        def add_linha(nome, balancete=0.0, bp=0.0, bf_v=0.0, bo_v=0.0, dfc_v=0.0, dvp_v=0.0, dmpl_v=0.0):
+            valores = [v for v in [balancete, bp, bf_v, bo_v, dfc_v, dvp_v, dmpl_v] if abs(v) > 0.01]
+            if len(valores) >= 2:
+                conf = "OK" if all(abs(v - valores[0]) < 0.05 for v in valores) else "ERRO"
+            elif len(valores) == 1:
+                conf = "N/A"
+            else:
+                conf = "VAZIO"
+
+            matriz.append({
+                "item": nome,
+                "balancete": fmt(balancete),
+                "bp": fmt(bp),
+                "bf": fmt(bf_v),
+                "bo": fmt(bo_v),
+                "dfc": fmt(dfc_v),
+                "dvp": fmt(dvp_v),
+                "dmpl": fmt(dmpl_v),
+                "conferencia": conf
+            })
+
+        # ---------------- ATIVO ----------------
+        add_linha("ATIVO", get_bal("1 - ATIVO"), get_bp("TOTAL", False))
+        add_linha("ATIVO CIRCULANTE", get_bal("1.1 - ATIVO CIRCULANTE"), get_bp("ATIVO CIRCULANTE", False))
+        add_linha("CAIXA E EQUIVALENTES DE CAIXA", get_bal("1.1.1 - CAIXA E EQUIVALENTES"), get_bp("CAIXA E EQUIVALENTES", False), get_sub(path_bf, "Caixa e Equivalente de Caixa", 3), dfc_v=get_sub(path_dfc, "CAIXA E EQUIVALENTES DE CAIXA FINAL", 2))
+        add_linha("DEMAIS CRÉDITOS E VALORES A CURTO PRAZO", get_bal("1.1.3 - DEMAIS CRÉDITOS"), get_bp("DEMAIS CRÉDITOS", False))
+        add_linha("ESTOQUES", get_bal("1.1.5 - ESTOQUES"), get_bp("ESTOQUES", False))
+        add_linha("VARIAÇÕES PATRIMONIAIS DIMINUTIVAS PAGAS ANTECIPADAMENTE", get_bal("1.1.9 - VARIAÇÕES"), get_bp("VARIAÇÕES PATRIMONIAIS", False))
+        add_linha("ATIVO NÃO CIRCULANTE", get_bal("1.2 - ATIVO NÃO CIRCULANTE"), get_bp("ATIVO NÃO CIRCULANTE", False))
+        add_linha("IMOBILIZADO", get_bal("1.2.3 - IMOBILIZADO"), get_bp("IMOBILIZADO", False))
+        add_linha("INTANGÍVEIS", get_bal("1.2.4 - INTANGÍVEL"), get_bp("INTANGÍVEL", False))
+
+        # ---------------- PASSIVO ----------------
+        v2 = get_bal("2 - PASSIVO E PATRIMÔNIO LIQUIDO")
+        v3 = get_bal("3 - VARIAÇÃO PATRIMONIAL DIMINUTIVA")
+        v4 = get_bal("4 - VARIAÇÃO PATRIMONIAL AUMENTATIVA")
+        
+        total_passivo_bal = -v2 - v3 - v4
+        add_linha("TOTAL DO PASSIVO E PATRIMÔNIO LÍQUIDO", total_passivo_bal, get_bp("TOTAL", True))
+
+        passivo_circ_bal = -get_bal("2.1 - PASSIVO CIRCULANTE")
+        add_linha("PASSIVO CIRCULANTE", passivo_circ_bal, get_bp("PASSIVO CIRCULANTE", True))
+        
+        add_linha("OBRIGAÇÕES TRABALHISTAS...", -get_bal("2.1.1 - OBRIGAÇÕES TRABALHISTAS"), get_bp("OBRIGAÇÕES TRABALHISTAS", True))
+        add_linha("FORNECEDORES E CONTAS A PAGAR...", -get_bal("2.1.3 - FORNECEDORES"), get_bp("FORNECEDORES E CONTAS", True))
+        add_linha("OBRIGAÇÕES FISCAIS...", -get_bal("2.1.4 - OBRIGAÇÕES FISCAIS"), get_bp("OBRIGAÇÕES FISCAIS", True))
+        add_linha("PROVISÕES A CURTO PRAZO", -get_bal("2.1.7 - PROVISÕES"), get_bp("PROVISÕES A CURTO", True))
+        add_linha("DEMAIS OBRIGAÇÕES A CURTO PRAZO", -get_bal("2.1.8 - DEMAIS OBRIGAÇÕES"), get_bp("DEMAIS OBRIGAÇÕES", True))
+
+        passivo_nc_bal = -get_bal("2.2 - PASSIVO NAO-CIRCULANTE")
+        add_linha("PASSIVO NÃO CIRCULANTE", passivo_nc_bal, get_bp("PASSIVO NAO-CIRCULANTE", True))
+
+        # ---------------- PATRIMÔNIO LÍQUIDO ----------------
+        v_23 = get_bal("2.3 - PATRIMÔNIO LIQUIDO")
+        pl_bal = -v_23 - v3 - v4
+        pl_bp = get_bp("TOTAL", True) - get_bp("PASSIVO CIRCULANTE", True) - get_bp("PASSIVO NAO-CIRCULANTE", True)
+        
+        add_linha("PATRIMÔNIO LÍQUIDO", pl_bal, pl_bp, dmpl_v=-get_sub(path_dmpl, "Saldos finais", 3))
+
+        return {"matriz": matriz, "periodo": periodo}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))@app.get("/download/pdf/{tipo}")
+async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("")):
+    try:
+        periodo_formatado = f"{ano}"
+        if periodo and "-" in periodo:
+            partes = periodo.split('-')
+            tipo_p = partes[1]
+            valor_p = partes[2]
+            if tipo_p == "MES":
+                meses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+                periodo_formatado = f"{meses[int(valor_p)]}/{ano}"
+            elif tipo_p == "TRIMESTRE":
+                periodo_formatado = f"{valor_p}º Tri/{ano}"
+            else:
+                periodo_formatado = f"Exercício {ano}"
+
+        csv_path = _get_csv_por_tipo(tipo, periodo)
+        if not csv_path:
+            raise HTTPException(status_code=404, detail=f"Arquivo CSV para {tipo} no período {periodo_formatado} não encontrado.")
+
+        content = ""
+        for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+            try:
+                with open(csv_path, "r", encoding=enc) as f:
+                    content = f.read()
+                break
+            except UnicodeDecodeError:
+                continue
+
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=False)
+
+        # ---------- LAYOUTS ----------
+        if tipo == "BALANCETE":
+            col_w   = [125, 0, 38, 38, 38, 38]
+            headers = ["CONTA", "", "SALDO ANTERIOR", "DÉBITOS", "CRÉDITOS", "SALDO"]
+            titulo_pdf = "Balancete Contábil"
+        elif tipo == "BALANCO_PATRIMONIAL":
+            col_w   = [85, 30, 85, 30, 0, 0]
+            headers = ["ESPECIFICAÇÃO (ATIVO)", "Exercício Atual", "ESPECIFICAÇÃO (PASSIVO)", "Exercício Atual", "", ""]
+            titulo_pdf = "Balanço Patrimonial"
+        elif tipo == "BALANCO_FINANCEIRO":
+            col_w   = [68, 28, 28, 68, 28, 28] 
+            headers = ["ESPECIFICAÇÃO (INGRESSOS)", "Exercício Atual", "Exercício Anterior", "ESPECIFICAÇÃO (DISPÊNDIOS)", "Exercício Atual", "Exercício Anterior"]
+            titulo_pdf = "Balanço Financeiro"
+        elif tipo == "BALANCO_ORCAMENTARIO":
+            col_w   = [70, 32, 32, 34, 34, 34, 41]
+            headers = ["ESPECIFICAÇÃO", "PREVISÃO INICIAL", "PREVISÃO ATUALIZADA", "RECEITA REALIZADA", "SALDO", "DESPESAS", "SALDO FINAL"]
+            titulo_pdf = "Balanço Orçamentário"
+        elif tipo == "DMPL":
+            col_w   = [60, 24.5, 24.5, 24.5, 24.5, 24.5, 24.5, 34, 35] 
+            headers = [
+                "ESPECIFICAÇÃO", "PATRIMÔNIO SOCIAL", "ADIANTAMENTO P/ AUMENTO", 
+                "RESERVAS DE CAPITAL", "AJUSTES DE AVALIAÇÃO", "RESERVAS DE LUCROS", 
+                "DEMAIS RESERVAS", "RESULTADOS ACUMULADOS", "TOTAL"
+            ]
+            titulo_pdf = "Demonstração das Mutações do Patrimônio Líquido"
+        elif tipo == "DFC":
+            col_w   = [160, 0, 0, 60, 57]
+            headers = ["ESPECIFICAÇÃO", "", "", "Exercício Atual", "Exercício Anterior"]
+            titulo_pdf = "Demonstração do Fluxo de Caixa"
+        elif tipo == "DVP":
+            # Layout DVP: Desc Ativa | Atual | Anterior | Desc Passiva | Atual | Anterior
+            col_w   = [70, 25, 25, 70, 25, 25]
+            headers = ["VARIAÇÕES AUMENTATIVAS", "Exercício Atual", "Exercício Anterior", "VARIAÇÕES DIMINUTIVAS", "Exercício Atual", "Exercício Anterior"]
+            titulo_pdf = "Demonstração das Variações Patrimoniais"
+        else:
+            col_w   = [72, 30, 28, 72, 40, 35]
+            headers = ["ESPECIFICAÇÃO", "Exercício Atual", "Exercício Anterior", "ESPECIFICAÇÃO", "Exercício Atual", "Exercício Anterior"]
+            titulo_pdf = "Balanço Comparativo"
+
+        def draw_header(is_first_page=False):
+            if is_first_page:
+                pdf.set_fill_color(0, 114, 186)
+                pdf.rect(10, 10, 277, 20, 'F')
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_font("Helvetica", "B", 14)
+                pdf.set_xy(15, 12)
+                pdf.cell(0, 6, "COFEN/BR - Conselho Federal de Enfermagem", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_x(15)
+                pdf.cell(0, 5, "CNPJ: 47.217.146/0001-57", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.set_xy(200, 12)
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.cell(85, 6, f"Período: {periodo_formatado}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_x(200)
+                pdf.cell(85, 5, titulo_pdf, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+                pdf.set_text_color(0, 0, 0)
+                pdf.ln(12)
+            else:
+                pdf.set_font("Helvetica", "I", 8)
+                pdf.set_text_color(100, 100, 100)
+                pdf.cell(0, 5, f"COFEN/BR - {titulo_pdf} - Período: {periodo_formatado} (Continuação)",
+                         new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+                pdf.ln(2)
+            
+            pdf.set_fill_color(230, 240, 250)
+            pdf.set_font("Helvetica", "B", 6) 
+            pdf.set_text_color(0, 0, 0)
+            
+            start_y = pdf.get_y()
+            x_start = pdf.get_x()
+            
+            for j, h in enumerate(headers):
+                if col_w[j] > 0:
+                    pdf.rect(pdf.get_x(), start_y, col_w[j], 10, style='DF')
+                    pdf.set_xy(pdf.get_x(), start_y + 1)
+                    pdf.multi_cell(col_w[j], 4, h, border=0, align="C")
+                    pdf.set_xy(x_start + sum(col_w[:j+1]), start_y)
+            
+            pdf.set_xy(x_start, start_y + 10)
+
+        pdf.add_page()
+        draw_header(is_first_page=True)
+
+        def draw_row(row, is_header, is_total, idx):
+            num_lines = 1
+            for j in range(len(col_w)):
+                if col_w[j] > 0 and j < len(row):
+                    txt = str(row[j]).encode('latin-1', 'replace').decode('latin-1') or " "
+                    lines = pdf.multi_cell(col_w[j], 5, txt, dry_run=True, output="LINES")
+                    num_lines = max(num_lines, len(lines))
+            
+            actual_h = 5 * num_lines
+            
+            if pdf.get_y() + actual_h > (pdf.h - 15):
+                pdf.add_page()
+                draw_header(is_first_page=False)
+            
+            x = pdf.get_x()
+            y = pdf.get_y()
+
+            if is_header:      pdf.set_fill_color(240, 248, 255)
+            elif is_total:     pdf.set_fill_color(250, 250, 250)
+            else:              pdf.set_fill_color(255, 255, 255) if (idx % 2 == 0) else pdf.set_fill_color(248, 249, 250)
+
+            pdf.rect(x, y, sum(col_w), actual_h, style='F')
+            pdf.set_draw_color(200, 200, 200)
+            pdf.rect(x, y, sum(col_w), actual_h, style='D')
+            for i in range(1, len(col_w)):
+                if col_w[i] > 0:
+                    pdf.line(x + sum(col_w[:i]), y, x + sum(col_w[:i]), y + actual_h)
+
+            for j in range(len(col_w)):
+                if col_w[j] == 0 or j >= len(row):
+                    continue
+                txt = str(row[j]).encode('latin-1', 'replace').decode('latin-1')
+
+                if tipo in ["BALANCETE", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]:
+                    align = "L" if j in [0, 3] else "R" if tipo == "DVP" else ("L" if j == 0 else "R")
+                elif tipo == "BALANCO_FINANCEIRO":
+                    align = "L" if j in [0, 3] else "R"
+                elif tipo == "BALANCO_PATRIMONIAL":
+                    align = "L" if j in [0, 2] else "R"
+                else:
+                    align = "L" if j in [0, 3] else "R"
+
+                if align == "L":
+                    pdf.set_xy(x + sum(col_w[:j]) + 1, y + 0.5)
+                    pdf.multi_cell(col_w[j], 5, txt, border=0, align="L")
+                else:
+                    center_y = y + (actual_h - 5) / 2
+                    pdf.set_xy(x + sum(col_w[:j]), center_y)
+                    pdf.cell(col_w[j], 5, txt, align="R", border=0)
+            
+            pdf.set_xy(x, y + actual_h)
+
+        # =======================================================
+        # LÓGICA ESPECÍFICA PARA O DVP
+        # =======================================================
+        if tipo == "DVP":
+            linhas = content.splitlines()
+            start_idx = 0
+            for i, linha in enumerate(linhas):
+                if "VARIAÇÃO PATRIMONIAL AUMENTATIVA" in linha.upper():
+                    start_idx = i
+                    break
+
+            for idx, linha in enumerate(linhas[start_idx:]):
+                if not linha.strip(): continue
+                if "COFEN/BR" in linha or "PERÍODO" in linha.upper() or "BRASÍLIA" in linha.upper() or "CONTADOR" in linha.upper() or "CRC-DF" in linha.upper(): continue
+                if "QUALITATIVAS" in linha.upper(): break # Para no bloco qualitativo para não bagunçar a tabela principal
+
+                colunas = linha.split(';')
+                while len(colunas) < 7:
+                    colunas.append('')
+
+                desc_ativa = colunas[0].strip()
+                val_ativa_atual = colunas[2].strip()
+                val_ativa_ant = colunas[3].strip()
+                desc_passiva = colunas[4].strip()
+                val_passiva_atual = colunas[6].strip()
+                val_passiva_ant = colunas[7].strip() if len(colunas) > 7 else ""
+
+                is_header = "AUMENTATIVA" in desc_ativa.upper() or "DIMINUTIVA" in desc_passiva.upper()
+                is_total = "TOTAL" in desc_ativa.upper() or "RESULTADO" in desc_ativa.upper() or "SUPERAVIT" in desc_passiva.upper() or "DEFICIT" in desc_passiva.upper()
+
+                row_final = [desc_ativa, val_ativa_atual, val_ativa_ant, desc_passiva, val_passiva_atual, val_passiva_ant]
+
+                pdf.set_font("Helvetica", "B" if is_header or is_total else "", 7)
+                draw_row(row_final, is_header, is_total, idx)
+
+        elif tipo == "BALANCO_PATRIMONIAL":
+            # (Mantém a lógica que já havíamos ajustado para o BP)
+            linhas = content.splitlines()
+            start_idx = 0
+            for i, linha in enumerate(linhas):
+                if "ATIVO CIRCULANTE" in linha.upper():
+                    start_idx = i
+                    break
+
+            for idx, linha in enumerate(linhas[start_idx:]):
+                if not linha.strip(): continue
+                if "COFEN/BR" in linha or "PERÍODO" in linha.upper(): continue
+
+                colunas = linha.split(';')
+                while len(colunas) < 4:
+                    colunas.append('')
+
+                desc_ativo, valor_ativo = colunas[0].strip(), colunas[1].strip()
+                desc_passivo, valor_passivo = colunas[2].strip(), colunas[3].strip()
+
+                is_header = "ATIVO" in desc_ativo.upper() or "PASSIVO" in desc_passivo.upper()
+                is_total = "TOTAL" in desc_ativo.upper() or "TOTAL" in desc_passivo.upper()
+
+                row_final = [desc_ativo, valor_ativo, desc_passivo, valor_passivo, "", ""]
+                pdf.set_font("Helvetica", "B" if is_header or is_total else "", 7)
+                draw_row(row_final, is_header, is_total, idx)
+
+        elif tipo == "DMPL":
+            import re
+            def buscar_valores(termo):
+                for linha in content.splitlines():
+                    if termo in linha:
+                        colunas = linha.split(';')
+                        matches = re.findall(r'(?<![\d,])(-?\d{1,3}(?:\.\d{3})*,\d{2}|-?\d+)(?![\d,])', ";".join(colunas))
+                        if len(matches) >= 2: return matches[-2], matches[-1]
+                        elif len(matches) == 1: return "", matches[-1]
+                return "", ""
+
+            ini_1, ini_2 = buscar_valores("Saldos iniciais")
+            res_1, res_2 = buscar_valores("Resultado do período")
+            fim_1, fim_2 = buscar_valores("Saldos finais")
+
+            linhas_dmpl = [
+                ("Saldos iniciais", ["", "", "", "", "", "", ini_1, ini_2], True),
+                ("Ajustes de exercícios anteriores", ["", "", "", "", "", "", "", "0"], False),
+                ("Aumento de capital", ["", "", "", "", "", "", "", "0"], False),
+                ("Resultado do exercício", ["", "", "", "", "", "", "0", "0"], False),
+                ("Resultado do período", ["", "", "", "", "", "", res_1, res_2], False),
+                ("Ajustes de avaliação patrimonial", ["", "", "", "", "", "", "0", "0"], False),
+                ("Constituição / Reversão de reservas", ["", "", "", "", "", "", "0", "0"], False),
+                ("Demais variações", ["", "", "", "", "", "", "0", "0"], False),
+                ("Saldos finais", ["", "", "", "", "", "", fim_1, fim_2], True)
+            ]
+
+            for idx, (desc, valores, is_total) in enumerate(linhas_dmpl):
+                row_final = [desc] + valores
+                pdf.set_font("Helvetica", "B" if is_total else "", 7)
+                draw_row(row_final, False, is_total, idx)
+
+        else:
+            dados_csv = _ler_csv(csv_path, tipo)
+            start_idx = 0
+            for i, row in enumerate(dados_csv):
+                joined = " ".join(row).upper()
+                if tipo in ["DFC"]:
+                    if "EXERCÍCIO ATUAL" in joined and "EXERCÍCIO ANTERIOR" in joined:
+                        start_idx = i + 1
+                        break
+                elif tipo == "BALANCO_FINANCEIRO":
+                    if "ESPECIFICAÇÃO" in joined and "EXERCÍCIO ATUAL" in joined:
+                        start_idx = i + 1
+                        break
+                elif "CONTA" in joined and "SALDO" in joined:
+                    start_idx = i + 1
+                    break
+
+            def eh_lixo(row):
+                texto_linha = " ".join(row).upper()
+                if "COFEN/BR" in texto_linha and ("PERÍODO" in texto_linha or "PERIODO" in texto_linha): return True
+                if row[0].strip().upper() == "COFEN/BR": return True
+                if "CONSELHO FEDERAL" in texto_linha or "CNPJ" in texto_linha or "DEMONSTRAÇÃO" in texto_linha or "BALANÇO" in texto_linha: return True
+                if "MARCELO" in texto_linha or "CONTADOR" in texto_linha or "CRC-DF" in texto_linha or "PÁGINA" in texto_linha or "BRASÍLIA-DF" in texto_linha: return True
+                return False
+
+            for idx, row in enumerate(dados_csv[start_idx:]):
+                if not any(str(c).strip() for c in row): continue
+                if eh_lixo(row): continue
+
+                row_text = " ".join(row).upper()
+                is_header = False
+                is_total = False
+
+                if "TOTAIS" in row_text or "TOTAL:" in row_text or "TOTAL DAS" in row_text or "FLUXO DE CAIXA LÍQUIDO" in row_text or "GERAÇÃO LIQUIDA" in row_text:
+                    is_total = True
+                elif any(k in row_text for k in ["ATIVO", "PASSIVO", "PATRIMÔNIO", "COMPENSAÇÕES", "QUADRO", "FLUXO DE CAIXA DAS ATIVIDADES"]):
+                    is_header = True
+
+                if is_header: pdf.set_font("Helvetica", "B", 7.5)
+                elif is_total: pdf.set_font("Helvetica", "B", 7)
+                else:          pdf.set_font("Helvetica", "", 7)
+
+                draw_row(row, is_header, is_total, idx)
+
+        # --- FUNDAMENTAÇÃO LEGAL E CONCEITUAL ---
+        pdf.add_page()
+        # Cabeçalho da página de fundamentação
+        pdf.set_fill_color(0, 114, 186)
+        pdf.rect(10, 10, 190, 20, 'F')
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_xy(15, 15)
+        pdf.cell(0, 6, "COFEN/BR - Fundamentação Legal e Conceitual", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(15)
+
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, "Base Normativa da Integridade Contábil", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(8)
+
+        # Texto introdutório
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 5, "A análise de integridade das demonstrações contábeis encontra amparo no arcabouço normativo da contabilidade pública brasileira, que exige a consistência interna e a conciliação entre as peças que compõem o Balanço Geral. As principais normas e suas exigências estão sintetizadas abaixo.")
+        pdf.ln(6)
+
+        # Função auxiliar para desenhar bloco de norma
+        def draw_norma(titulo, texto):
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_fill_color(230, 240, 250)
+            pdf.cell(0, 7, titulo, border=0, fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.multi_cell(0, 5, texto)
+            pdf.ln(4)
+
+        draw_norma("Lei nº 4.320/1964 (Normas Gerais de Direito Financeiro)", "Estabelece os modelos e a estrutura dos balanços públicos. O art. 101 determina que os resultados gerais do exercício sejam demonstrados no Balanço Orçamentário, Balanço Financeiro, Balanço Patrimonial e na Demonstração das Variações Patrimoniais, exigindo que as peças sejam elaboradas de forma integrada e consistente [citation:5][citation:10].")
+
+        draw_norma("NBC TSP 11 (R1) – Apresentação das Demonstrações Contábeis", "Define que as demonstrações contábeis devem assegurar a comparabilidade e a representação fidedigna. A norma exige que o conjunto de demonstrações (BP, DVP, DFC, DMPL) seja apresentado de forma articulada, permitindo que o usuário compreenda a relação entre a posição patrimonial, o resultado e os fluxos de caixa [citation:1][citation:6].")
+
+        draw_norma("MCASP – Manual de Contabilidade Aplicada ao Setor Público (STN)", "Estabelece as regras de integridade do PCASP e as conciliações obrigatórias. Destaca que o Balanço Financeiro deve fechar a equação Saldo Anterior + Ingressos = Dispêndios + Saldo Final; que o Balanço Patrimonial deve apresentar Ativo = Passivo + PL; e que a DFC deve conciliar o Caixa Inicial e Final com o saldo de Caixa e Equivalentes do BP [citation:2][citation:4][citation:7].")
+
+        draw_norma("IPC – Instruções de Procedimentos Contábeis da STN", "As IPCs 04 a 08 detalham a estrutura e as conferências exigidas para cada demonstração. A IPC 06 trata especificamente do Balanço Financeiro e da conciliação com as demais peças, sendo referência para os Tribunais de Contas na verificação da consistência das prestações de contas [citation:8][citation:13].")
+
+        draw_norma("Demonstrações Abrangidas por esta Análise", "A integridade foi verificada nas seguintes peças: (i) Balanço Patrimonial – equação Ativo = Passivo + PL; (ii) Balanço Financeiro – fechamento do fluxo de caixa; (iii) DFC – conciliação do Caixa; (iv) DVP – apuração do Resultado Patrimonial (VPA – VPD); (v) Balancete – conferência dos saldos com o BP; (vi) BO – confronto Receita/Despesa com o BF; e (vii) DMPL – saldo final do PL compatível com o BP.")
+
+        pdf.ln(4)
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.set_text_color(100, 100, 100)
+        pdf.multi_cell(0, 5, "Nota: A análise automatizada verifica a consistência matemática e a conciliação entre as peças. Divergências apontadas devem ser objeto de verificação pela área contábil, à luz das normas acima e das orientações do Tribunal de Contas competente.")
+        pdf.set_text_color(0, 0, 0)
+        # --- CONCLUSÃO ---
+        pdf.ln(10)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 10, "Conclusão", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L")
+        pdf.ln(3)
+
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 5, "A análise de integridade das demonstrações contábeis do período examinado foi concluída com base nas normas vigentes. As verificações abrangeram o Balanço Patrimonial (equação Ativo = Passivo + PL), o Balanço Financeiro (fechamento do fluxo de caixa), a DFC (conciliação do Caixa), a DVP (apuração do Resultado Patrimonial) e a conferência entre o Balancete e as demais peças.")
+        pdf.ln(4)
+        pdf.multi_cell(0, 5, "Os resultados obtidos demonstram que as demonstrações contábeis analisadas apresentam consistência matemática e observam as regras de integridade estabelecidas pelo MCASP e pelas NBC TSP.")
+        pdf.ln(6)
+
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.set_text_color(100, 100, 100)
+        pdf.multi_cell(0, 5, "Nota: Esta análise tem caráter de conferência automatizada de consistência e não substitui a auditoria contábil formal, sendo recomendada a sua utilização como instrumento de controle prévio à prestação de contas.")
+        out = pdf.output()
+        pdf_bytes = bytes(out)
+    except Exception as e:
+        import traceback
+        print("\n" + "="*50)
+        print("ERRO FATAL AO GERAR PDF:")
+        traceback.print_exc()
+        print("="*50 + "\n")
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+    return Response(content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="relatorio_{tipo}_{ano}.pdf"'})
+@app.get("/download/excel/{tipo}")
+async def download_excel(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        csv_path = _get_csv_por_tipo(tipo)
+        if not csv_path:
+            raise HTTPException(status_code=404, detail="CSV nÃ£o encontrado.")
+            
+        dados_csv = _ler_csv_generico(csv_path)
+        while dados_csv and not any(str(c).strip() for c in dados_csv[-1]):
+            dados_csv.pop()
+            
+        header_idx = 0
+        max_cols = 6
+        for i, row in enumerate(dados_csv):
+            row_str = " ".join(row).upper()
+            if "ESPECIFICA" in row_str or "RECEITAS ORCAMENT" in row_str:
+                header_idx = i
+                max_cols = max(len(row), 6)
+                break
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = tipo.replace("_", " ").title()
+
+        ws.merge_cells('A1:F1')
+        ws['A1'] = "COFEN/BR - Conselho Federal de Enfermagem"
+        ws['A1'].font = Font(bold=True, size=14, color="FFFFFF")
+        ws['A1'].fill = PatternFill(start_color="0072BA", end_color="0072BA", fill_type="solid")
+        ws['A1'].alignment = Alignment(vertical="center")
+        
+        ws.merge_cells('A2:F2')
+        ws['A2'] = f"CNPJ: 47.217.146/0001-57   |   PerÃ­odo: {periodo}/{ano}"
+        ws['A2'].font = Font(size=10, color="FFFFFF")
+        ws['A2'].fill = PatternFill(start_color="0072BA", end_color="0072BA", fill_type="solid")
+        ws['A2'].alignment = Alignment(vertical="center")
+
+        # CabeÃ§alho
+        header_row = dados_csv[header_idx]
+        for col_idx, h in enumerate(header_row, start=1):
+            cell = ws.cell(row=5, column=col_idx, value=h)
+            cell.font = Font(bold=True, color="000000")
+            cell.fill = PatternFill(start_color="E6F0FA", end_color="E6F0FA", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = openpyxl.styles.Border(bottom=openpyxl.styles.Side(style='thin', color='C8D6DF'), top=openpyxl.styles.Side(style='thin', color='C8D6DF'))
+
+        # Dados
+        for row_idx, row in enumerate(dados_csv[header_idx+1:], start=6):
+            if not any(str(c).strip() for c in row):
+                continue
+                
+            row_str = " ".join(row).upper()
+            is_header = any(k in row[0].upper() for k in ["ATIVO", "PASSIVO", "PATRIMÃ”NIO", "RECEITAS", "DESPESAS", "INGRESSOS"])
+            is_total = "TOTAL" in row_str
+
+            for col_idx, val in enumerate(row, start=1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                
+                if is_header:
+                    cell.font = Font(bold=True, size=10)
+                    cell.fill = PatternFill(start_color="F4F8FC", end_color="F4F8FC", fill_type="solid")
+                elif is_total:
+                    cell.font = Font(bold=True, size=10)
+                    cell.fill = PatternFill(start_color="FAFAFA", end_color="FAFAFA", fill_type="solid")
+                else:
+                    cell.font = Font(size=10)
+                    if row_idx % 2 == 0:
+                        cell.fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+                
+                if col_idx == 1:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                else:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    
+                cell.border = openpyxl.styles.Border(bottom=openpyxl.styles.Side(style='hair', color='E0E0E0'))
+
+        ws.column_dimensions['A'].width = 70
+        for col in 'BCDEF':
+            ws.column_dimensions[col].width = 25
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        excel_bytes = buf.getvalue()
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar Excel: {e}")
+        
+    return Response(content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="relatorio_{tipo}_{ano}.xlsx"'})
+
+@app.get("/download/pptx/{tipo}")
+async def download_pptx(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        prs = Presentation()
+        prs.slide_width = Inches(10)
+        prs.slide_height = Inches(7.5)
+
+        csv_path = _get_csv_por_tipo(tipo)
+        if not csv_path:
+            raise HTTPException(status_code=404, detail="CSV nÃ£o encontrado.")
+        
+        dados_csv = _ler_csv_generico(csv_path)
+        while dados_csv and not any(str(c).strip() for c in dados_csv[-1]):
+            dados_csv.pop()
+        
+        header_idx = 0
+        max_cols = 6
+        for i, row in enumerate(dados_csv):
+            row_str = " ".join(row).upper()
+            if "ESPECIFICA" in row_str or "RECEITAS ORCAMENT" in row_str:
+                header_idx = i
+                max_cols = max(len(row), 6)
+                break
+
+        data_rows = dados_csv[header_idx+1:]
+        POR_SLIDE = 30
+        total_slides = max(1, (len(data_rows) + POR_SLIDE - 1) // POR_SLIDE)
+        
+        for pag in range(total_slides):
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            fatia = data_rows[pag*POR_SLIDE : (pag+1)*POR_SLIDE]
+            
+            n_linhas = len(fatia) + 1
+            shape = slide.shapes.add_table(n_linhas, max_cols, Inches(0.2), Inches(0.2), Inches(9.6), Inches(0.2) * n_linhas)
+            tbl = shape.table
+            
+            # Header
+            header_row = dados_csv[header_idx]
+            for j in range(max_cols):
+                cell = tbl.cell(0, j)
+                cell.text = header_row[j][:30] if j < len(header_row) else ""
+                for pr in cell.text_frame.paragraphs:
+                    for r in pr.runs:
+                        r.font.bold = True
+                        r.font.size = Inches(0.08)
+
+            for i, row in enumerate(fatia, start=1):
+                for j in range(max_cols):
+                    text = row[j] if j < len(row) else ""
+                    text = text.encode('latin-1', 'replace').decode('latin-1')
+                    cell = tbl.cell(i, j)
+                    cell.text = text[:40]
+                    for pr in cell.text_frame.paragraphs:
+                        for r in pr.runs:
+                            r.font.size = Inches(0.07)
+                            if any(k in text.upper() for k in ["ATIVO", "PASSIVO", "TOTAL", "ESPECIFICAÃ‡ÃƒO", "RECEITAS"]):
+                                r.font.bold = True
+                            if j > 0:
+                                pr.alignment = PP_ALIGN.RIGHT
+
+        buf = io.BytesIO(); prs.save(buf); buf.seek(0)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar PPTX: {e}")
+        
+    return Response(content=buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="relatorio_{tipo}_{ano}.pptx"'})
+
+@app.post("/upload")
+async def upload_csv(
+    file: UploadFile = File(...),
+    tipo_relatorio: str = Form(...),
+    ano: int = Form(...),
+    periodo_tipo: str = Form(...),
+    periodo_valor: str = Form(...)
+):
+    try:
+        if not file.filename.endswith(".csv"):
+            raise HTTPException(status_code=400, detail="O arquivo deve ser um CSV.")
+        
+        conteudo_arquivo = await file.read()
+        try:
+            texto_arquivo = conteudo_arquivo.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            texto_arquivo = conteudo_arquivo.decode('latin-1')
+        
+        # Normalização agressiva para busca
+        import unicodedata
+        texto_normalizado = texto_arquivo.upper()
+        texto_normalizado = texto_normalizado.replace("Ç", "C")
+        texto_normalizado = ''.join(c for c in unicodedata.normalize('NFD', texto_normalizado) if unicodedata.category(c) != 'Mn')
+        texto_normalizado = texto_normalizado.replace("į", "I").replace("Į", "I").replace("ő", "O").replace("Ő", "O")
+
+        # Regras de validação estritas e abrangentes
+        if tipo_relatorio == "BALANCETE":
+            if "BALANCETE" not in texto_normalizado:
+                raise HTTPException(status_code=400, detail="Arquivo rejeitado! O arquivo não contém o título 'Balancete'.")
+                
+        elif tipo_relatorio == "BALANCO_PATRIMONIAL":
+            if not ("BALANCO" in texto_normalizado and ("PATRIMONIAL" in texto_normalizado or "COMPARATIVO" in texto_normalizado)):
+                raise HTTPException(status_code=400, detail="Arquivo rejeitado! O arquivo não contém o título 'Balanço Patrimonial' ou 'Balanço Comparativo'.")
+                
+        elif tipo_relatorio == "BALANCO_FINANCEIRO":
+            if not ("BALANCO" in texto_normalizado and "FINANCEIRO" in texto_normalizado):
+                raise HTTPException(status_code=400, detail="Arquivo rejeitado! O arquivo não contém o título 'Balanço Financeiro'.")
+                
+        elif tipo_relatorio == "BALANCO_ORCAMENTARIO":
+            if not ("BALANCO" in texto_normalizado and "ORCAMENTARIO" in texto_normalizado):
+                raise HTTPException(status_code=400, detail="Arquivo rejeitado! O arquivo não contém o título 'Balanço Orçamentário'.")
+                
+        elif tipo_relatorio == "DFC":
+            if not ("FLUXO DE CAIXA" in texto_normalizado or "DEMONSTRACAO DO FLUXO" in texto_normalizado):
+                raise HTTPException(status_code=400, detail="Arquivo rejeitado! O arquivo não contém o título 'Demonstração do Fluxo de Caixa'.")
+                
+        elif tipo_relatorio == "DVP":
+            if not ("VARIACOES PATRIMONIAIS" in texto_normalizado):
+                raise HTTPException(status_code=400, detail="Arquivo rejeitado! O arquivo não contém o título 'Variações Patrimoniais'.")
+                
+        elif tipo_relatorio == "DMPL":
+            if not ("MUTACOES" in texto_normalizado or "MUTACOES DO PATRIMONIO" in texto_normalizado):
+                raise HTTPException(status_code=400, detail="Arquivo rejeitado! O arquivo não contém o título 'Demonstração das Mutações do Patrimônio Líquido'.")
+
+        await file.seek(0)
+        
+        nome_padronizado = f"{tipo_relatorio}_{ano}_{periodo_tipo}_{periodo_valor}.csv"
+        caminho_final = os.path.join(UPLOAD_DIR, nome_padronizado)
+        
+        with open(caminho_final, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        data_agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO importacoes (tipo_relatorio, ano, periodo_tipo, periodo_valor, nome_original, caminho_arquivo, data_importacao)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (tipo_relatorio, ano, periodo_tipo, periodo_valor, file.filename, caminho_final, data_agora))
+        conn.commit()
+        conn.close()
+        
+        return {"mensagem": "Upload realizado com sucesso!", "arquivo": nome_padronizado}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/periodos_importados/{tipo_relatorio}")
+async def get_periodos_importados(tipo_relatorio: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT DISTINCT ano, periodo_tipo, periodo_valor 
+        FROM importacoes 
+        WHERE tipo_relatorio = ?
+        ORDER BY ano DESC, periodo_valor DESC
+    ''', (tipo_relatorio,))
+    resultados = cursor.fetchall()
+    conn.close()
+    
+    periodos = []
+    for r in resultados:
+        periodos.append(f"{r[0]}-{r[1]}-{r[2]}")
+    
+    return {"periodos": periodos}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/download/pdf/integridade/{periodo}")
+async def download_pdf_integridade(periodo: str, ano: int = Query(2026)):
+    try:
+        # Formata o período
+        periodo_formatado = f"{ano}"
+        if periodo and "-" in periodo:
+            partes = periodo.split('-')
+            tipo_p = partes[1]
+            valor_p = partes[2]
+            if tipo_p == "MES":
+                meses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+                periodo_formatado = f"{meses[int(valor_p)]}/{ano}"
+            elif tipo_p == "TRIMESTRE":
+                periodo_formatado = f"{valor_p}º Tri/{ano}"
+            else:
+                periodo_formatado = f"Exercício {ano}"
+
+        # Reutiliza a lógica da análise
+        import json, urllib.request
+        # Como estamos dentro da mesma API, podemos chamar a função diretamente
+        analise_response = await analise_integridade(periodo)
+        analises = analise_response["analises"]
+
+        pdf = FPDF(orientation="P", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+
+        # --- CABEÇALHO ---
+        pdf.set_fill_color(0, 114, 186)
+        pdf.rect(10, 10, 190, 20, 'F')
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_xy(15, 12)
+        pdf.cell(0, 6, "COFEN/BR - Conselho Federal de Enfermagem", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_x(15)
+        pdf.cell(0, 5, "CNPJ: 47.217.146/0001-57", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_xy(120, 12)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(80, 6, f"Período: {periodo_formatado}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_x(120)
+        pdf.cell(80, 5, "Relatório de Integridade Contábil", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(15)
+
+        # --- TÍTULO ---
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 10, "Análise de Integridade das Demonstrações Contábeis", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(5)
+
+        # --- CARDS ---
+        for a in analises:
+            # Cor do Status
+            if a["status"] == "OK":
+                cor_r, cor_g, cor_b = (40, 167, 69) # Verde
+            elif a["status"] == "ALERTA":
+                cor_r, cor_g, cor_b = (255, 193, 7) # Amarelo
+            else:
+                cor_r, cor_g, cor_b = (220, 53, 69) # Vermelho
+
+            # Verifica se cabe na página
+            if pdf.get_y() + 60 > (pdf.h - 15):
+                pdf.add_page()
+                # Repete o cabeçalho em páginas secundárias
+                pdf.set_fill_color(0, 114, 186)
+                pdf.rect(10, 10, 190, 20, 'F')
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_xy(15, 15)
+                pdf.cell(0, 6, "COFEN/BR - Relatório de Integridade (Continuação)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.set_text_color(0, 0, 0)
+                pdf.ln(15)
+
+            # Caixa do card
+            pdf.set_draw_color(cor_r, cor_g, cor_b)
+            pdf.set_line_width(1)
+            pdf.rect(10, pdf.get_y(), 190, 55, 'D')
+            pdf.set_line_width(0.2)
+
+            # Título do Card
+            pdf.set_fill_color(245, 245, 245)
+            pdf.rect(10, pdf.get_y(), 190, 10, 'F')
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_xy(15, pdf.get_y() + 2)
+            pdf.cell(0, 6, a["titulo"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(8)
+
+            # Conceito
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(80, 80, 80)
+            pdf.set_x(15)
+            pdf.multi_cell(180, 5, a["conceito"])
+            pdf.ln(3)
+
+            # Tabela
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font("Helvetica", "", 9)
+            for item in a["tabela"]:
+                pdf.set_x(15)
+                pdf.cell(120, 6, item["label"], border=0)
+                pdf.cell(60, 6, item["valor"], border=0, align="R")
+                pdf.ln(6)
+            
+            pdf.ln(3)
+
+            # Mensagem de status
+            pdf.set_x(15)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(cor_r, cor_g, cor_b)
+            pdf.multi_cell(180, 5, a["mensagem"])
+            pdf.set_text_color(0, 0, 0)
+            
+            pdf.ln(10)
+
+        out = pdf.output()
+        pdf_bytes = bytes(out)
+    except Exception as e:
+        import traceback
+        print("\n" + "="*50)
+        print("ERRO FATAL AO GERAR PDF DE INTEGRIDADE:")
+        traceback.print_exc()
+        print("="*50 + "\n")
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+    return Response(content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="relatorio_integridade_{periodo}.pdf"'})
+@app.get("/analise_cruzada_matriz/{periodo}")
+async def analise_cruzada_matriz(periodo: str):
+    try:
+        def get_val(caminho, termo, coluna):
+            if not caminho: return 0.0
+            linhas = _ler_csv_como_linhas(caminho)
+            for linha in linhas:
+                if termo in linha.upper():
+                    partes = linha.split(';')
+                    if len(partes) > coluna:
+                        return _limpar_valor(partes[coluna])
+            return 0.0
+
+        path_balancete = _get_csv_por_tipo("BALANCETE", periodo)
+        path_bp = _get_csv_por_tipo("BALANCO_PATRIMONIAL", periodo)
+        path_bf = _get_csv_por_tipo("BALANCO_FINANCEIRO", periodo)
+        path_bo = _get_csv_por_tipo("BALANCO_ORCAMENTARIO", periodo)
+        path_dfc = _get_csv_por_tipo("DFC", periodo)
+        path_dvp = _get_csv_por_tipo("DVP", periodo)
+
+        matriz = []
+        
+        def add_linha(nome, balancete, bp, bf, bo, dfc, dvp):
+            valores = [v for v in [balancete, bp, bf, bo, dfc, dvp] if v != 0]
+            if len(valores) > 0:
+                if all(abs(v - valores[0]) < 0.05 for v in valores):
+                    conf = "OK"
+                else:
+                    conf = "ERRO"
+            else:
+                conf = "N/A"
+
+            def fmt(v):
+                return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v != 0 else "-"
+
+            matriz.append({
+                "item": nome,
+                "balancete": fmt(balancete),
+                "bp": fmt(bp),
+                "bf": fmt(bf),
+                "bo": fmt(bo),
+                "dfc": fmt(dfc),
+                "dvp": fmt(dvp),
+                "conferencia": conf
+            })
+
+        # 1. Ativo Circulante (Balancete: col 4 = Saldo Atual; BP: col 1 = Valor do Ativo)
+        add_linha("Ativo Circulante", 
+                  get_val(path_balancete, "1.1 - ATIVO CIRCULANTE", 4), 
+                  get_val(path_bp, "ATIVO CIRCULANTE", 1), 
+                  0, 0, 0, 0)
+
+        # 2. Caixa e Equivalentes (Balancete: col 4; BP: col 1; BF: col 3; DFC: col 2)
+        add_linha("Caixa e Equivalentes", 
+                  get_val(path_balancete, "1.1.1 - CAIXA E EQUIVALENTES DE CAIXA", 4), 
+                  get_val(path_bp, "CAIXA E EQUIVALENTES DE CAIXA", 1), 
+                  get_val(path_bf, "Caixa e Equivalente de Caixa", 3), 
+                  0, 
+                  get_val(path_dfc, "CAIXA E EQUIVALENTES DE CAIXA FINAL", 2), 
+                  0)
+
+        # 3. Passivo Circulante (Balancete: col 4; BP: col 3 = Valor do Passivo)
+        add_linha("Passivo Circulante", 
+                  get_val(path_balancete, "2.1 - PASSIVO CIRCULANTE", 4), 
+                  get_val(path_bp, "PASSIVO CIRCULANTE", 3), 
+                  0, 0, 0, 0)
+
+        # 4. Variações Aumentativas (DVP: col 2 = Total das Variações Ativas)
+        add_linha("Variações Aumentativas (VPA)", 
+                  get_val(path_balancete, "4 - VARIAÇÃO PATRIMONIAL AUMENTATIVA", 4), 
+                  0, 0, 0, 0, 
+                  get_val(path_dvp, "Total das Varia", 2))
+
+        # 5. Variações Diminutivas (DVP: col 6 = Total das Variações Passivas)
+        add_linha("Variações Diminutivas (VPD)", 
+                  get_val(path_balancete, "3 - VARIAÇÃO PATRIMONIAL DIMINUTIVA", 4), 
+                  0, 0, 0, 0, 
+                  get_val(path_dvp, "Total das Varia", 6))
+
+        # 6. Receita Corrente Realizada (Balancete: col 4; BF: col 1; BO: col 6; DFC: col 2)
+        add_linha("Receita Corrente Realizada", 
+                  get_val(path_balancete, "6.2.1.2.1 - RECEITAS CORRENTE", 4), 
+                  0, 
+                  get_val(path_bf, "RECEITAS CORRENTE", 1), 
+                  get_val(path_bo, "RECEITAS CORRENTE", 6), 
+                  get_val(path_dfc, "RECEITAS CORRENTE", 2), 
+                  0)
+
+        return {"matriz": matriz}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/download/pdf/{tipo}")
+async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("")):
+    try:
+        periodo_formatado = f"{ano}"
+        if periodo and "-" in periodo:
+            partes = periodo.split('-')
+            tipo_p = partes[1]
+            valor_p = partes[2]
+            if tipo_p == "MES":
+                meses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+                periodo_formatado = f"{meses[int(valor_p)]}/{ano}"
+            elif tipo_p == "TRIMESTRE":
+                periodo_formatado = f"{valor_p}º Tri/{ano}"
+            else:
+                periodo_formatado = f"Exercício {ano}"
+
+        csv_path = _get_csv_por_tipo(tipo, periodo)
+        if not csv_path:
+            raise HTTPException(status_code=404, detail=f"Arquivo CSV para {tipo} no período {periodo_formatado} não encontrado.")
+
+        content = ""
+        for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+            try:
+                with open(csv_path, "r", encoding=enc) as f:
+                    content = f.read()
+                break
+            except UnicodeDecodeError:
+                continue
+
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=False)
+
+        # ---------- LAYOUTS ----------
+        if tipo == "BALANCETE":
+            col_w   = [125, 0, 38, 38, 38, 38]
+            headers = ["CONTA", "", "SALDO ANTERIOR", "DÉBITOS", "CRÉDITOS", "SALDO"]
+            titulo_pdf = "Balancete Contábil"
+        elif tipo == "BALANCO_PATRIMONIAL":
+            col_w   = [85, 30, 85, 30, 0, 0]
+            headers = ["ESPECIFICAÇÃO (ATIVO)", "Exercício Atual", "ESPECIFICAÇÃO (PASSIVO)", "Exercício Atual", "", ""]
+            titulo_pdf = "Balanço Patrimonial"
+        elif tipo == "BALANCO_FINANCEIRO":
+            col_w   = [68, 28, 28, 68, 28, 28] 
+            headers = ["ESPECIFICAÇÃO (INGRESSOS)", "Exercício Atual", "Exercício Anterior", "ESPECIFICAÇÃO (DISPÊNDIOS)", "Exercício Atual", "Exercício Anterior"]
+            titulo_pdf = "Balanço Financeiro"
+        elif tipo == "BALANCO_ORCAMENTARIO":
+            col_w   = [70, 32, 32, 34, 34, 34, 41]
+            headers = ["ESPECIFICAÇÃO", "PREVISÃO INICIAL", "PREVISÃO ATUALIZADA", "RECEITA REALIZADA", "SALDO", "DESPESAS", "SALDO FINAL"]
+            titulo_pdf = "Balanço Orçamentário"
+        elif tipo == "DMPL":
+            col_w   = [60, 24.5, 24.5, 24.5, 24.5, 24.5, 24.5, 34, 35] 
+            headers = [
+                "ESPECIFICAÇÃO", "PATRIMÔNIO SOCIAL", "ADIANTAMENTO P/ AUMENTO", 
+                "RESERVAS DE CAPITAL", "AJUSTES DE AVALIAÇÃO", "RESERVAS DE LUCROS", 
+                "DEMAIS RESERVAS", "RESULTADOS ACUMULADOS", "TOTAL"
+            ]
+            titulo_pdf = "Demonstração das Mutações do Patrimônio Líquido"
+        elif tipo == "DFC":
+            col_w   = [160, 0, 0, 60, 57]
+            headers = ["ESPECIFICAÇÃO", "", "", "Exercício Atual", "Exercício Anterior"]
+            titulo_pdf = "Demonstração do Fluxo de Caixa"
+        elif tipo == "DVP":
+            # Layout DVP: Desc Ativa | Atual | Anterior | Desc Passiva | Atual | Anterior
+            col_w   = [70, 25, 25, 70, 25, 25]
+            headers = ["VARIAÇÕES AUMENTATIVAS", "Exercício Atual", "Exercício Anterior", "VARIAÇÕES DIMINUTIVAS", "Exercício Atual", "Exercício Anterior"]
+            titulo_pdf = "Demonstração das Variações Patrimoniais"
+        else:
+            col_w   = [72, 30, 28, 72, 40, 35]
+            headers = ["ESPECIFICAÇÃO", "Exercício Atual", "Exercício Anterior", "ESPECIFICAÇÃO", "Exercício Atual", "Exercício Anterior"]
+            titulo_pdf = "Balanço Comparativo"
+
+        def draw_header(is_first_page=False):
+            if is_first_page:
+                pdf.set_fill_color(0, 114, 186)
+                pdf.rect(10, 10, 277, 20, 'F')
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_font("Helvetica", "B", 14)
+                pdf.set_xy(15, 12)
+                pdf.cell(0, 6, "COFEN/BR - Conselho Federal de Enfermagem", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_x(15)
+                pdf.cell(0, 5, "CNPJ: 47.217.146/0001-57", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.set_xy(200, 12)
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.cell(85, 6, f"Período: {periodo_formatado}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_x(200)
+                pdf.cell(85, 5, titulo_pdf, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+                pdf.set_text_color(0, 0, 0)
+                pdf.ln(12)
+            else:
+                pdf.set_font("Helvetica", "I", 8)
+                pdf.set_text_color(100, 100, 100)
+                pdf.cell(0, 5, f"COFEN/BR - {titulo_pdf} - Período: {periodo_formatado} (Continuação)",
+                         new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+                pdf.ln(2)
+            
+            pdf.set_fill_color(230, 240, 250)
+            pdf.set_font("Helvetica", "B", 6) 
+            pdf.set_text_color(0, 0, 0)
+            
+            start_y = pdf.get_y()
+            x_start = pdf.get_x()
+            
+            for j, h in enumerate(headers):
+                if col_w[j] > 0:
+                    pdf.rect(pdf.get_x(), start_y, col_w[j], 10, style='DF')
+                    pdf.set_xy(pdf.get_x(), start_y + 1)
+                    pdf.multi_cell(col_w[j], 4, h, border=0, align="C")
+                    pdf.set_xy(x_start + sum(col_w[:j+1]), start_y)
+            
+            pdf.set_xy(x_start, start_y + 10)
+
+        pdf.add_page()
+        draw_header(is_first_page=True)
+
+        def draw_row(row, is_header, is_total, idx):
+            num_lines = 1
+            for j in range(len(col_w)):
+                if col_w[j] > 0 and j < len(row):
+                    txt = str(row[j]).encode('latin-1', 'replace').decode('latin-1') or " "
+                    lines = pdf.multi_cell(col_w[j], 5, txt, dry_run=True, output="LINES")
+                    num_lines = max(num_lines, len(lines))
+            
+            actual_h = 5 * num_lines
+            
+            if pdf.get_y() + actual_h > (pdf.h - 15):
+                pdf.add_page()
+                draw_header(is_first_page=False)
+            
+            x = pdf.get_x()
+            y = pdf.get_y()
+
+            if is_header:      pdf.set_fill_color(240, 248, 255)
+            elif is_total:     pdf.set_fill_color(250, 250, 250)
+            else:              pdf.set_fill_color(255, 255, 255) if (idx % 2 == 0) else pdf.set_fill_color(248, 249, 250)
+
+            pdf.rect(x, y, sum(col_w), actual_h, style='F')
+            pdf.set_draw_color(200, 200, 200)
+            pdf.rect(x, y, sum(col_w), actual_h, style='D')
+            for i in range(1, len(col_w)):
+                if col_w[i] > 0:
+                    pdf.line(x + sum(col_w[:i]), y, x + sum(col_w[:i]), y + actual_h)
+
+            for j in range(len(col_w)):
+                if col_w[j] == 0 or j >= len(row):
+                    continue
+                txt = str(row[j]).encode('latin-1', 'replace').decode('latin-1')
+
+                if tipo in ["BALANCETE", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]:
+                    align = "L" if j in [0, 3] else "R" if tipo == "DVP" else ("L" if j == 0 else "R")
+                elif tipo == "BALANCO_FINANCEIRO":
+                    align = "L" if j in [0, 3] else "R"
+                elif tipo == "BALANCO_PATRIMONIAL":
+                    align = "L" if j in [0, 2] else "R"
+                else:
+                    align = "L" if j in [0, 3] else "R"
+
+                if align == "L":
+                    pdf.set_xy(x + sum(col_w[:j]) + 1, y + 0.5)
+                    pdf.multi_cell(col_w[j], 5, txt, border=0, align="L")
+                else:
+                    center_y = y + (actual_h - 5) / 2
+                    pdf.set_xy(x + sum(col_w[:j]), center_y)
+                    pdf.cell(col_w[j], 5, txt, align="R", border=0)
+            
+            pdf.set_xy(x, y + actual_h)
+
+        # =======================================================
+        # LÓGICA ESPECÍFICA PARA O DVP
+        # =======================================================
+        if tipo == "DVP":
+            linhas = content.splitlines()
+            start_idx = 0
+            for i, linha in enumerate(linhas):
+                if "VARIAÇÃO PATRIMONIAL AUMENTATIVA" in linha.upper():
+                    start_idx = i
+                    break
+
+            for idx, linha in enumerate(linhas[start_idx:]):
+                if not linha.strip(): continue
+                if "COFEN/BR" in linha or "PERÍODO" in linha.upper() or "BRASÍLIA" in linha.upper() or "CONTADOR" in linha.upper() or "CRC-DF" in linha.upper(): continue
+                if "QUALITATIVAS" in linha.upper(): break # Para no bloco qualitativo para não bagunçar a tabela principal
+
+                colunas = linha.split(';')
+                while len(colunas) < 7:
+                    colunas.append('')
+
+                desc_ativa = colunas[0].strip()
+                val_ativa_atual = colunas[2].strip()
+                val_ativa_ant = colunas[3].strip()
+                desc_passiva = colunas[4].strip()
+                val_passiva_atual = colunas[6].strip()
+                val_passiva_ant = colunas[7].strip() if len(colunas) > 7 else ""
+
+                is_header = "AUMENTATIVA" in desc_ativa.upper() or "DIMINUTIVA" in desc_passiva.upper()
+                is_total = "TOTAL" in desc_ativa.upper() or "RESULTADO" in desc_ativa.upper() or "SUPERAVIT" in desc_passiva.upper() or "DEFICIT" in desc_passiva.upper()
+
+                row_final = [desc_ativa, val_ativa_atual, val_ativa_ant, desc_passiva, val_passiva_atual, val_passiva_ant]
+
+                pdf.set_font("Helvetica", "B" if is_header or is_total else "", 7)
+                draw_row(row_final, is_header, is_total, idx)
+
+        elif tipo == "BALANCO_PATRIMONIAL":
+            # (Mantém a lógica que já havíamos ajustado para o BP)
+            linhas = content.splitlines()
+            start_idx = 0
+            for i, linha in enumerate(linhas):
+                if "ATIVO CIRCULANTE" in linha.upper():
+                    start_idx = i
+                    break
+
+            for idx, linha in enumerate(linhas[start_idx:]):
+                if not linha.strip(): continue
+                if "COFEN/BR" in linha or "PERÍODO" in linha.upper(): continue
+
+                colunas = linha.split(';')
+                while len(colunas) < 4:
+                    colunas.append('')
+
+                desc_ativo, valor_ativo = colunas[0].strip(), colunas[1].strip()
+                desc_passivo, valor_passivo = colunas[2].strip(), colunas[3].strip()
+
+                is_header = "ATIVO" in desc_ativo.upper() or "PASSIVO" in desc_passivo.upper()
+                is_total = "TOTAL" in desc_ativo.upper() or "TOTAL" in desc_passivo.upper()
+
+                row_final = [desc_ativo, valor_ativo, desc_passivo, valor_passivo, "", ""]
+                pdf.set_font("Helvetica", "B" if is_header or is_total else "", 7)
+                draw_row(row_final, is_header, is_total, idx)
+
+        elif tipo == "DMPL":
+            import re
+            def buscar_valores(termo):
+                for linha in content.splitlines():
+                    if termo in linha:
+                        colunas = linha.split(';')
+                        matches = re.findall(r'(?<![\d,])(-?\d{1,3}(?:\.\d{3})*,\d{2}|-?\d+)(?![\d,])', ";".join(colunas))
+                        if len(matches) >= 2: return matches[-2], matches[-1]
+                        elif len(matches) == 1: return "", matches[-1]
+                return "", ""
+
+            ini_1, ini_2 = buscar_valores("Saldos iniciais")
+            res_1, res_2 = buscar_valores("Resultado do período")
+            fim_1, fim_2 = buscar_valores("Saldos finais")
+
+            linhas_dmpl = [
+                ("Saldos iniciais", ["", "", "", "", "", "", ini_1, ini_2], True),
+                ("Ajustes de exercícios anteriores", ["", "", "", "", "", "", "", "0"], False),
+                ("Aumento de capital", ["", "", "", "", "", "", "", "0"], False),
+                ("Resultado do exercício", ["", "", "", "", "", "", "0", "0"], False),
+                ("Resultado do período", ["", "", "", "", "", "", res_1, res_2], False),
+                ("Ajustes de avaliação patrimonial", ["", "", "", "", "", "", "0", "0"], False),
+                ("Constituição / Reversão de reservas", ["", "", "", "", "", "", "0", "0"], False),
+                ("Demais variações", ["", "", "", "", "", "", "0", "0"], False),
+                ("Saldos finais", ["", "", "", "", "", "", fim_1, fim_2], True)
+            ]
+
+            for idx, (desc, valores, is_total) in enumerate(linhas_dmpl):
+                row_final = [desc] + valores
+                pdf.set_font("Helvetica", "B" if is_total else "", 7)
+                draw_row(row_final, False, is_total, idx)
+
+        else:
+            dados_csv = _ler_csv(csv_path, tipo)
+            start_idx = 0
+            for i, row in enumerate(dados_csv):
+                joined = " ".join(row).upper()
+                if tipo in ["DFC"]:
+                    if "EXERCÍCIO ATUAL" in joined and "EXERCÍCIO ANTERIOR" in joined:
+                        start_idx = i + 1
+                        break
+                elif tipo == "BALANCO_FINANCEIRO":
+                    if "ESPECIFICAÇÃO" in joined and "EXERCÍCIO ATUAL" in joined:
+                        start_idx = i + 1
+                        break
+                elif "CONTA" in joined and "SALDO" in joined:
+                    start_idx = i + 1
+                    break
+
+            def eh_lixo(row):
+                texto_linha = " ".join(row).upper()
+                if "COFEN/BR" in texto_linha and ("PERÍODO" in texto_linha or "PERIODO" in texto_linha): return True
+                if row[0].strip().upper() == "COFEN/BR": return True
+                if "CONSELHO FEDERAL" in texto_linha or "CNPJ" in texto_linha or "DEMONSTRAÇÃO" in texto_linha or "BALANÇO" in texto_linha: return True
+                if "MARCELO" in texto_linha or "CONTADOR" in texto_linha or "CRC-DF" in texto_linha or "PÁGINA" in texto_linha or "BRASÍLIA-DF" in texto_linha: return True
+                return False
+
+            for idx, row in enumerate(dados_csv[start_idx:]):
+                if not any(str(c).strip() for c in row): continue
+                if eh_lixo(row): continue
+
+                row_text = " ".join(row).upper()
+                is_header = False
+                is_total = False
+
+                if "TOTAIS" in row_text or "TOTAL:" in row_text or "TOTAL DAS" in row_text or "FLUXO DE CAIXA LÍQUIDO" in row_text or "GERAÇÃO LIQUIDA" in row_text:
+                    is_total = True
+                elif any(k in row_text for k in ["ATIVO", "PASSIVO", "PATRIMÔNIO", "COMPENSAÇÕES", "QUADRO", "FLUXO DE CAIXA DAS ATIVIDADES"]):
+                    is_header = True
+
+                if is_header: pdf.set_font("Helvetica", "B", 7.5)
+                elif is_total: pdf.set_font("Helvetica", "B", 7)
+                else:          pdf.set_font("Helvetica", "", 7)
+
+                draw_row(row, is_header, is_total, idx)
+
+        # --- FUNDAMENTAÇÃO LEGAL E CONCEITUAL ---
+        pdf.add_page()
+        # Cabeçalho da página de fundamentação
+        pdf.set_fill_color(0, 114, 186)
+        pdf.rect(10, 10, 190, 20, 'F')
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_xy(15, 15)
+        pdf.cell(0, 6, "COFEN/BR - Fundamentação Legal e Conceitual", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(15)
+
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, "Base Normativa da Integridade Contábil", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(8)
+
+        # Texto introdutório
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 5, "A análise de integridade das demonstrações contábeis encontra amparo no arcabouço normativo da contabilidade pública brasileira, que exige a consistência interna e a conciliação entre as peças que compõem o Balanço Geral. As principais normas e suas exigências estão sintetizadas abaixo.")
+        pdf.ln(6)
+
+        # Função auxiliar para desenhar bloco de norma
+        def draw_norma(titulo, texto):
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_fill_color(230, 240, 250)
+            pdf.cell(0, 7, titulo, border=0, fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.multi_cell(0, 5, texto)
+            pdf.ln(4)
+
+        draw_norma("Lei nº 4.320/1964 (Normas Gerais de Direito Financeiro)", "Estabelece os modelos e a estrutura dos balanços públicos. O art. 101 determina que os resultados gerais do exercício sejam demonstrados no Balanço Orçamentário, Balanço Financeiro, Balanço Patrimonial e na Demonstração das Variações Patrimoniais, exigindo que as peças sejam elaboradas de forma integrada e consistente [citation:5][citation:10].")
+
+        draw_norma("NBC TSP 11 (R1) – Apresentação das Demonstrações Contábeis", "Define que as demonstrações contábeis devem assegurar a comparabilidade e a representação fidedigna. A norma exige que o conjunto de demonstrações (BP, DVP, DFC, DMPL) seja apresentado de forma articulada, permitindo que o usuário compreenda a relação entre a posição patrimonial, o resultado e os fluxos de caixa [citation:1][citation:6].")
+
+        draw_norma("MCASP – Manual de Contabilidade Aplicada ao Setor Público (STN)", "Estabelece as regras de integridade do PCASP e as conciliações obrigatórias. Destaca que o Balanço Financeiro deve fechar a equação Saldo Anterior + Ingressos = Dispêndios + Saldo Final; que o Balanço Patrimonial deve apresentar Ativo = Passivo + PL; e que a DFC deve conciliar o Caixa Inicial e Final com o saldo de Caixa e Equivalentes do BP [citation:2][citation:4][citation:7].")
+
+        draw_norma("IPC – Instruções de Procedimentos Contábeis da STN", "As IPCs 04 a 08 detalham a estrutura e as conferências exigidas para cada demonstração. A IPC 06 trata especificamente do Balanço Financeiro e da conciliação com as demais peças, sendo referência para os Tribunais de Contas na verificação da consistência das prestações de contas [citation:8][citation:13].")
+
+        draw_norma("Demonstrações Abrangidas por esta Análise", "A integridade foi verificada nas seguintes peças: (i) Balanço Patrimonial – equação Ativo = Passivo + PL; (ii) Balanço Financeiro – fechamento do fluxo de caixa; (iii) DFC – conciliação do Caixa; (iv) DVP – apuração do Resultado Patrimonial (VPA – VPD); (v) Balancete – conferência dos saldos com o BP; (vi) BO – confronto Receita/Despesa com o BF; e (vii) DMPL – saldo final do PL compatível com o BP.")
+
+        pdf.ln(4)
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.set_text_color(100, 100, 100)
+        pdf.multi_cell(0, 5, "Nota: A análise automatizada verifica a consistência matemática e a conciliação entre as peças. Divergências apontadas devem ser objeto de verificação pela área contábil, à luz das normas acima e das orientações do Tribunal de Contas competente.")
+        pdf.set_text_color(0, 0, 0)
+        # --- CONCLUSÃO ---
+        pdf.ln(10)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 10, "Conclusão", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L")
+        pdf.ln(3)
+
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 5, "A análise de integridade das demonstrações contábeis do período examinado foi concluída com base nas normas vigentes. As verificações abrangeram o Balanço Patrimonial (equação Ativo = Passivo + PL), o Balanço Financeiro (fechamento do fluxo de caixa), a DFC (conciliação do Caixa), a DVP (apuração do Resultado Patrimonial) e a conferência entre o Balancete e as demais peças.")
+        pdf.ln(4)
+        pdf.multi_cell(0, 5, "Os resultados obtidos demonstram que as demonstrações contábeis analisadas apresentam consistência matemática e observam as regras de integridade estabelecidas pelo MCASP e pelas NBC TSP.")
+        pdf.ln(6)
+
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.set_text_color(100, 100, 100)
+        pdf.multi_cell(0, 5, "Nota: Esta análise tem caráter de conferência automatizada de consistência e não substitui a auditoria contábil formal, sendo recomendada a sua utilização como instrumento de controle prévio à prestação de contas.")
+        out = pdf.output()
+        pdf_bytes = bytes(out)
+    except Exception as e:
+        import traceback
+        print("\n" + "="*50)
+        print("ERRO FATAL AO GERAR PDF:")
+        traceback.print_exc()
+        print("="*50 + "\n")
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+    return Response(content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="relatorio_{tipo}_{ano}.pdf"'})
+@app.get("/download/excel/{tipo}")
+async def download_excel(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        csv_path = _get_csv_por_tipo(tipo)
+        if not csv_path:
+            raise HTTPException(status_code=404, detail="CSV nÃ£o encontrado.")
+            
+        dados_csv = _ler_csv_generico(csv_path)
+        while dados_csv and not any(str(c).strip() for c in dados_csv[-1]):
+            dados_csv.pop()
+            
+        header_idx = 0
+        max_cols = 6
+        for i, row in enumerate(dados_csv):
+            row_str = " ".join(row).upper()
+            if "ESPECIFICA" in row_str or "RECEITAS ORCAMENT" in row_str:
+                header_idx = i
+                max_cols = max(len(row), 6)
+                break
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = tipo.replace("_", " ").title()
+
+        ws.merge_cells('A1:F1')
+        ws['A1'] = "COFEN/BR - Conselho Federal de Enfermagem"
+        ws['A1'].font = Font(bold=True, size=14, color="FFFFFF")
+        ws['A1'].fill = PatternFill(start_color="0072BA", end_color="0072BA", fill_type="solid")
+        ws['A1'].alignment = Alignment(vertical="center")
+        
+        ws.merge_cells('A2:F2')
+        ws['A2'] = f"CNPJ: 47.217.146/0001-57   |   PerÃ­odo: {periodo}/{ano}"
+        ws['A2'].font = Font(size=10, color="FFFFFF")
+        ws['A2'].fill = PatternFill(start_color="0072BA", end_color="0072BA", fill_type="solid")
+        ws['A2'].alignment = Alignment(vertical="center")
+
+        # CabeÃ§alho
+        header_row = dados_csv[header_idx]
+        for col_idx, h in enumerate(header_row, start=1):
+            cell = ws.cell(row=5, column=col_idx, value=h)
+            cell.font = Font(bold=True, color="000000")
+            cell.fill = PatternFill(start_color="E6F0FA", end_color="E6F0FA", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = openpyxl.styles.Border(bottom=openpyxl.styles.Side(style='thin', color='C8D6DF'), top=openpyxl.styles.Side(style='thin', color='C8D6DF'))
+
+        # Dados
+        for row_idx, row in enumerate(dados_csv[header_idx+1:], start=6):
+            if not any(str(c).strip() for c in row):
+                continue
+                
+            row_str = " ".join(row).upper()
+            is_header = any(k in row[0].upper() for k in ["ATIVO", "PASSIVO", "PATRIMÃ”NIO", "RECEITAS", "DESPESAS", "INGRESSOS"])
+            is_total = "TOTAL" in row_str
+
+            for col_idx, val in enumerate(row, start=1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                
+                if is_header:
+                    cell.font = Font(bold=True, size=10)
+                    cell.fill = PatternFill(start_color="F4F8FC", end_color="F4F8FC", fill_type="solid")
+                elif is_total:
+                    cell.font = Font(bold=True, size=10)
+                    cell.fill = PatternFill(start_color="FAFAFA", end_color="FAFAFA", fill_type="solid")
+                else:
+                    cell.font = Font(size=10)
+                    if row_idx % 2 == 0:
+                        cell.fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+                
+                if col_idx == 1:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                else:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    
+                cell.border = openpyxl.styles.Border(bottom=openpyxl.styles.Side(style='hair', color='E0E0E0'))
+
+        ws.column_dimensions['A'].width = 70
+        for col in 'BCDEF':
+            ws.column_dimensions[col].width = 25
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        excel_bytes = buf.getvalue()
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar Excel: {e}")
+        
+    return Response(content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="relatorio_{tipo}_{ano}.xlsx"'})
+
+@app.get("/download/pptx/{tipo}")
+async def download_pptx(tipo: str, ano: int = Query(2026), periodo: str = Query("Jan-Set")):
+    try:
+        prs = Presentation()
+        prs.slide_width = Inches(10)
+        prs.slide_height = Inches(7.5)
+
+        csv_path = _get_csv_por_tipo(tipo)
+        if not csv_path:
+            raise HTTPException(status_code=404, detail="CSV nÃ£o encontrado.")
+        
+        dados_csv = _ler_csv_generico(csv_path)
+        while dados_csv and not any(str(c).strip() for c in dados_csv[-1]):
+            dados_csv.pop()
+        
+        header_idx = 0
+        max_cols = 6
+        for i, row in enumerate(dados_csv):
+            row_str = " ".join(row).upper()
+            if "ESPECIFICA" in row_str or "RECEITAS ORCAMENT" in row_str:
+                header_idx = i
+                max_cols = max(len(row), 6)
+                break
+
+        data_rows = dados_csv[header_idx+1:]
+        POR_SLIDE = 30
+        total_slides = max(1, (len(data_rows) + POR_SLIDE - 1) // POR_SLIDE)
+        
+        for pag in range(total_slides):
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            fatia = data_rows[pag*POR_SLIDE : (pag+1)*POR_SLIDE]
+            
+            n_linhas = len(fatia) + 1
+            shape = slide.shapes.add_table(n_linhas, max_cols, Inches(0.2), Inches(0.2), Inches(9.6), Inches(0.2) * n_linhas)
+            tbl = shape.table
+            
+            # Header
+            header_row = dados_csv[header_idx]
+            for j in range(max_cols):
+                cell = tbl.cell(0, j)
+                cell.text = header_row[j][:30] if j < len(header_row) else ""
+                for pr in cell.text_frame.paragraphs:
+                    for r in pr.runs:
+                        r.font.bold = True
+                        r.font.size = Inches(0.08)
+
+            for i, row in enumerate(fatia, start=1):
+                for j in range(max_cols):
+                    text = row[j] if j < len(row) else ""
+                    text = text.encode('latin-1', 'replace').decode('latin-1')
+                    cell = tbl.cell(i, j)
+                    cell.text = text[:40]
+                    for pr in cell.text_frame.paragraphs:
+                        for r in pr.runs:
+                            r.font.size = Inches(0.07)
+                            if any(k in text.upper() for k in ["ATIVO", "PASSIVO", "TOTAL", "ESPECIFICAÃ‡ÃƒO", "RECEITAS"]):
+                                r.font.bold = True
+                            if j > 0:
+                                pr.alignment = PP_ALIGN.RIGHT
+
+        buf = io.BytesIO(); prs.save(buf); buf.seek(0)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar PPTX: {e}")
+        
+    return Response(content=buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="relatorio_{tipo}_{ano}.pptx"'})
+
+@app.post("/upload")
+async def upload_arquivo(file: UploadFile = File(...)):
+    caminho = os.path.join(UPLOAD_DIR, file.filename)
+    with open(caminho, "wb") as b: shutil.copyfileobj(file.file, b)
+    return {"filename": file.filename, "status": "sucesso"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@app.get("/api/bp_teste/{periodo}")
+async def bp_teste(periodo: str):
+    import csv
+    import os
+    
+    try:
+        path_bp = _get_csv_por_tipo("BALANCO_PATRIMONIAL", periodo)
+        if not path_bp or not os.path.exists(path_bp):
+            return {"erro": "Arquivo BP nao encontrado", "ativo": 0, "passivo": 0}
+
+        def _limpar_num(val):
+            if not val: return 0.0
+            v = str(val).upper().replace("R$", "").replace(" ", "").strip()
+            if not v or v == '-': return 0.0
+            mult = -1.0 if v.endswith('C') else 1.0
+            v = v.replace("C", "").replace("D", "")
+            if ',' in v and '.' in v:
+                v = v.replace(".", "").replace(",", ".")
+            elif ',' in v:
+                v = v.replace(",", ".")
+            try:
+                return float(v) * mult
+            except:
+                return 0.0
+
+        ativo = 0.0
+        passivo = 0.0
+
+        with open(path_bp, 'r', encoding='utf-8-sig', errors='ignore') as f:
+            for row in csv.reader(f, delimiter=';'):
+                if len(row) >= 4:
+                    col0 = row[0].strip().replace('"', '').upper()
+                    col2 = row[2].strip().replace('"', '').upper()
+                    
+                    if col0 == "TOTAL":
+                        ativo = _limpar_num(row[1])
+                    if col2 == "TOTAL":
+                        passivo = _limpar_num(row[3])
+
+        return {
+            "ativo": ativo,
+            "passivo": passivo,
+            "diferenca": ativo - passivo,
+            "status": "OK" if abs(ativo - passivo) < 0.05 else "ERRO"
+        }
+    except Exception as e:
+        return {"erro": str(e), "ativo": 0, "passivo": 0}
+
+@app.get("/api/bp_teste/{periodo}")
+async def bp_teste(periodo: str):
+    import csv
+    import os
+    try:
+        path_bp = _get_csv_por_tipo("BALANCO_PATRIMONIAL", periodo)
+        if not path_bp or not os.path.exists(path_bp):
+            return {"erro": "Arquivo BP nao encontrado", "ativo": 0, "passivo": 0}
+
+        def _limpar_num(val):
+            if not val: return 0.0
+            v = str(val).upper().replace("R$", "").replace(" ", "").strip()
+            if not v or v == '-': return 0.0
+            mult = -1.0 if v.endswith('C') else 1.0
+            v = v.replace("C", "").replace("D", "")
+            if ',' in v and '.' in v:
+                v = v.replace(".", "").replace(",", ".")
+            elif ',' in v:
+                v = v.replace(",", ".")
+            try:
+                return float(v) * mult
+            except:
+                return 0.0
+
+        ativo = 0.0
+        passivo = 0.0
+
+        with open(path_bp, 'r', encoding='utf-8-sig', errors='ignore') as f:
+            for row in csv.reader(f, delimiter=';'):
+                if len(row) >= 4:
+                    col0 = row[0].strip().replace('"', '').upper()
+                    col2 = row[2].strip().replace('"', '').upper()
+                    
+                    if col0 == "TOTAL":
+                        ativo = _limpar_num(row[1])
+                    if col2 == "TOTAL":
+                        passivo = _limpar_num(row[3])
+
+        return {
+            "ativo": ativo,
+            "passivo": passivo,
+            "diferenca": ativo - passivo,
+            "status": "OK" if abs(ativo - passivo) < 0.05 else "ERRO"
+        }
+    except Exception as e:
+        return {"erro": str(e), "ativo": 0, "passivo": 0}
+
+@app.get("/analise_cruzada/{periodo}")
+async def analise_cruzada(periodo: str):
+    return await bp_teste(periodo)

@@ -1,0 +1,100 @@
+{
+  "slide_4": {
+    "R$ 39,3 mi": "superavit_orcamentario",
+    "R$ 37,5 mi": "superavit_patrimonial",
+    "R$ 63,0 mi": "superavit_financeiro",
+    "R$ 625,6 mi": "patrimonio_liquido",
+    "R$ 636,8 mi": "ativo_total",
+    "R$ 11,2 mi": "passivo_total"
+  },
+  "slide_5": {
+    "R$ 636,8 mi": "ativo_total",
+    "R$ 37,5 mi": "superavit_patrimonial",
+    "R$ 321,9 mi": "ingressos_totais"
+  },
+  "slide_7": {
+    "Destaques: crescimento do PL explicado pelo aumento de créditos tributários a receber (superávit patrimonial); aumento d": "texto_destaque_bp"
+  },
+  "slide_8": {
+    "Conclusão:  posição financeira extremamente sólida e de baixo risco.": "texto_conclusao_bp"
+  },
+  "slide_9": {
+    "Principais conclusões: receita cresce de forma moderada enquanto as despesas aceleram; o superávit orçamentário caiu 35%": "texto_conclusao_bo"
+  },
+  "slide_10": {
+    "Destaques: alta de 2,36% nas transferências dos CORENs · queda de 12,20% nas receitas financeiras (menor Selic) · cresci": "texto_destaque_receita"
+  },
+  "slide_11": {
+    "Conclusões: o caixa permanece equilibrado (ingressos = dispêndios); há redução expressiva na geração de caixa (-55,88%);": "texto_conclusao_bf"
+  },
+  "slide_12": {
+    "Margem patrimonial | 42,45% → 26,88% \n                                                                                           (Superávit Patrimonial / Variações Ativas)": "texto_margem_patrimonial"
+  },
+  "slide_13": {
+    "Conclusão:  melhora expressiva no indicador, com queda de 16,04 p.p., devido a variação da receita.": "texto_conclusao_lrf"
+  },
+  "slide_18": {
+    "A RCL total dos 12 meses ultrapassa R$ 224 milhões, estabelecendo um limite legal de aproximadamente R$ 112 milhões para": "texto_rcl"
+  },
+  "slide_19": {
+    "O custo bruto de pessoal totaliza R$ 87,2 milhões — predominantemente vencimentos e encargos (90,83%).": "texto_custo_bruto"
+  },
+  "slide_20": {
+    "Impacto do ajuste: a exclusão das sentenças judiciais trabalhistas de 2025 reduz o custo total de pessoal de R$ 87,2 mil": "texto_ajuste"
+  },
+  "slide_21": {
+    "R$ 112,06 mi": "limite_lrf",
+    "38,91%": "percentual_bruto",
+    "R$ 87,20 mi da RCL — sem ajuste": "custo_bruto_texto",
+    "28,64%": "percentual_ajustado",
+    "R$ 64,18 mi da RCL — excluídas sentenças 2025": "custo_ajustado_texto"
+  },
+  "slide_22": {
+    "R$ 224.112.061,24": "rcl_12m",
+    "R$ 112.056.030,62": "limite_lrf_12m",
+    "R$ 64.183.565,30": "custo_ajustado_12m",
+    "28,64%": "comprometimento_rcl",
+    "R$ 47.872.465,32": "folga_lrf",
+    "R$ 106.453.229,09 / R$ 42.269.663,79": "limite_prudencial"
+  },
+  "slide_24": {
+    "R$ 114,00 mi": "total_executado",
+    "R$ 19,00 mi": "media_mensal",
+    "AF05 · Coordenação": "maior_centro_custo",
+    "Junho": "mes_maior_execucao",
+    "R$ 23,21 mi executados": "valor_maior_execucao"
+  },
+  "slide_30": {
+    "R$ 140,39 mi": "receita_realizada_2026",
+    "+0,73%": "variacao_receita",
+    "R$ 232,00 mi": "receita_orcada_2026",
+    "60,51%": "execucao_orcamentaria"
+  },
+  "slide_31": {
+    "60,51%": "execucao_orcamentaria_2026"
+  },
+  "slide_34": {
+    "56,5%": "concentracao_arrecadacao",
+    "25,89%": "participacao_sp",
+    "9,85%": "participacao_rj",
+    "9,59%": "participacao_mg",
+    "6,05%": "participacao_pr",
+    "5,10%": "participacao_ba"
+  },
+  "slide_35": {
+    "R$ 140,39 mi realizado": "receita_realizada_2026",
+    "Meta: R$ 232,00 mi": "meta_2026",
+    "60,51%": "execucao_2026",
+    "R$ 140,39 mi": "realizado_1s2026",
+    "R$ 91,61 mi": "necessario_2s2026"
+  },
+  "slide_38": {
+    "Alta liquidez (Liquidez Corrente > 29)": "ponto_forte_liquidez",
+    "Baixíssimo endividamento (1,75%)": "ponto_forte_endividamento",
+    "Patrimônio Líquido robusto (R$ 625,6 mi)": "ponto_forte_pl",
+    "Redução do superávit orçamentário (-35%)": "ponto_atencao_superavit",
+    "Aumento de restos a pagar (R$ 32,9 mi)": "ponto_atencao_restos",
+    "Queda das receitas financeiras (-12,2%)": "ponto_atencao_receitas",
+    "Crescimento das transferências concedidas (+68%)": "ponto_atencao_transferencias"
+  }
+}

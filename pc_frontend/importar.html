@@ -1,0 +1,289 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema PC - Prestação de Contas</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f8f9fa; color: #333; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Menu Lateral */
+        .sidebar { width: 260px; background: #fff; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; z-index: 10; overflow-y: auto; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #e0e0e0; }
+        .sidebar-header h1 { color: #0072BA; font-size: 24px; font-weight: 800; }
+        .sidebar-header span { color: #888; font-size: 12px; font-weight: normal; display: block; margin-top: 4px; }
+        
+        .sidebar-menu { padding: 10px 0; flex: 1; }
+        .menu-group { padding: 10px 20px; color: #333; font-size: 14px; font-weight: 600; margin-top: 10px; }
+        
+        .menu-item { display: block; padding: 10px 20px 10px 30px; color: #555; font-size: 14px; cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; text-decoration: none; }
+        .menu-item:hover { background: #f0f4f8; color: #0072BA; }
+        .menu-item.active { background: #e6f0fa; color: #0072BA; font-weight: bold; border-left-color: #0072BA; }
+        
+        .menu-top { padding: 15px 20px; font-size: 14px; font-weight: 600; cursor: pointer; display: block; text-decoration: none; color: #333; border-bottom: 1px solid #f0f0f0; }
+        .menu-top:hover { background: #f0f4f8; color: #0072BA; }
+        .menu-top.active { background: #0072BA; color: #fff; }
+
+        /* Área Principal */
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .topbar { height: 70px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; }
+        .topbar h2 { font-size: 20px; color: #333; }
+        .topbar .user { font-size: 14px; color: #555; display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 32px; height: 32px; background: #0072BA; color: #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 12px; }
+        
+        .content { flex: 1; padding: 30px; overflow-y: auto; }
+        
+        /* Controle de Telas */
+        .tela { display: none; animation: fadeIn 0.3s; }
+        .tela.ativa { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Card de Importação */
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 6px solid #0072BA; padding: 30px; width: 100%; max-width: 600px; margin: 0 auto; }
+        .card h3 { color: #0072BA; font-size: 20px; margin-bottom: 10px; text-align: center; }
+        .card p { color: #666; font-size: 14px; text-align: center; margin-bottom: 25px; }
+
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; color: #444; font-size: 14px; }
+        select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; outline: none; cursor: pointer; }
+        select:focus { border-color: #0072BA; }
+
+        /* Input de Arquivo */
+        .file-upload-wrapper { display: flex; width: 100%; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; }
+        .file-upload-btn { padding: 12px 20px; background: #f0f0f0; font-weight: 600; color: #333; cursor: pointer; white-space: nowrap; border-right: 1px solid #ccc; }
+        .file-upload-text { flex: 1; padding: 12px; background: #fafbfc; color: #888; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        input[type="file"] { display: none; }
+
+        button.btn { width: 100%; padding: 15px; background: #0072BA; color: #fff; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+        button.btn:hover { background: #005a96; }
+        button.btn:disabled { background: #90caf9; cursor: not-allowed; }
+
+        .status { margin-top: 20px; padding: 15px; border-radius: 6px; text-align: center; font-weight: bold; display: none; }
+        .status.success { background: #d4edda; color: #155724; display: block; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; display: block; border: 1px solid #f5c6cb; }
+        .status.info { background: #cce5ff; color: #004085; display: block; border: 1px solid #b8daff; }
+
+        /* Card de Download */
+        .download-card { background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 6px solid #0072BA; padding: 40px; width: 100%; max-width: 700px; margin: 0 auto; text-align: center; }
+        .download-card h3 { color: #0072BA; font-size: 24px; margin-bottom: 10px; }
+        .download-card p { color: #666; margin-bottom: 30px; }
+        
+        .btn-group { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
+        .btn-download { padding: 15px 25px; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .btn-pdf { background: #dc3545; }
+        .btn-pdf:hover { background: #c82333; }
+        .btn-excel { background: #28a745; }
+        .btn-excel:hover { background: #218838; }
+        .btn-pptx { background: #fd7e14; }
+        .btn-pptx:hover { background: #e86b00; }
+    </style>
+</head>
+<body>
+
+    <!-- Menu Lateral -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>COFEN</h1>
+            <span>Sistema PC - Prestacao de Contas</span>
+        </div>
+        <div class="sidebar-menu">
+            <a href="#" class="menu-top" onclick="mudarTela('dashboard', this)">Dashboard</a>
+            
+            <div class="menu-group">Demonstrações Contábeis</div>
+            <a class="menu-item" onclick="mudarTela('download', this, 'Balancete', 'BALANCETE')">Balancete</a>
+            <a class="menu-item" onclick="mudarTela('download', this, 'Balanço Patrimonial', 'BALANCO_PATRIMONIAL')">Balanço Patrimonial</a>
+            <a class="menu-item" onclick="mudarTela('download', this, 'Balanço Orçamentário', 'BALANCO_ORCAMENTARIO')">Balanço Orçamentário</a>
+            <a class="menu-item" onclick="mudarTela('download', this, 'Balanço Financeiro', 'BALANCO_FINANCEIRO')">Balanço Financeiro</a>
+            <a class="menu-item" onclick="mudarTela('download', this, 'DFC', 'DFC')">DFC</a>
+            <a class="menu-item" onclick="mudarTela('download', this, 'DVP', 'DVP')">DVP</a>
+            <a class="menu-item" onclick="mudarTela('download', this, 'DMPL', 'DMPL')">DMPL</a>
+            
+            <a href="#" class="menu-top" onclick="mudarTela('importar', this)" style="margin-top: 20px; border-top: 1px solid #e0e0e0;">Importar Relatórios</a>
+        </div>
+    </div>
+
+    <!-- Área Principal -->
+    <div class="main">
+        <div class="topbar">
+            <h2 id="titulo-pagina">Painel de Controle</h2>
+            <div class="user">
+                <span>Marcelo Medeiros</span>
+                <div class="avatar">MM</div>
+            </div>
+        </div>
+
+        <div class="content">
+            
+            <!-- TELA: DASHBOARD -->
+            <div id="tela-dashboard" class="tela ativa">
+                <div class="download-card" style="border-top-color: #6c757d;">
+                    <h3>Bem-vindo ao Painel</h3>
+                    <p>Selecione uma demonstração no menu à esquerda para gerar o relatório, ou clique em <strong>Importar Relatórios</strong> para subir um novo arquivo CSV.</p>
+                </div>
+            </div>
+
+            <!-- TELA: DOWNLOAD DE RELATÓRIOS -->
+            <div id="tela-download" class="tela">
+                <div class="download-card">
+                    <h3 id="titulo-download">Relatório</h3>
+                    <p>Selecione o formato desejado para exportar a demonstração contábil.</p>
+                    
+                    <div class="btn-group">
+                        <a id="link-pdf" href="#" target="_blank" class="btn-download btn-pdf">📄 Baixar PDF</a>
+                        <a id="link-excel" href="#" class="btn-download btn-excel">📊 Baixar Excel</a>
+                        <a id="link-pptx" href="#" class="btn-download btn-pptx">📽️ Baixar PPTX</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TELA: IMPORTAR -->
+            <div id="tela-importar" class="tela">
+                <div class="card">
+                    <h3>Importar Relatórios (CSV)</h3>
+                    <p>Selecione o tipo de relatório e envie o arquivo exportado do SISCONT.</p>
+
+                    <div class="form-group">
+                        <label for="tipo-relatorio">Tipo de Relatório</label>
+                        <select id="tipo-relatorio">
+                            <option value="BALANCETE">Balancete</option>
+                            <option value="BALANCO_PATRIMONIAL">Balanço Patrimonial</option>
+                            <option value="BALANCO_ORCAMENTARIO">Balanço Orçamentário</option>
+                            <option value="BALANCO_FINANCEIRO">Balanço Financeiro</option>
+                            <option value="DFC">DFC (Fluxo de Caixa)</option>
+                            <option value="DVP">DVP (Variações Patrimoniais)</option>
+                            <option value="DMPL">DMPL (Mutações do PL)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Arquivo CSV</label>
+                        <div class="file-upload-wrapper">
+                            <label class="file-upload-btn" for="arquivo-csv">Escolher arquivo</label>
+                            <div class="file-upload-text" id="file-name">Nenhum arquivo selecionado</div>
+                        </div>
+                        <input type="file" id="arquivo-csv" accept=".csv">
+                    </div>
+
+                    <button class="btn" id="btn-enviar" onclick="enviarArquivo()">Importar Arquivo</button>
+                    <div id="status" class="status"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- CONTROLE DE TELAS ---
+        function mudarTela(tela, elemento, titulo = null, tipoApi = null) {
+            // Esconde todas as telas
+            document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
+            // Remove o destaque do menu
+            document.querySelectorAll('.menu-top, .menu-item').forEach(m => m.classList.remove('active'));
+            
+            // Mostra a tela correta
+            document.getElementById('tela-' + tela).classList.add('ativa');
+            if(elemento) elemento.classList.add('active');
+            
+            // Ajusta o título
+            if(tela === 'dashboard') document.getElementById('titulo-pagina').innerText = 'Painel de Controle';
+            if(tela === 'importar') document.getElementById('titulo-pagina').innerText = 'Importar Relatórios';
+            
+            // Configura a tela de download se for o caso
+            if(tela === 'download') {
+                document.getElementById('titulo-pagina').innerText = titulo;
+                document.getElementById('titulo-download').innerText = titulo;
+                
+                // Define os links de download usando as rotas da API
+                document.getElementById('link-pdf').href = '/download/pdf/' + tipoApi + '?ano=2026&periodo=Jan-Set';
+                document.getElementById('link-excel').href = '/download/excel/' + tipoApi + '?ano=2026&periodo=Jan-Set';
+                document.getElementById('link-pptx').href = '/download/pptx/' + tipoApi + '?ano=2026&periodo=Jan-Set';
+            }
+        }
+
+        // --- LÓGICA DE IMPORTAÇÃO ---
+        const nomesArquivos = {
+            "BALANCETE": "Balancete.csv",
+            "BALANCO_PATRIMONIAL": "BalancoPatrimonialComparativo.csv",
+            "BALANCO_ORCAMENTARIO": "Balancoorcamentario.csv",
+            "BALANCO_FINANCEIRO": "BalancoFinanceiro.csv",
+            "DFC": "DFC.csv",
+            "DVP": "VariacoesPatrimoniais.csv",
+            "DMPL": "DMPL.csv"
+        };
+
+        const fileInput = document.getElementById('arquivo-csv');
+        const fileNameDisplay = document.getElementById('file-name');
+
+        if (fileInput) {
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    fileNameDisplay.textContent = fileInput.files[0].name;
+                    fileNameDisplay.style.color = '#28a745';
+                    fileNameDisplay.style.fontWeight = 'bold';
+                } else {
+                    fileNameDisplay.textContent = 'Nenhum arquivo selecionado';
+                    fileNameDisplay.style.color = '#888';
+                    fileNameDisplay.style.fontWeight = 'normal';
+                }
+            });
+        }
+
+        async function enviarArquivo() {
+            const tipo = document.getElementById('tipo-relatorio').value;
+            const btn = document.getElementById('btn-enviar');
+            const statusDiv = document.getElementById('status');
+            
+            if (fileInput.files.length === 0) {
+                statusDiv.className = 'status error';
+                statusDiv.style.display = 'block';
+                statusDiv.innerText = 'Por favor, selecione um arquivo CSV antes de continuar.';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const novoNome = nomesArquivos[tipo];
+            
+            const arquivoRenomeado = new File([file], novoNome, { type: 'text/csv' });
+            const formData = new FormData();
+            formData.append('file', arquivoRenomeado);
+            
+            btn.disabled = true;
+            btn.innerText = 'Enviando arquivo...';
+            statusDiv.className = 'status info';
+            statusDiv.style.display = 'block';
+            statusDiv.innerText = '⏳ Conectando ao servidor e enviando o arquivo...';
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.className = 'status success';
+                    statusDiv.innerText = '✅ Sucesso! O arquivo foi salvo no servidor como "' + data.filename + '".';
+                    
+                    alert('Importação Concluída!\n\nO arquivo foi processado e salvo com sucesso.');
+                    
+                    fileInput.value = '';
+                    fileNameDisplay.textContent = 'Nenhum arquivo selecionado';
+                    fileNameDisplay.style.color = '#888';
+                    fileNameDisplay.style.fontWeight = 'normal';
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.innerText = '❌ Erro no servidor. O arquivo não pôde ser salvo.';
+                }
+            } catch (error) {
+                console.error(error);
+                statusDiv.className = 'status error';
+                statusDiv.innerText = '❌ Erro de conexão. Verifique se o terminal do servidor está aberto.';
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Importar Arquivo';
+            }
+        }
+    </script>
+</body>
+</html>
