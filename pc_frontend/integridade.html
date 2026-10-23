@@ -122,7 +122,9 @@
             html += '</tr></thead><tbody>';
             
             matriz.forEach(row => {
-                const statusClass = row.conf === 'OK' ? 'status-ok' : (row.conf === 'ERRO' ? 'status-erro' : '');
+                const isPendencia = /^\(\d+\)$/.test(row.conf);
+                const statusClass = row.conf === 'OK' ? 'status-ok' : (isPendencia ? 'status-erro' : '');
+                
                 html += '<tr>';
                 html += `<td style="text-align: left; font-weight: bold; color: #333;">${row.item}</td>`;
                 html += `<td>${row.balancete}</td>`;
@@ -137,6 +139,22 @@
             });
             
             html += '</tbody></table></div>';
+            
+            let pendencias = matriz.filter(row => /^\(\d+\)$/.test(row.conf));
+            if (pendencias.length > 0) {
+                html += '<div style="margin-top: 20px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
+                html += '<h4 style="margin-top: 0; color: #dc3545;">Justificativas das Pendências</h4>';
+                pendencias.forEach(p => {
+                    html += `<div style="margin-bottom: 15px; display: flex; align-items: flex-start; gap: 10px;">
+                        <span style="color: #dc3545; font-weight: bold; min-width: 30px; margin-top: 8px;">${p.conf}</span>
+                        <span style="font-weight: bold; min-width: 250px; margin-top: 8px;">${p.item}</span>
+                        <span style="font-weight: bold; color: #555; margin-top: 8px;">Justificativa:</span>
+                        <textarea id="obs_${p.conf}" maxlength="300" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-height: 45px; resize: vertical; font-family: inherit; font-size: 14px;" placeholder="Digite a justificativa (max 300 caracteres)...">${p.observacao || ''}</textarea>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
             document.getElementById('integridade-cards').innerHTML = html;
         }
 
@@ -213,21 +231,31 @@
             btn.innerText = "Salvando...";
             btn.disabled = true;
 
-            fetch('/salvar_matriz_historico/' + periodo)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.erro) {
-                        alert("Erro ao salvar: " + data.erro);
-                    } else {
-                        alert("Matriz salva no histórico com sucesso!"); setTimeout(() => { carregarHistorico(); }, 500);
-                        btn.style.display = "none"; // Esconde o botão após salvar
-                    }
-                })
-                .catch(err => alert("Erro de conexão ao salvar."))
-                .finally(() => {
-                    btn.innerText = "Confirmar e Salvar";
-                    btn.disabled = false;
-                });
+            let justificativas = {};
+            document.querySelectorAll('textarea[id^="obs_"], input[id^="obs_"]').forEach(input => {
+                justificativas[input.id.replace('obs_', '')] = input.value;
+            });
+
+            fetch('/salvar_matriz_historico/' + periodo, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ justificativas: justificativas })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.erro) {
+                    alert("Erro ao salvar: " + data.erro);
+                } else {
+                    alert("Matriz e justificativas salvas com sucesso!");
+                    carregarHistorico(); 
+                    btn.style.display = "none"; 
+                }
+            })
+            .catch(err => alert("Erro de conexão ao salvar. Verifique o terminal."))
+            .finally(() => {
+                btn.innerText = "Confirmar e Salvar";
+                btn.disabled = false;
+            });
         }
 
         document.addEventListener('DOMContentLoaded', function() {

@@ -2,7 +2,7 @@
 import re
 import json
 import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body, Body, Body, Body
 from fastapi.responses import Response
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
@@ -106,25 +106,36 @@ async def salvar_integridade_cruzada(periodo: str):
 # ==========================================
 # ROTAS DA MATRIZ (NOVA TABELA SEPARADA)
 # ==========================================
-@router.get("/salvar_matriz_historico/{periodo}")
-async def salvar_matriz_historico(periodo: str):
+@router.post("/salvar_matriz_historico/{periodo}")
+async def salvar_matriz_historico(periodo: str, payload: dict = Body(None)):
     try:
         from matriz_integridade import gerar_matriz
         dados = await gerar_matriz(periodo)
-        if isinstance(dados, dict) and dados.get("erro") == "faltando": return dados
-
+        
+        if isinstance(dados, dict) and dados.get("erro") == "faltando": 
+            return dados
+            
+        if payload and "justificativas" in payload:
+            justificativas = payload["justificativas"]
+            for linha in dados.get("matriz", []):
+                conf = str(linha.get("conf", ""))
+                if conf in justificativas and justificativas[conf].strip() != "":
+                    linha["observacao"] = justificativas[conf]
+                    
         json_resultado = json.dumps(dados)
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute('''INSERT INTO historico_matriz_integridade (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)''', (periodo, data_agora, json_resultado))
+        cursor.execute("INSERT INTO historico_matriz_integridade (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", (periodo, data_agora, json_resultado))
         conn.commit()
         conn.close()
+        
         return {"mensagem": "Sucesso", "dados": dados}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/historico_matriz")
 async def listar_historico_matriz():
     conn = sqlite3.connect(DB_PATH)
@@ -198,10 +209,26 @@ async def gerar_pdf_integridade(id: int):
             
             # Conferência
             conf = str(linha.get('conf', ''))
-            pdf.set_text_color(0, 128, 0) if conf == "OK" else pdf.set_text_color(255, 0, 0) if conf == "ERRO" else pdf.set_text_color(0, 0, 0)
+            if conf == "OK":
+                pdf.set_text_color(0, 128, 0)
+            elif conf.startswith("(") and conf.endswith(")"):
+                pdf.set_text_color(255, 0, 0)
+            else:
+                pdf.set_text_color(0, 0, 0)
             pdf.cell(larguras[8], 7, conf, border=1, align="C")
             pdf.set_text_color(0, 0, 0)
             pdf.ln()
+
+        pendencias = [l for l in matriz if str(l.get('conf', '')).startswith('(')]
+        if pendencias:
+            pdf.ln(10)
+            pdf.set_font("helvetica", "B", 10)
+            pdf.set_text_color(0, 0, 0)
+            pdf.cell(0, 8, "Observações / Justificativas das Pendências:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("helvetica", "", 9)
+            for p in pendencias:
+                obs = p.get("observacao", "_________________________________________________________")
+                pdf.multi_cell(0, 6, f"{p['conf']} {p['item']} - Justificativa: {obs}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         pdf_bytes = pdf.output()
         return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Matriz_{periodo}.pdf"})

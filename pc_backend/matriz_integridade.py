@@ -52,6 +52,7 @@ async def gerar_matriz(periodo: str):
         l_dmpl= _ler_linhas(_get_csv("DMPL", periodo))
 
         matriz = []
+        contador_pendencias = [1]
 
         def add_linha(nome, bal=0, bp=0, bf=0, bo=0, dfc=0, dvp=0, dmpl=0):
             valores_brutos = [bal, bp, bf, bo, dfc, dvp, dmpl]
@@ -61,7 +62,8 @@ async def gerar_matriz(periodo: str):
                 if all(abs(abs(v) - abs(valores[0])) < 0.05 for v in valores):
                     conf = "OK"
                 else:
-                    conf = "ERRO"
+                    conf = f"({contador_pendencias[0]})"
+                    contador_pendencias[0] += 1
             elif len(valores) == 1:
                 conf = "N/A"
             else:
@@ -121,9 +123,9 @@ async def gerar_matriz(periodo: str):
         
         # --- VALORES RESTITUÍVEIS AJUSTADOS ---
         # DISPÊNDIOS: coluna 2 (Débito)
-        add_linha("VALORES RESTITUÍVEIS - DISPÊNDIOS", get_bal_movimento("2.1.8.8 - VALORES RESTITUÍVEIS", 3), bf=get_val(l_bf, "Depósitos Restituíveis e Valores Vinculados", 3))
+        add_linha("VALORES RESTITUÍVEIS - DISPÊNDIOS", get_bal_movimento("2.1.8.8 - VALORES RESTITUÍVEIS", 3), bf=get_val(l_bf, "VINCULADOS", 4))
         # INGRESSOS: coluna 3 (Crédito)
-        add_linha("VALORES RESTITUÍVEIS - INGRESSOS", get_bal_movimento("2.1.8.8 - VALORES RESTITUÍVEIS", 4), bf=get_val(l_bf, "Depósitos Restituíveis e Valores Vinculados", 1))
+        add_linha("VALORES RESTITUÍVEIS - INGRESSOS", get_bal_movimento("2.1.8.8 - VALORES RESTITUÍVEIS", 4), bf=get_val(l_bf, "VINCULADOS", 1))
 
         add_linha("PASSIVO NÃO CIRCULANTE", get_bal("2.2 - PASSIVO NAO-CIRCULANTE"), get_bp("PASSIVO NAO-CIRCULANTE", True))
 
@@ -138,10 +140,18 @@ async def gerar_matriz(periodo: str):
         add_linha("PATRIMÔNIO LÍQUIDO", pl_balancete, pl_bp, dmpl=pl_dmpl)
         
         # --- VPA E VPD ---
-        vpa_dvp = get_val(l_dvp, "TOTAL DAS VARIA", 2)
+        vpa_dvp = 0.0
+        for p in l_dvp:
+            if len(p) > 2 and "VARIAÇÃO PATRIMONIAL AUMENTATIVA" in p[0].upper():
+                vpa_dvp = _limpar_valor(p[2])
+                break
         add_linha("VPA", v4_vpa, dvp=vpa_dvp)
         
-        vpd_dvp = get_val(l_dvp, "TOTAL DAS VARIA", 4)
+        vpd_dvp = 0.0
+        for p in l_dvp:
+            if len(p) > 6 and "DIMINUTIVA" in p[4].upper():
+                vpd_dvp = _limpar_valor(p[6])
+                break
         add_linha("VPD", v3_vpd, dvp=vpd_dvp)
 
         # --- RECEITAS E DESPESAS ---
