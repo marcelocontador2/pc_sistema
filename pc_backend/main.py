@@ -1286,6 +1286,43 @@ async def lista_periodos():
     unicos = list({v['label']:v for v in periodos}.values())
     return sorted(unicos, key=lambda x: x["ano"], reverse=True)
 
+
+# =======================================================
+# ROTAS DE PAGINA (CONFERENCIA E INTEGRIDADE)
+# =======================================================
+from fastapi.responses import FileResponse
+import os as _os
+
+@app.get("/conferencia")
+async def serve_conferencia():
+    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
+    return FileResponse(caminho)
+
+@app.get("/integridade")
+async def serve_integridade():
+    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")
+    return FileResponse(caminho)
+
+
+@app.get("/api/ler_relatorio/{tipo}")
+async def ler_relatorio_csv(tipo: str):
+    import os, glob, csv
+    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    arquivos = glob.glob(os.path.join(pasta, f"*{tipo}*.csv"))
+    if not arquivos:
+        return {"erro": f"Arquivo do tipo {tipo} nao encontrado."}
+    arquivo = max(arquivos, key=os.path.getctime)
+    dados = []
+    try:
+        with open(arquivo, 'r', encoding='latin-1', errors='ignore') as f:
+            reader = csv.reader(f, delimiter=';')
+            for row in reader:
+                if row and any(row):
+                    dados.append([col.strip().replace(chr(34), '') for col in row])
+    except Exception as e:
+        return {"erro": str(e)}
+    return {"tipo": tipo, "arquivo": os.path.basename(arquivo), "dados": dados}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

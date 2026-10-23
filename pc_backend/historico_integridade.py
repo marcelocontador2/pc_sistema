@@ -100,3 +100,10 @@ async def excluir_historico(id: int):
         return {"mensagem": "Historico excluido com sucesso!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/salvar_integridade_cruzada/{periodo}")
+async def salvar_integridade_cruzada(periodo: str):
+    # Por enquanto ele chama a mesma funcao da conferencia. 
+    # Amanha alteramos a regra de calculo aqui.
+    return await salvar_integridade(periodo)

@@ -8,130 +8,194 @@
         .header { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .form-group { display: flex; align-items: center; gap: 5px; }
         label { font-weight: bold; color: #444; }
-        select, input { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
         .btn { border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #fff; background: #0056b3; }
-        .main-content { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
-        th { padding: 10px; text-align: left; background: #0056b3; color: #fff; }
-        td { padding: 10px; border-bottom: 1px solid #eee; }
+        .flex-layout { display: flex; gap: 20px; }
+        .sidebar { width: 300px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; height: fit-content; }
+        .main-content { flex: 1; }
+        .card { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .card h3 { margin-top: 0; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .card p { color: #666; font-size: 14px; margin-bottom: 15px; }
+        .card table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .card td { padding: 10px 0; border-bottom: 1px solid #eee; color: #444; font-size: 15px; }
+        .card td:last-child { text-align: right; font-weight: bold; color: #333; }
+        .status-box { padding: 12px; border-radius: 4px; font-size: 14px; }
+        .btn-acao { border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; color: white; font-weight: bold; margin-right: 5px; }
+        .btn-exibir { background: #28a745; }
+        .btn-excluir { background: #dc3545; }
+        @media print { #btn-voltar, #btn-pdf, .header, .sidebar, .btn-acao { display: none !important; } body { background: white !important; padding: 0 !important; } .flex-layout { display: block !important; } .main-content { width: 100% !important; } .card { break-inside: avoid; border: 1px solid #ccc !important; box-shadow: none !important; } }
     </style>
 </head>
 <body>
+    <div style="margin-bottom: 20px; display: flex; gap: 10px;" class="no-print">
+        <a href="/" id="btn-voltar" style="background: #fff; border: 1px solid #ccc; padding: 8px 15px; border-radius: 6px; text-decoration: none; color: #333; font-weight: bold;">&larr; Voltar ao Sistema</a>
+        <button onclick="gerarPDF()" id="btn-pdf" style="background: #0056b3; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold;">🖨️ Gerar PDF</button>
+    </div>
+
     <div class="header">
         <div class="form-group">
             <label>Ano:</label>
-            <select id="select-ano"><option value="2026">2026</option><option value="2025">2025</option></select>
+            <select id="ano"><option value="2026">2026</option><option value="2025">2025</option></select>
         </div>
-        
         <div class="form-group">
             <label>Tipo:</label>
-            <select id="select-tipo" onchange="atualizarValores()">
+            <select id="tipo_periodo" onchange="ajustarPeriodo()">
                 <option value="MES">Mensal</option>
                 <option value="TRIMESTRE">Trimestral</option>
-                <option value="ANO">Anual</option>
+                <option value="ANO">Exercício</option>
             </select>
         </div>
-
-        <div class="form-group">
-            <label>Período:</label>
-            <select id="select-valor"></select>
+        <div class="form-group" id="group-mes">
+            <label>Mês:</label>
+            <select id="mes">
+                <option value="01">01 - Janeiro</option><option value="02">02 - Fevereiro</option><option value="03">03 - Março</option>
+                <option value="04">04 - Abril</option><option value="05">05 - Maio</option><option value="06">06 - Junho</option>
+                <option value="07">07 - Julho</option><option value="08">08 - Agosto</option><option value="09">09 - Setembro</option>
+                <option value="10">10 - Outubro</option><option value="11">11 - Novembro</option><option value="12">12 - Dezembro</option>
+            </select>
         </div>
-
-        <button class="btn" onclick="verificarEGerar()">Verificar e Gerar Matriz</button>
+        <div class="form-group" id="group-trimestre" style="display:none;">
+            <label>Trimestre:</label>
+            <select id="trimestre">
+                <option value="1">1º Trimestre</option><option value="2">2º Trimestre</option>
+                <option value="3">3º Trimestre</option><option value="4">4º Trimestre</option>
+            </select>
+        </div>
+        <button class="btn" onclick="verificarEGerar()">Verificar e Gerar Integridade</button>
     </div>
 
-    <div class="main-content">
-        <h2 style="margin-top:0; color:#333;">Integridade entre Demonstrações Contábeis</h2>
-        <div id="matriz-cards"><p>Selecione o período e clique em Verificar e Gerar.</p></div>
+    <div class="flex-layout">
+        <div class="sidebar">
+            <h3>Histórico Salvo</h3>
+            <ul id="lista-historico" style="list-style: none; padding: 0;">Carregando...</ul>
+        </div>
+        <div class="main-content">
+            <div id="integridade-cards"><p>Selecione o período para gerar a integridade.</p></div>
+        </div>
     </div>
 
     <script>
-        function atualizarValores() {
-            const tipo = document.getElementById('select-tipo').value;
-            const selectValor = document.getElementById('select-valor');
-            selectValor.innerHTML = '';
-            
-            let opcoes = [];
-            if (tipo === 'MES') {
-                opcoes = ['01','02','03','04','05','06','07','08','09','10','11','12'];
-            } else if (tipo === 'TRIMESTRE') {
-                opcoes = ['1','2','3','4'];
-            } else if (tipo === 'ANO') {
-                opcoes = ['1'];
-            }
-
-            opcoes.forEach(op => {
-                let opt = document.createElement('option');
-                opt.value = op;
-                opt.textContent = op;
-                selectValor.appendChild(opt);
-            });
+        function ajustarPeriodo() {
+            const tipo = document.getElementById('tipo_periodo').value;
+            document.getElementById('group-mes').style.display = (tipo === 'MES') ? 'flex' : 'none';
+            document.getElementById('group-trimestre').style.display = (tipo === 'TRIMESTRE') ? 'flex' : 'none';
         }
 
         function verificarEGerar() {
-            const ano = document.getElementById('select-ano').value;
-            const tipo = document.getElementById('select-tipo').value;
-            const valor = document.getElementById('select-valor').value;
-            const cards = document.getElementById('matriz-cards');
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo_periodo').value;
+            const cards = document.getElementById('integridade-cards');
             
+            let valor = (tipo === 'MES') ? document.getElementById('mes').value : (tipo === 'TRIMESTRE') ? document.getElementById('trimestre').value : "1";
             const periodoFormatado = ano + '-' + tipo + '-' + valor;
             
-            cards.innerHTML = '<p>Verificando peças contábeis para o período ' + periodoFormatado + '...</p>';
+            cards.innerHTML = '<p>Verificando...</p>';
             
-            fetch('/gerar_matriz/' + periodoFormatado)
+            fetch('/salvar_integridade_cruzada/' + periodoFormatado)
                 .then(r => r.json())
                 .then(data => {
                     if (data.erro === 'faltando') {
-                        let msg = '<h3 style="color: #dc3545; margin-top: 0;">Peças Contábeis Pendentes!</h3>';
-                        msg += '<p>Para gerar a integridade do período <b>' + periodoFormatado + '</b>, faça o upload das seguintes peças:</p>';
-                        msg += '<ul style="text-align: left; margin: 15px auto; width: fit-content;">';
-                        data.pecas.forEach(p => { msg += '<li><b>' + p + '</b></li>'; });
-                        msg += '</ul>';
-                        msg += '<button onclick="fecharAviso()" style="background: #0056b3; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px;">Ir para Importação</button>';
-                        
-                        let modal = document.getElementById('modal-aviso');
-                        if (!modal) {
-                            modal = document.createElement('div');
-                            modal.id = 'modal-aviso';
-                            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; justify-content: center; align-items: center;';
-                            document.body.appendChild(modal);
-                        }
-                        modal.innerHTML = '<div style="background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); text-align: center; font-family: Arial;">' + msg + '</div>';
-                        modal.style.display = 'flex';
-                        
-                        cards.innerHTML = '<p>Selecione o período e clique em Verificar e Gerar.</p>';
+                        let msg = '<h3 style="color: #dc3545;">Peças Pendentes!</h3><ul>';
+                        data.pecas.forEach(p => { msg += '<li>' + p + '</li>'; });
+                        msg += '</ul><a href="/" style="background:#0056b3; color:#fff; padding:10px 20px; text-decoration:none; border-radius:6px;">Ir para Importação</a>';
+                        cards.innerHTML = msg;
                         return;
                     }
-
-                    if (data.matriz) {
-                        let html = '<table>';
-                        html += '<thead><tr>';
-                        html += '<th style="padding:10px; text-align:left;">NOMENCLATURA</th>';
-                        html += '<th>BALANCETE</th><th>BP</th><th>BF</th><th>BO</th><th>DFC</th><th>DVP</th><th>DMPL</th><th>CONFERÊNCIA</th>';
-                        html += '</tr></thead><tbody>';
-                        
-                        data.matriz.forEach(row => {
-                            const cor = row.conf === 'OK' ? '#e8f5e9' : (row.conf === 'ERRO' ? '#ffebee' : '#fff');
-                            html += `<tr style="background:${cor}; border-bottom:1px solid #ddd;">`;
-                            html += `<td style="padding:10px; text-align:left; font-weight:bold;">${row.item}</td>`;
-                            html += `<td>${row.balancete}</td><td>${row.bp}</td><td>${row.bf}</td><td>${row.bo}</td><td>${row.dfc}</td><td>${row.dvp}</td><td>${row.dmpl}</td>`;
-                            html += `<td style="font-weight:bold; color:${row.conf === 'OK' ? 'green' : (row.conf === 'ERRO' ? 'red' : 'gray')};">${row.conf}</td>`;
-                            html += '</tr>';
+                    if (data.dados && data.dados.analises) {
+                        let html = '';
+                        data.dados.analises.forEach(function(a) {
+                            const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
+                            let linhas = '';
+                            a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
+                            html += '<div class="card" style="border-left:5px solid ' + cor + ';">';
+                            html += '<h3>' + a.titulo + '</h3><p>' + a.conceito + '</p>';
+                            html += '<table>' + linhas + '</table>';
+                            html += '<div class="status-box" style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + ';">' + a.mensagem + '</div></div>';
                         });
-                        html += '</tbody></table>';
                         cards.innerHTML = html;
+                        carregarHistorico();
                     }
                 })
-                .catch(err => cards.innerHTML = '<p style="color:red;">Erro ao gerar matriz.</p>');
+                .catch(err => cards.innerHTML = '<p style="color:red;">Erro ao gerar.</p>');
         }
 
-        function fecharAviso() {
-            const modal = document.getElementById('modal-aviso');
-            if (modal) modal.style.display = 'none';
+        
+function carregarHistorico() {
+            fetch('/historico_integridade').then(r => r.json()).then(data => {
+                let html = '';
+                if(data.length === 0) html = '<li>Nenhum histórico.</li>';
+                data.forEach(item => {
+                    html += `<li style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" class="check-historico" value="${item.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                            <div>
+                                <div style="font-weight: bold; color: #0056b3;">${item.periodo}</div>
+                                <div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 5px; margin-left: 26px;">
+                            <button onclick="abrirHistorico(${item.id})" class="btn-acao btn-exibir" style="margin-bottom: 5px;">Exibir</button>
+                            <button onclick="excluirHistorico(${item.id})" class="btn-acao btn-excluir" style="margin-bottom: 5px;">Excluir</button>
+                        </div>
+                    </li>`;
+                });
+                document.getElementById('lista-historico').innerHTML = html;
+            });
         }
+
+
+        function abrirHistorico(id) {
+            const cards = document.getElementById('integridade-cards');
+            cards.innerHTML = '<p>Carregando histórico...</p>';
+            fetch('/historico_integridade/' + id).then(r => r.json()).then(data => {
+                let html = '';
+                data.analises.forEach(function(a) {
+                    const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
+                    let linhas = '';
+                    a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
+                    html += '<div class="card" style="border-left:5px solid ' + cor + ';">';
+                    html += '<h3>' + a.titulo + '</h3><p>' + a.conceito + '</p>';
+                    html += '<table>' + linhas + '</table>';
+                    html += '<div class="status-box" style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + ';">' + a.mensagem + '</div></div>';
+                });
+                cards.innerHTML = html;
+            });
+        }
+
+        function excluirHistorico(id) {
+            if(confirm("Tem certeza que deseja excluir?")) {
+                fetch('/excluir_integridade/' + id, { method: 'DELETE' }).then(r => {
+                    if(r.ok) { alert("Excluído!"); carregarHistorico(); }
+                });
+            }
+        }
+
+        
+
+function gerarPDF() {
+            // REGRA DE OURO: Obrigatoriamente tem que ter um item do histórico marcado!
+            const selecionados = document.querySelectorAll('.check-historico:checked');
+            
+            if (selecionados.length === 0) {
+                alert("Atenção: Você precisa marcar (selecionar) um relatório no 'Histórico Salvo' antes de gerar o PDF!");
+                return; // Bloqueia a impressão
+            }
+
+            // Se chegou aqui, tem caixinha marcada. Carrega e imprime.
+            const id = selecionados[0].value;
+            abrirHistorico(id);
+            
+            // Espera carregar e imprime
+            setTimeout(function() { 
+                window.print(); 
+            }, 500);
+        }
+
+
 
         document.addEventListener("DOMContentLoaded", function() {
-            atualizarValores();
+            ajustarPeriodo();
+            carregarHistorico();
         });
     </script>
 </body>

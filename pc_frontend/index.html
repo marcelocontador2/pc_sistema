@@ -53,6 +53,9 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
 .empty-state{text-align:center;padding:40px;color:var(--cofen-gray);background:#fff;border-radius:12px;border:1px dashed var(--cofen-border)}
 .upload-box{display:none}
 </style>
+
+
+
 </head>
 <body>
 <aside class="sidebar">
@@ -62,23 +65,20 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
     <li>
       <a id="menu-demonstracoes" class="active" onclick="toggleSubmenu(this)">Demonstrações Contábeis</a>
       <ul class="submenu open" id="submenu-demonstracoes">
-        <li><a id="submenu-balancete" onclick="mostrarTela('demonstracoes','BALANCETE')">Balancete</a></li>
-        <li><a id="submenu-bp" onclick="mostrarTela('demonstracoes','BALANCO_PATRIMONIAL')">Balanço Patrimonial</a></li>
+        <li><a id="submenu-balancete" onclick="carregarRelatorio(\'BALANCETE\')">Balancete</a></li>
+        <li><a id="submenu-bp" onclick="carregarRelatorio(\'BALANCO_PATRIMONIAL\')">Balanço Patrimonial</a></li>
         <li><a id="submenu-bo" onclick="mostrarTela('demonstracoes','BALANCO_ORCAMENTARIO')">Balanço Orçamentário</a></li>
         <li><a id="submenu-bf" onclick="mostrarTela('demonstracoes','BALANCO_FINANCEIRO')">Balanço Financeiro</a></li>
         <li><a id="submenu-dfc" onclick="mostrarTela('demonstracoes','DFC')">DFC</a></li>
         <li><a id="submenu-dvp" onclick="mostrarTela('demonstracoes','DVP')">DVP</a></li>
         <li><a id="submenu-dmpl" onclick="mostrarTela('demonstracoes','DMPL')">DMPL</a></li>
       
-        <li><a href="#" onclick="abrirTelaIntegridade('conferencia', 'Conferência das Demonstrações', event)">Conferência das Demonstrações</a></li>
-        <li><a href="#" onclick="abrirTelaIntegridade('integridade', 'Integridade entre Demonstrações', event)">Integridade entre Demonstrações</a></li>
+        <li><a href="/conferencia" style="display:block; padding:10px 20px; text-decoration:none; color:#333; font-weight:bold;">Conferência das Demonstrações</a></li>
+        <li><a href="/integridade" style="display:block; padding:10px 20px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
 </ul>
     </li>
     <li><a id="menu-upload" onclick="mostrarTela('upload')">Importar Relatórios</a></li>
-  
-        <li><a href="#" onclick="abrirTelaIntegridade('conferencia', 'Conferência das Demonstrações', event)">Conferência das Demonstrações</a></li>
-        <li><a href="#" onclick="abrirTelaIntegridade('integridade', 'Integridade entre Demonstrações', event)">Integridade entre Demonstrações</a></li>
-</ul>
+  </ul>
 </aside>
 <main class="main-content">
   <header class="header">
@@ -238,9 +238,18 @@ function mostrarTela(tela, tipo=null) {
     }
 }
 
-
-
-)
+function carregarPeriodos() {
+    const select = document.getElementById('filtro-periodo');
+    const reportsDiv = document.getElementById('reports-list');
+    
+    select.innerHTML = '<option value="">Carregando...</option>';
+    if (reportsDiv) reportsDiv.innerHTML = '';
+    
+    fetch('/periodos_importados/' + currentTipo)
+        .then(res => {
+            if (!res.ok) throw new Error('Falha na resposta');
+            return res.json();
+        })
         .then(data => {
             select.innerHTML = '';
             if (!data || !data.periodos || data.periodos.length === 0) {
@@ -490,162 +499,124 @@ document.getElementById('filtro-periodo').addEventListener('change', () => { car
 })();
 </script>
 
+
+
+
+
+
+
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // Procura a lista do menu principal
-    const navMenu = document.querySelector('.nav-menu');
-    if (navMenu) {
-        // Cria o novo item do menu (Análises de Integridade)
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = "#";
-        a.id = "menu-integridade";
-        a.innerHTML = "Análises de Integridade";
-        a.style.cursor = "pointer";
-        a.onclick = function(e) { abrirIntegridade(e); };
-        li.appendChild(a);
-        navMenu.appendChild(li); // Adiciona no finalzinho do menu
-    }
-});
-
-function abrirIntegridade(e) {
-    if (e) e.preventDefault();
+    // Pega todos os links do menu lateral
+    const links = document.querySelectorAll('.nav-menu a, .submenu a');
     
-    let overlay = document.getElementById('overlay-integridade');
-    if (!overlay) {
-        // Cria a tela que fica por cima do sistema
-        overlay = document.createElement('div');
-        overlay.id = 'overlay-integridade';
-        overlay.style.position = 'fixed';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.backgroundColor = '#f4f6f9';
-        overlay.style.zIndex = '99999'; // Fica acima de tudo
-        overlay.style.overflowY = 'auto';
-        overlay.style.padding = '30px';
-        overlay.style.display = 'none';
-        overlay.style.boxSizing = 'border-box';
-        
-        let innerHTML = '<div style="max-width:1200px; margin:0 auto; font-family:Arial, sans-serif;">';
-        innerHTML += '<button onclick="document.getElementById(\'overlay-integridade\').style.display=\'none\'" style="background:#fff; border:1px solid #ccc; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; margin-bottom:20px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">&larr; Voltar ao Painel</button>';
-        innerHTML += '<h2 style="margin-bottom:20px; color:#333;">Análises de Integridade Contábil</h2>';
-        innerHTML += '<div id="integridade-cards"><p>Carregando dados...</p></div>';
-        innerHTML += '</div>';
-        
-        overlay.innerHTML = innerHTML;
-        document.body.appendChild(overlay);
-    }
-    
-    overlay.style.display = 'block'; // Mostra a tela
-
-    // Busca os dados do Backend
-    fetch('/analise_integridade/2026-TRIMESTRE-3')
-        .then(r => r.json())
-        .then(data => {
-            let html = '';
-            if(data.analises && data.analises.length > 0) {
-                data.analises.forEach(function(a) {
-                    const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
-                    let linhas = '';
-                    a.tabela.forEach(function(l) {
-                        linhas += '<tr>';
-                        linhas += '<td style="padding:10px 0; border-bottom:1px solid #eee; color:#444; font-size:15px;">' + l.label + '</td>';
-                        linhas += '<td style="padding:10px 0; border-bottom:1px solid #eee; text-align:right; font-weight:bold; color:#333; font-size:15px;">' + l.valor + '</td>';
-                        linhas += '</tr>';
-                    });
-                    
-                    html += '<div style="background:#fff; border-left:5px solid ' + cor + '; padding:20px; margin-bottom:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">';
-                    html += '<h3 style="margin-top:0; color:#333; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">' + a.titulo + '</h3>';
-                    html += '<p style="color:#666; font-size:14px; margin-bottom:15px;">' + a.conceito + '</p>';
-                    html += '<table style="width:100%; border-collapse:collapse; margin-bottom:15px;">' + linhas + '</table>';
-                    html += '<div style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + '; padding:12px; border-radius:4px; font-size:14px;">' + a.mensagem + '</div>';
-                    html += '</div>';
-                });
-            } else {
-                html = '<p>Nenhuma análise encontrada.</p>';
+    links.forEach(link => {
+        link.addEventListener('click', function() {
+            // Sempre que um link do menu for clicado, esconde o overlay
+            const overlay = document.getElementById('overlay-integridade');
+            if (overlay) {
+                overlay.style.display = 'none';
             }
-            document.getElementById('integridade-cards').innerHTML = html;
+        });
+    });
+});
+</script>
+
+
+<style>
+/* Estilo da Tabela de Relatórios (Azul e Branco) */
+.tabela-relatorio { width: 100%; border-collapse: collapse; margin-top: 15px; font-family: Arial, sans-serif; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+.tabela-relatorio th { background-color: #0056b3; color: white; padding: 12px; text-align: left; }
+.tabela-relatorio td { padding: 10px; border-bottom: 1px solid #eee; color: #333; }
+.tabela-relatorio tr:nth-child(even) { background-color: #f8fbff; }
+.tabela-relatorio tr:hover { background-color: #e6f0fa; }
+</style>
+
+<script>
+// --- CARREGADOR DE RELATORIOS (Integracao com uploads_raw) ---
+function carregarRelatorio(tipo) {
+    // Esconde a tela de integridade se ela estiver aberta
+    const overlay = document.getElementById('overlay-integridade');
+    if (overlay) overlay.style.display = 'none';
+
+    // Esconde todas as content-areas originais
+    document.querySelectorAll('.content-area').forEach(e => e.classList.remove('active'));
+    
+    // Cria ou encontra a div de exibição do relatório
+    let tela = document.getElementById('tela-relatorio-dinamico');
+    if (!tela) {
+        tela = document.createElement('div');
+        tela.id = 'tela-relatorio-dinamico';
+        tela.className = 'content-area active';
+        tela.style.padding = '20px';
+        // Insere no meio do layout principal (onde ficam os outros content-areas)
+        const mainArea = document.querySelector('main') || document.querySelector('.main-content');
+        if(mainArea) {
+            mainArea.appendChild(tela);
+        } else {
+            document.body.appendChild(tela);
+        }
+    } else {
+        tela.classList.add('active');
+    }
+
+    tela.innerHTML = '<h3 style="color:#0056b3;">Carregando ' + tipo + '...</h3>';
+
+    // Busca os dados na rota do backend
+    fetch('/api/ler_relatorio/' + tipo)
+        .then(res => res.json())
+        .then(data => {
+            if (data.erro) {
+                tela.innerHTML = '<p style="color:red;">' + data.erro + '</p>';
+                return;
+            }
+            
+            let html = '<h3 style="color:#0056b3;">Relatório: ' + data.tipo + '</h3>';
+            html += '<p style="color:#666; margin-bottom: 15px;">Arquivo: ' + data.arquivo + '</p>';
+            html += '<table class="tabela-relatorio">';
+            
+            data.dados.forEach((row, index) => {
+                html += '<tr>';
+                if (index === 0) {
+                    row.forEach(cell => { html += '<th>' + cell + '</th>'; });
+                } else {
+                    row.forEach(cell => { html += '<td>' + cell + '</td>'; });
+                }
+                html += '</tr>';
+            });
+            
+            html += '</table>';
+            tela.innerHTML = html;
         })
-        .catch(function(err) {
-            document.getElementById('integridade-cards').innerHTML = '<p style="color:red;">Erro ao carregar os dados.</p>';
+        .catch(err => {
+            tela.innerHTML = '<p style="color:red;">Erro ao buscar dados do servidor.</p>';
         });
 }
-</script>
 
+// --- CONECTANDO OS BOTOES DO MENU ---
+document.addEventListener("DOMContentLoaded", function() {
+    // Mapeia os IDs dos menus para os tipos de arquivo
+    const mapeamento = {
+        'submenu-balancete': 'BALANCETE',
+        'submenu-bp': 'BALANCO_PATRIMONIAL',
+        'submenu-bo': 'BALANCO_ORCAMENTARIO',
+        'submenu-bf': 'BALANCO_FINANCEIRO',
+        'submenu-dfc': 'DFC',
+        'submenu-dvp': 'DVP',
+        'submenu-dmpl': 'DMPL'
+    };
 
-
-
-
-
-
-
-
-        
-
-
-
-<script>
-function abrirTelaIntegridade(pasta, titulo, e) {
-    if (e) e.preventDefault();
-    
-    let overlay = document.getElementById('overlay-integridade');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'overlay-integridade';
-        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:#f4f6f9; z-index:9999; display:none; box-sizing:border-box;';
-        
-        let conteudo = '<div style="padding:10px 20px; background:#fff; border-bottom:1px solid #ddd; display:flex; align-items:center;">';
-        conteudo += '<button onclick="document.getElementById(\'overlay-integridade\').style.display=\'none\'" style="background:#fff; border:1px solid #ccc; padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:bold;">&larr; Voltar ao Sistema</button>';
-        conteudo += '<h3 id="titulo-overlay" style="margin-left: 20px; margin-top: 0; margin-bottom: 0;">Título</h3>';
-        conteudo += '</div>';
-        conteudo += '<iframe id="iframe-integridade" src="" style="width:100%; height:calc(100% - 50px); border:none;"></iframe>';
-        
-        overlay.innerHTML = conteudo;
-        document.body.appendChild(overlay);
+    for (const [id, tipo] of Object.entries(mapeamento)) {
+        const link = document.getElementById(id);
+        if (link) {
+            // Sobrescreve apenas o onclick desses links específicos
+            link.onclick = function(e) {
+                e.preventDefault();
+                carregarRelatorio(tipo);
+            };
+        }
     }
-    
-    document.getElementById('titulo-overlay').innerText = titulo;
-    document.getElementById('iframe-integridade').src = '/pc_frontend/' + pasta + '.html';
-    overlay.style.display = 'block';
-}
-</script>
-
-</body></html>
-    `);
-    janelaImpressao.document.close();
-}
-</script>
-
-
-
-
-
-<script>
-function abrirTelaIntegridade(pasta, titulo, e) {
-    if (e) e.preventDefault();
-    
-    let overlay = document.getElementById('overlay-integridade');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'overlay-integridade';
-        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:#f4f6f9; z-index:9999; display:none; box-sizing:border-box;';
-        
-        let conteudo = '<div style="padding:10px 20px; background:#fff; border-bottom:1px solid #ddd; display:flex; align-items:center;">';
-        conteudo += '<button onclick="document.getElementById(\'overlay-integridade\').style.display=\'none\'" style="background:#fff; border:1px solid #ccc; padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:bold;">&larr; Voltar ao Sistema</button>';
-        conteudo += '<h3 id="titulo-overlay" style="margin-left: 20px; margin-top: 0; margin-bottom: 0;">Título</h3>';
-        conteudo += '</div>';
-        conteudo += '<iframe id="iframe-integridade" src="" style="width:100%; height:calc(100% - 50px); border:none;"></iframe>';
-        
-        overlay.innerHTML = conteudo;
-        document.body.appendChild(overlay);
-    }
-    
-    document.getElementById('titulo-overlay').innerText = titulo;
-    document.getElementById('iframe-integridade').src = '/pc_frontend/' + pasta + '.html';
-    overlay.style.display = 'block';
-}
+});
 </script>
 
 </body>
