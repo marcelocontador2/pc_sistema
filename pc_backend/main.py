@@ -1301,6 +1301,129 @@ async def serve_conferencia():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
     return FileResponse(caminho)
 
+
+@app.get("/api/calcular_liquidez/{periodo}")
+async def calcular_liquidez(periodo: str):
+    try:
+        from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+        caminho_bp = _get_csv("BALANCO_PATRIMONIAL", periodo)
+        if not caminho_bp:
+            raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
+        
+        l_bp = _ler_linhas(caminho_bp)
+        
+        # Função para buscar valor na coluna 1 ou 3 dependendo da linha
+        def buscar_valor(termo, coluna):
+            for p in l_bp:
+                if len(p) > coluna and termo.upper() in p[0].upper():
+                    return abs(_limpar_valor(p[coluna]))
+            return 0.0
+
+        # Ativo na Coluna 1
+        ativo_circulante = buscar_valor("ATIVO CIRCULANTE", 1)
+        caixa = buscar_valor("CAIXA E EQUIVALENTES", 1)
+        estoques = buscar_valor("ESTOQUES", 1)
+        
+        # Passivo na Coluna 3 (onde o diagnóstico mostrou os valores)
+        # Como não tem a linha "PASSIVO CIRCULANTE", usamos o valor da coluna 3 da linha do Ativo Circulante
+        passivo_circulante = buscar_valor("ATIVO CIRCULANTE", 3)
+        passivo_nao_circulante = buscar_valor("ATIVO NÃO CIRCULANTE", 3)
+        
+        # Realizável a Longo Prazo (pode não existir, usamos 0)
+        realizavel = 0.0
+
+        # Cálculos
+        liq_imediata = (caixa / passivo_circulante) if passivo_circulante > 0 else 0
+        liq_corrente = (ativo_circulante / passivo_circulante) if passivo_circulante > 0 else 0
+        liq_seca = ((ativo_circulante - estoques) / passivo_circulante) if passivo_circulante > 0 else 0
+        denom_geral = passivo_circulante + passivo_nao_circulante
+        liq_geral = ((ativo_circulante + realizavel) / denom_geral) if denom_geral > 0 else 0
+
+        return {
+            "resultados": {
+                "liquidez_imediata": round(liq_imediata, 2),
+                "liquidez_corrente": round(liq_corrente, 2),
+                "liquidez_seca": round(liq_seca, 2),
+                "liquidez_geral": round(liq_geral, 2)
+            },
+            "valores": {
+                "ativo_circulante": ativo_circulante,
+                "passivo_circulante": passivo_circulante,
+                "caixa": caixa,
+                "estoques": estoques,
+                "realizavel": realizavel,
+                "passivo_nao_circulante": passivo_nao_circulante
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/gerar_pdf_liquidez/{periodo}")
+async def gerar_pdf_liquidez(periodo: str):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+        
+        caminho_bp = _get_csv("BALANCO_PATRIMONIAL", periodo)
+        if not caminho_bp:
+            raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
+        
+        l_bp = _ler_linhas(caminho_bp)
+        
+        def buscar_valor(termo, coluna):
+            for p in l_bp:
+                if len(p) > coluna and termo.upper() in p[0].upper():
+                    return abs(_limpar_valor(p[coluna]))
+            return 0.0
+
+        ativo_circulante = buscar_valor("ATIVO CIRCULANTE", 1)
+        caixa = buscar_valor("CAIXA E EQUIVALENTES", 1)
+        estoques = buscar_valor("ESTOQUES", 1)
+        passivo_circulante = buscar_valor("ATIVO CIRCULANTE", 3)
+        passivo_nao_circulante = buscar_valor("ATIVO NÃO CIRCULANTE", 3)
+        realizavel = 0.0
+
+        liq_imediata = (caixa / passivo_circulante) if passivo_circulante > 0 else 0
+        liq_corrente = (ativo_circulante / passivo_circulante) if passivo_circulante > 0 else 0
+        liq_seca = ((ativo_circulante - estoques) / passivo_circulante) if passivo_circulante > 0 else 0
+        denom_geral = passivo_circulante + passivo_nao_circulante
+        liq_geral = ((ativo_circulante + realizavel) / denom_geral) if denom_geral > 0 else 0
+
+        pdf = FPDF(orientation='P', unit='mm', format='A4')
+        pdf.add_page()
+        pdf.set_font("helvetica", "B", 16)
+        pdf.cell(0, 10, f"Indices de Liquidez - {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(10)
+
+        def add_indice(titulo, valor, formula):
+            pdf.set_font("helvetica", "B", 12)
+            pdf.cell(0, 8, f"{titulo}: {valor}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("helvetica", "", 10)
+            pdf.set_text_color(100, 100, 100)
+            pdf.multi_cell(0, 6, formula, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(5)
+
+        def fmt(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        add_indice("Liquidez Imediata", round(liq_imediata, 2), f"({fmt(caixa)}) / ({fmt(passivo_circulante)})")
+        add_indice("Liquidez Corrente", round(liq_corrente, 2), f"({fmt(ativo_circulante)}) / ({fmt(passivo_circulante)})")
+        add_indice("Liquidez Seca", round(liq_seca, 2), f"(({fmt(ativo_circulante)} - {fmt(estoques)})) / ({fmt(passivo_circulante)})")
+        add_indice("Liquidez Geral", round(liq_geral, 2), f"({fmt(ativo_circulante)} + {fmt(realizavel)}) / ({fmt(passivo_circulante)} + {fmt(passivo_nao_circulante)})")
+
+        pdf_bytes = pdf.output()
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Liquidez_{periodo}.pdf"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/liquidez")
+async def serve_liquidez():
+    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "liquidez.html")
+    return FileResponse(caminho)
+
 @app.get("/integridade")
 async def serve_integridade():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")

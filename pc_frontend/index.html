@@ -56,15 +56,82 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
 
 
 
+
+        <style>
+            /* Força o alinhamento à esquerda em todos os links do menu lateral */
+            .menu-lateral a, .sidebar a, ul li a {
+                padding-left: 10px !important;
+                display: block;
+            }
+            /* Zera a margem padrão das listas para não empurrar */
+            .menu-lateral ul, .sidebar ul, ul {
+                padding-left: 0 !important;
+                margin-left: 0 !important;
+                list-style: none !important;
+            }
+        </style>
+
+
+        <style>
+            /* Efeito sensível (hover) no menu */
+            ul li a:hover {
+                background-color: #0056b3 !important;
+                color: #ffffff !important;
+                border-radius: 6px;
+                transition: background-color 0.2s ease;
+            }
+        </style>
+
+
+        <style>
+            /* Efeito sensível (hover) no menu */
+            ul li a:hover {
+                background-color: #0056b3 !important;
+                color: #ffffff !important;
+                border-radius: 6px;
+                transition: background-color 0.2s ease;
+            }
+        </style>
+
+
+        <style>
+            /* 1. Tira o sublinhado e ajusta o tamanho dos menus principais */
+            ul li a {
+                padding: 12px 20px !important; /* 20px de respiro na esquerda */
+                font-size: 15px !important;
+                font-weight: 600 !important;
+                color: #2c3e50 !important;
+                letter-spacing: 0.3px;
+                border-radius: 4px;
+                transition: all 0.2s;
+            }
+
+            /* 2. Deixa os submenus (Balancete, DFC, etc.) mais delicados */
+            ul.submenu li a {
+                padding: 8px 20px 8px 40px !important; /* 40px de recuo para mostrar hierarquia */
+                font-size: 13px !important;
+                font-weight: 400 !important;
+                color: #666666 !important;
+                letter-spacing: 0.1px;
+            }
+
+            /* 3. Efeito de hover (fundo azul) para dar sensação de clique */
+            ul li a:hover {
+                background-color: #0056b3 !important;
+                color: #ffffff !important;
+            }
+        </style>
+
 </head>
 <body>
 <aside class="sidebar">
   <div class="logo-area"><h1>COFEN</h1><p>Sistema PC - Prestacao de Contas</p></div>
-  <ul class="nav-menu">
-    <li><a id="menu-dashboard" onclick="mostrarTela('dashboard')">Dashboard</a></li>
+  <ul style="padding-left: 60px; margin-left: 0; list-style: none;">
+    
+    <li><a href="#" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
     <li>
       <a id="menu-demonstracoes" class="active" onclick="toggleSubmenu(this)">Demonstrações Contábeis</a>
-      <ul class="submenu open" id="submenu-demonstracoes">
+      <ul class="submenu open" id="submenu-demonstracoes" style="list-style: none; padding-left: 0; margin-left: 0;">
         <li><a id="submenu-balancete" onclick="carregarRelatorio(\'BALANCETE\')">Balancete</a></li>
         <li><a id="submenu-bp" onclick="carregarRelatorio(\'BALANCO_PATRIMONIAL\')">Balanço Patrimonial</a></li>
         <li><a id="submenu-bo" onclick="mostrarTela('demonstracoes','BALANCO_ORCAMENTARIO')">Balanço Orçamentário</a></li>
@@ -73,11 +140,12 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
         <li><a id="submenu-dvp" onclick="mostrarTela('demonstracoes','DVP')">DVP</a></li>
         <li><a id="submenu-dmpl" onclick="mostrarTela('demonstracoes','DMPL')">DMPL</a></li>
       
-        <li><a href="/conferencia" style="display:block; padding:10px 20px; text-decoration:none; color:#333; font-weight:bold;">Conferência das Demonstrações</a></li>
-        <li><a href="/integridade" style="display:block; padding:10px 20px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
-</ul>
+        <li><a href="/conferencia" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Conferência das Demonstrações</a></li>
+        <li><a href="/integridade" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
+<li><a href="/liquidez" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Índices de Liquidez</a></li>
+    </ul>
     </li>
-    <li><a id="menu-upload" onclick="mostrarTela('upload')">Importar Relatórios</a></li>
+    
   </ul>
 </aside>
 <main class="main-content">
