@@ -246,13 +246,11 @@ async def gerar_matriz(periodo: str):
             if len(p) > 3 and "CAIXA E EQUIVALENTES DE CAIXA FINAL" in p[0].upper():
                 val_dfc_caixa = _limpar_valor(p[3])
                 break
-        add_linha("CAIXA E EQUIVALENTES DE CAIXA", get_bal_movimento("1.1.1 - CAIXA E EQUIVALENTES DE CAIXA", 5), dfc=val_dfc_caixa)
-        
-        
-        
-
-        # 5. Crédito Empenhado Liquidado Pago - Despesas de Capital
-        # Pega o valor exato da linha 34 (DESEMBOLSOS) e 35 (OUTROS DESEMBOLSOS)
+        add_linha("CAIXA E EQUIVALENTES DE CAIXA", 
+                  get_bal_movimento("1.1.1 - CAIXA E EQUIVALENTES DE CAIXA", 5), 
+                  bp=get_val(l_bp, "CAIXA E EQUIVALENTES DE CAIXA", 1), 
+                  bf=next((_limpar_valor(p[4]) for p in l_bf if "CAIXA" in p[0].strip().upper()), 0.0), 
+                  dfc=next((_limpar_valor(p[3]) for p in l_dfc if "CAIXA E EQUIVALENTES DE CAIXA FINAL" in p[0].upper()), 0.0))
         # O Python usa índice 0, então a linha 34 é o índice 34 no array de linhas
         val_desembolsos = 0.0
         val_outros = 0.0
