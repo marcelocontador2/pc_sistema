@@ -137,7 +137,7 @@ async def gerar_matriz(periodo: str):
         
         pl_bp = get_bp("TOTAL DO PATRIMÔNIO LÍQUIDO", True)
         pl_dmpl = get_val(l_dmpl, "SALDOS FINAIS", 3)
-        add_linha("PATRIMÔNIO LÍQUIDO", pl_balancete, pl_bp, dmpl=pl_dmpl)
+        add_linha("PATRIMÔNIO LÍQUIDO", pl_balancete, pl_bp, dmpl=next((_limpar_valor(p[8]) for p in l_dmpl if "SALDOS FINAIS" in p[0].strip().upper()), 0.0))
         
         # --- VPA E VPD ---
         vpa_dvp = 0.0
