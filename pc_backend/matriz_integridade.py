@@ -250,10 +250,29 @@ async def gerar_matriz(periodo: str):
         
         
         
+
         # 5. Crédito Empenhado Liquidado Pago - Despesas de Capital
-        add_linha("CRÉDITO EMPENHADO LIQUIDADO PAGO - DESPESAS DE CAPITAL", get_bal("6.2.2.1.3.04.02 - CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CAPITAL"), dfc=get_val(l_dfc, "CRÉDITO EMPENHADO LIQUIDADO PAGO - DESPESAS DE CAPITAL", 3))
+        # Pega o valor exato da linha 34 (DESEMBOLSOS) e 35 (OUTROS DESEMBOLSOS)
+        # O Python usa índice 0, então a linha 34 é o índice 34 no array de linhas
+        val_desembolsos = 0.0
+        val_outros = 0.0
+        
+        # Busca pelo texto exato na lista l_dfc (que é a lista de linhas do CSV)
+        for i, p in enumerate(l_dfc):
+            texto = p[0].strip().upper()
+            if texto == "DESEMBOLSOS" and i == 34:
+                val_desembolsos = abs(_limpar_valor(p[3]))
+            elif "OUTROS DESEMBOLSOS DE INVESTIMENTOS" in texto and i == 35:
+                val_outros = abs(_limpar_valor(p[3]))
 
+        val_dfc_capital = val_desembolsos - val_outros
 
+        add_linha("CRÉDITO EMPENHADO LIQUIDADO PAGO - DESPESAS DE CAPITAL", 
+                  get_bal("6.2.2.1.3.04.02 - CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CAPITAL"), 
+                  bf=next((_limpar_valor(p[4]) for p in l_bf if len(p) > 4 and "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CAPITAL" in p[3].upper()), 0.0), 
+                  bo=get_val(l_bo, "CREDITO DISPONIVEL - DESPESA CAPITAL", 6), 
+                  dfc=val_dfc_capital)
+                  
         return {"matriz": matriz}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
