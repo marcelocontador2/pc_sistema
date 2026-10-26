@@ -16,7 +16,7 @@
         
         /* Estilo da Tabela Matriz */
         .matriz-tabela { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .matriz-tabela th { padding: 10px; text-align: left; background: #0056b3; color: white; border: 1px solid #004494; }
+        .matriz-tabela th { padding: 10px; text-align: center; background: #0056b3; color: white; border: 1px solid #004494; }
         .matriz-tabela td { padding: 8px; border: 1px solid #ddd; }
         .matriz-tabela tr:nth-child(even) { background-color: #f8fbff; }
         .status-ok { color: green; font-weight: bold; }
@@ -127,13 +127,25 @@
                 
                 html += '<tr>';
                 html += `<td style="text-align: left; font-weight: bold; color: #333;">${row.item}</td>`;
-                html += `<td>${row.balancete}</td>`;
-                html += `<td>${row.bp}</td>`;
-                html += `<td>${row.bf}</td>`;
-                html += `<td>${row.bo}</td>`;
-                html += `<td>${row.dfc}</td>`;
-                html += `<td>${row.dvp}</td>`;
-                html += `<td>${row.dmpl}</td>`;
+                
+                if (row.item === "INCORPORAÇÃO DE ATIVOS") {
+                    const valBal = row.balancete !== '-' ? row.balancete : '';
+                    html += `<td><input type="text" class="input-edit" id="edit_bal" value="${valBal}" style="width: 100%; border: 1px solid #ccc; padding: 4px; text-align: right;"></td>`;
+                    html += `<td>${row.bp}</td>`;
+                    html += `<td>${row.bf}</td>`;
+                    html += `<td>${row.bo}</td>`; // Agora é texto automático
+                    html += `<td>${row.dfc}</td>`;
+                    html += `<td>${row.dvp}</td>`; // Agora é texto automático
+                    html += `<td>${row.dmpl}</td>`;
+                } else {
+                    html += `<td>${row.balancete}</td>`;
+                    html += `<td>${row.bp}</td>`;
+                    html += `<td>${row.bf}</td>`;
+                    html += `<td>${row.bo}</td>`;
+                    html += `<td>${row.dfc}</td>`;
+                    html += `<td>${row.dvp}</td>`;
+                    html += `<td>${row.dmpl}</td>`;
+                }
                 html += `<td class="${statusClass}">${row.conf}</td>`;
                 html += '</tr>';
             });
@@ -149,7 +161,7 @@
                         <span style="color: #dc3545; font-weight: bold; min-width: 30px; margin-top: 8px;">${p.conf}</span>
                         <span style="font-weight: bold; min-width: 250px; margin-top: 8px;">${p.item}</span>
                         <span style="font-weight: bold; color: #555; margin-top: 8px;">Justificativa:</span>
-                        <textarea id="obs_${p.conf}" maxlength="300" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-height: 45px; resize: vertical; font-family: inherit; font-size: 14px;" placeholder="Digite a justificativa (max 300 caracteres)...">${p.observacao || ''}</textarea>
+                        <textarea id="obs_${p.conf}" maxlength="400" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-height: 45px; resize: vertical; font-family: inherit; font-size: 14px;" placeholder="Digite a justificativa (max 400 caracteres)...">${p.observacao || ''}</textarea>
                     </div>`;
                 });
                 html += '</div>';
@@ -225,7 +237,7 @@
         }
 
         
-        function salvarMatriz() {
+                function salvarMatriz() {
             const btn = document.getElementById('btn-salvar-matriz');
             const periodo = btn.getAttribute('data-periodo');
             btn.innerText = "Salvando...";
@@ -241,17 +253,22 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ justificativas: justificativas })
             })
-            .then(r => r.json())
-            .then(data => {
-                if (data.erro) {
-                    alert("Erro ao salvar: " + data.erro);
-                } else {
-                    alert("Matriz e justificativas salvas com sucesso!");
-                    carregarHistorico(); 
-                    btn.style.display = "none"; 
+            .then(async r => {
+                if (!r.ok) {
+                    const erro = await r.text();
+                    throw new Error("Erro no servidor: " + erro);
                 }
+                return r.json();
             })
-            .catch(err => alert("Erro de conexão ao salvar. Verifique o terminal."))
+            .then(data => {
+                alert("Matriz e justificativas salvas com sucesso!");
+                setTimeout(() => { carregarHistorico(); }, 500); 
+                btn.style.display = "none";
+            })
+            .catch(err => {
+                alert(err.message);
+                console.error(err);
+            })
             .finally(() => {
                 btn.innerText = "Confirmar e Salvar";
                 btn.disabled = false;
@@ -261,6 +278,114 @@
         document.addEventListener('DOMContentLoaded', function() {
             ajustarPeriodo();
             carregarHistorico();
+        });
+    
+        function formatarInput(input) {
+            let valor = input.value.replace(/\D/g, '');
+            if (!valor) {
+                input.value = '';
+                input.setAttribute('data-original', '0');
+                return;
+            }
+            let numero = parseInt(valor, 10) / 100;
+            let formatado = numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            input.value = formatado;
+            input.setAttribute('data-original', formatado);
+        }
+
+        function calcularConferencia() {
+            const balInput = document.getElementById('edit_bal');
+            if (!balInput) return;
+            
+            let balStr = balInput.getAttribute('data-original') || '0';
+            let bal = parseFloat(balStr.replace(/\./g, '').replace(',', '.')) || 0;
+            
+            // Os valores de BO e DVP já vêm como "R$ X.XXX,XX". Vamos limpar para comparar.
+            let boStr = document.querySelectorAll('.matriz-tabela tr:last-child td')[3].innerText;
+            let dvpStr = document.querySelectorAll('.matriz-tabela tr:last-child td')[6].innerText;
+            
+            let bo = parseFloat(boStr.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+            let dvp = parseFloat(dvpStr.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+            
+            let confCell = document.getElementById('conf-incorporacao');
+            if (!confCell) return;
+            
+            // Lógica de conferência: Se bal for igual a bo OU igual a dvp, é OK.
+            if (Math.abs(bal - bo) < 0.05 || Math.abs(bal - dvp) < 0.05) {
+                confCell.innerText = 'OK';
+                confCell.className = 'status-ok';
+            } else {
+                // Pega o próximo número de pendência disponível na tabela
+                let pendencias = document.querySelectorAll('.status-erro');
+                let proximoNum = pendencias.length + 1;
+                // Se já era uma pendência, mantém o número. Se não, atribui um novo.
+                if (confCell.innerText.match(/^\(\d+\)$/)) {
+                    // mantém
+                } else {
+                    confCell.innerText = '(' + proximoNum + ')';
+                }
+                confCell.className = 'status-erro';
+            }
+        }
+
+        // Formata todos os inputs de edição ao carregar a tabela
+        document.addEventListener('input', function(e) {
+            if (e.target && e.target.id === 'edit_bal') {
+                formatarInput(e.target);
+                calcularConferencia();
+            }
+        });
+    
+        // Função para formatar o valor em tempo real (Máscara de Dinheiro)
+        function formatarInput(input) {
+            let valor = input.value.replace(/\D/g, '');
+            if (!valor) {
+                input.value = '';
+                input.setAttribute('data-original', '0');
+                return;
+            }
+            let numero = parseInt(valor, 10) / 100;
+            let formatado = numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            input.value = formatado;
+            input.setAttribute('data-original', formatado);
+        }
+
+        // Função para recalcular a conferência ao digitar (sem salvar)
+        function calcularConferencia() {
+            const balInput = document.getElementById('edit_bal');
+            if (!balInput) return;
+            
+            let balStr = balInput.getAttribute('data-original') || '0';
+            let bal = parseFloat(balStr.replace(/\./g, '').replace(',', '.')) || 0;
+            
+            let boStr = document.querySelectorAll('.matriz-tabela tr:last-child td')[4].innerText;
+            let dvpStr = document.querySelectorAll('.matriz-tabela tr:last-child td')[6].innerText;
+            
+            let bo = parseFloat(boStr.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+            let dvp = parseFloat(dvpStr.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+            
+            let confCell = document.getElementById('conf-incorporacao');
+            if (!confCell) return;
+            
+            if (Math.abs(bal - bo) < 0.05 || Math.abs(bal - dvp) < 0.05) {
+                confCell.innerText = 'OK';
+                confCell.className = 'status-ok';
+            } else {
+                let pendencias = document.querySelectorAll('.status-erro');
+                let proximoNum = pendencias.length + 1;
+                if (!confCell.innerText.match(/^\(\d+\)$/)) {
+                    confCell.innerText = '(' + proximoNum + ')';
+                }
+                confCell.className = 'status-erro';
+            }
+        }
+
+        // Formata todos os inputs de edição ao carregar a tabela
+        document.addEventListener('input', function(e) {
+            if (e.target && e.target.id === 'edit_bal') {
+                formatarInput(e.target);
+                calcularConferencia();
+            }
         });
     </script>
 </body>

@@ -2,7 +2,7 @@
 import re
 import json
 import datetime
-from fastapi import APIRouter, HTTPException, Body, Body, Body, Body
+from fastapi import APIRouter, HTTPException, Body, Body, Body, Body, Body
 from fastapi.responses import Response
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
@@ -59,6 +59,13 @@ async def salvar_integridade(periodo: str):
         from integridade import analise_integridade
         dados = await analise_integridade(periodo)
         
+        # Injeta as justificativas no JSON se existirem
+        if payload and "justificativas" in payload:
+            for linha in dados.get("matriz", []):
+                conf = str(linha.get("conf", ""))
+                if conf in payload["justificativas"] and payload["justificativas"][conf].strip() != "":
+                    linha["observacao"] = payload["justificativas"][conf]
+
         json_resultado = json.dumps(dados)
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
@@ -115,6 +122,14 @@ async def salvar_matriz_historico(periodo: str, payload: dict = Body(None)):
         if isinstance(dados, dict) and dados.get("erro") == "faltando": 
             return dados
             
+        if payload and "campos_editados" in payload:
+            for linha in dados.get("matriz", []):
+                if linha.get("is_editable"):
+                    item = linha.get("item")
+                    linha["balancete"] = payload["campos_editados"].get(f"edit_bal_{item}", linha["balancete"])
+                    linha["bo"] = payload["campos_editados"].get(f"edit_bo_{item}", linha["bo"])
+                    linha["dvp"] = payload["campos_editados"].get(f"edit_dvp_{item}", linha["dvp"])
+
         if payload and "justificativas" in payload:
             justificativas = payload["justificativas"]
             for linha in dados.get("matriz", []):
@@ -122,6 +137,13 @@ async def salvar_matriz_historico(periodo: str, payload: dict = Body(None)):
                 if conf in justificativas and justificativas[conf].strip() != "":
                     linha["observacao"] = justificativas[conf]
                     
+        # Injeta as justificativas no JSON se existirem
+        if payload and "justificativas" in payload:
+            for linha in dados.get("matriz", []):
+                conf = str(linha.get("conf", ""))
+                if conf in payload["justificativas"] and payload["justificativas"][conf].strip() != "":
+                    linha["observacao"] = payload["justificativas"][conf]
+
         json_resultado = json.dumps(dados)
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
