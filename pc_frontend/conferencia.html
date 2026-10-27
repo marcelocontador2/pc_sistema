@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -13,23 +13,27 @@
         .flex-layout { display: flex; gap: 20px; }
         .sidebar { width: 300px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; height: fit-content; }
         .main-content { flex: 1; }
-        .card { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .card h3 { margin-top: 0; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-        .card p { color: #666; font-size: 14px; margin-bottom: 15px; }
-        .card table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-        .card td { padding: 10px 0; border-bottom: 1px solid #eee; color: #444; font-size: 15px; }
-        .card td:last-child { text-align: right; font-weight: bold; color: #333; }
-        .status-box { padding: 12px; border-radius: 4px; font-size: 14px; }
+        
+        .matriz-tabela { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .matriz-tabela th { padding: 10px; text-align: left; background: #0056b3; color: white; border: 1px solid #004494; }
+        .matriz-tabela td { padding: 8px; border: 1px solid #ddd; }
+        .matriz-tabela tr:nth-child(even) { background-color: #f8fbff; }
+        .status-ok { color: green; font-weight: bold; }
+        .status-erro { color: red; font-weight: bold; }
+        
         .btn-acao { border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; color: white; font-weight: bold; margin-right: 5px; }
         .btn-exibir { background: #28a745; }
         .btn-excluir { background: #dc3545; }
-        @media print { #btn-voltar, #btn-pdf, .header, .sidebar, .btn-acao { display: none !important; } body { background: white !important; padding: 0 !important; } .flex-layout { display: block !important; } .main-content { width: 100% !important; } .card { break-inside: avoid; border: 1px solid #ccc !important; box-shadow: none !important; } }
+        
+        @media print { #btn-voltar, #btn-pdf, .header, .sidebar, .btn-acao { display: none !important; } body { background: white !important; padding: 0 !important; } .flex-layout { display: block !important; } .main-content { width: 100% !important; } .matriz-tabela { box-shadow: none !important; } }
     </style>
 </head>
 <body>
     <div style="margin-bottom: 20px; display: flex; gap: 10px;" class="no-print">
         <a href="/" id="btn-voltar" style="background: #fff; border: 1px solid #ccc; padding: 8px 15px; border-radius: 6px; text-decoration: none; color: #333; font-weight: bold;">&larr; Voltar ao Sistema</a>
-        <button onclick="gerarPDF()" id="btn-pdf" style="background: #0056b3; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold;">🖨️ Gerar PDF</button>
+        <button onclick="gerarPDF()" id="btn-pdf" style="background: #0056b3; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold;">Gerar PDF</button>
+        <button onclick="exibirSelecionado()" style="background: #28a745; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold;">Exibir Selecionado</button>
+        <button onclick="excluirSelecionado()" style="background: #dc3545; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold;">Excluir Selecionado</button>
     </div>
 
     <div class="header">
@@ -102,21 +106,25 @@
                         return;
                     }
                     if (data.dados && data.dados.analises) {
-                        let html = '';
-                        data.dados.analises.forEach(function(a) {
-                            const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
-                            let linhas = '';
-                            a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
-                            html += '<div class="card" style="border-left:5px solid ' + cor + ';">';
-                            html += '<h3>' + a.titulo + '</h3><p>' + a.conceito + '</p>';
-                            html += '<table>' + linhas + '</table>';
-                            html += '<div class="status-box" style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + ';">' + a.mensagem + '</div></div>';
-                        });
-                        cards.innerHTML = html;
+                        renderizarCartoes(data.dados.analises);
                         carregarHistorico();
                     }
                 })
                 .catch(err => cards.innerHTML = '<p style="color:red;">Erro ao gerar.</p>');
+        }
+
+        function renderizarCartoes(analises) {
+            let html = '';
+            analises.forEach(function(a) {
+                const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
+                let linhas = '';
+                a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
+                html += '<div style="border-left:5px solid ' + cor + '; padding: 15px; margin-bottom: 15px; border: 1px solid #ddd; background: #fff;">';
+                html += '<h3>' + a.titulo + '</h3><p>' + a.conceito + '</p>';
+                html += '<table style="width:100%; border-collapse:collapse;">' + linhas + '</table>';
+                html += '<div style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + '; padding:10px;">' + a.mensagem + '</div></div>';
+            });
+            document.getElementById('integridade-cards').innerHTML = html;
         }
 
         function carregarHistorico() {
@@ -132,56 +140,95 @@
                                 <div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div>
                             </div>
                         </div>
-                        <div style="margin-top: 5px; margin-left: 26px;">
-                            <button onclick="abrirHistorico(${item.id})" class="btn-acao btn-exibir" style="margin-bottom: 5px;">Exibir</button>
-                            <button onclick="excluirHistorico(${item.id})" class="btn-acao btn-excluir" style="margin-bottom: 5px;">Excluir</button>
-                        </div>
                     </li>`;
                 });
                 document.getElementById('lista-historico').innerHTML = html;
             });
         }
 
-        function abrirHistorico(id) {
-            const cards = document.getElementById('integridade-cards');
-            cards.innerHTML = '<p>Carregando histórico...</p>';
-            fetch('/historico_integridade/' + id).then(r => r.json()).then(data => {
-                let html = '';
-                data.analises.forEach(function(a) {
-                    const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
-                    let linhas = '';
-                    a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
-                    html += '<div class="card" style="border-left:5px solid ' + cor + ';">';
-                    html += '<h3>' + a.titulo + '</h3><p>' + a.conceito + '</p>';
-                    html += '<table>' + linhas + '</table>';
-                    html += '<div class="status-box" style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + ';">' + a.mensagem + '</div></div>';
-                });
-                cards.innerHTML = html;
+        
+        
+
+                        function excluirSelecionado() {
+            const selecionados = document.querySelectorAll(".check-historico:checked");
+            
+            if (selecionados.length === 0) {
+                alert("Selecione pelo menos um item no histórico.");
+                return;
+            }
+
+            if (!confirm(`Tem certeza que deseja excluir os ${selecionados.length} itens selecionados?`)) {
+                return;
+            }
+
+            let promessas = [];
+            
+            selecionados.forEach(check => {
+                const id = check.value;
+                let url = "/excluir_integridade/" + id; // Padrão para conferência
+                
+                // Verifica se é a página de integridade para usar a rota correta
+                if (window.location.pathname.includes('integridade')) {
+                    url = "/excluir_matriz/" + id;
+                }
+
+                promessas.push(
+                    fetch(url, { method: "DELETE" }).then(r => {
+                        if(r.ok) return true;
+                        return false;
+                    }).catch(() => false)
+                );
+            });
+
+            Promise.all(promessas).then(resultados => {
+                const sucessos = resultados.filter(r => r === true).length;
+                if (sucessos > 0) {
+                    alert(sucessos + " item(ns) excluído(s) com sucesso!");
+                    carregarHistorico();
+                } else {
+                    alert("Erro ao excluir os itens.");
+                }
             });
         }
 
-        function excluirHistorico(id) {
-            if(confirm("Tem certeza que deseja excluir?")) {
-                fetch('/excluir_integridade/' + id, { method: 'DELETE' }).then(r => {
-                    if(r.ok) { alert("Excluído!"); carregarHistorico(); }
-                });
+        function obterIdSelecionado() {
+            const check = document.querySelector(".check-historico:checked");
+            if (!check) {
+                alert("Selecione um item no histórico primeiro!");
+                return null;
             }
+            return check.value;
+        }
+
+        function exibirSelecionado() {
+            const id = obterIdSelecionado();
+            if (id) abrirHistorico(id);
+        }
+
+        
+
+        function abrirHistorico(id) {
+            document.querySelectorAll(".check-historico").forEach(c => c.checked = false);
+            const cards = document.getElementById('integridade-cards');
+            cards.innerHTML = '<p>Carregando histórico...</p>';
+            fetch('/historico_integridade/' + id).then(r => r.json()).then(data => {
+                if (data.analises) {
+                    renderizarCartoes(data.analises);
+                } else {
+                    cards.innerHTML = '<p>Dados não encontrados.</p>';
+                }
+            });
         }
 
         function gerarPDF() {
             const selecionados = document.querySelectorAll('.check-historico:checked');
-            
             if (selecionados.length === 0) {
-                alert("Atenção: Você precisa marcar (selecionar) um relatório no 'Histórico Salvo' antes de gerar o PDF!");
+                alert("Marque um relatório no 'Histórico Salvo' antes de gerar o PDF!");
                 return; 
             }
-
             const id = selecionados[0].value;
             abrirHistorico(id);
-            
-            setTimeout(function() { 
-                window.print(); 
-            }, 500);
+            setTimeout(function() { window.print(); }, 500);
         }
 
         document.addEventListener("DOMContentLoaded", function() {
@@ -191,3 +238,5 @@
     </script>
 </body>
 </html>
+
+
