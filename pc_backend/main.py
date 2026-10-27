@@ -2013,29 +2013,50 @@ def _calc_liquidez(periodo):
     l_bp = _ler_linhas(caminho_bp)
     def buscar(termo, coluna):
         for p in l_bp:
-            if len(p) > coluna and termo.upper() in p[0].upper():
-                return abs(_limpar_valor(p[coluna]))
+            if len(p) > coluna:
+                for celula in p:
+                    if termo.upper() in str(celula).upper():
+                        return abs(_limpar_valor(p[coluna]))
         return 0.0
 
+    # --- BUSCA DOS VALORES EXATOS DO BP ---
     ativo_circulante = buscar("ATIVO CIRCULANTE", 1)
     caixa = buscar("CAIXA E EQUIVALENTES", 1)
     estoques = buscar("ESTOQUES", 1) or buscar("ESTOQUES", 3)
     realizavel = buscar("ATIVO REALIZÁVEL A LONGO PRAZO", 1)
     passivo_circulante = buscar("PASSIVO CIRCULANTE", 3) or buscar("ATIVO CIRCULANTE", 3)
-    passivo_nao_circulante = buscar("PASSIVO NÃO CIRCULANTE", 3) or buscar("ATIVO NÃO CIRCULANTE", 3)
+    passivo_nao_circulante = buscar("PASSIVO NAO-CIRCULANTE", 3) or buscar("PASSIVO NÃO CIRCULANTE", 3)
+    
+    # Variáveis exatas do BP
+    ativo_permanente = buscar("ATIVO PERMANENTE", 1)
+    patrimonio_liquido = buscar("TOTAL DO PATRIMÔNIO LÍQUIDO", 3)
 
+    # --- CÁLCULO DA LIQUIDEZ ---
     liq_imediata = (caixa / passivo_circulante) if passivo_circulante > 0 else 0
     liq_corrente = (ativo_circulante / passivo_circulante) if passivo_circulante > 0 else 0
     liq_seca = ((ativo_circulante - estoques) / passivo_circulante) if passivo_circulante > 0 else 0
     denom_geral = passivo_circulante + passivo_nao_circulante
     liq_geral = ((ativo_circulante + realizavel) / denom_geral) if denom_geral > 0 else 0
 
+    # --- CÁLCULO DA ESTRUTURA ---
+    ativo_total = ativo_circulante + realizavel + ativo_permanente
+    passivo_total = passivo_circulante + passivo_nao_circulante
+    
+    endividamento_geral = round((passivo_total / ativo_total) * 100, 2) if ativo_total > 0 else 0
+    part_capital_terceiros = round((passivo_total / patrimonio_liquido) * 100, 2) if patrimonio_liquido > 0 else 0
+    imobilizacao_pl = round((ativo_permanente / patrimonio_liquido) * 100, 2) if patrimonio_liquido > 0 else 0
+
     return {
-        "resultados": {
+        "liquidez": {
             "liquidez_imediata": round(liq_imediata, 2),
             "liquidez_corrente": round(liq_corrente, 2),
             "liquidez_seca": round(liq_seca, 2),
             "liquidez_geral": round(liq_geral, 2)
+        },
+        "estrutura": {
+            "endividamento_geral": endividamento_geral,
+            "part_capital_terceiros": part_capital_terceiros,
+            "imobilizacao_pl": imobilizacao_pl
         },
         "valores": {
             "ativo_circulante": ativo_circulante,
@@ -2043,7 +2064,11 @@ def _calc_liquidez(periodo):
             "caixa": caixa,
             "estoques": estoques,
             "realizavel": realizavel,
-            "passivo_nao_circulante": passivo_nao_circulante
+            "passivo_nao_circulante": passivo_nao_circulante,
+            "ativo_total": ativo_total,
+            "passivo_total": passivo_total,
+            "patrimonio_liquido": patrimonio_liquido,
+            "ativo_permanente": ativo_permanente
         }
     }
 
@@ -2052,6 +2077,18 @@ async def api_calcular_liquidez(periodo: str):
     dados = _calc_liquidez(periodo)
     if not dados: raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
     return dados
+
+@app.delete("/excluir_liquidez/{id}")
+async def excluir_liquidez(id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM historico_liquidez WHERE id = ?", (id,))
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Excluido"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/salvar_liquidez/{periodo}")
 async def salvar_liquidez(periodo: str):
@@ -2080,23 +2117,25 @@ async def listar_liquidez():
     return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
 
 @app.get("/historico_liquidez/{id}")
-async def buscar_liquidez(id: int):
+async def get_historico_liquidez(id: int):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT resultado_json FROM historico_liquidez WHERE id = ?", (id,))
+    cursor.execute("SELECT periodo, resultado_json FROM historico_liquidez WHERE id = ?", (id,))
     row = cursor.fetchone()
     conn.close()
     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-    return json.loads(row[0])
+    
+    periodo, json_str = row
+    dados = json.loads(json_str)
+    
+    # Se os dados antigos nao tem estrutura, recalcula
+    if "estrutura" not in dados:
+        novos_dados = _calc_liquidez(periodo)
+        if novos_dados:
+            dados = novos_dados
+    
+    return dados
 
-@app.delete("/excluir_liquidez/{id}")
-async def excluir_liquidez(id: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM historico_liquidez WHERE id = ?", (id,))
-    conn.commit()
-    conn.close()
-    return {"mensagem": "Excluido"}
 
 @app.get("/gerar_pdf_liquidez/{id}")
 async def gerar_pdf_liquidez(id: int):
@@ -2114,7 +2153,15 @@ async def gerar_pdf_liquidez(id: int):
         
         periodo, data_geracao, json_str = row
         dados = json.loads(json_str)
-        res = dados["resultados"]
+        
+        # Garante que os dados de estrutura existam (mesmo em históricos antigos)
+        if "estrutura" not in dados:
+            novos_dados = _calc_liquidez(periodo)
+            if novos_dados:
+                dados = novos_dados
+        
+        res = dados["liquidez"]
+        est = dados.get("estrutura", {})
         val = dados["valores"]
 
         pdf = FPDF(orientation='P', unit='mm', format='A4')
@@ -2131,6 +2178,14 @@ async def gerar_pdf_liquidez(id: int):
         def fmt(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
         def desenhar_card(titulo, valor, formula):
+            # Se o Y atual + 45mm (tamanho do card + margem) passar do limite da página (A4 = 297mm - 20mm de margem)
+            if pdf.get_y() + 45 > 277:
+                pdf.add_page()
+                pdf.set_font("helvetica", "B", 12)
+                pdf.set_text_color(100, 100, 100)
+                pdf.cell(0, 10, "Indices de Liquidez (Continuacao)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+                pdf.ln(5)
+            
             pdf.set_fill_color(248, 251, 255)
             pdf.rect(15, pdf.get_y(), 180, 35, style='F')
             pdf.set_fill_color(0, 86, 179)
@@ -2153,6 +2208,33 @@ async def gerar_pdf_liquidez(id: int):
         desenhar_card("Liquidez Corrente", res["liquidez_corrente"], f"(Ativo Circulante) / (Passivo Circulante) | ({fmt(val['ativo_circulante'])}) / ({fmt(val['passivo_circulante'])})")
         desenhar_card("Liquidez Seca", res["liquidez_seca"], f"((Ativo Circulante - Estoques)) / (Passivo Circulante) | (({fmt(val['ativo_circulante'])} - {fmt(val['estoques'])})) / ({fmt(val['passivo_circulante'])})")
         desenhar_card("Liquidez Geral", res["liquidez_geral"], f"(Ativo Circulante + Realizável a Longo Prazo) / (Passivo Circulante + Passivo Não Circulante) | ({fmt(val['ativo_circulante'])} + {fmt(val['realizavel'])}) / ({fmt(val['passivo_circulante'])} + {fmt(val['passivo_nao_circulante'])})")
+
+        # --- CALCULO ESTRUTURA (MESMA LOGICA DO FRONTEND) ---
+        v_ativa_circ = val.get('ativo_circulante', 0)
+        v_realizavel = val.get('realizavel', 0)
+        v_ativo_perm = val.get('ativo_permanente', 0)
+        v_passivo_circ = val.get('passivo_circulante', 0)
+        v_passivo_nao_circ = val.get('passivo_nao_circulante', 0)
+        v_pl = val.get('patrimonio_liquido', 0)
+        
+        ativo_total = v_ativa_circ + v_realizavel + v_ativo_perm
+        passivo_total = v_passivo_circ + v_passivo_nao_circ
+        
+        endividamento = (passivo_total / ativo_total * 100) if ativo_total > 0 else 0
+        part_capital = (passivo_total / v_pl * 100) if v_pl > 0 else 0
+        imobilizacao = (v_ativo_perm / v_pl * 100) if v_pl > 0 else 0
+
+        # Formatação dos valores (para moeda)
+        f_ativo_total = fmt(ativo_total)
+        f_passivo_total = fmt(passivo_total)
+        f_pl = fmt(v_pl)
+        f_ativo_perm = fmt(v_ativo_perm)
+
+        # Desenha os 3 novos cards no PDF
+        desenhar_card("Endividamento Geral", f"{endividamento:.2f}%", f"Passivo Total / Ativo Total | ({f_passivo_total}) / ({f_ativo_total})")
+        desenhar_card("Part. de Capital de Terceiros", f"{part_capital:.2f}%", f"Passivo / PL | ({f_passivo_total}) / ({f_pl})")
+        desenhar_card("Imobilização do PL", f"{imobilizacao:.2f}%", f"Ativo Perm. / PL | ({f_ativo_perm}) / ({f_pl})")
+
 
         pdf_bytes = pdf.output()
         return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Indices_{periodo.replace('-', '_')}.pdf"})

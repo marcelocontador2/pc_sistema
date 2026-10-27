@@ -36,7 +36,7 @@ async def get_periodos_importados(tipo_relatorio: str):
     unicos = list({v['label']:v for v in periodos}.values())
     return sorted(unicos, key=lambda x: x["ano"], reverse=True)
 
-@app.get("/analise_cruzada/{periodo}")
+@router.get("/analise_cruzada/{periodo}")
 async def analise_cruzada(periodo: str):
     try:
         p_limpo = re.sub(r'[^A-Z0-9]', '_', periodo.upper())
