@@ -25,10 +25,27 @@
         .card .valor { font-size: 24px; font-weight: bold; color: #0056b3; }
         #lista-historico { list-style: none; padding: 0; }
     </style>
+
+    <style id="estilo-voltar-laranja">
+        .btn-voltar-laranja {
+            background-color: #ff7f00 !important;
+            border-color: #ff7f00 !important;
+            border-radius: 50px !important;
+            color: white !important;
+            padding: 8px 20px !important;
+            font-weight: bold !important;
+            text-decoration: none !important;
+            display: inline-block !important;
+            border: none !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            cursor: pointer !important;
+        }
+    </style>
+
 </head>
 <body>
     <div class="top-bar">
-        <a href="/" class="btn btn-voltar">&larr; Voltar</a>
+        <a href="/" class="btn-voltar-laranja btn btn-voltar">&#8592; Voltar</a>
         <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>

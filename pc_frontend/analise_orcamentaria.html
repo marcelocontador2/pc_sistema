@@ -1,0 +1,247 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Análise Orçamentária Comparativa</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; margin: 0; }
+        .header-title { color: #003366; font-size: 28px; font-weight: bold; margin-bottom: 20px; }
+        .top-bar { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        .btn { padding: 8px 20px; border: none; border-radius: 50px; color: white; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-laranja { background: #ff7f00; }
+        .btn-azul { background: #0056b3; }
+        .filtros { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-wrap: wrap; }
+        .filtros select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        .layout { display: flex; gap: 30px; }
+        .tabela-container { flex: 1; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }
+        .grafico-container { flex: 1; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; display: flex; flex-direction: column; justify-content: center; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #003366; color: white; padding: 15px; text-align: center; font-size: 14px; }
+        td { padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 14px; }
+        td:first-child { font-weight: bold; color: #333; }
+        td:not(:first-child) { text-align: right; }
+        .var-positiva { color: #28a745; }
+        .var-negativa { color: #dc3545; }
+        tr:nth-child(even) { background-color: #f8fbff; }
+    </style>
+
+    <style id="estilo-voltar-laranja">
+        .btn-voltar-laranja {
+            background-color: #ff7f00 !important;
+            border-color: #ff7f00 !important;
+            border-radius: 50px !important;
+            color: white !important;
+            padding: 8px 20px !important;
+            font-weight: bold !important;
+            text-decoration: none !important;
+            display: inline-block !important;
+            border: none !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            cursor: pointer !important;
+        }
+    </style>
+
+</head>
+<body>
+    <div class="top-bar">
+        <a href="/" class="btn-voltar-laranja btn btn-laranja">&#8592; Voltar</a>
+    </div>
+
+    <div class="header-title">Análise Orçamentária Comparativa</div>
+
+    <div class="filtros">
+        <label>Ano:</label>
+        <select id="ano">
+            <option value="2026" selected>2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+        </select>
+
+        <label>Tipo:</label>
+        <select id="tipo" onchange="atualizarOpcoes()">
+            <option value="MES">Mensal</option>
+            <option value="TRIMESTRE" selected>Trimestral</option>
+            <option value="EXERCICIO">Exercício (Anual)</option>
+        </select>
+
+        <label id="label-opcoes">Período:</label>
+        <select id="opcoes">
+            <!-- Opções preenchidas via JS -->
+        </select>
+
+        <button class="btn btn-azul" onclick="carregarAnalise()">Verificar Análise</button>
+    </div>
+
+    <div class="layout">
+        <div class="tabela-container">
+            <table id="tabela-analise">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th>Período Anterior</th>
+                        <th>Período Atual</th>
+                        <th>Var. (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" style="text-align: center; color: #666;">Selecione o período e clique em "Verificar Análise"</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="grafico-container">
+            <canvas id="graficoOrcamentario"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let meuGrafico = null;
+
+        // Atualiza as opções baseado no tipo selecionado
+        function atualizarOpcoes() {
+            const tipo = document.getElementById('tipo').value;
+            const selectOpcoes = document.getElementById('opcoes');
+            const label = document.getElementById('label-opcoes');
+            selectOpcoes.innerHTML = '';
+
+            if (tipo === 'MES') {
+                label.innerText = 'Mês:';
+                const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+                meses.forEach((m, i) => {
+                    selectOpcoes.innerHTML += `<option value="${i+1}">${m}</option>`;
+                });
+            } else if (tipo === 'TRIMESTRE') {
+                label.innerText = 'Trimestre:';
+                selectOpcoes.innerHTML = `
+                    <option value="1">1º Trimestre</option>
+                    <option value="2">2º Trimestre</option>
+                    <option value="3">3º Trimestre</option>
+                    <option value="4">4º Trimestre</option>
+                `;
+            } else {
+                label.innerText = 'Exercício:';
+                selectOpcoes.innerHTML = `<option value="">Anual</option>`;
+            }
+        }
+
+        // Monta o período no formato do backend
+        function montarPeriodo(ano, tipo, opcao) {
+            if (tipo === 'EXERCICIO') return `${ano}`;
+            return `${ano}-${tipo}-${opcao}`;
+        }
+
+        function carregarAnalise() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo').value;
+            const opcao = document.getElementById('opcoes').value;
+            
+            const periodoAtual = montarPeriodo(ano, tipo, opcao);
+            
+            // Para o anterior, subtrai 1 do ano (mantém mês/trimestre)
+            const anoAnterior = parseInt(ano) - 1;
+            const periodoAnterior = montarPeriodo(anoAnterior, tipo, opcao);
+
+            const tbody = document.querySelector("#tabela-analise tbody");
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Buscando dados...</td></tr>';
+
+            Promise.all([
+                fetch('/api/analise_orcamentaria/' + periodoAtual).then(r => r.json()),
+                fetch('/api/analise_orcamentaria/' + periodoAnterior).then(r => r.json())
+            ])
+            .then(([dadosAtual, dadosAnterior]) => {
+                if (dadosAtual.erro || dadosAnterior.erro) {
+                    const msgAtual = dadosAtual.mensagem || "";
+                    const msgAnterior = dadosAnterior.mensagem || "";
+                    let msgFinal = "Atenção:\n";
+                    if (msgAtual) msgFinal += "- " + msgAtual + "\n";
+                    if (msgAnterior) msgFinal += "- " + msgAnterior;
+                    
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red; font-weight: bold;">' + (msgAtual || msgAnterior) + '</td></tr>';
+                    if (meuGrafico) { meuGrafico.destroy(); }
+                    return;
+                }
+
+                const indicadores = [
+                    { nome: "Receita Realizada (R$ mi)", key: "receita_realizada" },
+                    { nome: "Despesa Paga (R$ mi)", key: "despesa_paga" },
+                    { nome: "Superávit Orçamentário (R$ mi)", key: "superavit" }
+                ];
+
+                let htmlTabela = '';
+                indicadores.forEach(ind => {
+                    const valAtual = (dadosAtual[ind.key] || 0) / 1000000;
+                    const valAnterior = (dadosAnterior[ind.key] || 0) / 1000000;
+                    
+                    let variacao = 0;
+                    if (valAnterior !== 0) {
+                        variacao = ((valAtual - valAnterior) / Math.abs(valAnterior)) * 100;
+                    }
+                    
+                    const classeVar = variacao >= 0 ? "var-positiva" : "var-negativa";
+                    const sinal = variacao >= 0 ? "+" : "";
+
+                    htmlTabela += `
+                        <tr>
+                            <td>${ind.nome}</td>
+                            <td>${valAnterior.toFixed(2).replace('.', ',')}</td>
+                            <td>${valAtual.toFixed(2).replace('.', ',')}</td>
+                            <td class="${classeVar}">${sinal}${variacao.toFixed(2).replace('.', ',')}%</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = htmlTabela;
+                atualizarGrafico(dadosAtual, dadosAnterior);
+            })
+            .catch(err => {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">Erro de conexão com o servidor.</td></tr>';
+            });
+        }
+
+        function atualizarGrafico(dadosAtual, dadosAnterior) {
+            const ctx = document.getElementById('graficoOrcamentario').getContext('2d');
+            
+            if (meuGrafico) {
+                meuGrafico.destroy();
+            }
+
+            meuGrafico = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Receita Realizada', 'Despesa Paga', 'Superávit'],
+                    datasets: [
+                        {
+                            label: 'Período Anterior',
+                            data: [
+                                (dadosAnterior.receita_realizada || 0) / 1000000,
+                                (dadosAnterior.despesa_paga || 0) / 1000000,
+                                (dadosAnterior.superavit || 0) / 1000000
+                            ],
+                            backgroundColor: '#4a90e2'
+                        },
+                        {
+                            label: 'Período Atual',
+                            data: [
+                                (dadosAtual.receita_realizada || 0) / 1000000,
+                                (dadosAtual.despesa_paga || 0) / 1000000,
+                                (dadosAtual.superavit || 0) / 1000000
+                            ],
+                            backgroundColor: '#003366'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Receita, Despesa e Superávit (R$ mi)', font: { size: 16 } },
+                        legend: { position: 'bottom' }
+                    },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // Inicializa as opções ao carregar a página
+        document.addEventListener("DOMContentLoaded", atualizarOpcoes);
+    </script>
+</body>
+</html>

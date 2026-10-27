@@ -25,10 +25,27 @@
         #lista-historico input { margin-right: 5px; }
         #lista-historico small { color: #666; margin-left: 20px; }
     </style>
+
+    <style id="estilo-voltar-laranja">
+        .btn-voltar-laranja {
+            background-color: #ff7f00 !important;
+            border-color: #ff7f00 !important;
+            border-radius: 50px !important;
+            color: white !important;
+            padding: 8px 20px !important;
+            font-weight: bold !important;
+            text-decoration: none !important;
+            display: inline-block !important;
+            border: none !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            cursor: pointer !important;
+        }
+    </style>
+
 </head>
 <body>
     <div class="top-bar" style="margin-bottom: 20px;">
-        <a href="/" class="btn btn-azul">Voltar</a>
+        <a href="/" class="btn-voltar-laranja btn btn-azul">&#8592; Voltar</a>
         <button class="btn btn-verde" onclick="exibirSelecionado()">Exibir Selecionado</button>
         <button class="btn btn-vermelho" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-azul" onclick="gerarPDF()">Gerar PDF</button>

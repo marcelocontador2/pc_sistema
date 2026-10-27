@@ -1533,8 +1533,9 @@ async def gerar_pdf_panorama(id: int):
         from fastapi.responses import Response
         from fpdf import FPDF
         from fpdf.enums import XPos, YPos
-        import sqlite3, json, os
+        import httpx, sqlite3, json, os
         
+        # 1. Pega o período do histórico salvo
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -1544,13 +1545,27 @@ async def gerar_pdf_panorama(id: int):
         if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
         
         periodo, data_geracao, json_str = row
-        dados = json.loads(json_str)
 
+        # 2. Consome a API do Painel para pegar os valores EXATOS do momento
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"http://127.0.0.1:8000/api/panorama/{periodo}")
+            if response.status_code != 200:
+                raise Exception(f"Erro ao buscar dados do painel: {response.status_code}")
+            dados = response.json()
+        
+        # 3. Busca o valor do Caixa diretamente do BP para garantir que não venha zerado
+        # Usa a função _calc_liquidez que já sabe buscar o caixa no BP
+        dados_bp = _calc_liquidez(periodo)
+        caixa_bp = dados_bp.get("valores", {}).get("caixa", 0) if dados_bp else 0
+
+        # 4. Gera o PDF
         pdf = FPDF(orientation='L', unit='mm', format='A4')
         pdf.add_page()
+        
         pdf.set_font("helvetica", "B", 10)
         pdf.set_text_color(150, 150, 150)
         pdf.cell(0, 10, "P A N O R A M A", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
         pdf.set_font("helvetica", "B", 22)
         pdf.set_text_color(0, 51, 102)
         pdf.cell(0, 15, f"Resultados Gerais - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -1570,17 +1585,26 @@ async def gerar_pdf_panorama(id: int):
             pdf.set_text_color(80, 80, 80)
             pdf.cell(w - 10, 5, label, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-        card(15, 50, 85, 35, fmt_mi(dados["superavit_orcamentario"]), "Superávit Orçamentário")
-        card(105, 50, 85, 35, fmt_mi(dados["superavit_patrimonial"]), "Superávit Patrimonial (DVP)")
-        card(195, 50, 85, 35, fmt_mi(dados["superavit_financeiro"]), "Superávit Financeiro (BP)")
-        card(15, 95, 85, 35, fmt_mi(dados["patrimonio_liquido"]), "Patrimônio Líquido")
-        card(105, 95, 85, 35, fmt_mi(dados["ativo_total"]), "Ativo Total")
-        card(195, 95, 85, 35, fmt_mi(dados["passivo_total"]), "Passivo Total")
+        # Linha 1 (Topo)
+        card(15, 50, 85, 35, fmt_mi(dados.get("superavit_orcamentario", 0)), "Superávit Orçamentário")
+        card(105, 50, 85, 35, fmt_mi(dados.get("superavit_patrimonial", 0)), "Superávit Patrimonial (DVP)")
+        card(195, 50, 85, 35, fmt_mi(dados.get("superavit_financeiro", 0)), "Superávit Financeiro (BP)")
+        
+        # Linha 2 (Meio)
+        card(15, 95, 85, 35, fmt_mi(dados.get("patrimonio_liquido", 0)), "Patrimônio Líquido")
+        card(105, 95, 85, 35, fmt_mi(dados.get("ativo_total", 0)), "Ativo Total")
+        card(195, 95, 85, 35, fmt_mi(dados.get("passivo_total", 0)), "Passivo Total")
 
-        pdf.set_y(160)
+        # Linha 3 (Base) - Agora com o caixa vindo direto do BP
+        card(15, 140, 85, 35, fmt_mi(dados.get("receita_realizada", 0) or dados.get("receitas_realizadas", 0)), "Receitas Realizadas (BO)")
+        card(105, 140, 85, 35, fmt_mi(dados.get("despesa_empenhada", 0) or dados.get("despesas_empenhadas", 0)), "Despesas Empenhadas (BO)")
+        card(195, 140, 85, 35, fmt_mi(caixa_bp), "Caixa e Equivalente (BP)")
+
+        pdf.set_y(185)
         pdf.set_font("helvetica", "I", 10)
         pdf.set_text_color(100, 100, 100)
         pdf.multi_cell(0, 5, "Todos os demonstrativos estão equilibrados e consistentes entre si. Equação patrimonial: Ativo = Passivo + PL.", align="L")
+        
         pdf.set_y(-20)
         pdf.set_font("helvetica", "", 8)
         pdf.cell(0, 10, "Cofen - Analise das Demonstrações Contábeis", align="L")
@@ -1590,14 +1614,6 @@ async def gerar_pdf_panorama(id: int):
         return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Resumo_{periodo.replace('-', '_')}.pdf"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-
-
-
-
-
-
 
 @app.get("/salvar_conferencia/{periodo}")
 async def salvar_conferencia(periodo: str):
