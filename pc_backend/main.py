@@ -1302,6 +1302,40 @@ async def serve_conferencia():
     return FileResponse(caminho)
 
 
+
+@app.get("/sincronizar_arquivos")
+async def sincronizar_arquivos():
+    import sqlite3, json, csv
+    pasta = UPLOAD_DIR
+    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS arquivos_importados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome_arquivo TEXT UNIQUE,
+        dados_json TEXT
+    )""")
+    
+    count = 0
+    for arquivo in os.listdir(pasta):
+        if arquivo.endswith('.csv'):
+            caminho = os.path.join(pasta, arquivo)
+            try:
+                with open(caminho, 'r', encoding='latin-1', errors='ignore') as f:
+                    linhas = [ [col.strip().replace(chr(34), '') for col in row] for row in csv.reader(f, delimiter=';') if row ]
+                
+                json_dados = json.dumps(linhas)
+                cursor.execute("INSERT OR REPLACE INTO arquivos_importados (nome_arquivo, dados_json) VALUES (?, ?)", 
+                               (arquivo, json_dados))
+                count += 1
+            except Exception as e:
+                print(f"Erro ao processar {arquivo}: {e}")
+                
+    conn.commit()
+    conn.close()
+    return {"mensagem": f"{count} arquivos sincronizados com o banco de dados!"}
+
 @app.get("/integridade")
 async def serve_integridade():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")
