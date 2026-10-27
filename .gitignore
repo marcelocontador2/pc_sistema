@@ -1,24 +1,7 @@
-﻿# Ambientes Virtuais
-pc_venv/
-venv/
-.env
-
-# Python
-__pycache__/
-*.py[cod]
-*.so
-
-# Banco de Dados e Logs Locais
-*.db
-*.sqlite
-*.log
-
-# Pastas de Backup e Sistema
-backups/
-pc_storage/
-
-# Arquivos do VS Code / Windows
-.vscode/
-.idea/
-Thumbs.db
-*.bak*
+﻿# Backups e temporarios
+backup_*/
+temp_*.py
+liquidez_nova.html
+pc_sistema/
+*.bak
+*.bak_*
