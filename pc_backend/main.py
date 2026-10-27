@@ -1820,6 +1820,185 @@ async def gerar_pdf_integridade_matriz(id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/gerar_pdf_base_legal")
+async def gerar_pdf_base_legal(periodo_atual: str = "2026-TRIMESTRE-3", periodo_anterior: str = "2025-TRIMESTRE-3"):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        
+        def fmt_periodo(p):
+            partes = p.split('-')
+            if len(partes) == 3:
+                if partes[1] == 'TRIMESTRE': return f"{partes[2]}º Tri/{partes[0]}"
+                if partes[1] == 'MES': return f"Mês {partes[2]}/{partes[0]}"
+                return f"Exercício {partes[0]}"
+            return p
+
+        txt_atual = fmt_periodo(periodo_atual)
+        txt_anterior = fmt_periodo(periodo_anterior)
+
+        pdf = FPDF(orientation='L', unit='mm', format='A4')
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=False)  # Desativa quebra automática
+        
+        # ================= CABEÇALHO =================
+        pdf.set_xy(15, 15)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(100, 150, 200)
+        pdf.cell(0, 10, "A B E R T U R A", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_xy(15, 22)
+        pdf.set_font("helvetica", "B", 24)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 15, "Base Legal e Metodologia", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+        # ================= COLUNA ESQUERDA (LEGISLAÇÃO) =================
+        # A página A4 paisagem tem 297mm de largura e 210mm de altura.
+        # A coluna esquerda ocupa de X=15 a X=130 (115mm de largura).
+        # Altura: do Y=50 até Y=170 (120mm de altura).
+        pdf.set_fill_color(233, 242, 250)
+        pdf.rect(15, 50, 115, 110, style='F')
+        
+        pdf.set_xy(20, 55)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, "LEGISLAÇÃO E NORMAS APLICADAS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        leis = [
+            "Lei nº 4.320/1964",
+            "Lei Complementar nº 101/2000 (LRF)",
+            "Manual de Contabilidade Aplicada ao Setor Público (MCASP)",
+            "Normas Brasileiras de Contabilidade - Setor Publico (NBC TSP)"
+        ]
+        
+        pdf.set_font("helvetica", "", 10)
+        pdf.set_text_color(51, 51, 51)
+        for lei in leis:
+            pdf.set_x(20)
+            pdf.cell(5, 10, "-")
+            pdf.multi_cell(0, 10, lei, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(5)
+
+        # ================= COLUNA DIREITA (DEMONSTRAÇÕES) =================
+        # A coluna direita ocupa de X=135 a X=280 (145mm de largura).
+        pdf.set_xy(135, 50)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, "DEMONSTRAÇÕES ANALISADAS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        demos = [
+            "Balancete de Verificação",
+            "Balanço Financeiro (BF)",
+            "Balanço Orçamentário (BO)",
+            "Balanço Patrimonial (BP)",
+            "Demonstração do Fluxo de Caixa (DFC)",
+            "Demonstração das Mutações do Patrimônio Líquido (DMPL)",
+            "Demonstração das Variações Patrimoniais (DVP)"
+        ]
+        
+        pdf.set_font("helvetica", "", 10)
+        pdf.set_text_color(51, 51, 51)
+        for demo in demos:
+            pdf.set_x(135)
+            pdf.cell(0, 8, demo, border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(2)
+
+        # ================= BLOCO DE PERÍODOS =================
+        # Posicionado logo abaixo da lista de demonstrações (Y dinâmico)
+        y_atual = pdf.get_y() + 5
+        
+        pdf.set_xy(135, y_atual)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, "PERÍODOS COMPARATIVOS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        y_bloco = y_atual + 10
+        pdf.set_fill_color(40, 100, 160)
+        pdf.set_text_color(255, 255, 255)
+        pdf.rect(135, y_bloco, 145, 20, style='F')
+        
+        pdf.set_xy(140, y_bloco + 3)
+        pdf.set_font("helvetica", "B", 14)
+        pdf.cell(0, 10, f"{txt_anterior} x {txt_atual}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_xy(140, y_bloco + 13)
+        pdf.set_font("helvetica", "", 9)
+        pdf.cell(0, 10, "12 meses para fins de LRF", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+        # ================= RODAPÉ =================
+        # Posição fixa no final da página (A4 Paisagem tem 210mm de altura, rodapé a 190mm)
+        pdf.set_xy(15, 190)
+        pdf.set_font("helvetica", "", 8)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 10, "Cofen - Analise das Demonstracoes Contabeis", align="L")
+        pdf.cell(0, 10, "01", align="R")
+
+        pdf_bytes = pdf.output()
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Base_Legal_{periodo_atual}.pdf"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/base_legal")
+async def serve_base_legal():
+    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "base_legal.html")
+    return FileResponse(caminho)
+
+
+@app.get("/salvar_base_legal/{periodo_atual}")
+async def salvar_base_legal(periodo_atual: str, periodo_anterior: str = "2025-TRIMESTRE-3"):
+    try:
+        import sqlite3, json, datetime, os
+        # Simulamos o salvamento dos dados do Base Legal (que são fixos, mas dependem do período)
+        # O PDF será gerado posteriormente com base no ID salvo
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_base_legal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo_atual TEXT, periodo_anterior TEXT, data_geracao TEXT)""")
+        
+        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("INSERT INTO historico_base_legal (periodo_atual, periodo_anterior, data_geracao) VALUES (?, ?, ?)", 
+                       (periodo_atual, periodo_anterior, data_agora))
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Base Legal salva!", "id": cursor.lastrowid}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/historico_base_legal")
+async def listar_base_legal():
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, periodo_atual, periodo_anterior, data_geracao FROM historico_base_legal ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo_atual": r[1], "periodo_anterior": r[2], "data_geracao": r[3]} for r in rows]
+
+@app.get("/gerar_pdf_base_legal/{id}")
+async def gerar_pdf_base_legal_id(id: int):
+    try:
+        import sqlite3, os
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT periodo_atual, periodo_anterior FROM historico_base_legal WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        
+        # Redireciona para a geração do PDF usando os períodos salvos
+        # (Reutiliza a função de PDF que já existe, passando os parâmetros)
+        return await gerar_pdf_base_legal(periodo_atual=row[0], periodo_anterior=row[1])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/liquidez")
 async def serve_liquidez():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "liquidez.html")
