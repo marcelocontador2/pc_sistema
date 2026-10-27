@@ -2038,9 +2038,10 @@ def _calc_liquidez(periodo):
     denom_geral = passivo_circulante + passivo_nao_circulante
     liq_geral = ((ativo_circulante + realizavel) / denom_geral) if denom_geral > 0 else 0
 
-    # --- CÁLCULO DA ESTRUTURA ---
-    ativo_total = ativo_circulante + realizavel + ativo_permanente
-    passivo_total = passivo_circulante + passivo_nao_circulante
+    # --- CÁLCULO DA ESTRUTURA (BUSCA EXATA NO BP) ---
+    # Busca os totais exatos que já existem no BP
+    ativo_total = buscar("ATIVO NÃO CIRCULANTE", 1) + ativo_circulante or buscar("TOTAL DO ATIVO", 1) or (ativo_circulante + realizavel + ativo_permanente)
+    passivo_total = buscar("TOTAL DO PASSIVO", 3) or (passivo_circulante + passivo_nao_circulante)
     
     endividamento_geral = round((passivo_total / ativo_total) * 100, 2) if ativo_total > 0 else 0
     part_capital_terceiros = round((passivo_total / patrimonio_liquido) * 100, 2) if patrimonio_liquido > 0 else 0
@@ -2217,8 +2218,8 @@ async def gerar_pdf_liquidez(id: int):
         v_passivo_nao_circ = val.get('passivo_nao_circulante', 0)
         v_pl = val.get('patrimonio_liquido', 0)
         
-        ativo_total = v_ativa_circ + v_realizavel + v_ativo_perm
-        passivo_total = v_passivo_circ + v_passivo_nao_circ
+        ativo_total = val.get('ativo_total', 0) or (v_ativa_circ + v_ativo_perm)
+        passivo_total = val.get('passivo_total', 0) or (v_passivo_circ + v_passivo_nao_circ)
         
         endividamento = (passivo_total / ativo_total * 100) if ativo_total > 0 else 0
         part_capital = (passivo_total / v_pl * 100) if v_pl > 0 else 0
