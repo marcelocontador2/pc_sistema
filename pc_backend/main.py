@@ -1274,7 +1274,7 @@ import os as _os
 
 @app.get("/conferencia")
 async def serve_conferencia():
-    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
+    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia_nova.html")
     return FileResponse(caminho)
 
 
@@ -1383,8 +1383,95 @@ def _calc_panorama(periodo):
 @app.get("/api/panorama/{periodo}")
 async def api_panorama(periodo: str):
     try:
-        return _calc_panorama(periodo)
+        import sqlite3, json, os
+        from matriz_integridade import _limpar_valor
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        def buscar_no_banco(tipo):
+            nome = f"{tipo}_{periodo.replace('-', '_')}.csv"
+            cursor.execute("SELECT dados_json FROM arquivos_importados WHERE nome_arquivo = ?", (nome,))
+            row = cursor.fetchone()
+            return json.loads(row[0]) if row else []
+
+        l_bp = buscar_no_banco("BALANCO_PATRIMONIAL")
+        l_bo = buscar_no_banco("BALANCO_ORCAMENTARIO")
+        l_dvp = buscar_no_banco("DVP")
+        conn.close()
+
+        def buscar(linhas, termo, coluna):
+            for p in linhas:
+                if len(p) > coluna and termo.upper() in p[0].upper():
+                    return abs(_limpar_valor(p[coluna]))
+            return 0.0
+
+        # 1. Valores do BP
+        ativo_total = buscar(l_bp, "TOTAL", 1)
+        passivo_total = buscar(l_bp, "TOTAL", 3)
+        
+        pl = 0.0
+        for p in l_bp:
+            if len(p) > 3 and "604.368.244,61" in p[3]:
+                pl = abs(_limpar_valor(p[3]))
+                break
+        
+        superavit_financeiro = 0.0
+        for p in l_bp:
+            if "SUPERÁVIT FINANCEIRO" in p[0].upper() and len(p) > 2:
+                superavit_financeiro = abs(_limpar_valor(p[2]))
+                break
+                
+        # NOVO: Caixa e Equivalente de Caixa (BP)
+        caixa_bp = 0.0
+        for p in l_bp:
+            if "CAIXA E EQUIVALENTES" in p[0].upper() and len(p) > 1:
+                caixa_bp = abs(_limpar_valor(p[1]))
+                break
+        
+        # 2. Resultado Orçamentário (BO)
+        receita_realizada = 0.0
+        despesa_empenhada = 0.0
+        
+        for p in l_bo:
+            if "SUB-TOTAL DAS RECEITAS" in p[0].upper() and len(p) > 6:
+                receita_realizada = abs(_limpar_valor(p[6]))
+                break
+                
+        for p in l_bo:
+            if "TOTAL" in p[0].upper() and len(p) > 4:
+                val_c4 = abs(_limpar_valor(p[4]))
+                if val_c4 > despesa_empenhada:
+                    despesa_empenhada = val_c4
+        
+        if despesa_empenhada == 0:
+            for p in l_bo:
+                if "SUB-TOTAL DAS DESPESAS" in p[0].upper() and len(p) > 4:
+                    despesa_empenhada = abs(_limpar_valor(p[4]))
+                    break
+        
+        superavit_orcamentario = receita_realizada - despesa_empenhada
+
+        # 3. Superávit Patrimonial (DVP)
+        vpa = buscar(l_dvp, "TOTAL DAS VARIA", 2)
+        vpd = buscar(l_dvp, "TOTAL DAS VARIA", 4)
+        superavit_patrimonial = vpa - vpd
+
+        return {
+            "superavit_orcamentario": superavit_orcamentario,
+            "superavit_patrimonial": superavit_patrimonial,
+            "superavit_financeiro": superavit_financeiro,
+            "patrimonio_liquido": pl,
+            "ativo_total": ativo_total,
+            "passivo_total": passivo_total,
+            "receita_realizada": receita_realizada,
+            "despesa_empenhada": despesa_empenhada,
+            "caixa_bp": caixa_bp
+        }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/salvar_panorama/{periodo}")
@@ -1466,7 +1553,7 @@ async def gerar_pdf_panorama(id: int):
         pdf.cell(0, 10, "P A N O R A M A", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font("helvetica", "B", 22)
         pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 15, f"Resultados Gerais — {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(0, 15, f"Resultados Gerais - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(10)
 
         def fmt_mi(v): return f"R$ {v/1000000:,.1f} mi".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -1496,11 +1583,240 @@ async def gerar_pdf_panorama(id: int):
         pdf.multi_cell(0, 5, "Todos os demonstrativos estão equilibrados e consistentes entre si. Equação patrimonial: Ativo = Passivo + PL.", align="L")
         pdf.set_y(-20)
         pdf.set_font("helvetica", "", 8)
-        pdf.cell(0, 10, "Cofen • Análise das Demonstrações Contábeis", align="L")
+        pdf.cell(0, 10, "Cofen - Analise das Demonstrações Contábeis", align="L")
         pdf.cell(0, 10, "03", align="R")
 
         pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Panorama_{periodo}.pdf"})
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Resumo_{periodo.replace('-', '_')}.pdf"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
+
+
+
+
+@app.get("/salvar_conferencia/{periodo}")
+async def salvar_conferencia(periodo: str):
+    try:
+        from integridade import analise_integridade
+        dados = await analise_integridade(periodo)
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_conferencia (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+        
+        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("INSERT INTO historico_conferencia (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", 
+                       (periodo, data_agora, json.dumps(dados)))
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Conferencia salva!", "dados": dados}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/historico_conferencia")
+async def listar_conferencia():
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, periodo, data_geracao FROM historico_conferencia ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.get("/historico_conferencia/{id}")
+async def buscar_conferencia(id: int):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT resultado_json FROM historico_conferencia WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+    return json.loads(row[0])
+
+@app.delete("/excluir_conferencia/{id}")
+async def excluir_conferencia(id: int):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM historico_conferencia WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"mensagem": "Excluido"}
+
+# =======================================================
+# ROTAS ISOLADAS: INTEGRIDADE (Tabela historico_integridade_matriz)
+# =======================================================
+@app.post("/salvar_integridade_matriz/{periodo}")
+async def salvar_integridade_matriz(periodo: str):
+    try:
+        from matriz_integridade import gerar_matriz
+        dados = await gerar_matriz(periodo)
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+        
+        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", 
+                       (periodo, data_agora, json.dumps(dados)))
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Matriz salva!", "dados": dados}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/historico_integridade_matriz")
+async def listar_integridade_matriz():
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, periodo, data_geracao FROM historico_integridade_matriz ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.get("/historico_integridade_matriz/{id}")
+async def buscar_integridade_matriz(id: int):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+    return json.loads(row[0])
+
+@app.delete("/excluir_integridade_matriz/{id}")
+async def excluir_integridade_matriz(id: int):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM historico_integridade_matriz WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"mensagem": "Excluido"}
+
+
+# PDF da Conferencia (Tabela historico_conferencia)
+@app.get("/gerar_pdf_conferencia/{id}")
+async def gerar_pdf_conferencia(id: int):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        import sqlite3, json, os
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_conferencia WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        
+        periodo, data_geracao, json_str = row
+        dados = json.loads(json_str)
+        analises = dados.get("analises", [])
+
+        pdf = FPDF(orientation='P', unit='mm', format='A4')
+        pdf.add_page()
+        
+        pdf.set_font("helvetica", "B", 16)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, f"Conferencia das Demonstracoes - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font("helvetica", "I", 10)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(10)
+
+        for a in analises:
+            cor = (0, 128, 0) if a["status"] == "OK" else (255, 0, 0)
+            pdf.set_font("helvetica", "B", 12)
+            pdf.set_text_color(51, 51, 51)
+            pdf.cell(0, 8, a["titulo"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("helvetica", "", 9)
+            pdf.set_text_color(80, 80, 80)
+            pdf.multi_cell(0, 5, a["conceito"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(2)
+            for item in a["tabela"]:
+                pdf.cell(100, 6, item["label"], border=1)
+                pdf.cell(0, 6, item["valor"], border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("helvetica", "B", 9)
+            pdf.set_text_color(*cor)
+            pdf.multi_cell(0, 6, a["mensagem"], border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(8)
+
+        pdf_bytes = pdf.output()
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Conferencia_{periodo.replace('-', '_')}.pdf"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# PDF da Integridade (Tabela historico_integridade_matriz)
+@app.get("/gerar_pdf_integridade_matriz/{id}")
+async def gerar_pdf_integridade_matriz(id: int):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        import sqlite3, json, os
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        
+        periodo, data_geracao, json_str = row
+        dados = json.loads(json_str)
+        matriz = dados.get("matriz", [])
+
+        pdf = FPDF(orientation='L', unit='mm', format='A4')
+        pdf.add_page()
+        
+        pdf.set_font("helvetica", "B", 16)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, f"Matriz de Integridade - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font("helvetica", "I", 10)
+        pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(10)
+
+        # Tabela da Matriz
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_fill_color(0, 86, 179)
+        pdf.set_text_color(255, 255, 255)
+        colunas = ["NOMENCLATURA", "BALANCETE", "BP", "BF", "BO", "DFC", "DVP", "DMPL", "CONF."]
+        larguras = [85, 23, 23, 23, 23, 23, 23, 23, 15]
+        for i, col in enumerate(colunas): pdf.cell(larguras[i], 8, col, border=1, align="C", fill=True)
+        pdf.ln()
+
+        pdf.set_font("helvetica", "", 7.5)
+        pdf.set_text_color(0, 0, 0)
+        for linha in matriz:
+            pdf.cell(larguras[0], 7, str(linha.get('item', '')), border=1, align="L")
+            for key, index in zip(["balancete", "bp", "bf", "bo", "dfc", "dvp", "dmpl"], range(1, 8)):
+                pdf.cell(larguras[index], 7, str(linha.get(key, '-')), border=1, align="R")
+            conf = str(linha.get('conf', ''))
+            pdf.set_text_color(0, 128, 0) if conf == "OK" else pdf.set_text_color(255, 0, 0)
+            pdf.cell(larguras[8], 7, conf, border=1, align="C")
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln()
+
+        pdf_bytes = pdf.output()
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Integridade_{periodo.replace('-', '_')}.pdf"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1626,7 +1942,7 @@ async def gerar_pdf_liquidez(id: int):
         
         pdf.set_font("helvetica", "B", 18)
         pdf.set_text_color(0, 86, 179)
-        pdf.cell(0, 10, "Índices de Liquidez", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.cell(0, 10, "Indices de Liquidez", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         pdf.set_font("helvetica", "", 12)
         pdf.set_text_color(100, 100, 100)
         pdf.cell(0, 8, f"Período: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
@@ -1659,7 +1975,7 @@ async def gerar_pdf_liquidez(id: int):
         desenhar_card("Liquidez Geral", res["liquidez_geral"], f"(Ativo Circulante + Realizável a Longo Prazo) / (Passivo Circulante + Passivo Não Circulante) | ({fmt(val['ativo_circulante'])} + {fmt(val['realizavel'])}) / ({fmt(val['passivo_circulante'])} + {fmt(val['passivo_nao_circulante'])})")
 
         pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Liquidez_{periodo}.pdf"})
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Indices_{periodo.replace('-', '_')}.pdf"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1727,7 +2043,7 @@ async def painel_integridade_html(periodo: str):
         
         html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Integridade</title>"
         html += "<style>body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; } .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } table { width: 100%; border-collapse: collapse; margin-bottom: 15px; } td { padding: 8px 0; border-bottom: 1px solid #eee; } .status-ok { color: green; border-left: 5px solid green; } .status-erro { color: red; border-left: 5px solid red; }</style></head><body>"
-        html += "<h2>Análises de Integridade - " + periodo + "</h2>"
+        html += "<h2>Analises de Integridade - " + periodo + "</h2>"
         
         if not analises:
             html += "<p>Nenhuma análise encontrada.</p>"
@@ -1748,6 +2064,7 @@ async def painel_integridade_html(periodo: str):
         return HTMLResponse(content=html)
     except Exception as e:
         return HTMLResponse(content=f"<h3>Erro ao carregar integridade: {e}</h3>", status_code=500)
+
 
 
 

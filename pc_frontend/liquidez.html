@@ -4,44 +4,48 @@
     <meta charset="UTF-8">
     <title>Índices de Liquidez</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; margin: 0; }
-        .header { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .btn { border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #fff; background: #0056b3; }
-        .btn-salvar { background: #28a745; display: none; }
-        .btn-pdf { background: #dc3545; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; padding: 20px; margin: 0; color: #333; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn { border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #fff; text-decoration: none; font-size: 14px; }
+        .btn-voltar { background: #fff; border: 1px solid #ccc; color: #333; }
+        .btn-pdf { background: #0056b3; }
+        .btn-exibir { background: #28a745; }
+        .btn-excluir { background: #dc3545; }
+        .btn-salvar { background: #28a745; }
+        
+        .filtros-bar { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .form-group { display: flex; align-items: center; gap: 5px; }
+        label { font-weight: bold; color: #444; font-size: 14px; }
+        select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        
         .flex-layout { display: flex; gap: 20px; }
         .sidebar { width: 300px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; height: fit-content; }
         .main-content { flex: 1; display: flex; gap: 20px; flex-wrap: wrap; }
-        .card { flex: 1; min-width: 300px; background: #fff; padding: 20px; border-radius: 8px; border-top: 5px solid #0056b3; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card { flex: 1; min-width: 250px; background: #fff; padding: 20px; border-radius: 8px; border-top: 5px solid #0056b3; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .card h4 { margin: 0 0 10px 0; color: #333; font-size: 16px; }
-        .card .valor { font-size: 36px; font-weight: bold; color: #0056b3; margin-bottom: 15px; }
+        .card .valor { font-size: 32px; font-weight: bold; color: #0056b3; margin-bottom: 15px; }
         .card .formula { background: #f8fbff; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #555; border: 1px dashed #ccc; }
-        .btn-acao { border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; color: white; font-weight: bold; margin-right: 5px; }
-        .btn-exibir { background: #28a745; }
-        .btn-excluir { background: #dc3545; }
+        #lista-historico { list-style: none; padding: 0; }
     </style>
 </head>
 <body>
-    <div style="margin-bottom: 20px;">
-        <a href="/" style="background: #fff; border: 1px solid #ccc; padding: 8px 15px; border-radius: 6px; text-decoration: none; color: #333; font-weight: bold;">&larr; Voltar</a>
+    <div class="top-bar">
+        <a href="/" class="btn btn-voltar">&larr; Voltar</a>
+        <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+        <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
     </div>
 
-    <div class="header">
-        <label><strong>Período:</strong></label>
-        <select id="periodo">
-            <option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option>
-        </select>
-        <button class="btn" onclick="calcularLiquidez()">Verificar Índices</button>
-        <button class="btn btn-salvar" id="btn-salvar" onclick="salvarLiquidez()">Confirmar e Salvar</button>
-        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
-        <button class="btn" style="background: #28a745;" onclick="exibirSelecionado()">Exibir Selecionado</button>
-        <button class="btn" style="background: #dc3545;" onclick="excluirSelecionado()">Excluir Selecionado</button>
+    <div class="filtros-bar">
+        <div class="form-group"><label>Período:</label><select id="periodo"><option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option></select></div>
+        <button class="btn btn-pdf" onclick="calcularLiquidez()">Verificar Índices</button>
+        <button class="btn btn-salvar" id="btn-salvar" onclick="salvarLiquidez()" style="display:none;">Confirmar e Salvar</button>
     </div>
 
     <div class="flex-layout">
         <div class="sidebar">
             <h3>Histórico Salvo</h3>
-            <ul id="lista-historico" style="list-style: none; padding: 0;">Carregando...</ul>
+            <ul id="lista-historico">Carregando...</ul>
         </div>
         <div class="main-content" id="resultado">
             <p>Clique em "Verificar Índices" para processar os dados.</p>
@@ -62,58 +66,33 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.detail) { div.innerHTML = '<p style="color:red;">Erro: ' + data.detail + '</p>'; return; }
-                    
                     const res = data.resultados;
                     const val = data.valores;
 
                     div.innerHTML = `
-                        <div class="card">
-                            <h4>Liquidez Imediata</h4>
-                            <div class="valor">${res.liquidez_imediata}</div>
-                            <div class="formula">(Caixa) / (Passivo Circulante)<br>(${formatarMoeda(val.caixa)}) / (${formatarMoeda(val.passivo_circulante)})</div>
-                        </div>
-                        <div class="card">
-                            <h4>Liquidez Corrente</h4>
-                            <div class="valor">${res.liquidez_corrente}</div>
-                            <div class="formula">(Ativo Circulante) / (Passivo Circulante)<br>(${formatarMoeda(val.ativo_circulante)}) / (${formatarMoeda(val.passivo_circulante)})</div>
-                        </div>
-                        <div class="card">
-                            <h4>Liquidez Seca</h4>
-                            <div class="valor">${res.liquidez_seca}</div>
-                            <div class="formula">((Ativo Circulante - Estoques)) / (Passivo Circulante)<br>((${formatarMoeda(val.ativo_circulante)} - ${formatarMoeda(val.estoques)})) / (${formatarMoeda(val.passivo_circulante)})</div>
-                        </div>
-                        <div class="card">
-                            <h4>Liquidez Geral</h4>
-                            <div class="valor">${res.liquidez_geral}</div>
-                            <div class="formula">(Ativo Circulante + Realizável a Longo Prazo) / (Passivo Circulante + Passivo Não Circulante)<br>(${formatarMoeda(val.ativo_circulante)} + ${formatarMoeda(val.realizavel)}) / (${formatarMoeda(val.passivo_circulante)} + ${formatarMoeda(val.passivo_nao_circulante)})</div>
-                        </div>
+                        <div class="card"><h4>Liquidez Imediata</h4><div class="valor">${res.liquidez_imediata}</div><div class="formula">(Caixa) / (Passivo Circulante)<br>(${formatarMoeda(val.caixa)}) / (${formatarMoeda(val.passivo_circulante)})</div></div>
+                        <div class="card"><h4>Liquidez Corrente</h4><div class="valor">${res.liquidez_corrente}</div><div class="formula">(Ativo Circulante) / (Passivo Circulante)<br>(${formatarMoeda(val.ativo_circulante)}) / (${formatarMoeda(val.passivo_circulante)})</div></div>
+                        <div class="card"><h4>Liquidez Seca</h4><div class="valor">${res.liquidez_seca}</div><div class="formula">((Ativo Circulante - Estoques)) / (Passivo Circulante)<br>((${formatarMoeda(val.ativo_circulante)} - ${formatarMoeda(val.estoques)})) / (${formatarMoeda(val.passivo_circulante)})</div></div>
+                        <div class="card"><h4>Liquidez Geral</h4><div class="valor">${res.liquidez_geral}</div><div class="formula">(Ativo Circulante + Realizável a Longo Prazo) / (Passivo Circulante + Passivo Não Circulante)<br>(${formatarMoeda(val.ativo_circulante)} + ${formatarMoeda(val.realizavel)}) / (${formatarMoeda(val.passivo_circulante)} + ${formatarMoeda(val.passivo_nao_circulante)})</div></div>
                     `;
-                    
-                    const btnSalvar = document.getElementById('btn-salvar');
-                    btnSalvar.style.display = 'inline-block';
-                    btnSalvar.setAttribute('data-periodo', periodo);
+                    document.getElementById('btn-salvar').style.display = 'inline-block';
+                    document.getElementById('btn-salvar').setAttribute('data-periodo', periodo);
                 })
                 .catch(err => div.innerHTML = '<p style="color:red;">Erro de conexão.</p>');
         }
 
-        function salvarLiquidez() {
+        async function salvarLiquidez() {
             const btn = document.getElementById('btn-salvar');
             const periodo = btn.getAttribute('data-periodo');
             btn.innerText = "Salvando...";
             btn.disabled = true;
-
-            fetch('/salvar_liquidez/' + periodo, { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    alert("Índices salvos com sucesso!");
-                    carregarHistorico();
-                    btn.style.display = 'none';
-                })
-                .catch(err => alert("Erro ao salvar."))
-                .finally(() => {
-                    btn.innerText = "Confirmar e Salvar";
-                    btn.disabled = false;
-                });
+            try {
+                await fetch('/salvar_liquidez/' + periodo, { method: 'POST' });
+                alert("Índices salvos com sucesso!");
+                carregarHistorico();
+                btn.style.display = 'none';
+            } catch (e) { alert("Erro ao salvar."); }
+            finally { btn.innerText = "Confirmar e Salvar"; btn.disabled = false; }
         }
 
         function carregarHistorico() {
@@ -124,103 +103,49 @@
                     html += `<li style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <input type="checkbox" class="check-historico" value="${item.id}" style="width: 16px; height: 16px; cursor: pointer;">
-                            <div>
-                                <div style="font-weight: bold; color: #0056b3;">${item.periodo}</div>
-                                <div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div>
-                            </div>
-                        </div>
-                        
-                    </li>`;
+                            <div><div style="font-weight: bold; color: #0056b3;">${item.periodo}</div><div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div></div>
+                        </div></li>`;
                 });
                 document.getElementById('lista-historico').innerHTML = html;
             });
         }
 
-                function exibirSelecionado() {
+        function exibirSelecionado() {
             const check = document.querySelector(".check-historico:checked");
-            if (!check) {
-                alert("Selecione um item no histórico primeiro!");
-                return;
-            }
-            abrirHistorico(check.value);
-        }
-
-        function excluirSelecionado() {
-            const selecionados = document.querySelectorAll(".check-historico:checked");
-            if (selecionados.length === 0) {
-                alert("Selecione pelo menos um item no histórico.");
-                return;
-            }
-            if (!confirm(`Tem certeza que deseja excluir os ${selecionados.length} itens selecionados?`)) {
-                return;
-            }
-            let promessas = [];
-            selecionados.forEach(check => {
-                const id = check.value;
-                promessas.push(fetch("/excluir_liquidez/" + id, { method: "DELETE" }).then(r => r.ok).catch(() => false));
-            });
-            Promise.all(promessas).then(resultados => {
-                const sucessos = resultados.filter(r => r === true).length;
-                if (sucessos > 0) {
-                    alert(sucessos + " item(ns) excluído(s) com sucesso!");
-                    carregarHistorico();
-                } else {
-                    alert("Erro ao excluir os itens.");
-                }
-            });
-        }
-
-        function abrirHistorico(id) {
-            const div = document.getElementById('resultado');
-            div.innerHTML = '<p>Carregando histórico...</p>';
-            fetch('/historico_liquidez/' + id).then(r => r.json()).then(data => {
+            if (!check) { alert("Selecione um item no histórico."); return; }
+            fetch('/historico_liquidez/' + check.value).then(r => r.json()).then(data => {
                 const res = data.resultados;
                 const val = data.valores;
+                const div = document.getElementById('resultado');
                 div.innerHTML = `
-                    <div class="card">
-                        <h4>Liquidez Imediata</h4>
-                        <div class="valor">${res.liquidez_imediata}</div>
-                        <div class="formula">(Caixa) / (Passivo Circulante)<br>(${formatarMoeda(val.caixa)}) / (${formatarMoeda(val.passivo_circulante)})</div>
-                    </div>
-                    <div class="card">
-                        <h4>Liquidez Corrente</h4>
-                        <div class="valor">${res.liquidez_corrente}</div>
-                        <div class="formula">(Ativo Circulante) / (Passivo Circulante)<br>(${formatarMoeda(val.ativo_circulante)}) / (${formatarMoeda(val.passivo_circulante)})</div>
-                    </div>
-                    <div class="card">
-                        <h4>Liquidez Seca</h4>
-                        <div class="valor">${res.liquidez_seca}</div>
-                        <div class="formula">((Ativo Circulante - Estoques)) / (Passivo Circulante)<br>((${formatarMoeda(val.ativo_circulante)} - ${formatarMoeda(val.estoques)})) / (${formatarMoeda(val.passivo_circulante)})</div>
-                    </div>
-                    <div class="card">
-                        <h4>Liquidez Geral</h4>
-                        <div class="valor">${res.liquidez_geral}</div>
-                        <div class="formula">(Ativo Circulante + Realizável a Longo Prazo) / (Passivo Circulante + Passivo Não Circulante)<br>(${formatarMoeda(val.ativo_circulante)} + ${formatarMoeda(val.realizavel)}) / (${formatarMoeda(val.passivo_circulante)} + ${formatarMoeda(val.passivo_nao_circulante)})</div>
-                    </div>
+                    <div class="card"><h4>Liquidez Imediata</h4><div class="valor">${res.liquidez_imediata}</div><div class="formula">(Caixa) / (Passivo Circulante)<br>(${formatarMoeda(val.caixa)}) / (${formatarMoeda(val.passivo_circulante)})</div></div>
+                    <div class="card"><h4>Liquidez Corrente</h4><div class="valor">${res.liquidez_corrente}</div><div class="formula">(Ativo Circulante) / (Passivo Circulante)<br>(${formatarMoeda(val.ativo_circulante)}) / (${formatarMoeda(val.passivo_circulante)})</div></div>
+                    <div class="card"><h4>Liquidez Seca</h4><div class="valor">${res.liquidez_seca}</div><div class="formula">((Ativo Circulante - Estoques)) / (Passivo Circulante)<br>((${formatarMoeda(val.ativo_circulante)} - ${formatarMoeda(val.estoques)})) / (${formatarMoeda(val.passivo_circulante)})</div></div>
+                    <div class="card"><h4>Liquidez Geral</h4><div class="valor">${res.liquidez_geral}</div><div class="formula">(Ativo Circulante + Realizável a Longo Prazo) / (Passivo Circulante + Passivo Não Circulante)<br>(${formatarMoeda(val.ativo_circulante)} + ${formatarMoeda(val.realizavel)}) / (${formatarMoeda(val.passivo_circulante)} + ${formatarMoeda(val.passivo_nao_circulante)})</div></div>
                 `;
             });
         }
 
-        function excluirHistorico(id) {
-            if(confirm("Tem certeza que deseja excluir?")) {
-                fetch('/excluir_liquidez/' + id, { method: 'DELETE' }).then(r => {
-                    if(r.ok) { alert("Excluído!"); carregarHistorico(); }
-                });
-            }
+        function excluirSelecionado() {
+            const selecionados = document.querySelectorAll(".check-historico:checked");
+            if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
+            if (!confirm(`Excluir ${selecionados.length} itens?`)) return;
+            let promessas = [];
+            selecionados.forEach(check => {
+                promessas.push(fetch("/excluir_liquidez/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false));
+            });
+            Promise.all(promessas).then(resultados => {
+                if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); }
+            });
         }
 
         function gerarPDF() {
-            const selecionados = document.querySelectorAll('.check-historico:checked');
-            if (selecionados.length === 0) {
-                alert("Marque um relatório no Histórico Salvo antes de gerar o PDF!");
-                return; 
-            }
-            const id = selecionados[0].value;
-            window.open('/gerar_pdf_liquidez/' + id, '_blank');
+            const check = document.querySelector(".check-historico:checked");
+            if (!check) { alert("Marque um relatório no histórico!"); return; }
+            window.open('/gerar_pdf_liquidez/' + check.value, '_blank');
         }
 
         document.addEventListener("DOMContentLoaded", carregarHistorico);
     </script>
 </body>
 </html>
-
