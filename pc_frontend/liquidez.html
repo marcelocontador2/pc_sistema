@@ -34,6 +34,8 @@
         <button class="btn" onclick="calcularLiquidez()">Verificar Índices</button>
         <button class="btn btn-salvar" id="btn-salvar" onclick="salvarLiquidez()">Confirmar e Salvar</button>
         <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn" style="background: #28a745;" onclick="exibirSelecionado()">Exibir Selecionado</button>
+        <button class="btn" style="background: #dc3545;" onclick="excluirSelecionado()">Excluir Selecionado</button>
     </div>
 
     <div class="flex-layout">
@@ -127,13 +129,44 @@
                                 <div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div>
                             </div>
                         </div>
-                        <div style="margin-top: 5px; margin-left: 26px;">
-                            <button onclick="abrirHistorico(${item.id})" class="btn-acao btn-exibir">Exibir</button>
-                            <button onclick="excluirHistorico(${item.id})" class="btn-acao btn-excluir">Excluir</button>
-                        </div>
+                        
                     </li>`;
                 });
                 document.getElementById('lista-historico').innerHTML = html;
+            });
+        }
+
+                function exibirSelecionado() {
+            const check = document.querySelector(".check-historico:checked");
+            if (!check) {
+                alert("Selecione um item no histórico primeiro!");
+                return;
+            }
+            abrirHistorico(check.value);
+        }
+
+        function excluirSelecionado() {
+            const selecionados = document.querySelectorAll(".check-historico:checked");
+            if (selecionados.length === 0) {
+                alert("Selecione pelo menos um item no histórico.");
+                return;
+            }
+            if (!confirm(`Tem certeza que deseja excluir os ${selecionados.length} itens selecionados?`)) {
+                return;
+            }
+            let promessas = [];
+            selecionados.forEach(check => {
+                const id = check.value;
+                promessas.push(fetch("/excluir_liquidez/" + id, { method: "DELETE" }).then(r => r.ok).catch(() => false));
+            });
+            Promise.all(promessas).then(resultados => {
+                const sucessos = resultados.filter(r => r === true).length;
+                if (sucessos > 0) {
+                    alert(sucessos + " item(ns) excluído(s) com sucesso!");
+                    carregarHistorico();
+                } else {
+                    alert("Erro ao excluir os itens.");
+                }
             });
         }
 
@@ -190,3 +223,4 @@
     </script>
 </body>
 </html>
+
