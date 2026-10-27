@@ -1870,7 +1870,8 @@ async def gerar_pdf_base_legal(periodo_atual: str = "2026-TRIMESTRE-3", periodo_
             "Lei nº 4.320/1964",
             "Lei Complementar nº 101/2000 (LRF)",
             "Manual de Contabilidade Aplicada ao Setor Público (MCASP)",
-            "Normas Brasileiras de Contabilidade - Setor Publico (NBC TSP)"
+            "Normas Brasileiras de Contabilidade - Setor Publico (NBC TSP)",
+            "Resolução COFEN nº 764/2024 (Prestação de Contas)"
         ]
         
         pdf.set_font("helvetica", "", 10)
