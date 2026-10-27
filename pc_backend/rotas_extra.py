@@ -1,9 +1,11 @@
-﻿import os
+﻿from fastapi import APIRouter
+router = APIRouter()
+import os
 import glob
 import re
 from fastapi import HTTPException
 
-@app.get("/periodos_importados/{tipo_relatorio}")
+@router.get("/periodos_importados/{tipo_relatorio}")
 async def get_periodos_importados(tipo_relatorio: str):
     periodos = []
     pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")

@@ -39,44 +39,6 @@ criar_tabelas()
 # ==========================================
 # ROTAS DA CONFERÊNCIA (MANTIDAS ORIGINAIS)
 # ==========================================
-@router.get("/salvar_integridade/{periodo}")
-async def salvar_integridade(periodo: str):
-    try:
-        import os
-        pecas_obrigatorias = ["BALANCETE", "BALANCO_PATRIMONIAL", "BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]
-        pecas_faltando = []
-        pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
-        p_limpo = re.sub(r'[^A-Z0-9]', '_', str(periodo).upper()).strip('_')
-        
-        for peca in pecas_obrigatorias:
-            nome_arquivo = f"{peca}_{p_limpo}.csv"
-            if not os.path.exists(os.path.join(pasta, nome_arquivo)):
-                pecas_faltando.append(peca)
-                
-        if pecas_faltando:
-            return {"erro": "faltando", "pecas": pecas_faltando}
-
-        from integridade import analise_integridade
-        dados = await analise_integridade(periodo)
-        
-        # Injeta as justificativas no JSON se existirem
-        if payload and "justificativas" in payload:
-            for linha in dados.get("matriz", []):
-                conf = str(linha.get("conf", ""))
-                if conf in payload["justificativas"] and payload["justificativas"][conf].strip() != "":
-                    linha["observacao"] = payload["justificativas"][conf]
-
-        json_resultado = json.dumps(dados)
-        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''INSERT INTO historico_integridade (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)''', (periodo, data_agora, json_resultado))
-        conn.commit()
-        conn.close()
-        return {"mensagem": "Integridade salva com sucesso!", "dados": dados}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/historico_integridade")
 async def listar_historico():

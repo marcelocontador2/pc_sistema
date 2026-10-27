@@ -1200,31 +1200,7 @@ async def criar_tabela_integridade():
 
 
 # Rota que CHAMA a analise, pega o resultado e SALVA no banco
-@app.get("/salvar_integridade/{periodo}")
-async def salvar_integridade(periodo: str):
-    try:
-        # Chama a função do integridade.py
-        from integridade import analise_integridade
-        dados = await analise_integridade(periodo)
-        
-        # Converte para JSON para salvar no banco
-        json_resultado = json.dumps(dados)
-        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO historico_integridade (periodo, data_geracao, resultado_json)
-            VALUES (?, ?, ?)
-        ''', (periodo, data_agora, json_resultado))
-        conn.commit()
-        conn.close()
-        
-        return {"mensagem": "Integridade gerada e salva com sucesso!", "dados": dados}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-# Rota que LISTA todos os históricos salvos
 @app.get("/historico_integridade")
 async def listar_historico():
     try:
@@ -1302,40 +1278,6 @@ async def serve_conferencia():
     return FileResponse(caminho)
 
 
-
-@app.get("/sincronizar_arquivos")
-async def sincronizar_arquivos():
-    import sqlite3, json, csv
-    pasta = UPLOAD_DIR
-    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS arquivos_importados (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome_arquivo TEXT UNIQUE,
-        dados_json TEXT
-    )""")
-    
-    count = 0
-    for arquivo in os.listdir(pasta):
-        if arquivo.endswith('.csv'):
-            caminho = os.path.join(pasta, arquivo)
-            try:
-                with open(caminho, 'r', encoding='latin-1', errors='ignore') as f:
-                    linhas = [ [col.strip().replace(chr(34), '') for col in row] for row in csv.reader(f, delimiter=';') if row ]
-                
-                json_dados = json.dumps(linhas)
-                cursor.execute("INSERT OR REPLACE INTO arquivos_importados (nome_arquivo, dados_json) VALUES (?, ?)", 
-                               (arquivo, json_dados))
-                count += 1
-            except Exception as e:
-                print(f"Erro ao processar {arquivo}: {e}")
-                
-    conn.commit()
-    conn.close()
-    return {"mensagem": f"{count} arquivos sincronizados com o banco de dados!"}
-
 @app.get("/integridade")
 async def serve_integridade():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")
@@ -1363,7 +1305,9 @@ async def ler_relatorio_csv(tipo: str):
 
 
 # --- CONEXAO DA MATRIZ DE INTEGRIDADE ---
+from rota_integridade import router as integridade_router_novo
 from matriz_integridade import router as matriz_router
+app.include_router(integridade_router_novo)
 app.include_router(matriz_router)
 
 # =======================================================
@@ -1581,6 +1525,7 @@ if __name__ == "__main__":
 
 # --- IMPORTACAO DAS ROTAS EXTRA ---
 import rotas_extra
+app.include_router(rotas_extra.router)
 
 @app.get("/painel_integridade_html/{periodo}")
 async def painel_integridade_html(periodo: str):
@@ -1614,5 +1559,7 @@ async def painel_integridade_html(periodo: str):
         return HTMLResponse(content=html)
     except Exception as e:
         return HTMLResponse(content=f"<h3>Erro ao carregar integridade: {e}</h3>", status_code=500)
+
+
 
 

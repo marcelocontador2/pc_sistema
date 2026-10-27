@@ -15,29 +15,8 @@ def _get_csv(tipo, periodo):
 
 def _ler_linhas(caminho):
     if not caminho: return []
-    
-    # 1. Tenta ler do banco de dados primeiro
-    try:
-        import sqlite3
-        import json
-        DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        nome_arquivo = os.path.basename(caminho)
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT dados_json FROM arquivos_importados WHERE nome_arquivo = ?", (nome_arquivo,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return json.loads(row[0])
-    except Exception:
-        pass # Se der erro no banco, segue para o arquivo físico
-
-    # 2. Fallback: Lê do arquivo físico (comportamento antigo)
-    try:
-        with open(caminho, 'r', encoding='latin-1', errors='ignore') as f:
-            return [ [col.strip().replace(chr(34), '') for col in row] for row in csv.reader(f, delimiter=';') if row ]
-    except Exception:
-        return []
+    with open(caminho, 'r', encoding='latin-1', errors='ignore') as f:
+        return [ [col.strip().replace(chr(34), '') for col in row] for row in csv.reader(f, delimiter=';') if row ]
 
 def _limpar_valor(valor):
     if not valor: return 0.0
