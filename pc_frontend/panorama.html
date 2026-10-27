@@ -68,6 +68,9 @@
                     <div class="card-indicador"><div class="valor" id="val-pl">R$ 0,0 mi</div><div class="label">Patrimônio Líquido</div></div>
                     <div class="card-indicador"><div class="valor" id="val-ativo">R$ 0,0 mi</div><div class="label">Ativo Total</div></div>
                     <div class="card-indicador"><div class="valor" id="val-passivo">R$ 0,0 mi</div><div class="label">Passivo Total</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-receita">R$ 0,0 mi</div><div class="label">Receitas Realizadas (BO)</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-despesa">R$ 0,0 mi</div><div class="label">Despesas Empenhadas (BO)</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-caixa">R$ 0,0 mi</div><div class="label">Caixa e Equivalente de Caixa (BP)</div></div>
                 </div>
                 <div class="footer"><div>Cofen • Análise das Demonstrações Contábeis</div><div>03</div></div>
             </div>
@@ -95,6 +98,9 @@
             document.getElementById("val-pl").innerText = formatarMilhoes(data.patrimonio_liquido);
             document.getElementById("val-ativo").innerText = formatarMilhoes(data.ativo_total);
             document.getElementById("val-passivo").innerText = formatarMilhoes(data.passivo_total);
+            document.getElementById("val-receita").innerText = formatarMilhoes(data.receita_realizada);
+            document.getElementById("val-despesa").innerText = formatarMilhoes(data.despesa_empenhada);
+            document.getElementById("val-caixa").innerText = formatarMilhoes(data.caixa_bp);
             const btnSalvar = document.getElementById("btn-confirmar");
             if (btnSalvar) btnSalvar.style.display = "inline-block";
         }
@@ -166,4 +172,5 @@
     </script>
 </body>
 </html>
+
 
