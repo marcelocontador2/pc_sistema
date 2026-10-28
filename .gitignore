@@ -15,3 +15,5 @@ pc_storage/*.db
 # Sistema
 .DS_Store
 Thumbs.db
+*.bak*
+pc_sistema/
