@@ -1810,153 +1810,350 @@ async def gerar_pdf_integridade_matriz(id: int):
         pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         pdf.ln(10)
 
-        # Tabela da Matriz
-        pdf.set_font("helvetica", "B", 8)
-        pdf.set_fill_color(0, 86, 179)
+        # Tabela
+        pdf.ln(2)
+        y0 = pdf.get_y()
+        pdf.set_fill_color(0, 51, 102)
         pdf.set_text_color(255, 255, 255)
-        colunas = ["NOMENCLATURA", "BALANCETE", "BP", "BF", "BO", "DFC", "DVP", "DMPL", "CONF."]
-        larguras = [85, 23, 23, 23, 23, 23, 23, 23, 15]
-        for i, col in enumerate(colunas): pdf.cell(larguras[i], 8, col, border=1, align="C", fill=True)
-        pdf.ln()
-
-        pdf.set_font("helvetica", "", 7.5)
+        pdf.set_font("helvetica", "B", 9)
+        pdf.set_xy(15, y0)
+        pdf.cell(110, 8, "Indicador", border=1, fill=True, align="L")
+        pdf.cell(50, 8, "Periodo Anterior", border=1, fill=True, align="R")
+        pdf.cell(50, 8, "Periodo Atual", border=1, fill=True, align="R")
+        pdf.cell(35, 8, "Var. (%)", border=1, fill=True, align="C")
+        pdf.set_xy(15, y0 + 8)
         pdf.set_text_color(0, 0, 0)
-        for linha in matriz:
-            pdf.cell(larguras[0], 7, str(linha.get('item', '')), border=1, align="L")
-            for key, index in zip(["balancete", "bp", "bf", "bo", "dfc", "dvp", "dmpl"], range(1, 8)):
-                pdf.cell(larguras[index], 7, str(linha.get(key, '-')), border=1, align="R")
-            conf = str(linha.get('conf', ''))
-            pdf.set_text_color(0, 128, 0) if conf == "OK" else pdf.set_text_color(255, 0, 0)
-            pdf.cell(larguras[8], 7, conf, border=1, align="C")
-            pdf.set_text_color(0, 0, 0)
-            pdf.ln()
+        pdf.set_font("helvetica", "", 9)
+
+        chaves = [
+            ("Receita Realizada (R$ mi)", "receita_realizada", "fm"),
+            ("Despesas Empenhadas (R$ mi)", "despesa_empenhada", "fm"),
+            ("Superavit Orcamentario (R$ mi)", "superavit", "fm"),
+            ("Restos a Pagar Inscritos (R$ mi)", "restos_pagar", "fm"),
+            ("Receitas Orcadas (R$ mi)", "receita_orcada", "fm"),
+            ("Despesas Orcadas (R$ mi)", "despesa_orcada", "fm"),
+            ("% de Realizacao das Receitas", "pct_receita", "pc"),
+            ("% de Realizacao das Despesas", "pct_despesa", "pc"),
+        ]
+        for i, (lbl, chave, tipo) in enumerate(chaves):
+            pdf.set_fill_color(248, 251, 255) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+            va = atual.get(chave); vb = anterior.get(chave)
+            sva = pc(va) if tipo == "pc" else fm(va)
+            svb = pc(vb) if tipo == "pc" else fm(vb)
+            v = varc(va, vb) if (va is not None and vb is not None) else "-"
+            pdf.set_xy(15, y0 + 8 + (i+1)*8)
+            pdf.cell(110, 8, lbl, border=1, fill=True, align="L")
+            pdf.cell(50, 8, svb, border=1, fill=True, align="R")
+            pdf.cell(50, 8, sva, border=1, fill=True, align="R")
+            pdf.cell(35, 8, v, border=1, fill=True, align="C")
+        pdf.set_y(y0 + 8 + len(chaves)*8 + 6)
+
+
+
+        # Grafico - centralizado
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 8, "Receita, Despesa e Superavit (R$ mi)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+
+        # Legenda
+        leg_y = pdf.get_y()
+        pdf.set_fill_color(74, 144, 226)
+        pdf.rect(195, leg_y + 1, 4, 4, style="F")
+        pdf.set_xy(201, leg_y)
+        pdf.set_font("helvetica", "", 8)
+        pdf.set_text_color(80, 80, 80)
+        pdf.cell(40, 6, "Periodo Anterior", align="L")
+        pdf.set_fill_color(0, 51, 102)
+        pdf.rect(245, leg_y + 1, 4, 4, style="F")
+        pdf.set_xy(251, leg_y)
+        pdf.cell(35, 6, "Periodo Atual", align="L")
+        pdf.ln(10)
+
+        grupos = [
+            ("Receita",   atual.get("receita_realizada", 0)/1e6,   anterior.get("receita_realizada", 0)/1e6),
+            ("Despesa",   atual.get("despesa_empenhada", 0)/1e6,   anterior.get("despesa_empenhada", 0)/1e6),
+            ("Superavit", atual.get("superavit", 0)/1e6,           anterior.get("superavit", 0)/1e6),
+        ]
+
+        max_pos = max(max(a, b) for _, a, b in grupos) or 1
+        max_neg = min(min(a, b) for _, a, b in grupos)
+        chart_h = 30.0
+        # escala proporcional considerando amplitude total
+        amplitude = max_pos - min(max_neg, 0)
+        if amplitude == 0: amplitude = 1
+        scale = chart_h / amplitude
+
+        bar_w = 18
+        bar_gap = 2
+        group_w = 2 * bar_w + bar_gap
+        group_gap = 25
+        total_w = group_w * len(grupos) + group_gap * (len(grupos) - 1)
+        start_x = (297 - total_w) / 2
+        top_y = pdf.get_y() + 5
+        zero_y = top_y + max_pos * scale
+
+        # Linha do zero
+        pdf.set_draw_color(160, 160, 160)
+        pdf.line(start_x - 10, zero_y, start_x + total_w + 10, zero_y)
+
+        # Barras
+        lowest_y = zero_y
+        for i, (lbl, va, vb) in enumerate(grupos):
+            x = start_x + i * (group_w + group_gap)
+            # Anterior
+            hb = vb * scale
+            pdf.set_fill_color(74, 144, 226)
+            if vb >= 0:
+                pdf.rect(x, zero_y - hb, bar_w, hb, style="F")
+            else:
+                pdf.rect(x, zero_y, bar_w, -hb, style="F")
+                if zero_y + (-hb) > lowest_y: lowest_y = zero_y + (-hb)
+            # Atual
+            ha = va * scale
+            pdf.set_fill_color(0, 51, 102)
+            if va >= 0:
+                pdf.rect(x + bar_w + bar_gap, zero_y - ha, bar_w, ha, style="F")
+            else:
+                pdf.rect(x + bar_w + bar_gap, zero_y, bar_w, -ha, style="F")
+                if zero_y + (-ha) > lowest_y: lowest_y = zero_y + (-ha)
+
+        # Rotulos ABAIXO de todas as barras
+        rot_y = lowest_y + 3
+        for i, (lbl, va, vb) in enumerate(grupos):
+            x = start_x + i * (group_w + group_gap)
+            pdf.set_xy(x, rot_y)
+            pdf.set_font("helvetica", "", 9)
+            pdf.set_text_color(60, 60, 60)
+            pdf.cell(group_w, 5, lbl, align="C")
+
+        pdf.set_y(rot_y + 12)
+
+        pdf.set_x(15)
+        pdf.set_font("helvetica", "I", 9)
+        pdf.set_text_color(80, 80, 80)
+        pdf.multi_cell(267, 5,
+            "Principais conclusoes: a receita realizada representa " + pc(atual.get("pct_receita")) +
+            " da previsao atualizada, enquanto as despesas empenhadas representam " + pc(atual.get("pct_despesa")) +
+            " da dotacao atualizada.",
+            align="L")
 
         pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Integridade_{periodo.replace('-', '_')}.pdf"})
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=Analise_{periodo}.pdf"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/analise_orcamentaria_bo/{periodo}")
+async def api_analise_orcamentaria_bo(periodo: str):
+    try:
+        from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+        import os
+        caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
+        if not caminho or not os.path.exists(caminho):
+            return {"erro": True, "mensagem": f"BO do período {periodo} não foi importado."}
+        linhas = _ler_linhas(caminho)
+        def buscar(termo, col, apos=0):
+            for i, p in enumerate(linhas):
+                if i < apos or not p: continue
+                if termo.upper() in p[0].strip().upper() and len(p) > col:
+                    return abs(_limpar_valor(p[col]))
+            return 0.0
+        receita = buscar("SUB-TOTAL DAS RECEITAS", 6)
+        receita_orc = buscar("SUB-TOTAL DAS RECEITAS", 5)
+        empenhada = buscar("SUB-TOTAL DAS DESPESAS", 4)
+        despesa_orc = buscar("SUB-TOTAL DAS DESPESAS", 3)
+        idx_desp = next((i for i, p in enumerate(linhas) if p and "SUB-TOTAL DAS DESPESAS" in p[0].upper()), 0)
+        restos = buscar("TOTAL:", 6, apos=idx_desp)
+        return {
+            "erro": False,
+            "receita_realizada": receita,
+            "despesa_empenhada": empenhada,
+            "superavit": receita - empenhada,
+            "restos_pagar": restos,
+            "receita_orcada": receita_orc,
+            "despesa_orcada": despesa_orc,
+            "pct_receita": round(receita / receita_orc * 100, 2) if receita_orc else 0,
+            "pct_despesa": round(empenhada / despesa_orc * 100, 2) if despesa_orc else 0,
+        }
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
 
-@app.get("/gerar_pdf_base_legal")
-async def gerar_pdf_base_legal(periodo_atual: str = "2026-TRIMESTRE-3", periodo_anterior: str = "2025-TRIMESTRE-3"):
+@app.post("/salvar_analise_orcamentaria/{periodo}")
+async def salvar_analise_orcamentaria(periodo: str):
+    atual = await api_analise_orcamentaria_bo(periodo)
+    if atual.get("erro"):
+        raise HTTPException(status_code=400, detail=atual.get("mensagem"))
+    ano_anterior = str(int(periodo.split("-")[0]) - 1)
+    periodo_anterior = periodo.replace(periodo.split("-")[0], ano_anterior, 1)
+    anterior = await api_analise_orcamentaria_bo(periodo_anterior)
+    dados = {"periodo_anterior": periodo_anterior, "periodo_atual": periodo,
+             "atual": atual, "anterior": anterior if not anterior.get("erro") else {}}
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_orcamentaria (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    cur.execute("INSERT INTO historico_analise_orcamentaria (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
+                (periodo, data_agora, json.dumps(dados)))
+    conn.commit(); conn.close()
+    return {"mensagem": "Salvo"}
+
+@app.get("/historico_analise_orcamentaria")
+async def get_historico_analise():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_orcamentaria ORDER BY id DESC")
+    rows = cur.fetchall(); conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.get("/historico_analise_orcamentaria/{id}")
+async def get_analise_por_id(id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id=?", (id,))
+    row = cur.fetchone(); conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+    return json.loads(row[1])
+
+@app.delete("/excluir_analise_orcamentaria/{id}")
+async def excluir_analise(id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM historico_analise_orcamentaria WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    return {"mensagem": "Excluido"}
+
+@app.get("/gerar_pdf_analise_orcamentaria/{id}")
+async def gerar_pdf_analise_orcamentaria(id: int):
     try:
         from fastapi.responses import Response
         from fpdf import FPDF
         from fpdf.enums import XPos, YPos
-        
-        def fmt_periodo(p):
-            partes = p.split('-')
-            if len(partes) == 3:
-                if partes[1] == 'TRIMESTRE': return f"{partes[2]}º Tri/{partes[0]}"
-                if partes[1] == 'MES': return f"Mês {partes[2]}/{partes[0]}"
-                return f"Exercício {partes[0]}"
-            return p
-
-        txt_atual = fmt_periodo(periodo_atual)
-        txt_anterior = fmt_periodo(periodo_anterior)
-
-        pdf = FPDF(orientation='L', unit='mm', format='A4')
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_orcamentaria WHERE id=?", (id,))
+        row = cur.fetchone(); conn.close()
+        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+        periodo, data_geracao, json_str = row
+        d = json.loads(json_str)
+        if "atual" in d:
+            atual = d["atual"]; anterior = d.get("anterior", {})
+        else:
+            atual = d; anterior = {}
+        def fm(v):
+            return f"{v/1000000:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v is not None else "0,00"
+        def pc(v):
+            return f"{v:.2f}".replace(".", ",") + "%" if v is not None else "0,00%"
+        def varc(a, b):
+            if a is None or b is None or b == 0: return "-"
+            return f"{((a-b)/abs(b))*100:+.2f}".replace(".", ",") + "%"
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
         pdf.add_page()
-        pdf.set_auto_page_break(auto=False)  # Desativa quebra automática
-        
-        # ================= CABEÇALHO =================
-        pdf.set_xy(15, 15)
-        pdf.set_font("helvetica", "B", 10)
-        pdf.set_text_color(100, 150, 200)
-        pdf.cell(0, 10, "A B E R T U R A", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        
-        pdf.set_xy(15, 22)
-        pdf.set_font("helvetica", "B", 24)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 15, "Base Legal e Metodologia", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
-        # ================= COLUNA ESQUERDA (LEGISLAÇÃO) =================
-        # A página A4 paisagem tem 297mm de largura e 210mm de altura.
-        # A coluna esquerda ocupa de X=15 a X=130 (115mm de largura).
-        # Altura: do Y=50 até Y=170 (120mm de altura).
-        pdf.set_fill_color(233, 242, 250)
-        pdf.rect(15, 50, 115, 110, style='F')
-        
-        pdf.set_xy(20, 55)
-        pdf.set_font("helvetica", "B", 10)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 10, "LEGISLAÇÃO E NORMAS APLICADAS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        
-        leis = [
-            "Lei nº 4.320/1964",
-            "Lei Complementar nº 101/2000 (LRF)",
-            "Manual de Contabilidade Aplicada ao Setor Público (MCASP)",
-            "Normas Brasileiras de Contabilidade - Setor Publico (NBC TSP)",
-            "Resolução COFEN nº 764/2024 (Prestação de Contas)"
-        ]
-        
-        pdf.set_font("helvetica", "", 10)
-        pdf.set_text_color(51, 51, 51)
-        for lei in leis:
-            pdf.set_x(20)
-            pdf.cell(5, 10, "-")
-            pdf.multi_cell(0, 10, lei, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.ln(5)
-
-        # ================= COLUNA DIREITA (DEMONSTRAÇÕES) =================
-        # A coluna direita ocupa de X=135 a X=280 (145mm de largura).
-        pdf.set_xy(135, 50)
-        pdf.set_font("helvetica", "B", 10)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 10, "DEMONSTRAÇÕES ANALISADAS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        
-        demos = [
-            "Balancete de Verificação",
-            "Balanço Financeiro (BF)",
-            "Balanço Orçamentário (BO)",
-            "Balanço Patrimonial (BP)",
-            "Demonstração do Fluxo de Caixa (DFC)",
-            "Demonstração das Mutações do Patrimônio Líquido (DMPL)",
-            "Demonstração das Variações Patrimoniais (DVP)"
-        ]
-        
-        pdf.set_font("helvetica", "", 10)
-        pdf.set_text_color(51, 51, 51)
-        for demo in demos:
-            pdf.set_x(135)
-            pdf.cell(0, 8, demo, border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.ln(2)
-
-        # ================= BLOCO DE PERÍODOS =================
-        # Posicionado logo abaixo da lista de demonstrações (Y dinâmico)
-        y_atual = pdf.get_y() + 5
-        
-        pdf.set_xy(135, y_atual)
-        pdf.set_font("helvetica", "B", 10)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 10, "PERÍODOS COMPARATIVOS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        
-        y_bloco = y_atual + 10
-        pdf.set_fill_color(40, 100, 160)
-        pdf.set_text_color(255, 255, 255)
-        pdf.rect(135, y_bloco, 145, 20, style='F')
-        
-        pdf.set_xy(140, y_bloco + 3)
-        pdf.set_font("helvetica", "B", 14)
-        pdf.cell(0, 10, f"{txt_anterior} x {txt_atual}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        
-        pdf.set_xy(140, y_bloco + 13)
-        pdf.set_font("helvetica", "", 9)
-        pdf.cell(0, 10, "12 meses para fins de LRF", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
-        # ================= RODAPÉ =================
-        # Posição fixa no final da página (A4 Paisagem tem 210mm de altura, rodapé a 190mm)
-        pdf.set_xy(15, 190)
-        pdf.set_font("helvetica", "", 8)
-        pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 10, "Cofen - Analise das Demonstracoes Contabeis", align="L")
-        pdf.cell(0, 10, "01", align="R")
-
+        pdf.set_font("helvetica", "B", 9); pdf.set_text_color(74,144,226)
+        pdf.cell(0, 6, "EXECUCAO ORCAMENTARIA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", "B", 20); pdf.set_text_color(0,51,102)
+        pdf.cell(0, 12, "Analise Orcamentaria Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", "", 9); pdf.set_text_color(120,120,120)
+        pdf.cell(0, 6, f"Periodo: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.ln(2)
+        y0 = pdf.get_y()
+        pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",9)
+        pdf.set_xy(15, y0)
+        pdf.cell(110, 8, "Indicador", border=1, fill=True, align="L")
+        pdf.cell(50, 8, "Periodo Anterior", border=1, fill=True, align="R")
+        pdf.cell(50, 8, "Periodo Atual", border=1, fill=True, align="R")
+        pdf.cell(35, 8, "Var. (%)", border=1, fill=True, align="C")
+        pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",9)
+        chaves = [("Receita Realizada (R$ mi)","receita_realizada","fm"),("Despesas Empenhadas (R$ mi)","despesa_empenhada","fm"),("Superavit Orcamentario (R$ mi)","superavit","fm"),("Restos a Pagar Inscritos (R$ mi)","restos_pagar","fm"),("Receitas Orcadas (R$ mi)","receita_orcada","fm"),("Despesas Orcadas (R$ mi)","despesa_orcada","fm"),("% de Realizacao das Receitas","pct_receita","pc"),("% de Realizacao das Despesas","pct_despesa","pc")]
+        for i,(lbl,chave,tipo) in enumerate(chaves):
+            pdf.set_fill_color(248,251,255) if i%2==0 else pdf.set_fill_color(255,255,255)
+            va = atual.get(chave); vb = anterior.get(chave)
+            sva = pc(va) if tipo=="pc" else fm(va)
+            svb = pc(vb) if tipo=="pc" else fm(vb)
+            v = varc(va, vb)
+            pdf.set_xy(15, y0 + 8 + (i+1)*8)
+            pdf.cell(110, 8, lbl, border=1, fill=True, align="L")
+            pdf.cell(50, 8, svb, border=1, fill=True, align="R")
+            pdf.cell(50, 8, sva, border=1, fill=True, align="R")
+            pdf.cell(35, 8, v, border=1, fill=True, align="C")
+        pdf.set_y(y0 + 8 + len(chaves)*8 + 6)
+        pdf.set_font("helvetica","B",10); pdf.set_text_color(0,51,102)
+        pdf.cell(0, 8, "Receita, Despesa e Superavit (R$ mi)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        leg_y = pdf.get_y()
+        pdf.set_fill_color(74,144,226); pdf.rect(195, leg_y+1, 4, 4, style="F")
+        pdf.set_xy(201, leg_y); pdf.set_font("helvetica","",8); pdf.set_text_color(80,80,80)
+        pdf.cell(40, 6, "Periodo Anterior", align="L")
+        pdf.set_fill_color(0,51,102); pdf.rect(245, leg_y+1, 4, 4, style="F")
+        pdf.set_xy(251, leg_y); pdf.cell(35, 6, "Periodo Atual", align="L")
+        pdf.ln(10)
+        grupos = [("Receita", atual.get("receita_realizada",0)/1e6, anterior.get("receita_realizada",0)/1e6),("Despesa", atual.get("despesa_empenhada",0)/1e6, anterior.get("despesa_empenhada",0)/1e6),("Superavit", atual.get("superavit",0)/1e6, anterior.get("superavit",0)/1e6)]
+        max_pos = max(max(a,b) for _,a,b in grupos) or 1
+        max_neg = min(min(a,b) for _,a,b in grupos)
+        chart_h = 30.0
+        amp = max_pos - min(max_neg,0)
+        if amp == 0: amp = 1
+        scale = chart_h / amp
+        bar_w = 20; bar_gap = 4; group_w = 2*bar_w + bar_gap; group_gap = 30
+        total_w = group_w*len(grupos) + group_gap*(len(grupos)-1)
+        start_x = (297 - total_w)/2
+        top_y = pdf.get_y() + 5
+        zero_y = top_y + max_pos*scale
+        pdf.set_draw_color(160,160,160)
+        pdf.line(start_x - 10, zero_y, start_x + total_w + 10, zero_y)
+        lowest_y = zero_y
+        for i,(lbl,va,vb) in enumerate(grupos):
+            x = start_x + i*(group_w + group_gap)
+            hb = vb*scale; ha = va*scale
+            pdf.set_fill_color(74,144,226)
+            if vb >= 0: pdf.rect(x, zero_y - hb, bar_w, hb, style="F")
+            else: pdf.rect(x, zero_y, bar_w, -hb, style="F"); lowest_y = max(lowest_y, zero_y - hb)
+            pdf.set_fill_color(0,51,102)
+            if va >= 0: pdf.rect(x + bar_w + bar_gap, zero_y - ha, bar_w, ha, style="F")
+            else: pdf.rect(x + bar_w + bar_gap, zero_y, bar_w, -ha, style="F"); lowest_y = max(lowest_y, zero_y - ha)
+        rot_y = lowest_y + 3
+        for i,(lbl,_,_) in enumerate(grupos):
+            x = start_x + i*(group_w + group_gap)
+            pdf.set_xy(x, rot_y)
+            pdf.set_font("helvetica","",9); pdf.set_text_color(60,60,60)
+            pdf.cell(group_w, 5, lbl, align="C")
+        pdf.set_y(rot_y + 12)
+        pdf.set_x(15); pdf.set_font("helvetica","I",9); pdf.set_text_color(80,80,80)
+        pdf.multi_cell(267, 5, "Principais conclusoes: a receita realizada representa " + pc(atual.get("pct_receita")) + " da previsao atualizada, enquanto as despesas empenhadas representam " + pc(atual.get("pct_despesa")) + " da dotacao atualizada.", align="L")
         pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Base_Legal_{periodo_atual}.pdf"})
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Analise_{periodo}.pdf"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/analise_orcamentaria")
+async def serve_analise_orcamentaria():
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_orcamentaria.html")
+    return FileResponse(caminho)
+
+@app.get("/api/relatorios_importados")
+async def api_relatorios_importados():
+    import os, glob
+    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    arquivos = glob.glob(os.path.join(pasta, "*.csv"))
+    lista = []
+    for arq in arquivos:
+        if os.path.exists(arq):
+            nome = os.path.basename(arq)
+            partes = nome.replace(".csv", "").split("_")
+            tipo = partes[0] if partes else "Desconhecido"
+            
+            periodo = "Não identificado"
+            for i, p in enumerate(partes):
+                if len(p) == 4 and p.isdigit():
+                    if i + 2 < len(partes):
+                        periodo = f"{p} - {partes[i+1]} {partes[i+2]}"
+                    else:
+                        periodo = p
+                    break
+                    
+            lista.append({"nome": nome, "tipo": tipo, "periodo": periodo})
+    
+    lista.sort(key=lambda x: x["nome"])
+    return lista
 
 @app.get("/base_legal")
 async def serve_base_legal():

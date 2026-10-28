@@ -146,6 +146,8 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
   <ul style="padding-left: 60px; margin-left: 0; list-style: none;">
     
     <li><a href="#" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
+    <li><a href="/base_legal" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Base Legal</a></li>
+    
     <li>
       <a id="menu-demonstracoes" class="active" onclick="toggleSubmenu(this)">Demonstrações Contábeis</a>
       <ul class="submenu open" id="submenu-demonstracoes" style="list-style: none; padding-left: 0; margin-left: 0;">
@@ -159,9 +161,10 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
       
         <li><a href="/conferencia" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Conferência das Demonstrações</a></li>
         <li><a href="/integridade" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
+    <li><a href="/analise_orcamentaria" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Análise Orçamentária</a></li>
 <li><a href="/liquidez" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Índices de Liquidez</a></li>
     <li><a href="/panorama" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Resultados Gerais</a></li>
-        <li><a href="/base_legal" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Base Legal</a></li>
+        
     </ul>
     </li>
     
@@ -274,6 +277,63 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
         </div>
 
         <button type="submit" class="btn-action btn-pdf" style="border: none; cursor: pointer; font-size: 16px; padding: 12px 24px;">Enviar e Importar</button>
+            </form>
+            <div style="margin-top: 30px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h3 style="margin-top: 0; color: #003366;">Relatórios Já Importados</h3>
+                <input type="text" id="busca-relatorio" placeholder="Buscar por tipo ou período..." style="width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ccc; border-radius: 4px;" oninput="filtrarTabela()">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f4f6f9; text-align: left;">
+                            <th style="padding: 10px; border-bottom: 2px solid #ddd;">Arquivo</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #ddd;">Tipo</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #ddd;">Período</th>
+                            <th style="padding: 10px; border-bottom: 2px solid #ddd; text-align: center;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-importados">
+                        <tr><td colspan="4" style="padding: 10px; text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <script>
+                let dadosImportados = [];
+                function carregarImportados() {
+                    fetch('/api/relatorios_importados')
+                        .then(r => r.json())
+                        .then(data => { dadosImportados = data || []; filtrarTabela(); })
+                        .catch(err => { document.getElementById('lista-importados').innerHTML = '<tr><td colspan="4" style="padding: 10px; text-align: center; color: red;">Erro ao carregar os relatórios.</td></tr>'; });
+                }
+                function filtrarTabela() {
+                    const termo = document.getElementById('busca-relatorio').value.toLowerCase();
+                    const tbody = document.getElementById('lista-importados');
+                    const filtrados = dadosImportados.filter(item => item.nome.toLowerCase().includes(termo) || item.tipo.toLowerCase().includes(termo) || item.periodo.toLowerCase().includes(termo));
+                    if (filtrados.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="padding: 10px; text-align: center;">Nenhum relatório encontrado.</td></tr>'; return; }
+                    let html = '';
+                    filtrados.forEach(item => {
+                        html += `<tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.nome}</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.tipo}</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.periodo}</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">
+                                <div style="display: flex; gap: 5px; justify-content: center;">
+                                    <button onclick="gerarPdfLista('${item.tipo}')" style="padding: 5px 10px; background: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">PDF</button>
+                                    <button onclick="excluirRelatorio('${item.nome}')" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Excluir</button>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+                    tbody.innerHTML = html;
+                }
+                function gerarPdfLista(tipo) { window.open('/download/pdf/' + tipo, '_blank'); }
+                function excluirRelatorio(nomeArquivo) {
+                    if (!confirm("Excluir " + nomeArquivo + "?")) return;
+                    fetch('/api/excluir_relatorio/' + nomeArquivo, { method: 'DELETE' })
+                    .then(r => r.json()).then(data => { if (data.erro) alert(data.mensagem); else { alert("Excluído!"); carregarImportados(); } })
+                    .catch(err => alert("Erro de conexão."));
+                }
+                document.addEventListener("DOMContentLoaded", carregarImportados);
+            </script>
+        
       </form>
       
       <div id="upload-mensagem" style="margin-top: 20px; font-weight: bold;"></div>
