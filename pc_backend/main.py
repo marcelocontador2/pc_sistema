@@ -2050,21 +2050,21 @@ async def gerar_pdf_analise_orcamentaria(id: int):
         pdf = FPDF(orientation="L", unit="mm", format="A4")
         pdf.add_page()
         pdf.set_font("helvetica", "B", 9); pdf.set_text_color(74,144,226)
-        pdf.cell(0, 6, "EXECUCAO ORCAMENTARIA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(0, 6, "EXECUÇÃO ORÇAMENTÁRIA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font("helvetica", "B", 20); pdf.set_text_color(0,51,102)
-        pdf.cell(0, 12, "Analise Orcamentaria Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(0, 12, "Análise Orçamentária Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font("helvetica", "", 9); pdf.set_text_color(120,120,120)
-        pdf.cell(0, 6, f"Periodo: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(0, 6, f"Período: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(2)
         y0 = pdf.get_y()
         pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",9)
         pdf.set_xy(15, y0)
         pdf.cell(110, 8, "Indicador", border=1, fill=True, align="L")
-        pdf.cell(50, 8, "Periodo Anterior", border=1, fill=True, align="R")
-        pdf.cell(50, 8, "Periodo Atual", border=1, fill=True, align="R")
+        pdf.cell(50, 8, "Período Anterior", border=1, fill=True, align="R")
+        pdf.cell(50, 8, "Período Atual", border=1, fill=True, align="R")
         pdf.cell(35, 8, "Var. (%)", border=1, fill=True, align="C")
         pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",9)
-        chaves = [("Receita Realizada (R$ mi)","receita_realizada","fm"),("Despesas Empenhadas (R$ mi)","despesa_empenhada","fm"),("Superavit Orcamentario (R$ mi)","superavit","fm"),("Restos a Pagar Inscritos (R$ mi)","restos_pagar","fm"),("Receitas Orcadas (R$ mi)","receita_orcada","fm"),("Despesas Orcadas (R$ mi)","despesa_orcada","fm"),("% de Realizacao das Receitas","pct_receita","pc"),("% de Realizacao das Despesas","pct_despesa","pc")]
+        chaves = [("Receita Realizada (R$ mi)","receita_realizada","fm"),("Despesas Empenhadas (R$ mi)","despesa_empenhada","fm"),("Superávit Orçamentário (R$ mi)","superavit","fm"),("Restos a Pagar Inscritos (R$ mi)","restos_pagar","fm"),("Receitas Orçadas (R$ mi)","receita_orcada","fm"),("Despesas Orçadas (R$ mi)","despesa_orcada","fm"),("% de Realização das Receitas","pct_receita","pc"),("% de Realização das Despesas","pct_despesa","pc")]
         for i,(lbl,chave,tipo) in enumerate(chaves):
             pdf.set_fill_color(248,251,255) if i%2==0 else pdf.set_fill_color(255,255,255)
             va = atual.get(chave); vb = anterior.get(chave)
@@ -2078,15 +2078,15 @@ async def gerar_pdf_analise_orcamentaria(id: int):
             pdf.cell(35, 8, v, border=1, fill=True, align="C")
         pdf.set_y(y0 + 8 + len(chaves)*8 + 6)
         pdf.set_font("helvetica","B",10); pdf.set_text_color(0,51,102)
-        pdf.cell(0, 8, "Receita, Despesa e Superavit (R$ mi)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.cell(0, 8, "Receita, Despesa e Superávit (R$ mi)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         leg_y = pdf.get_y()
         pdf.set_fill_color(74,144,226); pdf.rect(195, leg_y+1, 4, 4, style="F")
         pdf.set_xy(201, leg_y); pdf.set_font("helvetica","",8); pdf.set_text_color(80,80,80)
-        pdf.cell(40, 6, "Periodo Anterior", align="L")
+        pdf.cell(40, 6, "Período Anterior", align="L")
         pdf.set_fill_color(0,51,102); pdf.rect(245, leg_y+1, 4, 4, style="F")
-        pdf.set_xy(251, leg_y); pdf.cell(35, 6, "Periodo Atual", align="L")
+        pdf.set_xy(251, leg_y); pdf.cell(35, 6, "Período Atual", align="L")
         pdf.ln(10)
-        grupos = [("Receita", atual.get("receita_realizada",0)/1e6, anterior.get("receita_realizada",0)/1e6),("Despesa", atual.get("despesa_empenhada",0)/1e6, anterior.get("despesa_empenhada",0)/1e6),("Superavit", atual.get("superavit",0)/1e6, anterior.get("superavit",0)/1e6)]
+        grupos = [("Receita", atual.get("receita_realizada",0)/1e6, anterior.get("receita_realizada",0)/1e6),("Despesa", atual.get("despesa_empenhada",0)/1e6, anterior.get("despesa_empenhada",0)/1e6),("Superávit", atual.get("superavit",0)/1e6, anterior.get("superavit",0)/1e6)]
         max_pos = max(max(a,b) for _,a,b in grupos) or 1
         max_neg = min(min(a,b) for _,a,b in grupos)
         chart_h = 30.0
@@ -2118,7 +2118,7 @@ async def gerar_pdf_analise_orcamentaria(id: int):
             pdf.cell(group_w, 5, lbl, align="C")
         pdf.set_y(rot_y + 12)
         pdf.set_x(15); pdf.set_font("helvetica","I",9); pdf.set_text_color(80,80,80)
-        pdf.multi_cell(267, 5, "Principais conclusoes: a receita realizada representa " + pc(atual.get("pct_receita")) + " da previsao atualizada, enquanto as despesas empenhadas representam " + pc(atual.get("pct_despesa")) + " da dotacao atualizada.", align="L")
+        pdf.multi_cell(267, 5, "Principais conclusões: a receita realizada representa " + pc(atual.get("pct_receita")) + " da previsão atualizada, enquanto as despesas empenhadas representam " + pc(atual.get("pct_despesa")) + " da dotação atualizada.", align="L")
         pdf_bytes = pdf.output()
         return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Analise_{periodo}.pdf"})
     except Exception as e:
