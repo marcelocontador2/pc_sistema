@@ -1,7 +1,17 @@
-﻿# Backups e temporarios
-backup_*/
-temp_*.py
-liquidez_nova.html
-pc_sistema/
+﻿# Ambiente Virtual
+pc_venv/
+__pycache__/
+*.pyc
+
+# Backups gerados durante os ajustes
 *.bak
-*.bak_*
+*.backup
+
+# Banco de dados e arquivos locais
+*.db
+pc_storage/uploads_raw/*
+pc_storage/*.db
+
+# Sistema
+.DS_Store
+Thumbs.db

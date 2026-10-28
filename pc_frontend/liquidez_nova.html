@@ -1,0 +1,117 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Índices de Liquidez e Estrutura</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; margin: 0; }
+        .top-bar { margin-bottom: 20px; }
+        .btn { padding: 10px 15px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; }
+        .btn-azul { background: #0056b3; }
+        .btn-verde { background: #28a745; }
+        .btn-vermelho { background: #dc3545; }
+        .filtros { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        .layout { display: flex; gap: 20px; }
+        .sidebar { width: 300px; background: white; padding: 15px; border-radius: 8px; }
+        .conteudo { flex: 1; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .card { background: white; padding: 20px; border-radius: 8px; border-top: 5px solid #0056b3; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h4 { margin: 0 0 10px 0; font-size: 14px; }
+        .card .valor { font-size: 28px; font-weight: bold; color: #0056b3; }
+        .card .formula { font-size: 11px; color: #666; margin-top: 5px; }
+        .titulo { color: #003366; margin-bottom: 15px; border-bottom: 2px solid #0056b3; padding-bottom: 5px; }
+    </style>
+
+    <style id="estilo-voltar-laranja">
+        .btn-voltar-laranja {
+            background-color: #ff7f00 !important;
+            border-color: #ff7f00 !important;
+            border-radius: 50px !important;
+            color: white !important;
+            padding: 8px 20px !important;
+            font-weight: bold !important;
+            text-decoration: none !important;
+            display: inline-block !important;
+            border: none !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            cursor: pointer !important;
+        }
+    </style>
+
+</head>
+<body>
+    <div class="top-bar">
+        <a href="/" class="btn-voltar-laranja btn btn-azul" style="background-color: #ff7f00 !important; border-color: #ff7f00 !important; border-radius: 50px !important; color: white !important; background-color: #ff7f00 !important; border-color: #ff7f00 !important; border-radius: 50px !important; color: white !important; text-decoration:none;">&#8592; Voltar</a>
+        <button class="btn btn-verde" onclick="carregarHistorico()">Exibir Selecionado (Teste)</button>
+        <button class="btn btn-vermelho" onclick="alert('Função de excluir em testes')">Excluir Selecionado</button>
+        <button class="btn btn-azul" onclick="alert('Gerar PDF em testes')">Gerar PDF</button>
+    </div>
+
+    <div class="filtros">
+        <label>Período:</label>
+        <select id="periodo"><option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option></select>
+        <button class="btn btn-azul" onclick="calcularLiquidez()">Verificar Índices</button>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <h3>Histórico Salvo</h3>
+            <ul id="lista-historico"><li>Teste inicial</li></ul>
+        </div>
+        
+        <div class="conteudo">
+            <h3 class="titulo">Índices de Liquidez</h3>
+            <div class="grid" id="grid-liquidez">
+                <p>Aguardando clique...</p>
+            </div>
+
+            <h3 class="titulo">Índices de Estrutura</h3>
+            <div class="grid" id="grid-estrutura">
+                <p>Aguardando clique...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function calcularLiquidez() {
+            // Alerta para confirmar que o botão funciona
+            alert("Botão clicado! Buscando dados...");
+            
+            const periodo = document.getElementById('periodo').value;
+            const divLiq = document.getElementById('grid-liquidez');
+            const divEst = document.getElementById('grid-estrutura');
+            
+            divLiq.innerHTML = '<p>Buscando dados no servidor...</p>';
+            divEst.innerHTML = '';
+
+            fetch('/api/calcular_liquidez/' + periodo)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.erro || data.detail) {
+                        divLiq.innerHTML = '<p style="color:red;">Erro: ' + (data.erro || data.detail) + '</p>';
+                        return;
+                    }
+
+                    // Preenche Liquidez
+                    divLiq.innerHTML = 
+                        '<div class="card"><h4>Liquidez Imediata</h4><div class="valor">' + data.liquidez.liquidez_imediata + '</div><div class="formula">Caixa / Passivo Circulante</div></div>' +
+                        '<div class="card"><h4>Liquidez Corrente</h4><div class="valor">' + data.liquidez.liquidez_corrente + '</div><div class="formula">Ativo Circulante / Passivo Circulante</div></div>' +
+                        '<div class="card"><h4>Liquidez Seca</h4><div class="valor">' + data.liquidez.liquidez_seca + '</div><div class="formula">(Ativo Circ. - Estoques) / Passivo Circ.</div></div>';
+
+                    // Preenche Estrutura
+                    divEst.innerHTML = 
+                        '<div class="card"><h4>Endividamento Geral</h4><div class="valor">' + data.estrutura.endividamento_geral + '%</div><div class="formula">Passivo Total / Ativo Total</div></div>' +
+                        '<div class="card"><h4>Part. Capital de Terceiros</h4><div class="valor">' + data.estrutura.part_capital_terceiros + '%</div><div class="formula">Passivo Total / PL</div></div>' +
+                        '<div class="card"><h4>Imobilização do PL</h4><div class="valor">' + data.estrutura.imobilizacao_pl + '%</div><div class="formula">(Ativo Perm. - ARLP) / PL</div></div>';
+                })
+                .catch(function(err) {
+                    divLiq.innerHTML = '<p style="color:red;">Erro de rede: ' + err.message + '</p>';
+                });
+        }
+
+        function carregarHistorico() {
+            alert("Botão de histórico clicado!");
+        }
+    </script>
+</body>
+</html>

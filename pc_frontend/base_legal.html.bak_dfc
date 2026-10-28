@@ -1,0 +1,78 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Base Legal e Metodologia</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; padding: 40px; margin: 0; color: #333; display: flex; justify-content: center; }
+        .container { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 900px; }
+        .header { margin-bottom: 30px; }
+        .subtitulo { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #6c757d; font-weight: bold; }
+        h1 { font-size: 32px; color: #003366; margin: 10px 0 0 0; }
+        .filtros { display: flex; gap: 20px; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: bold; color: #444; }
+        select { padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; min-width: 200px; }
+        .btn { border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #fff; background: #0056b3; font-size: 16px; align-self: flex-end; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="subtitulo">Abertura</div>
+            <h1>Base Legal e Metodologia</h1>
+        </div>
+
+        <div class="filtros">
+            <div class="form-group">
+                <label>Período Comparativo (Anterior):</label>
+                <select id="periodo_anterior">
+                    <option value="2025-TRIMESTRE-3">2025 - 3º Trimestre</option>
+                    <option value="2025-TRIMESTRE-2">2025 - 2º Trimestre</option>
+                    <option value="2025-ANO-1">2025 - Exercício Completo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Período Atual (Referência):</label>
+                <select id="periodo_atual">
+                    <option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option>
+                    <option value="2026-TRIMESTRE-2">2026 - 2º Trimestre</option>
+                    <option value="2026-ANO-1">2026 - Exercício Completo</option>
+                </select>
+            </div>
+            <button class="btn" onclick="gerarPDF()">Gerar PDF</button>
+        </div>
+
+        <div style="display: flex; gap: 20px;">
+            <div style="flex: 1; background: #e9f2fa; padding: 20px; border-radius: 8px;">
+                <h3 style="color: #003366; margin-top: 0;">Legislação e Normas Aplicadas</h3>
+                <ul style="line-height: 2;">
+                    <li>Lei nº 4.320/1964</li>
+                    <li>Lei Complementar nº 101/2000 (LRF)</li>
+                    <li>Manual de Contabilidade Aplicada ao Setor Público (MCASP)</li>
+                    <li>Normas Brasileiras de Contabilidade – Setor Público (NBC TSP)</li>
+                </ul>
+            </div>
+            <div style="flex: 1;">
+                <h3 style="color: #003366; margin-top: 0;">Demonstrações Analisadas</h3>
+                <ul style="list-style: none; padding: 0; line-height: 2.2;">
+                    <li style="border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px;">Balanço Orçamentário (BO)</li>
+                    <li style="border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px;">Balanço Financeiro (BF)</li>
+                    <li style="border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px;">Demonstração das Variações Patrimoniais (DVP)</li>
+                    <li style="border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px;">Balanço Patrimonial (BP)</li>
+                    <li style="border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px;">Demonstração das Mutações do PL (DMPL)</li>
+                    <li style="border: 1px solid #ddd; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px;">Balancete de Verificação</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function gerarPDF() {
+            const anterior = document.getElementById('periodo_anterior').value;
+            const atual = document.getElementById('periodo_atual').value;
+            window.open(`/gerar_pdf_base_legal?periodo_anterior=${anterior}&periodo_atual=${atual}`, '_blank');
+        }
+    </script>
+</body>
+</html>

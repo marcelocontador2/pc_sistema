@@ -97,6 +97,21 @@
             fetch('/api/calcular_liquidez/' + periodo)
                 .then(r => r.json())
                 .then(data => {
+            // === REGRA DE INTEGRIDADE ===
+            if (data && data.erro === "faltando") {
+                const divErro = document.getElementById("grid-liquidez") || document.getElementById("integridade-cards") || document.querySelector("main") || document.body;
+                let html = '<div style="background:#fff3cd; border-left:5px solid #ffc107; padding:20px; border-radius:8px; margin-top:20px;">';
+                html += '<h3 style="color:#856404; margin:0 0 10px 0;">⚠️ Demonstrativos Faltando</h3>';
+                html += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados para este período:</p>';
+                html += '<ul style="color:#856404;">';
+                data.pecas.forEach(p => { html += '<li>' + p + '</li>'; });
+                html += '</ul>';
+                html += '<p style="color:#856404; margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p>';
+                html += '</div>';
+                divErro.innerHTML = html;
+                return;
+            }
+
                     if (data.detail) { div.innerHTML = '<p style="color:red;">Erro: ' + data.detail + '</p>'; return; }
                     div.innerHTML = desenharCards(data.liquidez, data.estrutura, data.valores);
                     document.getElementById('btn-salvar').style.display = 'inline-block';

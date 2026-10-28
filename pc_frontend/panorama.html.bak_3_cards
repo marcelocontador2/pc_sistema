@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Resultados Gerais</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; padding: 20px; margin: 0; color: #333; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn { border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #fff; text-decoration: none; font-size: 14px; }
+        .btn-voltar { background: #fff; border: 1px solid #ccc; color: #333; }
+        .btn-pdf { background: #0056b3; }
+        .btn-exibir { background: #28a745; }
+        .btn-excluir { background: #dc3545; }
+        .btn-salvar { background: #28a745; }
+        
+        .filtros-bar { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .form-group { display: flex; align-items: center; gap: 5px; }
+        label { font-weight: bold; color: #444; font-size: 14px; }
+        select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        
+        .flex-layout { display: flex; gap: 20px; }
+        .sidebar { width: 300px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; height: fit-content; }
+        .main-content { flex: 1; }
+        .card-panorama { background: #fff; padding: 40px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .header-panorama { margin-bottom: 30px; }
+        .subtitulo { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #6c757d; font-weight: bold; }
+        h1 { font-size: 28px; color: #003366; margin: 5px 0 0 0; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .card-indicador { background: #e9f2fa; padding: 25px; border-radius: 8px; }
+        .card-indicador .valor { font-size: 26px; font-weight: bold; color: #003366; white-space: nowrap; }
+        .card-indicador .label { font-size: 13px; color: #555; margin-top: 5px; }
+        .footer { border-top: 1px solid #ddd; padding-top: 15px; font-size: 12px; color: #777; display: flex; justify-content: space-between; font-style: italic; }
+        #lista-historico { list-style: none; padding: 0; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="/" class="btn btn-voltar">&larr; Voltar</a>
+        <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+        <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn btn-salvar" id="btn-confirmar" onclick="salvarPanorama()" style="display:none;">Confirmar e Salvar</button>
+    </div>
+
+    <div class="filtros-bar">
+        <div class="form-group"><label>Ano:</label><select id="ano"><option value="2026">2026</option><option value="2025">2025</option></select></div>
+        <div class="form-group"><label>Tipo:</label><select id="tipo_periodo" onchange="ajustarPeriodo()"><option value="MES">Mensal</option><option value="TRIMESTRE" selected>Trimestral</option><option value="ANO">Exercício</option></select></div>
+        <div class="form-group" id="group-mes" style="display:none;"><label>Mês:</label><select id="mes"><option value="01">01 - Janeiro</option><option value="02">02 - Fevereiro</option><option value="03">03 - Março</option><option value="04">04 - Abril</option><option value="05">05 - Maio</option><option value="06">06 - Junho</option><option value="07">07 - Julho</option><option value="08">08 - Agosto</option><option value="09">09 - Setembro</option><option value="10">10 - Outubro</option><option value="11">11 - Novembro</option><option value="12">12 - Dezembro</option></select></div>
+        <div class="form-group" id="group-trimestre"><label>Trimestre:</label><select id="trimestre"><option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3" selected>3º Trimestre</option><option value="4">4º Trimestre</option></select></div>
+        <button class="btn btn-pdf" onclick="carregarPanorama()">Verificar</button>
+    </div>
+
+    <div class="flex-layout">
+        <div class="sidebar">
+            <h3>Histórico Salvo</h3>
+            <ul id="lista-historico">Carregando...</ul>
+        </div>
+        <div class="main-content">
+            <div class="card-panorama">
+                <div class="header-panorama">
+                    <div class="subtitulo">Panorama</div>
+                    <h1>Resultados Gerais — <span id="periodo-titulo">3º Trimestre de 2026</span></h1>
+                </div>
+                <div class="grid">
+                    <div class="card-indicador"><div class="valor" id="val-superavit-orc">R$ 0,0 mi</div><div class="label" id="label-superavit-orc">Superávit Orçamentário</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-superavit-pat">R$ 0,0 mi</div><div class="label">Superávit Patrimonial (DVP)</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-superavit-fin">R$ 0,0 mi</div><div class="label">Superávit Financeiro (BP)</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-pl">R$ 0,0 mi</div><div class="label">Patrimônio Líquido</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-ativo">R$ 0,0 mi</div><div class="label">Ativo Total</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-passivo">R$ 0,0 mi</div><div class="label">Passivo Total</div></div>
+                </div>
+                <div class="footer"><div>Cofen • Análise das Demonstrações Contábeis</div><div>03</div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function formatarMilhoes(valor) { return "R$ " + (valor / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " mi"; }
+
+        function ajustarPeriodo() {
+            const tipo = document.getElementById('tipo_periodo').value;
+            document.getElementById('group-mes').style.display = (tipo === 'MES') ? 'flex' : 'none';
+            document.getElementById('group-trimestre').style.display = (tipo === 'TRIMESTRE') ? 'flex' : 'none';
+        }
+
+        function aplicarValores(data) {
+            const valOrc = data.superavit_orcamentario;
+            const labelOrc = document.getElementById("label-superavit-orc");
+            const valElement = document.getElementById("val-superavit-orc");
+            valElement.innerText = formatarMilhoes(valOrc);
+            if (valOrc < 0) { labelOrc.innerText = "Déficit Orçamentário"; labelOrc.style.color = "#dc3545"; valElement.style.color = "#dc3545"; }
+            else { labelOrc.innerText = "Superávit Orçamentário"; labelOrc.style.color = "#555"; valElement.style.color = "#003366"; }
+            document.getElementById("val-superavit-pat").innerText = formatarMilhoes(data.superavit_patrimonial);
+            document.getElementById("val-superavit-fin").innerText = formatarMilhoes(data.superavit_financeiro);
+            document.getElementById("val-pl").innerText = formatarMilhoes(data.patrimonio_liquido);
+            document.getElementById("val-ativo").innerText = formatarMilhoes(data.ativo_total);
+            document.getElementById("val-passivo").innerText = formatarMilhoes(data.passivo_total);
+            const btnSalvar = document.getElementById("btn-confirmar");
+            if (btnSalvar) btnSalvar.style.display = "inline-block";
+        }
+
+        async function carregarPanorama() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo_periodo').value;
+            let valor = (tipo === 'MES') ? document.getElementById('mes').value : (tipo === 'TRIMESTRE') ? document.getElementById('trimestre').value : "1";
+            const periodo = ano + '-' + tipo + '-' + valor;
+            document.getElementById("periodo-titulo").innerText = (tipo === 'TRIMESTRE') ? valor + "º Trimestre de " + ano : (tipo === 'MES') ? "Mês " + valor + " de " + ano : "Exercício de " + ano;
+            try {
+                const response = await fetch(`/api/panorama/${periodo}`);
+                const data = await response.json();
+                if (data.detail) { alert("Erro: " + data.detail); return; }
+                aplicarValores(data);
+                document.getElementById("btn-confirmar").setAttribute("data-periodo", periodo);
+            } catch (e) { console.error("Erro", e); }
+        }
+
+        async function salvarPanorama() {
+            const btn = document.getElementById("btn-confirmar");
+            const periodo = btn.getAttribute("data-periodo");
+            btn.innerText = "Salvando..."; btn.disabled = true;
+            try {
+                await fetch("/salvar_panorama/" + periodo, { method: "POST" });
+                alert("Resultados salvos com sucesso!");
+                carregarHistorico(); btn.style.display = "none";
+            } catch (e) { alert("Erro ao salvar."); }
+            finally { btn.innerText = "Confirmar e Salvar"; btn.disabled = false; }
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_panorama').then(r => r.json()).then(data => {
+                let html = '';
+                if(data.length === 0) html = '<li>Nenhum histórico.</li>';
+                data.forEach(item => {
+                    html += `<li style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" class="check-historico" value="${item.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                            <div><div style="font-weight: bold; color: #0056b3;">${item.periodo}</div><div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div></div>
+                        </div></li>`;
+                });
+                document.getElementById('lista-historico').innerHTML = html;
+            });
+        }
+
+        function exibirSelecionado() {
+            const check = document.querySelector(".check-historico:checked");
+            if (!check) { alert("Selecione um item no histórico."); return; }
+            fetch('/historico_panorama/' + check.value).then(r => r.json()).then(data => { aplicarValores(data); });
+        }
+
+        function excluirSelecionado() {
+            const selecionados = document.querySelectorAll(".check-historico:checked");
+            if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
+            if (!confirm(`Excluir ${selecionados.length} itens?`)) return;
+            let promessas = [];
+            selecionados.forEach(check => { promessas.push(fetch("/excluir_panorama/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false)); });
+            Promise.all(promessas).then(resultados => { if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); } });
+        }
+
+        function gerarPDF() {
+            const check = document.querySelector(".check-historico:checked");
+            if (!check) { alert("Marque um relatório no histórico!"); return; }
+            window.open('/gerar_pdf_panorama/' + check.value, '_blank');
+        }
+
+        document.addEventListener("DOMContentLoaded", () => { ajustarPeriodo(); carregarPanorama(); carregarHistorico(); });
+    </script>
+</body>
+</html>
+

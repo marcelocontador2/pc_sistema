@@ -126,7 +126,8 @@ let chart=null;
 function mp(a, t, v){ if(t==='EXERCICIO') return a; return a+'-'+t+'-'+v; }
 
 function carregar(){
-  const ano = document.getElementById('ano_atual').value;
+  
+const ano = document.getElementById('ano_atual').value;
   const tipo = document.getElementById('tipo_atual').value;
   const val = document.getElementById('val_atual').value;
   const pA = mp(ano, tipo, val);
@@ -135,6 +136,27 @@ function carregar(){
     fetch('/api/composicao_receitas_despesas/'+pA).then(r=>r.json()),
     fetch('/api/composicao_receitas_despesas/'+pB).then(r=>r.json())
   ]).then(([a,b])=>{
+        // === CARD: demonstrativos faltando ===
+        const conclEl = document.getElementById("concl");
+        if (conclEl) { conclEl.style.display = "none"; conclEl.innerHTML = ""; }
+        const pecasFaltando = [];
+        if (a && a.erro === "faltando" && a.pecas) pecasFaltando.push(...a.pecas);
+        if (b && b.erro === "faltando" && b.pecas) pecasFaltando.push(...b.pecas);
+        if (pecasFaltando.length > 0) {
+            const divErro = document.getElementById("concl") || document.querySelector(".concl") || document.body;
+            divErro.style.display = "block";
+            let htmlErro = '<div style="background:#fff3cd;border-left:5px solid #ffc107;padding:20px;border-radius:8px;">';
+            htmlErro += '<h3 style="color:#856404;margin:0 0 10px 0;">⚠️ Demonstrativos Faltando</h3>';
+            htmlErro += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados:</p><ul style="color:#856404;">';
+            [...new Set(pecasFaltando)].forEach(p => { htmlErro += '<li>' + p + '</li>'; });
+            htmlErro += '</ul><p style="color:#856404;margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p></div>';
+            divErro.innerHTML = htmlErro;
+            const tbErro = document.querySelector("#tab tbody");
+            if (tbErro) tbErro.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#856404;">Aguardando importação.</td></tr>';
+            if (typeof chart !== 'undefined' && chart) { chart.destroy(); chart = null; }
+            return;
+        }
+
     if(a.erro){alert('Atual: '+a.mensagem);return;}
     if(b.erro){alert('Anterior: '+b.mensagem);return;}
     renderTabela('tab-receitas', a.receitas, b.receitas);

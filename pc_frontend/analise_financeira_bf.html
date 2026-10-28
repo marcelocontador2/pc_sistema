@@ -66,7 +66,8 @@ function fmt(v){ return (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,m
 function pct(va,vb){ if(!vb||vb===0) return '-'; return (((va-vb)/Math.abs(vb))*100).toFixed(2).replace('.',',')+'%'; }
 
 function carregar(){
-  const ano = document.getElementById('ano').value;
+  
+const ano = document.getElementById('ano').value;
   const tipo = document.getElementById('tipo').value;
   const val = document.getElementById('val').value;
   const pA = mp(ano,tipo,val);
@@ -74,6 +75,24 @@ function carregar(){
   fetch('/api/analise_financeira_bf/'+pA)
     .then(r=>r.json())
     .then(a=>{
+        // === CARD: demonstrativos faltando ===
+        const conclEl = document.getElementById("concl");
+        if (conclEl) { conclEl.style.display = "none"; conclEl.innerHTML = ""; }
+        if (a && a.erro === "faltando") {
+            const divErro = document.getElementById("concl") || document.querySelector(".concl") || document.body;
+            divErro.style.display = "block";
+            let htmlErro = '<div style="background:#fff3cd;border-left:5px solid #ffc107;padding:20px;border-radius:8px;">';
+            htmlErro += '<h3 style="color:#856404;margin:0 0 10px 0;">⚠️ Demonstrativos Faltando</h3>';
+            htmlErro += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados:</p><ul style="color:#856404;">';
+            [...new Set(a.pecas || [])].forEach(p => { htmlErro += '<li>' + p + '</li>'; });
+            htmlErro += '</ul><p style="color:#856404;margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p></div>';
+            divErro.innerHTML = htmlErro;
+            const tbErro = document.querySelector("#tab tbody");
+            if (tbErro) tbErro.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#856404;">Aguardando importação.</td></tr>';
+            if (typeof chart !== 'undefined' && chart) { chart.destroy(); chart = null; }
+            return;
+        }
+
       if(a.erro){alert(a.mensagem);return;}
       // Os dois periodos ja vem no mesmo JSON: a.dados
       document.getElementById('btn-confirmar').style.display = 'inline-block';

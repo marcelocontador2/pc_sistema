@@ -1397,6 +1397,24 @@ async def api_panorama(periodo: str):
             row = cursor.fetchone()
             return json.loads(row[0]) if row else []
 
+        # === REGRA DE INTEGRIDADE: verifica se os 6 demonstrativos existem ===
+        demonstrativos = {
+            "BALANCO_PATRIMONIAL": "Balanço Patrimonial",
+            "BALANCO_ORCAMENTARIO": "Balanço Orçamentário",
+            "BALANCO_FINANCEIRO": "Balanço Financeiro",
+            "DFC": "Demonstração do Fluxo de Caixa",
+            "DVP": "Demonstração das Variações Patrimoniais",
+            "DMPL": "Demonstração das Mutações do PL",
+        }
+        faltando = []
+        for tipo, nome in demonstrativos.items():
+            dados = buscar_no_banco(tipo)
+            if not dados:
+                faltando.append(nome)
+        if faltando:
+            conn.close()
+            return {"erro": "faltando", "pecas": faltando}
+
         l_bp = buscar_no_banco("BALANCO_PATRIMONIAL")
         l_bo = buscar_no_banco("BALANCO_ORCAMENTARIO")
         l_dvp = buscar_no_banco("DVP")
@@ -1589,6 +1607,12 @@ async def gerar_pdf_panorama(id: int):
 @app.get("/api/conferencia/{periodo}")
 async def api_conferencia_calcular(periodo: str):
     try:
+        from matriz_integridade import _get_csv
+        pecas_obrigatorias = ["BALANCETE", "BALANCO_PATRIMONIAL", "BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]
+        faltando = [p for p in pecas_obrigatorias if not _get_csv(p, periodo)]
+        if faltando:
+            return {"erro": "faltando", "pecas": faltando}
+
         from integridade import analise_integridade
         dados = await analise_integridade(periodo)
         return dados
@@ -1823,6 +1847,13 @@ async def gerar_pdf_integridade_matriz(id: int):
 @app.get("/api/analise_orcamentaria_bo/{periodo}")
 async def api_analise_orcamentaria_bo(periodo: str):
     try:
+        # === REGRA DE INTEGRIDADE ===
+        from matriz_integridade import _get_csv
+        import os
+        caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
+        if not caminho_check or not os.path.exists(caminho_check):
+            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
+        
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         import os
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
@@ -1895,6 +1926,13 @@ async def salvar_analise_orcamentaria(periodo: str):
 @app.get("/api/composicao_receitas_despesas/{periodo}")
 async def api_composicao_rd(periodo: str):
     try:
+        # === REGRA DE INTEGRIDADE ===
+        from matriz_integridade import _get_csv
+        import os
+        caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
+        if not caminho_check or not os.path.exists(caminho_check):
+            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
+        
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         import os
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
@@ -2073,6 +2111,13 @@ async def serve_composicao():
 @app.get("/api/analise_financeira_bf/{periodo}")
 async def api_analise_financeira_bf(periodo: str):
     try:
+        # === REGRA DE INTEGRIDADE ===
+        from matriz_integridade import _get_csv
+        import os
+        caminho_check = _get_csv("BALANCO_FINANCEIRO", periodo)
+        if not caminho_check or not os.path.exists(caminho_check):
+            return {"erro": "faltando", "pecas": ["Balanço Financeiro"]}
+        
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         import os
         caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
@@ -2345,6 +2390,34 @@ async def gerar_pdf_analise_orcamentaria(id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/periodos_disponiveis/{tipo_demonstrativo}")
+async def api_periodos_disponiveis(tipo_demonstrativo: str):
+    try:
+        import os
+        pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+        if not os.path.exists(pasta):
+            return []
+        arquivos = os.listdir(pasta)
+        prefixo = tipo_demonstrativo.upper()
+        periodos = []
+        for arq in arquivos:
+            if arq.upper().startswith(prefixo) and arq.upper().endswith(".CSV"):
+                partes = arq.replace(".csv", "").split("_")
+                # Encontra o ano (4 digitos)
+                ano_idx = None
+                for i, p in enumerate(partes):
+                    if len(p) == 4 and p.isdigit():
+                        ano_idx = i
+                        break
+                if ano_idx is not None and ano_idx + 2 < len(partes):
+                    ano = partes[ano_idx]
+                    tipo = partes[ano_idx+1]
+                    valor = partes[ano_idx+2]
+                    periodos.append(f"{ano}-{tipo}-{valor}")
+        return sorted(set(periodos), reverse=True)
+    except Exception as e:
+        return {"erro": str(e)}
+
 @app.get("/analise_orcamentaria")
 async def serve_analise_orcamentaria():
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_orcamentaria.html")
@@ -2509,8 +2582,13 @@ def _calc_liquidez(periodo):
 
 @app.get("/api/calcular_liquidez/{periodo}")
 async def api_calcular_liquidez(periodo: str):
+    # === REGRA DE INTEGRIDADE ===
+    from matriz_integridade import _get_csv
+    if not _get_csv("BALANCO_PATRIMONIAL", periodo):
+        return {"erro": "faltando", "pecas": ["Balanço Patrimonial"]}
     dados = _calc_liquidez(periodo)
-    if not dados: raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
+    if not dados:
+        return {"erro": "faltando", "pecas": ["Balanço Patrimonial"]}
     return dados
 
 @app.delete("/excluir_liquidez/{id}")
