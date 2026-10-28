@@ -51,7 +51,7 @@
         <a href="/" class="btn-voltar-laranja btn btn-voltar">&#8592; Voltar</a>
         <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
-        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button><button class="btn btn-salvar" id="btn-confirmar" onclick="salvarMatriz()" style="display:none;">Confirmar e Salvar</button>
+        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
     </div>
 
     <div class="filtros-bar">
@@ -60,6 +60,7 @@
         <div class="form-group" id="group-mes" style="display:none;"><label>Mês:</label><select id="mes"><option value="01">01 - Janeiro</option><option value="02">02 - Fevereiro</option><option value="03">03 - Março</option><option value="04">04 - Abril</option><option value="05">05 - Maio</option><option value="06">06 - Junho</option><option value="07">07 - Julho</option><option value="08">08 - Agosto</option><option value="09">09 - Setembro</option><option value="10">10 - Outubro</option><option value="11">11 - Novembro</option><option value="12">12 - Dezembro</option></select></div>
         <div class="form-group" id="group-trimestre"><label>Trimestre:</label><select id="trimestre"><option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3" selected>3º Trimestre</option><option value="4">4º Trimestre</option></select></div>
         <button class="btn btn-pdf" onclick="verificarEGerar()">Verificar Matriz</button>
+            <button class="btn btn-salvar" id="btn-confirmar" onclick="salvarMatriz()" style="background:#28a745; display:none;">Confirmar e Salvar</button>
     </div>
 
     <div class="flex-layout">
@@ -86,18 +87,26 @@
             const periodo = ano + '-' + tipo + '-' + valor;
             const cards = document.getElementById('integridade-cards');
             cards.innerHTML = '<p>Verificando...</p>';
-            
-            fetch('/salvar_integridade_matriz/' + periodo, { method: 'POST' })
+            const btnSalvar = document.getElementById('btn-confirmar');
+            btnSalvar.style.display = 'none';
+
+            fetch('/api/integridade_matriz/' + periodo)
                 .then(r => r.json())
                 .then(data => {
-                    if (data.dados && data.dados.matriz) {
-                        renderizarTabela(data.dados.matriz); document.getElementById("btn-confirmar").style.display = "inline-block"; document.getElementById("btn-confirmar").setAttribute("data-periodo", periodo);
-                        carregarHistorico();
+                    if (data.erro) {
+                        cards.innerHTML = '<p style="color:red;">Erro: ' + (data.mensagem || 'falha') + '</p>';
+                        return;
+                    }
+                    if (data.matriz && Array.isArray(data.matriz)) {
+                        renderizarTabela(data.matriz);
+                        btnSalvar.style.display = 'inline-block';
+                        btnSalvar.disabled = false;
+                        btnSalvar.setAttribute('data-periodo', periodo);
                     } else {
-                        cards.innerHTML = '<p style="color:red;">Erro ao gerar: Formato de retorno inválido.</p>';
+                        cards.innerHTML = '<p style="color:red;">Formato invalido: ' + JSON.stringify(Object.keys(data)) + '</p>';
                     }
                 })
-                .catch(err => cards.innerHTML = '<p style="color:red;">Erro de conexão.</p>');
+                .catch(err => cards.innerHTML = '<p style="color:red;">Erro: ' + err.message + '</p>');
         }
 
         function renderizarTabela(matriz) {

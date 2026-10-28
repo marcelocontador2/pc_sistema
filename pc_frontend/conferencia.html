@@ -57,6 +57,7 @@
         <div class="form-group" id="group-mes" style="display:none;"><label>Mês:</label><select id="mes"><option value="01">01 - Janeiro</option><option value="02">02 - Fevereiro</option><option value="03">03 - Março</option><option value="04">04 - Abril</option><option value="05">05 - Maio</option><option value="06">06 - Junho</option><option value="07">07 - Julho</option><option value="08">08 - Agosto</option><option value="09">09 - Setembro</option><option value="10">10 - Outubro</option><option value="11">11 - Novembro</option><option value="12">12 - Dezembro</option></select></div>
         <div class="form-group" id="group-trimestre"><label>Trimestre:</label><select id="trimestre"><option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3" selected>3º Trimestre</option><option value="4">4º Trimestre</option></select></div>
         <button class="btn btn-pdf" onclick="verificarEGerar()">Verificar e Gerar Conferência</button>
+<button class="btn" id="btn-confirmar" style="background:#28a745;display:none;" onclick="salvarConferencia()">Confirmar e Salvar</button>
     </div>
 
     <div class="flex-layout">
@@ -83,8 +84,7 @@
             const periodo = ano + '-' + tipo + '-' + valor;
             const cards = document.getElementById('integridade-cards');
             cards.innerHTML = '<p>Verificando...</p>';
-            
-            fetch('/salvar_conferencia/' + periodo)
+            fetch('/api/conferencia/' + periodo)
                 .then(r => r.json())
                 .then(data => {
                     if (data.erro === 'faltando') {
@@ -92,11 +92,14 @@
                         data.pecas.forEach(p => { msg += '<li>' + p + '</li>'; });
                         msg += '</ul>';
                         cards.innerHTML = msg;
+                        document.getElementById('btn-confirmar').style.display = 'none';
                         return;
                     }
-                    if (data.dados && data.dados.analises) {
-                        renderizarCartoes(data.dados.analises);
-                        carregarHistorico();
+                    if (data.analises) {
+                        renderizarCartoes(data.analises);
+                        const b = document.getElementById('btn-confirmar');
+                        b.style.display = 'inline-block';
+                        b.setAttribute('data-periodo', periodo);
                     }
                 })
                 .catch(err => cards.innerHTML = '<p style="color:red;">Erro ao gerar.</p>');
@@ -107,11 +110,15 @@
             analises.forEach(function(a) {
                 const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
                 let linhas = '';
-                a.tabela.forEach(l => { linhas += '<tr><td>' + l.label + '</td><td>' + l.valor + '</td></tr>'; });
-                html += '<div class="card" style="border-left-color: ' + cor + ';">';
-                html += '<h4>' + a.titulo + '</h4><p>' + a.conceito + '</p>';
-                html += '<table style="width:100%; border-collapse:collapse;">' + linhas + '</table>';
-                html += '<div style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + '; padding:10px; margin-top:10px;">' + a.mensagem + '</div></div>';
+                a.tabela.forEach(l => {
+                    linhas += '<tr><td style="padding:4px 8px; border-bottom:1px solid #eee; text-align:left; font-size:12px;">' + l.label + '</td>'
+                           + '<td style="padding:4px 8px; border-bottom:1px solid #eee; text-align:right; font-family:Consolas,monospace; font-size:12px; white-space:nowrap;">' + l.valor + '</td></tr>';
+                });
+                html += '<div class="card" style="border-left-color: ' + cor + '; margin-bottom:8px; padding:10px 15px; page-break-inside:avoid; break-inside:avoid;">';
+                html += '<h4 style="margin:0 0 4px 0; font-size:14px;">' + a.titulo + '</h4>';
+                html += '<p style="margin:0 0 6px 0; font-size:11px; color:#555;">' + a.conceito + '</p>';
+                html += '<table style="width:100%; border-collapse:collapse; margin-bottom:4px;">' + linhas + '</table>';
+                html += '<div style="background:' + (a.status === 'OK' ? '#e8f5e9' : '#ffebee') + '; color:' + cor + '; padding:4px 8px; font-size:11px; font-weight:bold;">' + a.mensagem + '</div></div>';
             });
             document.getElementById('integridade-cards').innerHTML = html;
         }
@@ -159,7 +166,19 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => { ajustarPeriodo(); carregarHistorico(); });
-    </script>
+    
+        function salvarConferencia() {
+            const btn = document.getElementById('btn-confirmar');
+            const periodo = btn.getAttribute('data-periodo');
+            if (!periodo) { alert('Clique em Verificar primeiro.'); return; }
+            btn.innerText = 'Salvando...'; btn.disabled = true;
+            fetch('/salvar_conferencia/' + periodo)
+                .then(r => r.json())
+                .then(() => { alert('Conferência salva!'); carregarHistorico(); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; })
+                .catch(() => { alert('Erro ao salvar.'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; });
+        }
+
+</script>
 </body>
 </html>
 

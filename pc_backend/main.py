@@ -1274,8 +1274,9 @@ import os as _os
 
 @app.get("/conferencia")
 async def serve_conferencia():
-    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia_nova.html")
-    return FileResponse(caminho)
+    from fastapi.responses import FileResponse
+    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
+    return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
 
 
 @app.get("/integridade")
@@ -1399,80 +1400,52 @@ async def api_panorama(periodo: str):
         l_bp = buscar_no_banco("BALANCO_PATRIMONIAL")
         l_bo = buscar_no_banco("BALANCO_ORCAMENTARIO")
         l_dvp = buscar_no_banco("DVP")
-        conn.close()
 
-        def buscar(linhas, termo, coluna):
+        def buscar(linhas, termos, coluna):
             for p in linhas:
-                if len(p) > coluna and termo.upper() in p[0].upper():
-                    return abs(_limpar_valor(p[coluna]))
+                for celula in p:
+                    for termo in termos:
+                        if termo.upper() in str(celula).upper():
+                            if len(p) > coluna:
+                                try:
+                                    v = abs(_limpar_valor(p[coluna]))
+                                    if v > 0:
+                                        return v
+                                except:
+                                    pass
             return 0.0
 
-        # 1. Valores do BP
-        ativo_total = buscar(l_bp, "TOTAL", 1)
-        passivo_total = buscar(l_bp, "TOTAL", 3)
-        
-        pl = 0.0
-        for p in l_bp:
-            if len(p) > 3 and "604.368.244,61" in p[3]:
-                pl = abs(_limpar_valor(p[3]))
-                break
-        
-        superavit_financeiro = 0.0
-        for p in l_bp:
-            if "SUPERÁVIT FINANCEIRO" in p[0].upper() and len(p) > 2:
-                superavit_financeiro = abs(_limpar_valor(p[2]))
-                break
-                
-        # NOVO: Caixa e Equivalente de Caixa (BP)
-        caixa_bp = 0.0
-        for p in l_bp:
-            if "CAIXA E EQUIVALENTES" in p[0].upper() and len(p) > 1:
-                caixa_bp = abs(_limpar_valor(p[1]))
-                break
-        
-        # 2. Resultado Orçamentário (BO)
-        receita_realizada = 0.0
-        despesa_empenhada = 0.0
-        
-        for p in l_bo:
-            if "SUB-TOTAL DAS RECEITAS" in p[0].upper() and len(p) > 6:
-                receita_realizada = abs(_limpar_valor(p[6]))
-                break
-                
-        for p in l_bo:
-            if "TOTAL" in p[0].upper() and len(p) > 4:
-                val_c4 = abs(_limpar_valor(p[4]))
-                if val_c4 > despesa_empenhada:
-                    despesa_empenhada = val_c4
-        
-        if despesa_empenhada == 0:
-            for p in l_bo:
-                if "SUB-TOTAL DAS DESPESAS" in p[0].upper() and len(p) > 4:
-                    despesa_empenhada = abs(_limpar_valor(p[4]))
-                    break
-        
+        # === BP ===
+        passivo_total = buscar(l_bp, ["TOTAL DO PASSIVO"], 3)
+        pl = buscar(l_bp, ["TOTAL DO PATRIMÔNIO LÍQUIDO", "TOTAL DO PATRIMONIO LIQUIDO"], 3)
+        ativo_total = passivo_total + pl  # Ativo = Passivo + PL
+        caixa_bp = buscar(l_bp, ["CAIXA E EQUIVALENTES", "CAIXA E EQUIVALENTE"], 1)
+        superavit_financeiro = buscar(l_bp, ["SUPERÁVIT FINANCEIRO", "SUPERAVIT FINANCEIRO"], 2)
+
+        # === BO ===
+        receita_realizada = buscar(l_bo, ["SUB-TOTAL DAS RECEITAS"], 6)
+        despesa_empenhada = buscar(l_bo, ["SUB-TOTAL DAS DESPESAS"], 4)
         superavit_orcamentario = receita_realizada - despesa_empenhada
 
-        # 3. Superávit Patrimonial (DVP)
-        vpa = buscar(l_dvp, "TOTAL DAS VARIA", 2)
-        vpd = buscar(l_dvp, "TOTAL DAS VARIA", 4)
-        superavit_patrimonial = vpa - vpd
+        # === DVP ===
+        total_vpa = buscar(l_dvp, ["Total das Variações Ativas"], 2)
+        total_vpd = buscar(l_dvp, ["Total das Variações Passivas"], 6)
+        superavit_patrimonial = total_vpa - total_vpd
 
+        conn.close()
         return {
+            "ativo_total": ativo_total,
+            "passivo_total": passivo_total,
+            "patrimonio_liquido": pl,
+            "caixa_bp": caixa_bp,
+            "receita_realizada": receita_realizada,
+            "despesa_empenhada": despesa_empenhada,
             "superavit_orcamentario": superavit_orcamentario,
             "superavit_patrimonial": superavit_patrimonial,
             "superavit_financeiro": superavit_financeiro,
-            "patrimonio_liquido": pl,
-            "ativo_total": ativo_total,
-            "passivo_total": passivo_total,
-            "receita_realizada": receita_realizada,
-            "despesa_empenhada": despesa_empenhada,
-            "caixa_bp": caixa_bp
         }
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"erro": "falha", "mensagem": str(e)}
 
 @app.post("/salvar_panorama/{periodo}")
 async def salvar_panorama(periodo: str):
@@ -1615,6 +1588,15 @@ async def gerar_pdf_panorama(id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/conferencia/{periodo}")
+async def api_conferencia_calcular(periodo: str):
+    try:
+        from integridade import analise_integridade
+        dados = await analise_integridade(periodo)
+        return dados
+    except Exception as e:
+        return {"erro": "falha", "mensagem": str(e)}
+
 @app.get("/salvar_conferencia/{periodo}")
 async def salvar_conferencia(periodo: str):
     try:
@@ -1670,6 +1652,15 @@ async def excluir_conferencia(id: int):
 # =======================================================
 # ROTAS ISOLADAS: INTEGRIDADE (Tabela historico_integridade_matriz)
 # =======================================================
+@app.get("/api/integridade_matriz/{periodo}")
+async def api_integridade_matriz_calcular(periodo: str):
+    try:
+        from matriz_integridade import gerar_matriz
+        dados = await gerar_matriz(periodo)
+        return dados
+    except Exception as e:
+        return {"erro": "falha", "mensagem": str(e)}
+
 @app.post("/salvar_integridade_matriz/{periodo}")
 async def salvar_integridade_matriz(periodo: str):
     try:
@@ -1785,161 +1776,49 @@ async def gerar_pdf_integridade_matriz(id: int):
         from fastapi.responses import Response
         from fpdf import FPDF
         from fpdf.enums import XPos, YPos
-        import sqlite3, json, os
-        
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE id = ?", (id,))
-        row = cursor.fetchone()
-        conn.close()
-        
-        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
-        
+        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+        cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE id=?", (id,))
+        row = cur.fetchone(); conn.close()
+        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
         periodo, data_geracao, json_str = row
-        dados = json.loads(json_str)
-        matriz = dados.get("matriz", [])
+        d = json.loads(json_str)
+        matriz = d.get("matriz", [])
 
-        pdf = FPDF(orientation='L', unit='mm', format='A4')
+        # A3 PAISAGEM (420x297) para caber as 9 colunas com folga
+        pdf = FPDF(orientation="L", unit="mm", format="A3")
+        pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        
-        pdf.set_font("helvetica", "B", 16)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 10, f"Matriz de Integridade - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.set_font("helvetica", "I", 10)
-        pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.ln(10)
+        pdf.set_font("helvetica", "B", 18); pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 12, f"Matriz de Integridade - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font("helvetica", "I", 11); pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 6, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(6)
 
-        # Tabela
-        pdf.ln(2)
-        y0 = pdf.get_y()
-        pdf.set_fill_color(0, 51, 102)
-        pdf.set_text_color(255, 255, 255)
+        # Larguras proporcionais para A3 (util ~400mm)
+        # NOMENCLATURA 100, 7 colunas de 38 = 266, CONF 34 = 400 total
+        colunas = ["NOMENCLATURA", "BALANCETE", "BP", "BF", "BO", "DFC", "DVP", "DMPL", "CONF."]
+        larguras = [100, 38, 38, 38, 38, 38, 38, 38, 34]
+
         pdf.set_font("helvetica", "B", 9)
-        pdf.set_xy(15, y0)
-        pdf.cell(110, 8, "Indicador", border=1, fill=True, align="L")
-        pdf.cell(50, 8, "Periodo Anterior", border=1, fill=True, align="R")
-        pdf.cell(50, 8, "Periodo Atual", border=1, fill=True, align="R")
-        pdf.cell(35, 8, "Var. (%)", border=1, fill=True, align="C")
-        pdf.set_xy(15, y0 + 8)
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font("helvetica", "", 9)
+        pdf.set_fill_color(0, 86, 179); pdf.set_text_color(255, 255, 255)
+        for i, col in enumerate(colunas):
+            pdf.cell(larguras[i], 9, col, border=1, align="C", fill=True)
+        pdf.ln()
 
-        chaves = [
-            ("Receita Realizada (R$ mi)", "receita_realizada", "fm"),
-            ("Despesas Empenhadas (R$ mi)", "despesa_empenhada", "fm"),
-            ("Superavit Orcamentario (R$ mi)", "superavit", "fm"),
-            ("Restos a Pagar Inscritos (R$ mi)", "restos_pagar", "fm"),
-            ("Receitas Orcadas (R$ mi)", "receita_orcada", "fm"),
-            ("Despesas Orcadas (R$ mi)", "despesa_orcada", "fm"),
-            ("% de Realizacao das Receitas", "pct_receita", "pc"),
-            ("% de Realizacao das Despesas", "pct_despesa", "pc"),
-        ]
-        for i, (lbl, chave, tipo) in enumerate(chaves):
-            pdf.set_fill_color(248, 251, 255) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
-            va = atual.get(chave); vb = anterior.get(chave)
-            sva = pc(va) if tipo == "pc" else fm(va)
-            svb = pc(vb) if tipo == "pc" else fm(vb)
-            v = varc(va, vb) if (va is not None and vb is not None) else "-"
-            pdf.set_xy(15, y0 + 8 + (i+1)*8)
-            pdf.cell(110, 8, lbl, border=1, fill=True, align="L")
-            pdf.cell(50, 8, svb, border=1, fill=True, align="R")
-            pdf.cell(50, 8, sva, border=1, fill=True, align="R")
-            pdf.cell(35, 8, v, border=1, fill=True, align="C")
-        pdf.set_y(y0 + 8 + len(chaves)*8 + 6)
-
-
-
-        # Grafico - centralizado
-        pdf.set_font("helvetica", "B", 10)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 8, "Receita, Despesa e Superavit (R$ mi)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-
-        # Legenda
-        leg_y = pdf.get_y()
-        pdf.set_fill_color(74, 144, 226)
-        pdf.rect(195, leg_y + 1, 4, 4, style="F")
-        pdf.set_xy(201, leg_y)
-        pdf.set_font("helvetica", "", 8)
-        pdf.set_text_color(80, 80, 80)
-        pdf.cell(40, 6, "Periodo Anterior", align="L")
-        pdf.set_fill_color(0, 51, 102)
-        pdf.rect(245, leg_y + 1, 4, 4, style="F")
-        pdf.set_xy(251, leg_y)
-        pdf.cell(35, 6, "Periodo Atual", align="L")
-        pdf.ln(10)
-
-        grupos = [
-            ("Receita",   atual.get("receita_realizada", 0)/1e6,   anterior.get("receita_realizada", 0)/1e6),
-            ("Despesa",   atual.get("despesa_empenhada", 0)/1e6,   anterior.get("despesa_empenhada", 0)/1e6),
-            ("Superavit", atual.get("superavit", 0)/1e6,           anterior.get("superavit", 0)/1e6),
-        ]
-
-        max_pos = max(max(a, b) for _, a, b in grupos) or 1
-        max_neg = min(min(a, b) for _, a, b in grupos)
-        chart_h = 30.0
-        # escala proporcional considerando amplitude total
-        amplitude = max_pos - min(max_neg, 0)
-        if amplitude == 0: amplitude = 1
-        scale = chart_h / amplitude
-
-        bar_w = 18
-        bar_gap = 2
-        group_w = 2 * bar_w + bar_gap
-        group_gap = 25
-        total_w = group_w * len(grupos) + group_gap * (len(grupos) - 1)
-        start_x = (297 - total_w) / 2
-        top_y = pdf.get_y() + 5
-        zero_y = top_y + max_pos * scale
-
-        # Linha do zero
-        pdf.set_draw_color(160, 160, 160)
-        pdf.line(start_x - 10, zero_y, start_x + total_w + 10, zero_y)
-
-        # Barras
-        lowest_y = zero_y
-        for i, (lbl, va, vb) in enumerate(grupos):
-            x = start_x + i * (group_w + group_gap)
-            # Anterior
-            hb = vb * scale
-            pdf.set_fill_color(74, 144, 226)
-            if vb >= 0:
-                pdf.rect(x, zero_y - hb, bar_w, hb, style="F")
-            else:
-                pdf.rect(x, zero_y, bar_w, -hb, style="F")
-                if zero_y + (-hb) > lowest_y: lowest_y = zero_y + (-hb)
-            # Atual
-            ha = va * scale
-            pdf.set_fill_color(0, 51, 102)
-            if va >= 0:
-                pdf.rect(x + bar_w + bar_gap, zero_y - ha, bar_w, ha, style="F")
-            else:
-                pdf.rect(x + bar_w + bar_gap, zero_y, bar_w, -ha, style="F")
-                if zero_y + (-ha) > lowest_y: lowest_y = zero_y + (-ha)
-
-        # Rotulos ABAIXO de todas as barras
-        rot_y = lowest_y + 3
-        for i, (lbl, va, vb) in enumerate(grupos):
-            x = start_x + i * (group_w + group_gap)
-            pdf.set_xy(x, rot_y)
-            pdf.set_font("helvetica", "", 9)
-            pdf.set_text_color(60, 60, 60)
-            pdf.cell(group_w, 5, lbl, align="C")
-
-        pdf.set_y(rot_y + 12)
-
-        pdf.set_x(15)
-        pdf.set_font("helvetica", "I", 9)
-        pdf.set_text_color(80, 80, 80)
-        pdf.multi_cell(267, 5,
-            "Principais conclusoes: a receita realizada representa " + pc(atual.get("pct_receita")) +
-            " da previsao atualizada, enquanto as despesas empenhadas representam " + pc(atual.get("pct_despesa")) +
-            " da dotacao atualizada.",
-            align="L")
+        pdf.set_font("helvetica", "", 8); pdf.set_text_color(0, 0, 0)
+        for linha in matriz:
+            pdf.cell(larguras[0], 7, str(linha.get('item', '')), border=1, align="L")
+            for key, index in zip(["balancete", "bp", "bf", "bo", "dfc", "dvp", "dmpl"], range(1, 8)):
+                pdf.cell(larguras[index], 7, str(linha.get(key, '-')), border=1, align="R")
+            conf = str(linha.get('conf', ''))
+            pdf.set_text_color(0, 128, 0) if conf == "OK" else pdf.set_text_color(255, 0, 0)
+            pdf.cell(larguras[8], 7, conf, border=1, align="C")
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln()
 
         pdf_bytes = pdf.output()
         return Response(content=bytes(pdf_bytes), media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=Analise_{periodo}.pdf"})
+            headers={"Content-Disposition": f"attachment; filename=Integridade_{periodo}.pdf"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1978,6 +1857,23 @@ async def api_analise_orcamentaria_bo(periodo: str):
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 
+@app.get("/historico_analise_orcamentaria")
+async def get_historico_analise_orcamentaria():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_orcamentaria ORDER BY id DESC")
+    rows = cur.fetchall(); conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.get("/historico_analise_orcamentaria/{id}")
+async def get_analise_orcamentaria_id(id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id=?", (id,))
+    row = cur.fetchone(); conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+    return json.loads(row[1])
+
 @app.post("/salvar_analise_orcamentaria/{periodo}")
 async def salvar_analise_orcamentaria(periodo: str):
     atual = await api_analise_orcamentaria_bo(periodo)
@@ -1998,25 +1894,338 @@ async def salvar_analise_orcamentaria(periodo: str):
     conn.commit(); conn.close()
     return {"mensagem": "Salvo"}
 
-@app.get("/historico_analise_orcamentaria")
-async def get_historico_analise():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_orcamentaria ORDER BY id DESC")
+@app.get("/api/composicao_receitas_despesas/{periodo}")
+async def api_composicao_rd(periodo: str):
+    try:
+        from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+        import os
+        caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
+        if not caminho or not os.path.exists(caminho):
+            return {"erro": True, "mensagem": f"BO {periodo} nao importado."}
+        linhas = _ler_linhas(caminho)
+        def buscar(termo, col=6):
+            termo_up = termo.strip().upper()
+            # 1o: correspondencia exata
+            for p in linhas:
+                if p and len(p) > col and p[0].strip().upper() == termo_up:
+                    return abs(_limpar_valor(p[col]))
+            # 2o: contains (fallback)
+            for p in linhas:
+                if p and len(p) > col and termo_up in p[0].strip().upper():
+                    return abs(_limpar_valor(p[col]))
+            return 0.0
+        receitas = {
+            "Receitas Correntes": buscar("RECEITAS CORRENTE"),
+            "Receitas Patrimoniais": buscar("RECEITAS PATRIMONIAIS"),
+            "Transferencias Correntes": buscar("TRANSFERÊNCIAS CORRENTES"),
+            "Outras Receitas Correntes": buscar("OUTRAS RECEITAS CORRENTES"),
+            "Receitas de Capital": buscar("RECEITAS DE CAPITAL"),
+        }
+        despesas = {
+            "Pessoal e Encargos": buscar("PESSOAL E ENCARGOS SOCIAIS", 4),
+            "Outras Despesas Correntes": buscar("OUTRAS DESPESAS CORRENTES", 4),
+            "Investimentos": buscar("INVESTIMENTOS - APLICAÇÕES DIRETAS", 4),
+            "Inversoes Financeiras": buscar("INVERSÕES FINANCEIRAS  APLICAÇÕES DIRETAS", 4),
+        }
+        return {"erro": False, "receitas": receitas, "despesas": despesas}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+
+@app.post("/salvar_composicao_receitas_despesas/{periodo_atual}/{periodo_anterior}")
+async def salvar_composicao_rd(periodo_atual: str, periodo_anterior: str):
+    atual = await api_composicao_rd(periodo_atual)
+    if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
+    anterior = await api_composicao_rd(periodo_anterior)
+    dados = {"periodo_atual": periodo_atual, "periodo_anterior": periodo_anterior,
+             "atual": atual, "anterior": anterior if not anterior.get("erro") else {}}
+    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS historico_composicao_rd (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    cur.execute("INSERT INTO historico_composicao_rd (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
+                (f"{periodo_atual} vs {periodo_anterior}", data_agora, json.dumps(dados)))
+    conn.commit(); conn.close()
+    return {"mensagem": "Salvo"}
+
+@app.get("/historico_composicao_receitas_despesas")
+async def get_hist_composicao():
+    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao FROM historico_composicao_rd ORDER BY id DESC")
     rows = cur.fetchall(); conn.close()
     return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
 
-@app.get("/historico_analise_orcamentaria/{id}")
-async def get_analise_por_id(id: int):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id=?", (id,))
+@app.get("/historico_composicao_receitas_despesas/{id}")
+async def get_composicao_id(id: int):
+    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+    cur.execute("SELECT periodo, resultado_json FROM historico_composicao_rd WHERE id=?", (id,))
     row = cur.fetchone(); conn.close()
     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
     return json.loads(row[1])
 
+@app.delete("/excluir_composicao_receitas_despesas/{id}")
+async def excluir_composicao(id: int):
+    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+    cur.execute("DELETE FROM historico_composicao_rd WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    return {"mensagem": "Excluido"}
+
+@app.get("/gerar_pdf_composicao_receitas_despesas/{id}")
+async def gerar_pdf_composicao_receitas_despesas(id: int):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+        cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_composicao_rd WHERE id=?", (id,))
+        row = cur.fetchone(); conn.close()
+        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+        periodo, data_geracao, json_str = row
+        d = json.loads(json_str)
+        atual = d.get("atual", {})
+        anterior = d.get("anterior", {})
+        rec_at = atual.get("receitas", {})
+        rec_an = anterior.get("receitas", {})
+        desp_at = atual.get("despesas", {})
+        desp_an = anterior.get("despesas", {})
+
+        def fm(v):
+            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v is not None else "0,00"
+        def varc(va, vb):
+            if vb is None or vb == 0: return "-"
+            return f"{((va-vb)/abs(vb))*100:+.2f}%".replace(".", ",")
+
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=False)
+        pdf.add_page()
+
+        # Cabecalho compacto
+        pdf.set_font("helvetica", "B", 8); pdf.set_text_color(74,144,226)
+        pdf.cell(0, 5, "COMPOSIÇÃO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", "B", 16); pdf.set_text_color(0,51,102)
+        pdf.cell(0, 9, "Receitas e Despesas Comparativas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", "", 8); pdf.set_text_color(120,120,120)
+        pdf.cell(0, 5, f"Comparação: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.ln(1)
+
+        Y_TAB = pdf.get_y() + 2
+        X_REC = 10
+        X_DESP = 152
+
+        def render_tabela(x0, y0, titulo, dados_at, dados_an):
+            pdf.set_xy(x0, y0)
+            pdf.set_font("helvetica","B",8); pdf.set_text_color(0,51,102)
+            pdf.cell(135, 5, titulo, border=0, align="L")
+            pdf.set_xy(x0, y0+5)
+            pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",7)
+            pdf.cell(50, 4.5, "Conta", border=1, fill=True, align="L")
+            pdf.cell(30, 4.5, "Anterior", border=1, fill=True, align="R")
+            pdf.cell(30, 4.5, "Atual", border=1, fill=True, align="R")
+            pdf.cell(25, 4.5, "Var. (%)", border=1, fill=True, align="C")
+            pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",6.5)
+            i = 0
+            for k, va in dados_at.items():
+                vb = dados_an.get(k, 0)
+                pdf.set_xy(x0, y0+5+4.5+i*4.5)
+                pdf.set_fill_color(248,251,255) if i%2==0 else pdf.set_fill_color(255,255,255)
+                pdf.cell(50, 4.5, k[:30], border=1, fill=True, align="L")
+                pdf.cell(30, 4.5, fm(vb), border=1, fill=True, align="R")
+                pdf.cell(30, 4.5, fm(va), border=1, fill=True, align="R")
+                pdf.cell(25, 4.5, varc(va, vb), border=1, fill=True, align="C")
+                i += 1
+            return y0 + 5 + 4.5 + i*4.5
+
+        fim_rec = render_tabela(X_REC, Y_TAB, "RECEITAS (R$ mil)", rec_at, rec_an)
+        fim_desp = render_tabela(X_DESP, Y_TAB, "DESPESAS (R$ mil)", desp_at, desp_an)
+        y_grafico = max(fim_rec, fim_desp) + 4
+
+        # Grafico compacto
+        pdf.set_xy(15, y_grafico)
+        pdf.set_font("helvetica","B",8); pdf.set_text_color(0,51,102)
+        
+        grupos = list(rec_at.keys())
+        vals_at = [rec_at.get(k, 0) for k in grupos]
+        vals_an = [rec_an.get(k, 0) for k in grupos]
+        max_v = max(max(vals_at), max(vals_an), 1)
+        chart_h = 18; base_y = y_grafico + 6 + chart_h + 3
+        bar_w = 12; gap = 3; group_w = 2*bar_w + gap; group_space = 14
+        total_w = group_w*len(grupos) + group_space*(len(grupos)-1)
+        start_x = (297 - total_w)/2
+        pdf.set_draw_color(160,160,160)
+        pdf.line(start_x-5, base_y, start_x+total_w+5, base_y)
+        labels_curtos = ["Rec. Correntes", "Rec. Patrim.", "Transf. Corr.", "Outras Rec.", "Rec. Capital"]
+        for i, (lbl, va, vb) in enumerate(zip(grupos, vals_at, vals_an)):
+            x = start_x + i*(group_w+group_space)
+            hb = (vb/max_v)*chart_h; ha = (va/max_v)*chart_h
+            pdf.set_fill_color(74,144,226); pdf.rect(x, base_y-hb, bar_w, hb, style="F")
+            pdf.set_fill_color(0,51,102); pdf.rect(x+bar_w+gap, base_y-ha, bar_w, ha, style="F")
+            pdf.set_xy(x-4, base_y+1); pdf.set_font("helvetica","",6); pdf.set_text_color(60,60,60)
+            pdf.cell(group_w+8, 3.5, labels_curtos[i] if i < len(labels_curtos) else lbl[:10], align="C")
+
+        pdf_bytes = pdf.output()
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Composicao_{periodo.replace(' ','_').replace('/','_')}.pdf"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/composicao_receitas_despesas")
+async def serve_composicao():
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "composicao_receitas_despesas.html")
+    return FileResponse(caminho)
+
+@app.get("/api/analise_financeira_bf/{periodo}")
+async def api_analise_financeira_bf(periodo: str):
+    try:
+        from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+        import os
+        caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
+        if not caminho or not os.path.exists(caminho):
+            return {"erro": True, "mensagem": f"BF {periodo} nao importado."}
+        linhas = _ler_linhas(caminho)
+        def buscar(termo):
+            for p in linhas:
+                if p and termo.upper() in p[0].strip().upper():
+                    return p
+            return None
+        def val(p, idx):
+            if p and len(p) > idx: return abs(_limpar_valor(p[idx]))
+            return 0.0
+        l10 = buscar("RECEITA REALIZADA")
+        l28 = buscar("Recebimentos Extraorçamentários")
+        l33 = buscar("Saldo em espécie do Exercício Anterior")
+        l36 = buscar("Total:")
+        dados = {
+            "receita_realizada": {"atual": val(l10,1), "anterior": val(l10,2)},
+            "despesa_orcamentaria": {"atual": val(l10,4), "anterior": val(l10,5)},
+            "recebimentos_extra": {"atual": val(l28,1), "anterior": val(l28,2)},
+            "pagamentos_extra": {"atual": val(l28,4), "anterior": val(l28,5)},
+            "saldo_anterior": {"atual": val(l33,1), "anterior": val(l33,2)},
+            "saldo_seguinte": {"atual": val(l33,4), "anterior": val(l33,5)},
+            "total_ingressos": {"atual": val(l36,1), "anterior": val(l36,2)},
+            "total_dispendios": {"atual": val(l36,4), "anterior": val(l36,5)},
+        }
+        return {"erro": False, "dados": dados}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+
+@app.post("/salvar_analise_financeira_bf/{periodo_atual}/{periodo_anterior}")
+async def salvar_analise_financeira_bf(periodo_atual: str, periodo_anterior: str):
+    atual = await api_analise_financeira_bf(periodo_atual)
+    if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
+    # O periodo anterior JA esta no mesmo CSV (coluna 2). Nao precisa buscar outro arquivo.
+    dados = {"periodo_atual": periodo_atual, "periodo_anterior": periodo_anterior,
+             "atual": atual.get("dados", {}), "anterior": {}}
+    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_financeira_bf (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    cur.execute("INSERT INTO historico_analise_financeira_bf (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
+                (f"{periodo_atual} vs {periodo_anterior}", data_agora, json.dumps(dados)))
+    conn.commit(); conn.close()
+    return {"mensagem": "Salvo"}
+
+@app.get("/historico_analise_financeira_bf")
+async def get_hist_bf():
+    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_financeira_bf ORDER BY id DESC")
+    rows = cur.fetchall(); conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.get("/historico_analise_financeira_bf/{id}")
+async def get_bf_id(id: int):
+    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+    cur.execute("SELECT periodo, resultado_json FROM historico_analise_financeira_bf WHERE id=?", (id,))
+    row = cur.fetchone(); conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+    return json.loads(row[1])
+
+@app.delete("/excluir_analise_financeira_bf/{id}")
+async def excluir_bf(id: int):
+    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+    cur.execute("DELETE FROM historico_analise_financeira_bf WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    return {"mensagem": "Excluido"}
+
+@app.get("/gerar_pdf_analise_financeira_bf/{id}")
+async def gerar_pdf_analise_financeira_bf(id: int):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+        cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_financeira_bf WHERE id=?", (id,))
+        row = cur.fetchone(); conn.close()
+        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+        periodo, data_geracao, json_str = row
+        d = json.loads(json_str)
+        at = d.get("atual", {})
+        # O "atual" ja contem {atual, anterior} dentro de cada campo
+        an = at
+
+        def fm(v):
+            if v is None: return "0,00"
+            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        def varc(va, vb):
+            if vb is None or vb == 0: return "-"
+            return f"{((va-vb)/abs(vb))*100:+.2f}%".replace(".", ",")
+
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.add_page()
+        pdf.set_font("helvetica", "B", 9); pdf.set_text_color(74,144,226)
+        pdf.cell(0, 6, "ANÁLISE FINANCEIRA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", "B", 20); pdf.set_text_color(0,51,102)
+        pdf.cell(0, 12, "Balanço Financeiro Comparativo", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", "", 9); pdf.set_text_color(120,120,120)
+        pdf.cell(0, 6, f"Comparação: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.ln(3)
+
+        y0 = pdf.get_y()
+        pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",9)
+        pdf.set_xy(15, y0)
+        pdf.cell(110, 8, "Indicador", border=1, fill=True, align="L")
+        pdf.cell(50, 8, "Período Anterior", border=1, fill=True, align="R")
+        pdf.cell(50, 8, "Período Atual", border=1, fill=True, align="R")
+        pdf.cell(35, 8, "Var. (%)", border=1, fill=True, align="C")
+
+        pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",9)
+        inds = [
+            ("Receita Realizada (Ingressos)", "receita_realizada"),
+            ("Despesa Orçamentária", "despesa_orcamentaria"),
+            ("Recebimentos Extraorçamentários", "recebimentos_extra"),
+            ("Pagamentos Extraorçamentários", "pagamentos_extra"),
+            ("Saldo em Espécie do Exerc. Anterior", "saldo_anterior"),
+            ("Saldo em Espécie para o Exerc. Seguinte", "saldo_seguinte"),
+            ("Total (Ingressos)", "total_ingressos"),
+            ("Total (Dispêndios)", "total_dispendios"),
+        ]
+        for i, (lbl, chave) in enumerate(inds):
+            va = (at.get(chave) or {}).get("atual", 0)
+            vb = (an.get(chave) or {}).get("anterior", 0)
+            pdf.set_xy(15, y0 + 8 + (i+1)*8)
+            pdf.set_fill_color(248,251,255) if i%2==0 else pdf.set_fill_color(255,255,255)
+            pdf.cell(110, 8, lbl, border=1, fill=True, align="L")
+            pdf.cell(50, 8, fm(vb), border=1, fill=True, align="R")
+            pdf.cell(50, 8, fm(va), border=1, fill=True, align="R")
+            pdf.cell(35, 8, varc(va, vb), border=1, fill=True, align="C")
+
+        
+        # Observacao de valores em milhares
+        pdf.set_y(-20)
+        pdf.set_font("helvetica", "I", 8)
+        pdf.set_text_color(120, 120, 120)
+        pdf.ln(5)
+        pdf_bytes = pdf.output()
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=AnaliseFinanceira_{periodo.replace(' ','_')}.pdf"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analise_financeira_bf")
+async def serve_analise_financeira_bf():
+    from fastapi.responses import FileResponse
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_financeira_bf.html")
+    return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
+
 @app.delete("/excluir_analise_orcamentaria/{id}")
-async def excluir_analise(id: int):
+async def excluir_analise_orcamentaria(id: int):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("DELETE FROM historico_analise_orcamentaria WHERE id=?", (id,))
@@ -2029,8 +2238,7 @@ async def gerar_pdf_analise_orcamentaria(id: int):
         from fastapi.responses import Response
         from fpdf import FPDF
         from fpdf.enums import XPos, YPos
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.cursor()
+        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
         cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_orcamentaria WHERE id=?", (id,))
         row = cur.fetchone(); conn.close()
         if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
@@ -2041,86 +2249,101 @@ async def gerar_pdf_analise_orcamentaria(id: int):
         else:
             atual = d; anterior = {}
         def fm(v):
-            return f"{v/1000000:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v is not None else "0,00"
+            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v is not None else "0,00"
         def pc(v):
             return f"{v:.2f}".replace(".", ",") + "%" if v is not None else "0,00%"
         def varc(a, b):
             if a is None or b is None or b == 0: return "-"
             return f"{((a-b)/abs(b))*100:+.2f}".replace(".", ",") + "%"
+
         pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=False)
         pdf.add_page()
-        pdf.set_font("helvetica", "B", 9); pdf.set_text_color(74,144,226)
-        pdf.cell(0, 6, "EXECUÇÃO ORÇAMENTÁRIA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "B", 20); pdf.set_text_color(0,51,102)
-        pdf.cell(0, 12, "Análise Orçamentária Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "", 9); pdf.set_text_color(120,120,120)
-        pdf.cell(0, 6, f"Período: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(2)
+        pdf.set_font("helvetica", "B", 8); pdf.set_text_color(74,144,226)
+        pdf.cell(0, 5, "EXECUÇÃO ORÇAMENTÁRIA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", "B", 16); pdf.set_text_color(0,51,102)
+        pdf.cell(0, 9, "Análise Orçamentária Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", "", 8); pdf.set_text_color(120,120,120)
+        pdf.cell(0, 5, f"Período: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.ln(1)
+
         y0 = pdf.get_y()
-        pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",9)
+        pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",7)
         pdf.set_xy(15, y0)
-        pdf.cell(110, 8, "Indicador", border=1, fill=True, align="L")
-        pdf.cell(50, 8, "Período Anterior", border=1, fill=True, align="R")
-        pdf.cell(50, 8, "Período Atual", border=1, fill=True, align="R")
-        pdf.cell(35, 8, "Var. (%)", border=1, fill=True, align="C")
-        pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",9)
-        chaves = [("Receita Realizada (R$ mi)","receita_realizada","fm"),("Despesas Empenhadas (R$ mi)","despesa_empenhada","fm"),("Superávit Orçamentário (R$ mi)","superavit","fm"),("Restos a Pagar Inscritos (R$ mi)","restos_pagar","fm"),("Receitas Orçadas (R$ mi)","receita_orcada","fm"),("Despesas Orçadas (R$ mi)","despesa_orcada","fm"),("% de Realização das Receitas","pct_receita","pc"),("% de Realização das Despesas","pct_despesa","pc")]
-        for i,(lbl,chave,tipo) in enumerate(chaves):
+        pdf.cell(100, 5, "Indicador", border=1, fill=True, align="L")
+        pdf.cell(45, 5, "Período Anterior", border=1, fill=True, align="R")
+        pdf.cell(45, 5, "Período Atual", border=1, fill=True, align="R")
+        pdf.cell(35, 5, "Var. (%)", border=1, fill=True, align="C")
+
+        pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",7)
+        inds = [
+            ("Receita Realizada (R$)", "receita_realizada"),
+            ("Despesas Empenhadas (R$)", "despesa_empenhada"),
+            ("Superávit Orçamentário (R$)", "superavit"),
+            ("Restos a Pagar Inscritos (R$)", "restos_pagar"),
+            ("Receitas Orçadas (R$)", "receita_orcada"),
+            ("Despesas Orçadas (R$)", "despesa_orcada"),
+            ("% de Realização das Receitas", "pct_receita"),
+            ("% de Realização das Despesas", "pct_desp" + "esa"),
+        ]
+        for i, (lbl, chave) in enumerate(inds):
+            va = atual.get(chave) if isinstance(atual.get(chave), (int,float)) else None
+            vb = anterior.get(chave) if isinstance(anterior.get(chave), (int,float)) else None
+            pdf.set_xy(15, y0 + 5 + (i+1)*5)
             pdf.set_fill_color(248,251,255) if i%2==0 else pdf.set_fill_color(255,255,255)
-            va = atual.get(chave); vb = anterior.get(chave)
-            sva = pc(va) if tipo=="pc" else fm(va)
-            svb = pc(vb) if tipo=="pc" else fm(vb)
-            v = varc(va, vb)
-            pdf.set_xy(15, y0 + 8 + (i+1)*8)
-            pdf.cell(110, 8, lbl, border=1, fill=True, align="L")
-            pdf.cell(50, 8, svb, border=1, fill=True, align="R")
-            pdf.cell(50, 8, sva, border=1, fill=True, align="R")
-            pdf.cell(35, 8, v, border=1, fill=True, align="C")
-        pdf.set_y(y0 + 8 + len(chaves)*8 + 6)
-        pdf.set_font("helvetica","B",10); pdf.set_text_color(0,51,102)
-        pdf.cell(0, 8, "Receita, Despesa e Superávit (R$ mi)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        leg_y = pdf.get_y()
-        pdf.set_fill_color(74,144,226); pdf.rect(195, leg_y+1, 4, 4, style="F")
-        pdf.set_xy(201, leg_y); pdf.set_font("helvetica","",8); pdf.set_text_color(80,80,80)
-        pdf.cell(40, 6, "Período Anterior", align="L")
-        pdf.set_fill_color(0,51,102); pdf.rect(245, leg_y+1, 4, 4, style="F")
-        pdf.set_xy(251, leg_y); pdf.cell(35, 6, "Período Atual", align="L")
-        pdf.ln(10)
-        grupos = [("Receita", atual.get("receita_realizada",0)/1e6, anterior.get("receita_realizada",0)/1e6),("Despesa", atual.get("despesa_empenhada",0)/1e6, anterior.get("despesa_empenhada",0)/1e6),("Superávit", atual.get("superavit",0)/1e6, anterior.get("superavit",0)/1e6)]
-        max_pos = max(max(a,b) for _,a,b in grupos) or 1
-        max_neg = min(min(a,b) for _,a,b in grupos)
-        chart_h = 30.0
-        amp = max_pos - min(max_neg,0)
-        if amp == 0: amp = 1
-        scale = chart_h / amp
-        bar_w = 20; bar_gap = 4; group_w = 2*bar_w + bar_gap; group_gap = 30
-        total_w = group_w*len(grupos) + group_gap*(len(grupos)-1)
-        start_x = (297 - total_w)/2
-        top_y = pdf.get_y() + 5
-        zero_y = top_y + max_pos*scale
-        pdf.set_draw_color(160,160,160)
-        pdf.line(start_x - 10, zero_y, start_x + total_w + 10, zero_y)
+            pdf.cell(100, 5, lbl, border=1, fill=True, align="L")
+            pdf.cell(45, 5, fm(vb) if "pct" not in chave else pc(vb), border=1, fill=True, align="R")
+            pdf.cell(45, 5, fm(va) if "pct" not in chave else pc(va), border=1, fill=True, align="R")
+            pdf.cell(35, 5, varc(va, vb), border=1, fill=True, align="C")
+
+        pdf.set_xy(15, y0 + 5 + len(inds)*5 + 6)
+
+        pdf.set_font("helvetica","B",8); pdf.set_text_color(0,51,102)
+        pdf.cell(0, 5, "Receita, Despesa e Superávit (R$)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+
+        grupos = [
+            ("Receita",   atual.get("receita_realizada", 0),   anterior.get("receita_realizada", 0)),
+            ("Despesa",   atual.get("despesa_empenhada", 0),   anterior.get("despesa_empenhada", 0)),
+            ("Superávit", atual.get("superavit", 0),           anterior.get("superavit", 0)),
+        ]
+        max_pos = max(max(a, b) for _, a, b in grupos) or 1
+        max_neg = min(min(a, b) for _, a, b in grupos)
+        chart_h = 18.0
+        amplitude = max_pos - min(max_neg, 0)
+        if amplitude == 0: amplitude = 1
+        scale = chart_h / amplitude
+        bar_w = 12; bar_gap = 2; group_w = 2 * bar_w + bar_gap; group_gap = 20
+        total_w = group_w * len(grupos) + group_gap * (len(grupos) - 1)
+        start_x = (297 - total_w) / 2
+        top_y = pdf.get_y() + 2
+        zero_y = top_y + max_pos * scale
+        pdf.set_draw_color(160, 160, 160)
+        pdf.line(start_x - 8, zero_y, start_x + total_w + 8, zero_y)
         lowest_y = zero_y
-        for i,(lbl,va,vb) in enumerate(grupos):
-            x = start_x + i*(group_w + group_gap)
-            hb = vb*scale; ha = va*scale
-            pdf.set_fill_color(74,144,226)
+        for i, (lbl, va, vb) in enumerate(grupos):
+            x = start_x + i * (group_w + group_gap)
+            hb = vb * scale; ha = va * scale
+            pdf.set_fill_color(74, 144, 226)
             if vb >= 0: pdf.rect(x, zero_y - hb, bar_w, hb, style="F")
             else: pdf.rect(x, zero_y, bar_w, -hb, style="F"); lowest_y = max(lowest_y, zero_y - hb)
-            pdf.set_fill_color(0,51,102)
+            pdf.set_fill_color(0, 51, 102)
             if va >= 0: pdf.rect(x + bar_w + bar_gap, zero_y - ha, bar_w, ha, style="F")
             else: pdf.rect(x + bar_w + bar_gap, zero_y, bar_w, -ha, style="F"); lowest_y = max(lowest_y, zero_y - ha)
-        rot_y = lowest_y + 3
-        for i,(lbl,_,_) in enumerate(grupos):
-            x = start_x + i*(group_w + group_gap)
+        rot_y = lowest_y + 2
+        for i, (lbl, va, vb) in enumerate(grupos):
+            x = start_x + i * (group_w + group_gap)
             pdf.set_xy(x, rot_y)
-            pdf.set_font("helvetica","",9); pdf.set_text_color(60,60,60)
-            pdf.cell(group_w, 5, lbl, align="C")
-        pdf.set_y(rot_y + 12)
-        pdf.set_x(15); pdf.set_font("helvetica","I",9); pdf.set_text_color(80,80,80)
-        pdf.multi_cell(267, 5, "Principais conclusões: a receita realizada representa " + pc(atual.get("pct_receita")) + " da previsão atualizada, enquanto as despesas empenhadas representam " + pc(atual.get("pct_despesa")) + " da dotação atualizada.", align="L")
+            pdf.set_font("helvetica", "", 7); pdf.set_text_color(60, 60, 60)
+            pdf.cell(group_w, 3, lbl, align="C")
+
+        pdf.set_y(rot_y + 5)
+        pdf.set_x(15)
+        pdf.set_font("helvetica", "I", 7); pdf.set_text_color(80, 80, 80)
+        pdf.cell(267, 4, "Conclusões: receita = " + pc(atual.get("pct_receita")) + " da previsão; despesas empenhadas = " + pc(atual.get("pct_despesa")) + " da dotação.", align="L")
+
         pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Analise_{periodo}.pdf"})
+        return Response(content=bytes(pdf_bytes), media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=Analise_{periodo.replace(' ','_')}.pdf"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -90,26 +90,26 @@ function carregar(){
       return;
     }
     const ind=[
-      {n:'Receita Realizada (R$ mi)',k:'receita_realizada',m:1e6},
-      {n:'Despesas Empenhadas (R$ mi)',k:'despesa_empenhada',m:1e6},
-      {n:'Superávit Orçamentário (R$ mi)',k:'superavit',m:1e6},
-      {n:'Restos a Pagar Inscritos (R$ mi)',k:'restos_pagar',m:1e6},
-      {n:'Receitas Orçadas (R$ mi)',k:'receita_orcada',m:1e6},
-      {n:'Despesas Orçadas (R$ mi)',k:'despesa_orcada',m:1e6},
+      {n:'Receita Realizada (R$)',k:'receita_realizada',m:1e6},
+      {n:'Despesas Empenhadas (R$)',k:'despesa_empenhada',m:1e6},
+      {n:'Superávit Orçamentário (R$)',k:'superavit',m:1e6},
+      {n:'Restos a Pagar Inscritos (R$)',k:'restos_pagar',m:1e6},
+      {n:'Receitas Orçadas (R$)',k:'receita_orcada',m:1e6},
+      {n:'Despesas Orçadas (R$)',k:'despesa_orcada',m:1e6},
       {n:'% de Realização das Receitas',k:'pct_receita',m:1,f:'%'},
       {n:'% de Realização das Despesas',k:'pct_despesa',m:1,f:'%'}
     ];
     let out='';
     ind.forEach(d=>{
-      const va=(a[d.k]||0)/d.m, vb=(b[d.k]||0)/d.m;
+      const va=(a[d.k]||0), vb=(b[d.k]||0);
       const v=vb!==0?((va-vb)/Math.abs(vb))*100:0;
       const cls=v>=0?'pos':'neg', sg=v>=0?'+':'';
       const fa=d.f||'';
-      out+='<tr><td>'+d.n+'</td><td>'+vb.toFixed(2).replace('.',',')+fa+'</td><td>'+va.toFixed(2).replace('.',',')+fa+'</td><td class="'+cls+'">'+sg+v.toFixed(2).replace('.',',')+'%</td></tr>';
+      out+='<tr><td>'+d.n+'</td><td>'+vb.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+fa+'</td><td>'+va.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+fa+'</td><td class="'+cls+'">'+sg+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%</td></tr>';
     });
     tb.innerHTML=out;
     document.getElementById('concl').style.display='block';
-    document.getElementById('concl').innerHTML='<strong>Principais conclusões:</strong> a receita realizada representa '+a.pct_receita.toFixed(2).replace('.',',')+'% da previsão atualizada, enquanto as despesas empenhadas representam '+a.pct_despesa.toFixed(2).replace('.',',')+'% da dotação atualizada. A variação do superávit orçamentário e os restos a pagar inscritos merecem monitoramento.';
+    document.getElementById('concl').innerHTML='<strong>Principais conclusões:</strong> a receita realizada representa '+a.pct_receita.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'% da previsão atualizada, enquanto as despesas empenhadas representam '+a.pct_despesa.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'% da dotação atualizada. A variação do superávit orçamentário e os restos a pagar inscritos merecem monitoramento.';
     if(chart) chart.destroy();
     chart = new Chart(document.getElementById('graf').getContext('2d'), {
       type: 'bar',
@@ -124,7 +124,7 @@ function carregar(){
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          title: { display: true, text: 'Receita, Despesa e Superávit (R$ mi)', font: { size: 14, weight: 'bold' }, color: '#003366' },
+          title: { display: true, text: 'Receita, Despesa e Superávit (R$)', font: { size: 14, weight: 'bold' }, color: '#003366' },
           legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 12, padding: 15 } },
           tooltip: {
             backgroundColor: '#003366',

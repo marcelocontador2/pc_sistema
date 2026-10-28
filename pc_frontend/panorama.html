@@ -95,7 +95,10 @@
     </div>
 
     <script>
-        function formatarMilhoes(valor) { return "R$ " + (valor / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " mi"; }
+        function formatarMilhoes(valor) {
+            if (valor === null || valor === undefined) return "R$ 0,0 mi";
+            return "R$ " + (valor / 1000000).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " mi";
+        }
 
         function ajustarPeriodo() {
             const tipo = document.getElementById('tipo_periodo').value;
@@ -110,7 +113,14 @@
             valElement.innerText = formatarMilhoes(valOrc);
             if (valOrc < 0) { labelOrc.innerText = "Déficit Orçamentário"; labelOrc.style.color = "#003366"; valElement.style.color = "#003366"; }
             else { labelOrc.innerText = "Superávit Orçamentário"; labelOrc.style.color = "#555"; valElement.style.color = "#003366"; }
-            document.getElementById("val-superavit-pat").innerText = formatarMilhoes(data.superavit_patrimonial);
+            const valPat = data.superavit_patrimonial;
+            const labelPat = document.getElementById("label-superavit-pat");
+            const valElemPat = document.getElementById("val-superavit-pat");
+            if (valElemPat) valElemPat.innerText = formatarMilhoes(valPat);
+            if (labelPat) {
+                if (valPat < 0) { labelPat.innerText = "Déficit Patrimonial"; labelPat.style.color = "#dc3545"; }
+                else { labelPat.innerText = "Superávit Patrimonial (DVP)"; labelPat.style.color = "#555"; }
+            }
             document.getElementById("val-superavit-fin").innerText = formatarMilhoes(data.superavit_financeiro);
             document.getElementById("val-pl").innerText = formatarMilhoes(data.patrimonio_liquido);
             document.getElementById("val-ativo").innerText = formatarMilhoes(data.ativo_total);
@@ -131,10 +141,39 @@
             try {
                 const response = await fetch(`/api/panorama/${periodo}`);
                 const data = await response.json();
+                
+                // === Trata erro de integridade (faltando pecas) ===
+                if (data.erro === "faltando") {
+                    const div = document.getElementById("integridade-cards");
+                    let html = '<div style="background:#fff3cd; border-left:5px solid #ffc107; padding:20px; border-radius:8px; margin-top:20px;">';
+                    html += '<h3 style="color:#856404; margin:0 0 10px 0;">⚠️ Peças Pendentes</h3>';
+                    html += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados para o período <strong>' + periodo + '</strong>:</p>';
+                    html += '<ul style="color:#856404;">';
+                    data.pecas.forEach(p => { html += '<li>' + p + '</li>'; });
+                    html += '</ul>';
+                    html += '<p style="color:#856404; margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p>';
+                    html += '</div>';
+                    div.innerHTML = html;
+                    document.getElementById("btn-confirmar").style.display = "none";
+                    return;
+                }
+                
+                // === Trata erro de falha generica ===
+                if (data.erro) {
+                    alert("Erro: " + (data.mensagem || "Falha ao calcular panorama."));
+                    return;
+                }
+                
                 if (data.detail) { alert("Erro: " + data.detail); return; }
+                
+                // === Sucesso: aplica os valores ===
                 aplicarValores(data);
                 document.getElementById("btn-confirmar").setAttribute("data-periodo", periodo);
-            } catch (e) { console.error("Erro", e); }
+                
+            } catch (e) { 
+                console.error("Erro", e); 
+                alert("Erro de conexão ao buscar panorama.");
+            }
         }
 
         async function salvarPanorama() {

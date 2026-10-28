@@ -1,0 +1,175 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><title>Análise Financeira-BF</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
+.btn{padding:8px 18px;border:none;border-radius:4px;color:#fff;font-weight:bold;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px}
+.hdr-sub{color:#4a90e2;font-size:13px;text-transform:uppercase;letter-spacing:2px;font-weight:bold;margin-bottom:6px}
+.hdr-tit{color:#003366;font-size:30px;font-weight:bold;margin-bottom:20px}
+.topbar{display:flex;gap:8px;margin-bottom:15px}
+.filtros{background:#fff;padding:12px;border-radius:6px;border:1px solid #cbd5e1;margin-bottom:15px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.layout{display:flex;gap:20px;align-items:flex-start}
+.side{width:240px;background:#fff;padding:12px;border-radius:6px;border:1px solid #cbd5e1;flex-shrink:0}
+.side h3{margin-top:0;font-size:15px}
+#historico-lista{list-style:none;padding:0;margin:0}
+#historico-lista li{margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px;font-size:13px}
+.main{flex:1;min-width:0;display:flex;gap:20px;align-items:flex-start}
+.esq{flex:1.2;min-width:0}.dir{flex:1;min-width:0;background:#fff;padding:20px;border-radius:6px;border:1px solid #cbd5e1}
+.tab{background:#fff;border-radius:6px;border:1px solid #cbd5e1;overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#003366;color:#fff;padding:12px;text-align:center;border:1px solid #002244;font-size:12px}
+td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:right;font-family:Consolas,monospace}
+td:first-child{font-weight:bold;text-align:left;font-family:'Segoe UI',Arial,sans-serif}
+tr:nth-child(even){background:#f8fbff}
+.pos{color:#28a745}.neg{color:#dc3545}
+.concl{margin-top:15px;padding:15px;background:#f0f9ff;border-left:4px solid #003366;font-size:13px}
+#btn-confirmar{background:#28a745;display:none}
+</style>
+</head>
+<body>
+<div class="topbar">
+<a href="/" class="btn" style="background:#ff7f00">&#8592; Voltar</a>
+<button class="btn" style="background:#28a745" onclick="exibirSelecionado()">Exibir</button>
+<button class="btn" style="background:#dc3545" onclick="excluirSelecionado()">Excluir</button>
+<button class="btn" style="background:#0056b3" onclick="gerarPDF()">Gerar PDF</button>
+</div>
+<div class="hdr-sub">Análise Financeira</div>
+<div class="hdr-tit">Balanço Financeiro Comparativo</div>
+<div class="filtros">
+<label>Ano:</label>
+<select id="ano"><option>2026</option><option>2025</option></select>
+<label>Tipo:</label>
+<select id="tipo"><option value="TRIMESTRE">Trimestre</option><option value="MES">Mês</option><option value="EXERCICIO">Exercício</option></select>
+<select id="val"><option value="3">3º Trimestre</option><option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="4">4º Trimestre</option></select>
+<button class="btn" style="background:#0056b3" onclick="carregar()">Verificar</button>
+<button class="btn" id="btn-confirmar" onclick="salvar()">Confirmar e Salvar</button>
+</div>
+<div class="layout">
+<div class="side"><h3>Histórico Salvo</h3><ul id="historico-lista"><li>Carregando...</li></ul></div>
+<div class="main">
+<div class="esq">
+<div class="tab"><table id="tab">
+<thead><tr><th>Indicador</th><th>Período Anterior</th><th>Período Atual</th><th>Var. (%)</th></tr></thead>
+<tbody><tr><td colspan="4" style="text-align:center">Clique em Verificar</td></tr></tbody>
+</table></div>
+<div class="concl" id="concl" style="display:none"></div>
+</div>
+<div class="dir"><canvas id="graf" style="min-height:320px"></canvas></div>
+</div>
+</div>
+<script>
+let chart=null;
+function mp(a,t,v){ if(t==='EXERCICIO') return a; return a+'-'+t+'-'+v; }
+function fmt(v){ return (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function pct(va,vb){ if(!vb||vb===0) return '-'; return (((va-vb)/Math.abs(vb))*100).toFixed(2).replace('.',',')+'%'; }
+
+function carregar(){
+  const ano = document.getElementById('ano').value;
+  const tipo = document.getElementById('tipo').value;
+  const val = document.getElementById('val').value;
+  const pA = mp(ano,tipo,val);
+  const pB = mp(String(parseInt(ano)-1),tipo,val);
+  fetch('/api/analise_financeira_bf/'+pA)
+    .then(r=>r.json())
+    .then(a=>{
+      if(a.erro){alert(a.mensagem);return;}
+      // Os dois periodos ja vem no mesmo JSON: a.dados
+      document.getElementById('btn-confirmar').style.display = 'inline-block';
+      document.getElementById('btn-confirmar').setAttribute('data-periodo-atual', pA);
+      document.getElementById('btn-confirmar').setAttribute('data-periodo-anterior', pB);
+      render(a.dados, a.dados);
+    }).catch(e=>alert('Erro: '+e.message));
+}
+
+function render(at, ant){
+  const tb = document.querySelector('#tab tbody');
+  const inds = [
+    {n:'Receita Realizada (Ingressos)', k:'receita_realizada'},
+    {n:'Despesa Orçamentária', k:'despesa_orcamentaria'},
+    {n:'Recebimentos Extraorçamentários', k:'recebimentos_extra'},
+    {n:'Pagamentos Extraorçamentários', k:'pagamentos_extra'},
+    {n:'Saldo em Espécie do Exerc. Anterior', k:'saldo_anterior'},
+    {n:'Saldo em Espécie para o Exerc. Seguinte', k:'saldo_seguinte'},
+    {n:'Total (Ingressos)', k:'total_ingressos'},
+    {n:'Total (Dispêndios)', k:'total_dispendios'}
+  ];
+  let html = '';
+  inds.forEach(i=>{
+    const va = (at[i.k]||{}).atual || 0;
+    const vb = (ant[i.k]||{}).anterior || 0;
+    const v = pct(va, vb);
+    const cls = v.startsWith('-') ? 'neg' : 'pos';
+    html += '<tr><td>'+i.n+'</td><td>'+fmt(vb)+'</td><td>'+fmt(va)+'</td><td class="'+cls+'">'+v+'</td></tr>';
+  });
+  tb.innerHTML = html;
+  const conc = document.getElementById('concl');
+  conc.style.display = 'block';
+  const varSaldo = (at.saldo_seguinte||{}).atual - (at.saldo_anterior||{}).atual;
+  conc.innerHTML = '<strong>Conclusões:</strong> O caixa apresentou variação de R$ ' + fmt(varSaldo) + '. Ingressos e Dispêndios estão equilibrados.';
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById('graf').getContext('2d'), {
+    type: 'bar',
+    data: { labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+      datasets: [
+        {label:'Período Anterior', data:[(ant.saldo_anterior||{}).anterior||0, (ant.saldo_seguinte||{}).anterior||0, ((ant.saldo_seguinte||{}).anterior||0)-((ant.saldo_anterior||{}).anterior||0)], backgroundColor:'#4a90e2', borderRadius:4},
+        {label:'Período Atual', data:[(at.saldo_anterior||{}).atual||0, (at.saldo_seguinte||{}).atual||0, varSaldo], backgroundColor:'#003366', borderRadius:4}
+      ]},
+    options: {responsive:true,maintainAspectRatio:false,
+      plugins:{title:{display:true,text:'Movimentação de Caixa (R$)',font:{size:14,weight:'bold'},color:'#003366'},legend:{position:'bottom'}},
+      scales:{y:{beginAtZero:true,grid:{color:'#eef2f7'}}}}
+  });
+}
+
+function salvar(){
+  const btn = document.getElementById('btn-confirmar');
+  const pA = btn.getAttribute('data-periodo-atual');
+  const pB = btn.getAttribute('data-periodo-anterior');
+  if(!pA){alert('Verifique primeiro.');return;}
+  // Busca a API novamente para garantir que temos os dados atual + anterior corretos
+  fetch('/api/analise_financeira_bf/'+pA).then(r=>r.json()).then(a=>{
+    if(a.erro){alert(a.mensagem);return;}
+    // Envia para o backend: {atual: a.dados, anterior: a.dados} (mesmo CSV, duas colunas)
+    const payload = {atual: a.dados, anterior: a.dados};
+    // O backend espera /salvar_analise_financeira_bf/{periodo_atual}/{periodo_anterior} via POST
+    // Mas o formato de JSON nao e o que o backend usa. Vamos usar o formato simplificado:
+    // Envia o JSON completo com atual e anterior (que sao o mesmo objeto, ja que o CSV tem as duas colunas)
+    fetch('/salvar_analise_financeira_bf/'+pA+'/'+pB, {method: 'POST'})
+      .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(()=>{alert('Relatorio salvo!');carregarHistorico();})
+      .catch(e=>alert('Erro: '+e.message));
+  });
+}
+
+function carregarHistorico(){
+  const el = document.getElementById('historico-lista');
+  fetch('/historico_analise_financeira_bf').then(r=>r.json()).then(d=>{
+    if(!d||d.length===0){el.innerHTML='<li>Nenhum histórico.</li>';return;}
+    let html = '';
+    d.forEach(i=>{html += '<li><label><input type="checkbox" class="check-hist" value="'+i.id+'"> <strong>'+i.periodo+'</strong><br><small>'+i.data_geracao+'</small></label></li>';});
+    el.innerHTML = html;
+  }).catch(()=>{el.innerHTML='<li>Erro.</li>';});
+}
+function exibirSelecionado(){
+  const ck = document.querySelector('.check-hist:checked');
+  if(!ck){alert('Selecione um item.');return;}
+  fetch('/historico_analise_financeira_bf/'+ck.value).then(r=>r.json()).then(d=>{
+    if(d.atual){render(d.atual, d.anterior); alert('Período: '+(d.periodo_atual||''));}
+  });
+}
+function excluirSelecionado(){
+  const sel = document.querySelectorAll('.check-hist:checked');
+  if(sel.length===0){alert('Selecione um item.');return;}
+  if(!confirm('Excluir '+sel.length+'?'))return;
+  Promise.all([...sel].map(c=>fetch('/excluir_analise_financeira_bf/'+c.value,{method:'DELETE'}).then(r=>r.ok).catch(()=>false)))
+    .then(rs=>{if(rs.some(x=>x)){alert('Excluído!');carregarHistorico();}});
+}
+function gerarPDF(){
+  const ck = document.querySelector('.check-hist:checked');
+  if(!ck){alert('Marque um item.');return;}
+  window.open('/gerar_pdf_analise_financeira_bf/'+ck.value,'_blank');
+}
+document.addEventListener('DOMContentLoaded', carregarHistorico);
+</script>
+</body></html>
