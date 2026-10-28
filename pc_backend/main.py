@@ -1559,19 +1559,17 @@ async def gerar_pdf_panorama(id: int):
             pdf.cell(w - 10, 5, label, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         # Linha 1 (Topo)
-        card(15, 50, 85, 35, fmt_mi(dados.get("superavit_orcamentario", 0)), "Superávit Orçamentário")
-        card(105, 50, 85, 35, fmt_mi(dados.get("superavit_patrimonial", 0)), "Superávit Patrimonial (DVP)")
-        card(195, 50, 85, 35, fmt_mi(dados.get("superavit_financeiro", 0)), "Superávit Financeiro (BP)")
+        card(15, 50, 85, 35, fmt_mi(caixa_bp), "Caixa e Equivalente (BP)")
+        card(105, 50, 85, 35, fmt_mi(dados.get("ativo_total", 0)), "Ativo Total")
+        card(195, 50, 85, 35, fmt_mi(dados.get("passivo_total", 0)), "Passivo Total")
         
-        # Linha 2 (Meio)
         card(15, 95, 85, 35, fmt_mi(dados.get("patrimonio_liquido", 0)), "Patrimônio Líquido")
-        card(105, 95, 85, 35, fmt_mi(dados.get("ativo_total", 0)), "Ativo Total")
-        card(195, 95, 85, 35, fmt_mi(dados.get("passivo_total", 0)), "Passivo Total")
+        card(105, 95, 85, 35, fmt_mi(dados.get("receita_realizada", 0) or dados.get("receitas_realizadas", 0)), "Receitas Realizadas (BO)")
+        card(195, 95, 85, 35, fmt_mi(dados.get("despesa_empenhada", 0) or dados.get("despesas_empenhadas", 0)), "Despesas Empenhadas (BO)")
 
-        # Linha 3 (Base) - Agora com o caixa vindo direto do BP
-        card(15, 140, 85, 35, fmt_mi(dados.get("receita_realizada", 0) or dados.get("receitas_realizadas", 0)), "Receitas Realizadas (BO)")
-        card(105, 140, 85, 35, fmt_mi(dados.get("despesa_empenhada", 0) or dados.get("despesas_empenhadas", 0)), "Despesas Empenhadas (BO)")
-        card(195, 140, 85, 35, fmt_mi(caixa_bp), "Caixa e Equivalente (BP)")
+        card(15, 140, 85, 35, fmt_mi(dados.get("superavit_orcamentario", 0)), "Superávit/Déficit Orçamentário")
+        card(105, 140, 85, 35, fmt_mi(dados.get("superavit_patrimonial", 0)), "Superávit/Déficit Patrimonial")
+        card(195, 140, 85, 35, fmt_mi(dados.get("superavit_financeiro", 0)), "Superávit/Déficit Financeiro")
 
         pdf.set_y(185)
         pdf.set_font("helvetica", "I", 10)
@@ -2343,7 +2341,7 @@ async def gerar_pdf_analise_orcamentaria(id: int):
 
         pdf_bytes = pdf.output()
         return Response(content=bytes(pdf_bytes), media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=Analise_{periodo.replace(' ','_')}.pdf"})
+            headers={"Content-Disposition": f"attachment; filename=Analise_Orcamentaria_{periodo.replace('-','_').replace(' ','_')}.pdf"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
