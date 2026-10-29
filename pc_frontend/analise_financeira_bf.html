@@ -28,6 +28,85 @@
                 })
                 .catch(e => alert("Erro ao carregar o histórico: " + e.message));
         }
+
+        
+
+
+        
+
+
+        function render(at, ant) {
+            const tb = document.querySelector('#tab tbody');
+            const ind = [
+                { n: 'Receita Realizada (Ingressos)', k: 'receita_realizada' },
+                { n: 'Despesa Orçamentária', k: 'despesa_orcamentaria' },
+                { n: 'Recebimentos Extraorçamentários', k: 'recebimentos_extra' },
+                { n: 'Pagamentos Extraorçamentários', k: 'pagamentos_extra' },
+                { n: 'Saldo em Espécie do Exerc. Anterior', k: 'saldo_anterior' },
+                { n: 'Saldo em Espécie para o Exerc. Seguinte', k: 'saldo_seguinte' },
+                { n: 'Total (Ingressos)', k: 'total_ingressos' },
+                { n: 'Total (Dispêndios)', k: 'total_dispendios' }
+            ];
+
+            let out = '';
+            ind.forEach(item => {
+                // Extrai os valores: se for objeto, pega .atual ou .anterior; se for número, usa direto
+                let va = at[item.k];
+                let vb = ant[item.k];
+                if (typeof va === 'object' && va !== null) va = va.atual || 0;
+                if (typeof vb === 'object' && vb !== null) vb = vb.anterior || 0;
+                va = parseFloat(va) || 0;
+                vb = parseFloat(vb) || 0;
+                
+                const v = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+                const cls = v >= 0 ? 'pos' : 'neg';
+                const sg = v >= 0 ? '+' : '';
+                const fa = (num) => num.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                out += '<tr>';
+                out += '<td>' + item.n + '</td>';
+                out += '<td style="text-align:right;">' + fa(va) + '</td>';
+                out += '<td style="text-align:right;">' + fa(vb) + '</td>';
+                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fa(v) + '%</td>';
+                out += '</tr>';
+            });
+            tb.innerHTML = out;
+
+            // Gráfico: Atual primeiro (azul escuro), Anterior depois (azul claro)
+            const saldo_ant_at = (at.saldo_anterior || {}).atual || 0;
+            const saldo_ant_an = (ant.saldo_anterior || {}).anterior || 0;
+            const saldo_seg_at = (at.saldo_seguinte || {}).atual || 0;
+            const saldo_seg_an = (ant.saldo_seguinte || {}).anterior || 0;
+
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+                    datasets: [
+                        {
+                            label: 'Período Atual',
+                            data: [saldo_ant_at, saldo_seg_at, saldo_seg_at - saldo_ant_at],
+                            backgroundColor: '#003366',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Período Anterior',
+                            data: [saldo_ant_an, saldo_seg_an, saldo_seg_an - saldo_ant_an],
+                            backgroundColor: '#4a90e2',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                }
+            });
+        }
+
 </script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
@@ -128,44 +207,7 @@ const ano = document.getElementById('ano').value;
     }).catch(e=>alert('Erro: '+e.message));
 }
 
-function render(at, ant){
-  const tb = document.querySelector('#tab tbody');
-  const inds = [
-    {n:'Receita Realizada (Ingressos)', k:'receita_realizada'},
-    {n:'Despesa Orçamentária', k:'despesa_orcamentaria'},
-    {n:'Recebimentos Extraorçamentários', k:'recebimentos_extra'},
-    {n:'Pagamentos Extraorçamentários', k:'pagamentos_extra'},
-    {n:'Saldo em Espécie do Exerc. Anterior', k:'saldo_anterior'},
-    {n:'Saldo em Espécie para o Exerc. Seguinte', k:'saldo_seguinte'},
-    {n:'Total (Ingressos)', k:'total_ingressos'},
-    {n:'Total (Dispêndios)', k:'total_dispendios'}
-  ];
-  let html = '';
-  inds.forEach(i=>{
-    const va = (at[i.k]||{}).atual || 0;
-    const vb = (ant[i.k]||{}).anterior || 0;
-    const v = pct(va, vb);
-    const cls = v.startsWith('-') ? 'neg' : 'pos';
-    html += '<tr><td>'+i.n+'</td><td>'+fmt(vb)+'</td><td>'+fmt(va)+'</td><td class="'+cls+'">'+v+'</td></tr>';
-  });
-  tb.innerHTML = html;
-  const conc = document.getElementById('concl');
-  conc.style.display = 'block';
-  const varSaldo = (at.saldo_seguinte||{}).atual - (at.saldo_anterior||{}).atual;
-  conc.innerHTML = '<strong>Conclusões:</strong> O caixa apresentou variação de R$ ' + fmt(varSaldo) + '. Ingressos e Dispêndios estão equilibrados.';
-  if(chart) chart.destroy();
-  chart = new Chart(document.getElementById('graf').getContext('2d'), {
-    type: 'bar',
-    data: { labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
-      datasets: [
-        {label:'Período Anterior', data:[(ant.saldo_anterior||{}).anterior||0, (ant.saldo_seguinte||{}).anterior||0, ((ant.saldo_seguinte||{}).anterior||0)-((ant.saldo_anterior||{}).anterior||0)], backgroundColor:'#4a90e2', borderRadius:4},
-        {label:'Período Atual', data:[(at.saldo_anterior||{}).atual||0, (at.saldo_seguinte||{}).atual||0, varSaldo], backgroundColor:'#003366', borderRadius:4}
-      ]},
-    options: {responsive:true,maintainAspectRatio:false,
-      plugins:{title:{display:true,text:'Movimentação de Caixa (R$)',font:{size:14,weight:'bold'},color:'#003366'},legend:{position:'bottom'}},
-      scales:{y:{beginAtZero:true,grid:{color:'#eef2f7'}}}}
-  });
-}
+
 
 function salvar(){
   const btn = document.getElementById('btn-confirmar');
@@ -236,5 +278,214 @@ function exibirSelecionado() {
                 })
                 .catch(e => alert("Erro ao carregar o histórico: " + e.message));
         }
+
+        function render(at, ant) {
+            // Preenche a tabela
+            const tb = document.querySelector('#tab tbody');
+            const ind = [
+                { n: 'Receita Realizada (Ingressos)', k: 'receita_realizada' },
+                { n: 'Despesa Orçamentária', k: 'despesa_orcamentaria' },
+                { n: 'Recebimentos Extraorçamentários', k: 'recebimentos_extra' },
+                { n: 'Pagamentos Extraorçamentários', k: 'pagamentos_extra' },
+                { n: 'Saldo em Espécie do Exerc. Anterior', k: 'saldo_anterior', isSaldo: true },
+                { n: 'Saldo em Espécie para o Exerc. Seguinte', k: 'saldo_seguinte', isSaldo: true },
+                { n: 'Total (Ingressos)', k: 'total_ingressos' },
+                { n: 'Total (Dispêndios)', k: 'total_dispendios' }
+            ];
+
+            let out = '';
+            ind.forEach(item => {
+                let va, vb;
+                if (item.isSaldo) {
+                    va = (at[item.k] || {}).atual || 0;
+                    vb = (ant[item.k] || {}).anterior || 0;
+                } else {
+                    va = at[item.k] || 0;
+                    vb = ant[item.k] || 0;
+                }
+                const v = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+                const cls = v >= 0 ? 'pos' : 'neg';
+                const sg = v >= 0 ? '+' : '';
+                
+                out += '<tr>';
+                out += '<td>' + item.n + '</td>';
+                out += '<td style="text-align:right;">' + fmt(va) + '</td>';
+                out += '<td style="text-align:right;">' + fmt(vb) + '</td>';
+                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fmtPct(v) + '</td>';
+                out += '</tr>';
+            });
+            tb.innerHTML = out;
+
+            // Gráfico corrigido: Atual (azul escuro) na esquerda, Anterior (azul claro) na direita
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+                    datasets: [
+                        {
+                            label: 'Período Atual',
+                            data: [(at.saldo_anterior || {}).atual || 0, (at.saldo_seguinte || {}).atual || 0, ((at.saldo_seguinte || {}).atual || 0) - ((at.saldo_anterior || {}).atual || 0)],
+                            backgroundColor: '#003366',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Período Anterior',
+                            data: [(ant.saldo_anterior || {}).anterior || 0, (ant.saldo_seguinte || {}).anterior || 0, ((ant.saldo_seguinte || {}).anterior || 0) - ((ant.saldo_anterior || {}).anterior || 0)],
+                            backgroundColor: '#4a90e2',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                }
+            });
+        }
+
+
+        function render(at, ant) {
+            const tb = document.querySelector('#tab tbody');
+            const ind = [
+                { n: 'Receita Realizada (Ingressos)', k: 'receita_realizada' },
+                { n: 'Despesa Orçamentária', k: 'despesa_orcamentaria' },
+                { n: 'Recebimentos Extraorçamentários', k: 'recebimentos_extra' },
+                { n: 'Pagamentos Extraorçamentários', k: 'pagamentos_extra' },
+                { n: 'Saldo em Espécie do Exerc. Anterior', k: 'saldo_anterior', isSaldo: true },
+                { n: 'Saldo em Espécie para o Exerc. Seguinte', k: 'saldo_seguinte', isSaldo: true },
+                { n: 'Total (Ingressos)', k: 'total_ingressos' },
+                { n: 'Total (Dispêndios)', k: 'total_dispendios' }
+            ];
+
+            let out = '';
+            ind.forEach(item => {
+                let va, vb;
+                if (item.isSaldo) {
+                    va = (at[item.k] || {}).atual || 0;
+                    vb = (ant[item.k] || {}).anterior || 0;
+                } else {
+                    va = at[item.k] || 0;
+                    vb = ant[item.k] || 0;
+                }
+                const v = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+                const cls = v >= 0 ? 'pos' : 'neg';
+                const sg = v >= 0 ? '+' : '';
+                const fa = (num) => num.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                out += '<tr>';
+                out += '<td>' + item.n + '</td>';
+                out += '<td style="text-align:right;">' + fa(va) + '</td>';
+                out += '<td style="text-align:right;">' + fa(vb) + '</td>';
+                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fa(v) + '%</td>';
+                out += '</tr>';
+            });
+            tb.innerHTML = out;
+
+            // Gráfico: Atual primeiro (azul escuro), Anterior depois (azul claro)
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+                    datasets: [
+                        {
+                            label: 'Período Atual',
+                            data: [(at.saldo_anterior || {}).atual || 0, (at.saldo_seguinte || {}).atual || 0, ((at.saldo_seguinte || {}).atual || 0) - ((at.saldo_anterior || {}).atual || 0)],
+                            backgroundColor: '#003366',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Período Anterior',
+                            data: [(ant.saldo_anterior || {}).anterior || 0, (ant.saldo_seguinte || {}).anterior || 0, ((ant.saldo_seguinte || {}).anterior || 0) - ((ant.saldo_anterior || {}).anterior || 0)],
+                            backgroundColor: '#4a90e2',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                }
+            });
+        }
+
+
+        function render(at, ant) {
+            const tb = document.querySelector('#tab tbody');
+            const ind = [
+                { n: 'Receita Realizada (Ingressos)', k: 'receita_realizada' },
+                { n: 'Despesa Orçamentária', k: 'despesa_orcamentaria' },
+                { n: 'Recebimentos Extraorçamentários', k: 'recebimentos_extra' },
+                { n: 'Pagamentos Extraorçamentários', k: 'pagamentos_extra' },
+                { n: 'Saldo em Espécie do Exerc. Anterior', k: 'saldo_anterior' },
+                { n: 'Saldo em Espécie para o Exerc. Seguinte', k: 'saldo_seguinte' },
+                { n: 'Total (Ingressos)', k: 'total_ingressos' },
+                { n: 'Total (Dispêndios)', k: 'total_dispendios' }
+            ];
+
+            let out = '';
+            ind.forEach(item => {
+                // Extrai os valores: se for objeto, pega .atual ou .anterior; se for número, usa direto
+                let va = at[item.k];
+                let vb = ant[item.k];
+                if (typeof va === 'object' && va !== null) va = va.atual || 0;
+                if (typeof vb === 'object' && vb !== null) vb = vb.anterior || 0;
+                va = parseFloat(va) || 0;
+                vb = parseFloat(vb) || 0;
+                
+                const v = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+                const cls = v >= 0 ? 'pos' : 'neg';
+                const sg = v >= 0 ? '+' : '';
+                const fa = (num) => num.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                out += '<tr>';
+                out += '<td>' + item.n + '</td>';
+                out += '<td style="text-align:right;">' + fa(va) + '</td>';
+                out += '<td style="text-align:right;">' + fa(vb) + '</td>';
+                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fa(v) + '%</td>';
+                out += '</tr>';
+            });
+            tb.innerHTML = out;
+
+            // Gráfico: Atual primeiro (azul escuro), Anterior depois (azul claro)
+            const saldo_ant_at = (at.saldo_anterior || {}).atual || 0;
+            const saldo_ant_an = (ant.saldo_anterior || {}).anterior || 0;
+            const saldo_seg_at = (at.saldo_seguinte || {}).atual || 0;
+            const saldo_seg_an = (ant.saldo_seguinte || {}).anterior || 0;
+
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+                    datasets: [
+                        {
+                            label: 'Período Atual',
+                            data: [saldo_ant_at, saldo_seg_at, saldo_seg_at - saldo_ant_at],
+                            backgroundColor: '#003366',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Período Anterior',
+                            data: [saldo_ant_an, saldo_seg_an, saldo_seg_an - saldo_ant_an],
+                            backgroundColor: '#4a90e2',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                }
+            });
+        }
+
 </script>
 </body></html>

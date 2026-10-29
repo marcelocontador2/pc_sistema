@@ -2188,76 +2188,157 @@ async def excluir_bf(id: int):
     conn.commit(); conn.close()
     return {"mensagem": "Excluido"}
 
+
+
+
+
+
+
 @app.get("/gerar_pdf_analise_financeira_bf/{id}")
 async def gerar_pdf_analise_financeira_bf(id: int):
     try:
         from fastapi.responses import Response
         from fpdf import FPDF
         from fpdf.enums import XPos, YPos
-        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-        cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_financeira_bf WHERE id=?", (id,))
-        row = cur.fetchone(); conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-        periodo, data_geracao, json_str = row
-        d = json.loads(json_str)
-        at = d.get("atual", {})
-        # O "atual" ja contem {atual, anterior} dentro de cada campo
-        an = at
-
-        def fm(v):
-            if v is None: return "0,00"
-            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        def varc(va, vb):
-            if vb is None or vb == 0: return "-"
-            return f"{((va-vb)/abs(vb))*100:+.2f}%".replace(".", ",")
-
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as ticker
+        import io, tempfile, os, json, sqlite3
+        
+        # 1. Busca o periodo no banco
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT periodo FROM historico_analise_financeira_bf WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        periodo_atual = row[0].split(' vs ')[0]
+        
+        # 2. Busca os dados da API (que ja sabemos que tem a estrutura correta)
+        dados_resp = await api_analise_financeira_bf(periodo_atual)
+        if dados_resp.get("erro"): raise HTTPException(status_code=400, detail="Erro nos dados")
+        
+        d = dados_resp["dados"]  # Aqui estao os dados: receita_realizada, etc.
+        
+        # 3. Extrai os valores (atual e anterior) de cada indicador
+        def get_val(chave, tipo):
+            obj = d.get(chave, {})
+            return obj.get(tipo, 0) if isinstance(obj, dict) else 0
+        
+        receita_realizada = {"atual": get_val("receita_realizada", "atual"), "anterior": get_val("receita_realizada", "anterior")}
+        despesa_orcamentaria = {"atual": get_val("despesa_orcamentaria", "atual"), "anterior": get_val("despesa_orcamentaria", "anterior")}
+        recebimentos_extra = {"atual": get_val("recebimentos_extra", "atual"), "anterior": get_val("recebimentos_extra", "anterior")}
+        pagamentos_extra = {"atual": get_val("pagamentos_extra", "atual"), "anterior": get_val("pagamentos_extra", "anterior")}
+        saldo_anterior = {"atual": get_val("saldo_anterior", "atual"), "anterior": get_val("saldo_anterior", "anterior")}
+        saldo_seguinte = {"atual": get_val("saldo_seguinte", "atual"), "anterior": get_val("saldo_seguinte", "anterior")}
+        total_ingressos = {"atual": get_val("total_ingressos", "atual"), "anterior": get_val("total_ingressos", "anterior")}
+        total_dispendios = {"atual": get_val("total_dispendios", "atual"), "anterior": get_val("total_dispendios", "anterior")}
+        
+        # 4. Gera o grafico (Atual primeiro)
+        labels = ["Saldo Inicial", "Saldo Final", "Variação"]
+        ant = [saldo_anterior["anterior"], saldo_seguinte["anterior"], saldo_seguinte["anterior"] - saldo_anterior["anterior"]]
+        atu = [saldo_anterior["atual"], saldo_seguinte["atual"], saldo_seguinte["atual"] - saldo_anterior["atual"]]
+        
+        fig, ax = plt.subplots(figsize=(6, 2.8), dpi=150)
+        x = range(len(labels))
+        ax.bar([i - 0.2 for i in x], atu, width=0.4, label="Atual", color="#003366")
+        ax.bar([i + 0.2 for i in x], ant, width=0.4, label="Anterior", color="#4a90e2")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, fontsize=10)
+        ax.legend(loc="upper right", fontsize=9, frameon=False)
+        formatter = ticker.FuncFormatter(lambda x, pos: f"{x*1e-6:,.1f} Mi")
+        ax.yaxis.set_major_formatter(formatter)
+        ax.tick_params(axis="y", labelsize=9)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", linestyle="--", alpha=0.7)
+        plt.tight_layout()
+        
+        img_path = os.path.join(tempfile.gettempdir(), f"grafico_fin_{id}.png")
+        plt.savefig(img_path, bbox_inches="tight"); plt.close()
+        
+        # 5. Monta o PDF
         pdf = FPDF(orientation="L", unit="mm", format="A4")
         pdf.add_page()
-        pdf.set_font("helvetica", "B", 9); pdf.set_text_color(74,144,226)
-        pdf.cell(0, 6, "ANÁLISE FINANCEIRA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "B", 20); pdf.set_text_color(0,51,102)
-        pdf.cell(0, 12, "Balanço Financeiro Comparativo", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "", 9); pdf.set_text_color(120,120,120)
-        pdf.cell(0, 6, f"Comparação: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(3)
-
-        y0 = pdf.get_y()
-        pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",9)
-        pdf.set_xy(15, y0)
-        pdf.cell(110, 8, "Indicador", border=1, fill=True, align="L")
-        pdf.cell(50, 8, "Período Anterior", border=1, fill=True, align="R")
-        pdf.cell(50, 8, "Período Atual", border=1, fill=True, align="R")
-        pdf.cell(35, 8, "Var. (%)", border=1, fill=True, align="C")
-
-        pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",9)
-        inds = [
-            ("Receita Realizada (Ingressos)", "receita_realizada"),
-            ("Despesa Orçamentária", "despesa_orcamentaria"),
-            ("Recebimentos Extraorçamentários", "recebimentos_extra"),
-            ("Pagamentos Extraorçamentários", "pagamentos_extra"),
-            ("Saldo em Espécie do Exerc. Anterior", "saldo_anterior"),
-            ("Saldo em Espécie para o Exerc. Seguinte", "saldo_seguinte"),
-            ("Total (Ingressos)", "total_ingressos"),
-            ("Total (Dispêndios)", "total_dispendios"),
-        ]
-        for i, (lbl, chave) in enumerate(inds):
-            va = (at.get(chave) or {}).get("atual", 0)
-            vb = (an.get(chave) or {}).get("anterior", 0)
-            pdf.set_xy(15, y0 + 8 + (i+1)*8)
-            pdf.set_fill_color(248,251,255) if i%2==0 else pdf.set_fill_color(255,255,255)
-            pdf.cell(110, 8, lbl, border=1, fill=True, align="L")
-            pdf.cell(50, 8, fm(vb), border=1, fill=True, align="R")
-            pdf.cell(50, 8, fm(va), border=1, fill=True, align="R")
-            pdf.cell(35, 8, varc(va, vb), border=1, fill=True, align="C")
-
         
-        # Observacao de valores em milhares
-        pdf.set_y(-20)
-        pdf.set_font("helvetica", "I", 8)
-        pdf.set_text_color(120, 120, 120)
-        pdf.ln(5)
-        pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=AnaliseFinanceira_{periodo.replace(' ','_')}.pdf"})
+        font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold = "C:/Windows/Fonts/arialbd.ttf"
+        if os.path.exists(font_path):
+            pdf.add_font("Arial", "", font_path)
+            pdf.add_font("Arial", "B", font_bold)
+            f_family = "Arial"
+        else:
+            f_family = "helvetica"
+        
+        pdf.set_font(f_family, "B", 16)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, "Balanco Financeiro Comparativo", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font(f_family, "", 10)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 5, f"Periodo de Referencia: {periodo_atual}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(8)
+        
+        # Tabela
+        pdf.set_fill_color(0, 51, 102)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(f_family, "B", 10)
+        
+        pdf.cell(80, 8, "Indicador", border=1, fill=True, align="C")
+        pdf.cell(45, 8, "Periodo Atual", border=1, fill=True, align="C")
+        pdf.cell(45, 8, "Periodo Anterior", border=1, fill=True, align="C")
+        pdf.cell(30, 8, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font(f_family, "", 9)
+        
+        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        
+        ind = [
+            ("Receita Realizada (Ingressos)", receita_realizada),
+            ("Despesa Orcamentaria", despesa_orcamentaria),
+            ("Recebimentos Extraorcamentarios", recebimentos_extra),
+            ("Pagamentos Extraorcamentarios", pagamentos_extra),
+            ("Saldo em Especie do Exerc. Anterior", saldo_anterior),
+            ("Saldo em Especie para o Exerc. Seguinte", saldo_seguinte),
+            ("Total (Ingressos)", total_ingressos),
+            ("Total (Dispendios)", total_dispendios),
+        ]
+        
+        for nome, val in ind:
+            va = val["atual"]
+            vb = val["anterior"]
+            var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
+            
+            pdf.cell(80, 7, nome, border=1, align="L")
+            pdf.cell(45, 7, fmt(va), border=1, align="R")
+            pdf.cell(45, 7, fmt(vb), border=1, align="R")
+            
+            if var >= 0: pdf.set_text_color(0, 128, 0)
+            else: pdf.set_text_color(220, 53, 69)
+            pdf.cell(30, 7, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+        
+        # Grafico
+        pdf.ln(8)
+        y_atual = pdf.get_y()
+        pdf.image(img_path, x=30, y=y_atual, w=110)
+        
+        # Conclusao
+        pdf.set_xy(150, y_atual)
+        pdf.set_font(f_family, "B", 10)
+        pdf.cell(0, 6, "Principais conclusoes:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_x(150)
+        pdf.set_font(f_family, "", 8)
+        txt_conclusao = f"O caixa apresentou variacao de R$ {fmt(saldo_seguinte['atual'] - saldo_anterior['atual'])}. Ingressos e Dispendios estao equilibrados."
+        pdf.multi_cell(90, 4, txt_conclusao)
+        
+        pdf_bytes = bytes(pdf.output())
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={
+            "Content-Disposition": f"inline; filename=analise_financeira_{id}.pdf"
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
