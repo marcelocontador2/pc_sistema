@@ -17,3 +17,5 @@ pc_storage/*.db
 Thumbs.db
 *.bak*
 pc_sistema/
+*.bak*
+pc_sistema/
