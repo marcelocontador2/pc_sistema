@@ -2,7 +2,33 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><title>Análise Financeira-BF</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js">function exibirSelecionado() {
+            const check = document.querySelector(".check-hist:checked");
+            if (!check) { alert("Selecione um item no histórico."); return; }
+
+            fetch('/historico_analise_financeira_bf/' + check.value)
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.periodo_atual) {
+                        // Extrai o período atual salvo (ex: 2026-TRIMESTRE-3)
+                        const periodoSalvo = resp.periodo_atual;
+                        
+                        // Reconstrói os selects (ano, tipo, val) com base no período
+                        const partes = periodoSalvo.split('-');
+                        if (partes.length === 3) {
+                            document.getElementById('ano').value = partes[0];
+                            document.getElementById('tipo').value = partes[1];
+                            document.getElementById('val').value = partes[2];
+                        }
+                        
+                        // Chama a mesma função do botão "Verificar" para recalcular e desenhar
+                        // Isso garante que os dados do período anterior sejam buscados novamente
+                        carregar(); 
+                    }
+                })
+                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
+        }
+</script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
 .btn{padding:8px 18px;border:none;border-radius:4px;color:#fff;font-weight:bold;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px}
@@ -170,13 +196,7 @@ function carregarHistorico(){
     el.innerHTML = html;
   }).catch(()=>{el.innerHTML='<li>Erro.</li>';});
 }
-function exibirSelecionado(){
-  const ck = document.querySelector('.check-hist:checked');
-  if(!ck){alert('Selecione um item.');return;}
-  fetch('/historico_analise_financeira_bf/'+ck.value).then(r=>r.json()).then(d=>{
-    if(d.atual){render(d.atual, d.anterior); alert('Período: '+(d.periodo_atual||''));}
-  });
-}
+
 function excluirSelecionado(){
   const sel = document.querySelectorAll('.check-hist:checked');
   if(sel.length===0){alert('Selecione um item.');return;}
@@ -190,5 +210,31 @@ function gerarPDF(){
   window.open('/gerar_pdf_analise_financeira_bf/'+ck.value,'_blank');
 }
 document.addEventListener('DOMContentLoaded', carregarHistorico);
+function exibirSelecionado() {
+            const check = document.querySelector(".check-hist:checked");
+            if (!check) { alert("Selecione um item no histórico."); return; }
+
+            fetch('/historico_analise_financeira_bf/' + check.value)
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.periodo_atual) {
+                        // Extrai o período atual salvo (ex: 2026-TRIMESTRE-3)
+                        const periodoSalvo = resp.periodo_atual;
+                        
+                        // Reconstrói os selects (ano, tipo, val) com base no período
+                        const partes = periodoSalvo.split('-');
+                        if (partes.length === 3) {
+                            document.getElementById('ano').value = partes[0];
+                            document.getElementById('tipo').value = partes[1];
+                            document.getElementById('val').value = partes[2];
+                        }
+                        
+                        // Chama a mesma função do botão "Verificar" para recalcular e desenhar
+                        // Isso garante que os dados do período anterior sejam buscados novamente
+                        carregar(); 
+                    }
+                })
+                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
+        }
 </script>
 </body></html>
