@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Análise Patrimonial</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        .top-bar { margin-bottom: 20px; display: flex; gap: 10px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+        .btn-voltar { background: #ff8c00; }
+        .btn-exibir { background: #28a745; }
+        .btn-excluir { background: #dc3545; }
+        .btn-pdf { background: #003366; }
+        .filtros { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 15px; align-items: flex-end; }
+        .filtros select { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .btn-verificar { background: #003366; }
+        .btn-salvar { background: #28a745; }
+        .layout { display: flex; gap: 20px; }
+        .esq { flex: 1.5; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; }
+        .dir { flex: 1; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #003366; color: white; padding: 10px; text-align: center; font-size: 13px; }
+        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+        .neg { color: #dc3545; font-weight: bold; }
+        .pos { color: #28a745; font-weight: bold; }
+        .margem-card { background: #003366; color: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .sidebar { width: 220px; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px; }
+        .flex-layout { display: flex; gap: 20px; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="btn btn-voltar" onclick="window.location.href='/'">← Voltar</button>
+        <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+        <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <div style="color: #a0aec0; font-size: 12px; text-transform: uppercase;">Análise Patrimonial</div>
+        <h1 style="color: #003366; margin: 5px 0 20px 0; font-size: 26px;">Demonstração das Variações Patrimoniais (DVP)</h1>
+    </div>
+
+    <div class="filtros">
+        <div>
+            <label style="display:block; font-size:12px; margin-bottom:5px;">Período:</label>
+            <select id="periodo">
+                <option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option>
+            </select>
+        </div>
+        <button class="btn btn-verificar" onclick="carregar()">Verificar Patrimônio</button>
+        <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
+    </div>
+
+    <div class="flex-layout">
+        <div class="sidebar">
+            <h3 style="font-size: 14px; margin-top: 0;">Histórico Salvo</h3>
+            <ul id="historico-lista" style="padding-left: 0; list-style: none; font-size: 13px; color: #666;">
+                <li>Carregando...</li>
+            </ul>
+        </div>
+
+        <div style="flex: 1;">
+            <div class="layout">
+                <div class="esq">
+                    <table id="tab">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">Indicador</th>
+                                <th>Período Anterior (R$)</th>
+                                <th>Período Atual (R$)</th>
+                                <th>Var. (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="4" style="text-align:center;">Clique em "Verificar Patrimônio"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="dir">
+                    <canvas id="graf" style="max-height: 350px;"></canvas>
+                    <div id="concl" class="margem-card" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+        function fmt(v) { return (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+        function fmtPct(v) { return (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%'; }
+
+        function desenharTela(d, periodo) {
+            const tb = document.querySelector('#tab tbody');
+            const ind = [
+                { n: 'Variações Ativas', at: d.variacoes_ativas.atual, ant: d.variacoes_ativas.anterior },
+                { n: 'Transferências Recebidas', at: d.transf_recebidas.atual, ant: d.transf_recebidas.anterior },
+                { n: 'Reversão de Provisões', at: d.reversao_provisoes.atual, ant: d.reversao_provisoes.anterior },
+                { n: 'Variações Diminutivas', at: d.variacoes_diminutivas.atual, ant: d.variacoes_diminutivas.anterior },
+                { n: 'Pessoal e Encargos', at: d.pessoal_encargos.atual, ant: d.pessoal_encargos.anterior },
+                { n: 'Serviços de Terceiros', at: d.servicos_terceiros.atual, ant: d.servicos_terceiros.anterior },
+                { n: 'Transferências Concedidas', at: d.transf_concedidas.atual, ant: d.transf_concedidas.anterior },
+                { n: 'Superávit Patrimonial', at: d.superavit_patrimonial.atual, ant: d.superavit_patrimonial.anterior }
+            ];
+
+            let out = '';
+            ind.forEach(item => {
+                const v = item.ant !== 0 ? ((item.at - item.ant) / Math.abs(item.ant)) * 100 : 0;
+                const cls = v >= 0 ? 'pos' : 'neg';
+                const sg = v >= 0 ? '+' : '';
+                const isBold = item.n === 'Superávit Patrimonial' ? 'font-weight:bold;' : '';
+                
+                out += '<tr>';
+                out += '<td style="' + isBold + '">' + item.n + '</td>';
+                out += '<td style="text-align:right;">' + fmt(item.ant) + '</td>';
+                out += '<td style="text-align:right;">' + fmt(item.at) + '</td>';
+                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fmtPct(v) + '</td>';
+                out += '</tr>';
+            });
+            tb.innerHTML = out;
+
+            document.getElementById('concl').innerHTML = 
+                '<div style="font-size:13px; opacity:0.8; margin-bottom:10px;">Margem patrimonial</div>' +
+                '<div class="valor">' + fmtPct(d.margem_patrimonial.anterior) + ' ➔ ' + fmtPct(d.margem_patrimonial.atual) + '</div>' +
+                '<div class="formula">(Superávit Patrimonial / Variações Ativas)</div>';
+            document.getElementById('concl').style.display = 'block';
+            document.getElementById('concl').style.background = '#003366';
+            document.getElementById('concl').style.color = 'white';
+
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Variações Ativas', 'Variações Diminutivas', 'Superávit Patrimonial'],
+                    datasets: [
+                        { label: 'Período Anterior', data: [d.variacoes_ativas.anterior, d.variacoes_diminutivas.anterior, d.superavit_patrimonial.anterior], backgroundColor: '#4a90e2', borderRadius: 4 },
+                        { label: 'Período Atual', data: [d.variacoes_ativas.atual, d.variacoes_diminutivas.atual, d.superavit_patrimonial.atual], backgroundColor: '#003366', borderRadius: 4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+
+        function carregar() {
+            const p = document.getElementById('periodo').value;
+            const tb = document.querySelector('#tab tbody');
+            tb.innerHTML = '<tr><td colspan="4" style="text-align:center">Buscando...</td></tr>';
+            document.getElementById('concl').style.display = 'none';
+            document.getElementById('btn-salvar').style.display = 'none';
+
+            fetch('/api/analise_patrimonial/' + p)
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.erro === "faltando") {
+                        let htmlAmarelo = '<div style="background:#fff3cd;border-left:5px solid #ffc107;padding:20px;border-radius:8px;">';
+                        htmlAmarelo += '<h3 style="color:#856404;margin:0 0 10px 0;">⚠️ Demonstrativos Faltando</h3>';
+                        htmlAmarelo += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados:</p><ul style="color:#856404;">';
+                        [...new Set(resp.pecas || [])].forEach(p => { htmlAmarelo += '<li>' + p + '</li>'; });
+                        htmlAmarelo += '</ul></div>';
+                        tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#856404;">Aguardando importação.</td></tr>';
+                        document.getElementById('concl').innerHTML = htmlAmarelo;
+                        document.getElementById('concl').style.display = 'block';
+                        document.getElementById('concl').style.background = 'transparent';
+                        if (chart) { chart.destroy(); chart = null; }
+                        return;
+                    }
+                    if (resp.erro) {
+                        tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:red;">Erro: ' + (resp.mensagem || 'falha') + '</td></tr>';
+                        return;
+                    }
+                    document.getElementById('btn-salvar').style.display = 'inline-block';
+                    desenharTela(resp.dados, p);
+                })
+                .catch(e => { tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:red;">Erro de conexão.</td></tr>'; });
+        }
+
+        function salvar() {
+            const p = document.getElementById('periodo').value;
+            const btn = document.getElementById('btn-salvar');
+            btn.innerText = 'Salvando...'; btn.disabled = true;
+            fetch('/salvar_analise_patrimonial/' + p)
+                .then(r => r.json())
+                .then(d => { alert('Relatório salvo!'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; carregarHistorico(); })
+                .catch(e => { alert('Erro ao salvar.'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; });
+        }
+
+        function exibirSelecionado() {
+            const check = document.querySelector(".check-historico:checked");
+            if (!check) { alert("Selecione um item no histórico."); return; }
+            
+            const tb = document.querySelector('#tab tbody');
+            tb.innerHTML = '<tr><td colspan="4" style="text-align:center">Carregando histórico...</td></tr>';
+            document.getElementById('concl').style.display = 'none';
+
+            fetch('/historico_analise_patrimonial/' + check.value)
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.dados) {
+                        const sel = document.getElementById('periodo');
+                        sel.innerHTML = '<option value="' + resp.periodo + '">' + resp.periodo + '</option>';
+                        sel.value = resp.periodo;
+                        desenharTela(resp.dados, resp.periodo);
+                        document.getElementById('btn-salvar').style.display = 'inline-block';
+                    }
+                })
+                .catch(e => alert("Erro ao carregar o histórico."));
+        }
+
+        function excluirSelecionado() {
+            const selecionados = document.querySelectorAll(".check-historico:checked");
+            if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
+            if (!confirm("Excluir " + selecionados.length + " itens?")) return;
+            
+            let promessas = [];
+            selecionados.forEach(check => {
+                promessas.push(fetch("/excluir_analise_patrimonial/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false));
+            });
+            Promise.all(promessas).then(resultados => {
+                if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); }
+            });
+        }
+
+        function gerarPDF() {
+            const check = document.querySelector(".check-historico:checked");
+            if (!check) { alert("Marque um relatório no histórico para gerar o PDF!"); return; }
+            window.open('/gerar_pdf_analise_patrimonial/' + check.value, '_blank');
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_analise_patrimonial')
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    if(!data || data.length === 0) html = '<li>Nenhum histórico.</li>';
+                    else { 
+                        data.forEach(item => { 
+                            html += '<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px; display:flex; align-items:center; gap:8px;">';
+                            html += '<input type="checkbox" class="check-historico" value="' + item.id + '" style="width:16px; height:16px; cursor:pointer;">';
+                            html += '<div><strong>' + item.periodo + '</strong><br><span style="font-size:11px; color:#888;">' + item.data_geracao + '</span></div>';
+                            html += '</li>';
+                        }); 
+                    }
+                    document.getElementById('historico-lista').innerHTML = html;
+                });
+        }
+
+        document.addEventListener("DOMContentLoaded", carregarHistorico);
+    </script>
+</body>
+</html>

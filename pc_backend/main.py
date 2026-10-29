@@ -2418,6 +2418,283 @@ async def api_periodos_disponiveis(tipo_demonstrativo: str):
     except Exception as e:
         return {"erro": str(e)}
 
+@app.get("/analise_patrimonial")
+async def serve_analise_patrimonial():
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_patrimonial.html")
+    return FileResponse(caminho)
+
+@app.get("/api/analise_patrimonial/{periodo}")
+async def api_analise_patrimonial(periodo: str):
+    import os, csv
+    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    p_limpo = periodo.replace("-", "_")
+    caminho = os.path.join(pasta, f"DVP_{p_limpo}.csv")
+    
+    if not os.path.exists(caminho):
+        return {"erro": "faltando", "pecas": ["DVP"]}
+
+    def limpar(v):
+        if not v: return 0.0
+        v = str(v).replace("R$", "").strip()
+        if v in ["-", "0,00", ""]: return 0.0
+        if "," in v and "." in v: v = v.replace(".", "").replace(",", ".")
+        elif "," in v: v = v.replace(",", ".")
+        try: return float(v)
+        except: return 0.0
+
+    dados = {
+        "variacoes_ativas": {"atual": 0.0, "anterior": 0.0},
+        "transf_recebidas": {"atual": 0.0, "anterior": 0.0},
+        "reversao_provisoes": {"atual": 0.0, "anterior": 0.0},
+        "variacoes_diminutivas": {"atual": 0.0, "anterior": 0.0},
+        "pessoal_encargos": {"atual": 0.0, "anterior": 0.0},
+        "servicos_terceiros": {"atual": 0.0, "anterior": 0.0},
+        "transf_concedidas": {"atual": 0.0, "anterior": 0.0},
+        "superavit_patrimonial": {"atual": 0.0, "anterior": 0.0},
+        "margem_patrimonial": {"atual": 0.0, "anterior": 0.0}
+    }
+
+    try:
+        with open(caminho, 'r', encoding='latin-1') as f:
+            leitor = csv.reader(f, delimiter=';')
+            for row in leitor:
+                if len(row) < 8: continue
+                col_a = row[0].strip().upper()
+                col_d = row[4].strip().upper()
+                
+                if col_a == "VARIAÇÃO PATRIMONIAL AUMENTATIVA":
+                    dados["variacoes_ativas"]["atual"] = limpar(row[2])
+                    dados["variacoes_ativas"]["anterior"] = limpar(row[3])
+                elif col_a == "TRANSFERÊNCIAS E DELEGAÇÕES RECEBIDAS":
+                    dados["transf_recebidas"]["atual"] = limpar(row[2])
+                    dados["transf_recebidas"]["anterior"] = limpar(row[3])
+                elif col_a == "REVERSÃO DE PROVISÕES E AJUSTES DE PERDAS":
+                    dados["reversao_provisoes"]["atual"] = limpar(row[2])
+                    dados["reversao_provisoes"]["anterior"] = limpar(row[3])
+                
+                if col_d == "VARIAÇÃO PATRIMONIAL DIMINUTIVA":
+                    dados["variacoes_diminutivas"]["atual"] = limpar(row[6])
+                    dados["variacoes_diminutivas"]["anterior"] = limpar(row[7])
+                elif col_d == "PESSOAL E ENCARGOS":
+                    dados["pessoal_encargos"]["atual"] = limpar(row[6])
+                    dados["pessoal_encargos"]["anterior"] = limpar(row[7])
+                elif col_d == "SERVIÇOS TERCEIROS - PJ":
+                    dados["servicos_terceiros"]["atual"] = limpar(row[6])
+                    dados["servicos_terceiros"]["anterior"] = limpar(row[7])
+                elif col_d == "TRANSFERÊNCIAS E DELEGAÇÕES CONCEDIDAS":
+                    dados["transf_concedidas"]["atual"] = limpar(row[6])
+                    dados["transf_concedidas"]["anterior"] = limpar(row[7])
+                    
+        # Calcula Superávit e Margem
+        dados["superavit_patrimonial"]["atual"] = dados["variacoes_ativas"]["atual"] - dados["variacoes_diminutivas"]["atual"]
+        dados["superavit_patrimonial"]["anterior"] = dados["variacoes_ativas"]["anterior"] - dados["variacoes_diminutivas"]["anterior"]
+        
+        if dados["variacoes_ativas"]["atual"] > 0:
+            dados["margem_patrimonial"]["atual"] = (dados["superavit_patrimonial"]["atual"] / dados["variacoes_ativas"]["atual"]) * 100
+        if dados["variacoes_ativas"]["anterior"] > 0:
+            dados["margem_patrimonial"]["anterior"] = (dados["superavit_patrimonial"]["anterior"] / dados["variacoes_ativas"]["anterior"]) * 100
+
+        return {"erro": False, "dados": dados}
+    except Exception as e:
+        return {"erro": "falha", "mensagem": str(e)}
+
+
+@app.get("/salvar_analise_patrimonial/{periodo}")
+async def salvar_analise_patrimonial(periodo: str):
+    try:
+        dados = await api_analise_patrimonial(periodo)
+        if dados.get("erro"): raise HTTPException(status_code=400, detail="Dados faltando")
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_analise_patrimonial (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("INSERT INTO historico_analise_patrimonial (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", 
+                       (periodo, data_agora, json.dumps(dados["dados"])))
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Salvo com sucesso!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/historico_analise_patrimonial")
+async def listar_historico_patrimonial():
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_patrimonial ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+
+async def listar_historico_patrimonial():
+    return []
+
+@app.get("/historico_analise_patrimonial/{id}")
+async def buscar_historico_patrimonial(id: int):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT periodo, resultado_json FROM historico_analise_patrimonial WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+    return {"periodo": row[0], "dados": json.loads(row[1])}
+
+@app.delete("/excluir_analise_patrimonial/{id}")
+async def excluir_historico_patrimonial(id: int):
+    try:
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM historico_analise_patrimonial WHERE id = ?", (id,))
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Excluido com sucesso"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
+
+@app.get("/gerar_pdf_analise_patrimonial/{id}")
+async def gerar_pdf_analise_patrimonial(id: int):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as ticker
+        import io, tempfile, os, json, sqlite3
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT periodo, resultado_json, data_geracao FROM historico_analise_patrimonial WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        periodo, d_json, data_ger = row
+        d = json.loads(d_json)
+        
+        # --- 1. GERA O GRÁFICO (BEM BAIXO) ---
+        labels = ['Var. Ativas', 'Var. Diminutivas', 'Superavit']
+        ant = [d["variacoes_ativas"]["anterior"], d["variacoes_diminutivas"]["anterior"], d["superavit_patrimonial"]["anterior"]]
+        atu = [d["variacoes_ativas"]["atual"], d["variacoes_diminutivas"]["atual"], d["superavit_patrimonial"]["atual"]]
+        
+        fig, ax = plt.subplots(figsize=(5, 2.0), dpi=150) # Reduzido para 2.0 de altura
+        x = range(len(labels))
+        ax.bar([i - 0.2 for i in x], ant, width=0.4, label='Anterior', color='#4a90e2')
+        ax.bar([i + 0.2 for i in x], atu, width=0.4, label='Atual', color='#003366')
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, fontsize=8)
+        ax.legend(loc='upper right', fontsize=7, frameon=False)
+        formatter = ticker.FuncFormatter(lambda x, pos: f'{x*1e-6:,.0f} Mi')
+        ax.yaxis.set_major_formatter(formatter)
+        ax.tick_params(axis='y', labelsize=7)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.grid(axis='y', linestyle='--', alpha=0.5)
+        plt.tight_layout()
+        img_path = os.path.join(tempfile.gettempdir(), f"grafico_{id}.png")
+        plt.savefig(img_path, bbox_inches='tight'); plt.close()
+        
+        # --- 2. MONTA O PDF (SUPER COMPACTADO) ---
+        pdf = FPDF(orientation='L', unit='mm', format='A4')
+        pdf.add_page()
+        
+        font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold = "C:/Windows/Fonts/arialbd.ttf"
+        if os.path.exists(font_path):
+            pdf.add_font("Arial", "", font_path)
+            pdf.add_font("Arial", "B", font_bold)
+            f_family = "Arial"
+        else:
+            f_family = "helvetica"
+        
+        # Cabeçalho super reduzido
+        pdf.set_font(f_family, "B", 13)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 6, "Demonstração das Variações Patrimoniais (DVP)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font(f_family, "", 8)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 4, f"Período: {periodo}  |  Emitido em: {data_ger}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(2) # Quase zero de espaço
+        
+        # Tabela compactada
+        pdf.set_fill_color(0, 51, 102)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(f_family, "B", 8)
+        pdf.cell(90, 6, "Indicador", border=1, fill=True, align="C")
+        pdf.cell(55, 6, "Período Anterior (R$)", border=1, fill=True, align="C")
+        pdf.cell(55, 6, "Período Atual (R$)", border=1, fill=True, align="C")
+        pdf.cell(40, 6, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font(f_family, "", 8)
+        
+        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        
+        ind = [
+            ("Variações Ativas", d["variacoes_ativas"]), ("Transferências Recebidas", d["transf_recebidas"]),
+            ("Reversão de Provisões", d["reversao_provisoes"]), ("Variações Diminutivas", d["variacoes_diminutivas"]),
+            ("Pessoal e Encargos", d["pessoal_encargos"]), ("Serviços de Terceiros", d["servicos_terceiros"]),
+            ("Transferências Concedidas", d["transf_concedidas"]), ("Superávit Patrimonial", d["superavit_patrimonial"])
+        ]
+        
+        for nome, val in ind:
+            at, an = val["atual"], val["anterior"]
+            var = ((at - an) / abs(an)) * 100 if an != 0 else 0
+            is_bold = "B" if "Superávit" in nome else ""
+            pdf.set_font(f_family, is_bold, 8)
+            
+            pdf.cell(90, 5, nome, border=1, align="L") # Altura 5
+            pdf.cell(55, 5, fmt(an), border=1, align="R")
+            pdf.cell(55, 5, fmt(at), border=1, align="R")
+            
+            if var >= 0: pdf.set_text_color(0, 128, 0)
+            else: pdf.set_text_color(220, 53, 69)
+            
+            pdf.cell(40, 5, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font(f_family, "", 8)
+            
+        # Gráfico e Card Azul
+        pdf.ln(4)
+        y_atual = pdf.get_y()
+        
+        pdf.image(img_path, x=25, y=y_atual, w=90) # Gráfico menor
+        
+        # Card Azul
+        pdf.set_xy(140, y_atual)
+        pdf.set_fill_color(0, 51, 102)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(f_family, "B", 8)
+        
+        m_ant = d["margem_patrimonial"]["anterior"]
+        m_at = d["margem_patrimonial"]["atual"]
+        
+        pdf.cell(80, 6, "Margem Patrimonial", border=0, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_x(140)
+        pdf.set_font(f_family, "B", 11)
+        pdf.cell(80, 8, f"{m_ant:.2f}%  para  {m_at:.2f}%".replace(".", ","), border=0, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_x(140)
+        pdf.set_font(f_family, "", 7)
+        pdf.cell(80, 6, "(Superávit / Variações Ativas)", border=0, fill=True, align="C")
+        
+        pdf_bytes = bytes(pdf.output())
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=analise_patrimonial_{id}.pdf"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/analise_orcamentaria")
 async def serve_analise_orcamentaria():
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_orcamentaria.html")
