@@ -2,7 +2,41 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><title>Análise Orçamentária Comparativa</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js">function exibirSelecionado() {
+            const check = document.querySelector(".check-hist:checked");
+            if (!check) { alert("Selecione um item no histórico."); return; }
+
+            // Busca o período no banco usando o ID
+            fetch('/historico_analise_orcamentaria/' + check.value)
+                .then(r => r.json())
+                .then(resp => {
+                    // O backend retorna {periodo: "...", dados: {...}} ou similar
+                    // Vamos extrair o período de qualquer campo disponível
+                    let periodo = resp.periodo || resp.periodo_atual || resp.periodo_anterior;
+                    
+                    if (!periodo) {
+                        // Fallback: pega do JSON se existir
+                        if (resp.dados && resp.dados.periodo_atual) {
+                            periodo = resp.dados.periodo_atual;
+                        }
+                    }
+                    
+                    if (!periodo) {
+                        // Último fallback: usa o select atual
+                        periodo = document.getElementById('periodo').value;
+                    }
+                    
+                    if (periodo) {
+                        // Define o select e chama a função de carregar
+                        document.getElementById('periodo').value = periodo;
+                        carregar();
+                    } else {
+                        alert("Não foi possível identificar o período do histórico.");
+                    }
+                })
+                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
+        }
+</script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
 .btn{padding:8px 18px;border:none;border-radius:4px;color:#fff;font-weight:bold;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px}
@@ -58,7 +92,7 @@ tr:nth-child(even){background:#f8fbff}
 <div class="main">
 <div class="esq">
 <div class="tab"><table id="tab">
-<thead><tr><th>Indicador</th><th>Período Anterior</th><th>Período Atual</th><th>Var. (%)</th></tr></thead>
+<thead><tr><th>Indicador</th><th>Período Atual</th><th>Período Anterior</th><th>Var. (%)</th></tr></thead>
 <tbody><tr><td colspan="4" style="text-align:center">Clique em "Verificar Análise"</td></tr></tbody>
 </table></div>
 <div class="concl" id="concl" style="display:none"></div>
@@ -127,51 +161,38 @@ const p=document.getElementById('periodo').value;
       const v=vb!==0?((va-vb)/Math.abs(vb))*100:0;
       const cls=v>=0?'pos':'neg', sg=v>=0?'+':'';
       const fa=d.f||'';
-      out+='<tr><td>'+d.n+'</td><td>'+vb.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+fa+'</td><td>'+va.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+fa+'</td><td class="'+cls+'">'+sg+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%</td></tr>';
+      out+='<tr><td>'+d.n+'</td><td>'+va.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+fa+'</td><td>'+vb.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+fa+'</td><td class="'+cls+'">'+sg+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%</td></tr>';
     });
     tb.innerHTML=out;
     document.getElementById('concl').style.display='block';
     document.getElementById('concl').innerHTML='<strong>Principais conclusões:</strong> a receita realizada representa '+a.pct_receita.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'% da previsão atualizada, enquanto as despesas empenhadas representam '+a.pct_despesa.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'% da dotação atualizada. A variação do superávit orçamentário e os restos a pagar inscritos merecem monitoramento.';
     if(chart) chart.destroy();
     chart = new Chart(document.getElementById('graf').getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: ['Receita Realizada', 'Despesa Empenhada', 'Superávit Orçamentário'],
-        datasets: [
-          { label: 'Período Anterior', data: [b.receita_realizada/1e6, b.despesa_empenhada/1e6, b.superavit/1e6], backgroundColor: '#4a90e2', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.6 },
-          { label: 'Período Atual',    data: [a.receita_realizada/1e6, a.despesa_empenhada/1e6, a.superavit/1e6], backgroundColor: '#003366', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.6 }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          title: { display: true, text: 'Receita, Despesa e Superávit (R$)', font: { size: 14, weight: 'bold' }, color: '#003366' },
-          legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 12, padding: 15 } },
-          tooltip: {
-            backgroundColor: '#003366',
-            titleColor: '#fff',
-            bodyColor: '#fff',
-            padding: 10,
-            cornerRadius: 6,
-            callbacks: {
-              label: function(ctx) { return ctx.dataset.label + ': R$ ' + ctx.parsed.y.toFixed(2).replace('.', ',') + ' mi'; }
+            type: 'bar',
+            data: {
+                labels: ['Receita Realizada', 'Despesa Empenhada', 'Superávit Orçamentário'],
+                datasets: [
+                    {
+                        label: 'Período Atual',
+                        data: [a.receita_realizada/1e6, a.despesa_empenhada/1e6, a.superavit/1e6],
+                        backgroundColor: '#003366',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Período Anterior',
+                        data: [b.receita_realizada/1e6, b.despesa_empenhada/1e6, b.superavit/1e6],
+                        backgroundColor: '#4a90e2',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
             }
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: { color: '#eef2f7', drawBorder: false },
-            ticks: { color: '#6b7280', font: { size: 11 }, callback: function(v) { return v + ' mi'; } }
-          },
-          x: {
-            grid: { display: false, drawBorder: false },
-            ticks: { color: '#374151', font: { size: 12, weight: 'bold' } }
-          }
-        }
-      }
-    });
+        });
     }).catch(e=>{tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:red">Erro de conexão.</td></tr>'});
 }
 
@@ -194,11 +215,7 @@ function carregarHistorico(){
     el.innerHTML=html;
   }).catch(()=>{el.innerHTML='<li>Erro ao carregar.</li>';});
 }
-function exibirSelecionado(){
-  const ck=document.querySelector('.check-hist:checked');
-  if(!ck){alert('Selecione um item.');return;}
-  fetch('/historico_analise_orcamentaria/'+ck.value).then(r=>r.json()).then(d=>{alert('ID: '+ck.value+'\nPeriodo: '+d.periodo);});
-}
+
 function excluirSelecionado(){
   const sel=document.querySelectorAll('.check-hist:checked');
   if(sel.length===0){alert('Selecione um item.');return;}
@@ -212,5 +229,39 @@ function gerarPDF(){
   window.open('/gerar_pdf_analise_orcamentaria/'+ck.value,'_blank');
 }
 document.addEventListener('DOMContentLoaded',carregarHistorico);
+function exibirSelecionado() {
+            const check = document.querySelector(".check-hist:checked");
+            if (!check) { alert("Selecione um item no histórico."); return; }
+
+            // Busca o período no banco usando o ID
+            fetch('/historico_analise_orcamentaria/' + check.value)
+                .then(r => r.json())
+                .then(resp => {
+                    // O backend retorna {periodo: "...", dados: {...}} ou similar
+                    // Vamos extrair o período de qualquer campo disponível
+                    let periodo = resp.periodo || resp.periodo_atual || resp.periodo_anterior;
+                    
+                    if (!periodo) {
+                        // Fallback: pega do JSON se existir
+                        if (resp.dados && resp.dados.periodo_atual) {
+                            periodo = resp.dados.periodo_atual;
+                        }
+                    }
+                    
+                    if (!periodo) {
+                        // Último fallback: usa o select atual
+                        periodo = document.getElementById('periodo').value;
+                    }
+                    
+                    if (periodo) {
+                        // Define o select e chama a função de carregar
+                        document.getElementById('periodo').value = periodo;
+                        carregar();
+                    } else {
+                        alert("Não foi possível identificar o período do histórico.");
+                    }
+                })
+                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
+        }
 </script>
 </body></html>

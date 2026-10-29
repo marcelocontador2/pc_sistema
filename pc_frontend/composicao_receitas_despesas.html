@@ -122,7 +122,7 @@ h3.secao{color:#003366;margin:15px 0 8px 0;font-size:16px}
 <h3 class="secao">Receitas — comparativo (R$ mil)</h3>
 <div class="tab">
 <table id="tab-receitas">
-<thead><tr><th>Conta</th><th>Período Anterior</th><th>Período Atual</th><th>Var. (%)</th></tr></thead>
+<thead><tr><th>Conta</th><th>Período Atual</th><th>Período Anterior</th><th>Var. (%)</th></tr></thead>
 <tbody><tr><td colspan="4" style="text-align:center">Clique em Verificar</td></tr></tbody>
 </table>
 </div>
@@ -130,7 +130,7 @@ h3.secao{color:#003366;margin:15px 0 8px 0;font-size:16px}
 <h3 class="secao">Despesas — comparativo (R$ mil)</h3>
 <div class="tab">
 <table id="tab-despesas">
-<thead><tr><th>Conta</th><th>Período Anterior</th><th>Período Atual</th><th>Var. (%)</th></tr></thead>
+<thead><tr><th>Conta</th><th>Período Atual</th><th>Período Anterior</th><th>Var. (%)</th></tr></thead>
 <tbody><tr><td colspan="4" style="text-align:center">Clique em Verificar</td></tr></tbody>
 </table>
 </div>
@@ -197,7 +197,7 @@ function renderTabela(id, at, ant){
     const va = at[k]||0, vb = ant[k]||0;
     const v = pctVar(va, vb);
     const cls = v.startsWith('-') ? 'neg' : 'pos';
-    html += '<tr><td>'+k+'</td><td>'+fmtV(vb)+'</td><td>'+fmtV(va)+'</td><td class="'+cls+'">'+v+'</td></tr>';
+    html += '<tr><td>'+k+'</td><td>'+fmtV(va)+'</td><td>'+fmtV(vb)+'</td><td class="'+cls+'">'+v+'</td></tr>';
   });
   tb.innerHTML = html;
 }
@@ -212,7 +212,7 @@ function renderChart(a, b){
     type: 'bar',
     data: { labels: labels, datasets: [
       { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 },
-      { label: 'Período Atual', data: dataA, backgroundColor: '#003366', borderRadius: 4 }
+      { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 }
     ]},
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { title: { display: true, text: 'Composição de Receitas (R$ mil)', font: { size: 14, weight: 'bold' }, color: '#003366' }, legend: { position: 'bottom' } },

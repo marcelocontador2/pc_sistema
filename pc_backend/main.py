@@ -2275,121 +2275,6 @@ async def excluir_analise_orcamentaria(id: int):
     conn.commit(); conn.close()
     return {"mensagem": "Excluido"}
 
-@app.get("/gerar_pdf_analise_orcamentaria/{id}")
-async def gerar_pdf_analise_orcamentaria(id: int):
-    try:
-        from fastapi.responses import Response
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-        cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_orcamentaria WHERE id=?", (id,))
-        row = cur.fetchone(); conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-        periodo, data_geracao, json_str = row
-        d = json.loads(json_str)
-        if "atual" in d:
-            atual = d["atual"]; anterior = d.get("anterior", {})
-        else:
-            atual = d; anterior = {}
-        def fm(v):
-            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v is not None else "0,00"
-        def pc(v):
-            return f"{v:.2f}".replace(".", ",") + "%" if v is not None else "0,00%"
-        def varc(a, b):
-            if a is None or b is None or b == 0: return "-"
-            return f"{((a-b)/abs(b))*100:+.2f}".replace(".", ",") + "%"
-
-        pdf = FPDF(orientation="L", unit="mm", format="A4")
-        pdf.set_auto_page_break(auto=False)
-        pdf.add_page()
-        pdf.set_font("helvetica", "B", 8); pdf.set_text_color(74,144,226)
-        pdf.cell(0, 5, "EXECUÇÃO ORÇAMENTÁRIA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "B", 16); pdf.set_text_color(0,51,102)
-        pdf.cell(0, 9, "Análise Orçamentária Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "", 8); pdf.set_text_color(120,120,120)
-        pdf.cell(0, 5, f"Período: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(1)
-
-        y0 = pdf.get_y()
-        pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",7)
-        pdf.set_xy(15, y0)
-        pdf.cell(100, 5, "Indicador", border=1, fill=True, align="L")
-        pdf.cell(45, 5, "Período Anterior", border=1, fill=True, align="R")
-        pdf.cell(45, 5, "Período Atual", border=1, fill=True, align="R")
-        pdf.cell(35, 5, "Var. (%)", border=1, fill=True, align="C")
-
-        pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",7)
-        inds = [
-            ("Receita Realizada (R$)", "receita_realizada"),
-            ("Despesas Empenhadas (R$)", "despesa_empenhada"),
-            ("Superávit Orçamentário (R$)", "superavit"),
-            ("Restos a Pagar Inscritos (R$)", "restos_pagar"),
-            ("Receitas Orçadas (R$)", "receita_orcada"),
-            ("Despesas Orçadas (R$)", "despesa_orcada"),
-            ("% de Realização das Receitas", "pct_receita"),
-            ("% de Realização das Despesas", "pct_desp" + "esa"),
-        ]
-        for i, (lbl, chave) in enumerate(inds):
-            va = atual.get(chave) if isinstance(atual.get(chave), (int,float)) else None
-            vb = anterior.get(chave) if isinstance(anterior.get(chave), (int,float)) else None
-            pdf.set_xy(15, y0 + 5 + (i+1)*5)
-            pdf.set_fill_color(248,251,255) if i%2==0 else pdf.set_fill_color(255,255,255)
-            pdf.cell(100, 5, lbl, border=1, fill=True, align="L")
-            pdf.cell(45, 5, fm(vb) if "pct" not in chave else pc(vb), border=1, fill=True, align="R")
-            pdf.cell(45, 5, fm(va) if "pct" not in chave else pc(va), border=1, fill=True, align="R")
-            pdf.cell(35, 5, varc(va, vb), border=1, fill=True, align="C")
-
-        pdf.set_xy(15, y0 + 5 + len(inds)*5 + 6)
-
-        pdf.set_font("helvetica","B",8); pdf.set_text_color(0,51,102)
-        pdf.cell(0, 5, "Receita, Despesa e Superávit (R$)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-
-        grupos = [
-            ("Receita",   atual.get("receita_realizada", 0),   anterior.get("receita_realizada", 0)),
-            ("Despesa",   atual.get("despesa_empenhada", 0),   anterior.get("despesa_empenhada", 0)),
-            ("Superávit", atual.get("superavit", 0),           anterior.get("superavit", 0)),
-        ]
-        max_pos = max(max(a, b) for _, a, b in grupos) or 1
-        max_neg = min(min(a, b) for _, a, b in grupos)
-        chart_h = 18.0
-        amplitude = max_pos - min(max_neg, 0)
-        if amplitude == 0: amplitude = 1
-        scale = chart_h / amplitude
-        bar_w = 12; bar_gap = 2; group_w = 2 * bar_w + bar_gap; group_gap = 20
-        total_w = group_w * len(grupos) + group_gap * (len(grupos) - 1)
-        start_x = (297 - total_w) / 2
-        top_y = pdf.get_y() + 2
-        zero_y = top_y + max_pos * scale
-        pdf.set_draw_color(160, 160, 160)
-        pdf.line(start_x - 8, zero_y, start_x + total_w + 8, zero_y)
-        lowest_y = zero_y
-        for i, (lbl, va, vb) in enumerate(grupos):
-            x = start_x + i * (group_w + group_gap)
-            hb = vb * scale; ha = va * scale
-            pdf.set_fill_color(74, 144, 226)
-            if vb >= 0: pdf.rect(x, zero_y - hb, bar_w, hb, style="F")
-            else: pdf.rect(x, zero_y, bar_w, -hb, style="F"); lowest_y = max(lowest_y, zero_y - hb)
-            pdf.set_fill_color(0, 51, 102)
-            if va >= 0: pdf.rect(x + bar_w + bar_gap, zero_y - ha, bar_w, ha, style="F")
-            else: pdf.rect(x + bar_w + bar_gap, zero_y, bar_w, -ha, style="F"); lowest_y = max(lowest_y, zero_y - ha)
-        rot_y = lowest_y + 2
-        for i, (lbl, va, vb) in enumerate(grupos):
-            x = start_x + i * (group_w + group_gap)
-            pdf.set_xy(x, rot_y)
-            pdf.set_font("helvetica", "", 7); pdf.set_text_color(60, 60, 60)
-            pdf.cell(group_w, 3, lbl, align="C")
-
-        pdf.set_y(rot_y + 5)
-        pdf.set_x(15)
-        pdf.set_font("helvetica", "I", 7); pdf.set_text_color(80, 80, 80)
-        pdf.cell(267, 4, "Conclusões: receita = " + pc(atual.get("pct_receita")) + " da previsão; despesas empenhadas = " + pc(atual.get("pct_despesa")) + " da dotação.", align="L")
-
-        pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=Analise_Orcamentaria_{periodo.replace('-','_').replace(' ','_')}.pdf"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.get("/api/periodos_disponiveis/{tipo_demonstrativo}")
 async def api_periodos_disponiveis(tipo_demonstrativo: str):
     try:
@@ -2721,6 +2606,142 @@ async def buscar_historico_composicao_rd(id: int):
         except: dados_json = {}
         
     return {"periodo": periodo, "dados": dados_json}
+
+
+@app.get("/gerar_pdf_analise_orcamentaria/{id}")
+async def gerar_pdf_analise_orcamentaria(id: int):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as ticker
+        import io, tempfile, os, json, sqlite3
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        periodo, d_json = row
+        d = json.loads(d_json)
+        
+        # Estrutura esperada: { atual: {...}, anterior: {...} }
+        a = d.get("atual", {})
+        b = d.get("anterior", {})
+        
+        # --- 1. GERA O GRÁFICO (Atual primeiro) ---
+        labels = ["Receita Realizada", "Despesa Empenhada", "Superavit"]
+        ant = [b.get("receita_realizada", 0), b.get("despesa_empenhada", 0), b.get("superavit", 0)]
+        atu = [a.get("receita_realizada", 0), a.get("despesa_empenhada", 0), a.get("superavit", 0)]
+        
+        fig, ax = plt.subplots(figsize=(6, 2.8), dpi=150)
+        x = range(len(labels))
+        # Atual (azul escuro) na esquerda, Anterior (azul claro) na direita
+        ax.bar([i - 0.2 for i in x], atu, width=0.4, label="Atual", color="#003366")
+        ax.bar([i + 0.2 for i in x], ant, width=0.4, label="Anterior", color="#4a90e2")
+        
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, fontsize=10)
+        ax.legend(loc="upper right", fontsize=9, frameon=False)
+        formatter = ticker.FuncFormatter(lambda x, pos: f"{x*1e-6:,.1f} Mi")
+        ax.yaxis.set_major_formatter(formatter)
+        ax.tick_params(axis="y", labelsize=9)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", linestyle="--", alpha=0.7)
+        plt.tight_layout()
+        
+        img_path = os.path.join(tempfile.gettempdir(), f"grafico_orc_{id}.png")
+        plt.savefig(img_path, bbox_inches="tight"); plt.close()
+        
+        # --- 2. MONTA O PDF ---
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.add_page()
+        
+        font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold = "C:/Windows/Fonts/arialbd.ttf"
+        if os.path.exists(font_path):
+            pdf.add_font("Arial", "", font_path)
+            pdf.add_font("Arial", "B", font_bold)
+            f_family = "Arial"
+        else:
+            f_family = "helvetica"
+        
+        pdf.set_font(f_family, "B", 16)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, "Analise Orcamentaria Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font(f_family, "", 10)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 5, f"Periodo de Referencia: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(8)
+        
+        # Tabela: Indicador | Periodo Atual | Periodo Anterior | Var (%)
+        pdf.set_fill_color(0, 51, 102)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(f_family, "B", 10)
+        
+        pdf.cell(80, 8, "Indicador", border=1, fill=True, align="C")
+        pdf.cell(45, 8, "Periodo Atual", border=1, fill=True, align="C")
+        pdf.cell(45, 8, "Periodo Anterior", border=1, fill=True, align="C")
+        pdf.cell(30, 8, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font(f_family, "", 9)
+        
+        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        
+        # Indicadores na ordem que queremos
+        ind = [
+            ("Receita Realizada", "receita_realizada", 1e6),
+            ("Despesas Empenhadas", "despesa_empenhada", 1e6),
+            ("Superavit Orcamentario", "superavit", 1e6),
+            ("Restos a Pagar Inscritos", "restos_pagar", 1e6),
+            ("Receitas Orcadas", "receita_orcada", 1e6),
+            ("Despesas Orcadas", "despesa_orcada", 1e6),
+            ("% de Realizacao das Receitas", "pct_receita", 1),
+            ("% de Realizacao das Despesas", "pct_despesa", 1),
+        ]
+        
+        for nome, chave, m in ind:
+            va = a.get(chave, 0)
+            vb = b.get(chave, 0)
+            var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
+            
+            pdf.cell(80, 7, nome, border=1, align="L")
+            pdf.cell(45, 7, fmt(va) if m == 1e6 else f"{va:.2f}%", border=1, align="R")
+            pdf.cell(45, 7, fmt(vb) if m == 1e6 else f"{vb:.2f}%", border=1, align="R")
+            
+            if var >= 0: pdf.set_text_color(0, 128, 0)
+            else: pdf.set_text_color(220, 53, 69)
+            pdf.cell(30, 7, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+        
+        # Grafico e Conclusao
+        pdf.ln(8)
+        y_atual = pdf.get_y()
+        pdf.image(img_path, x=30, y=y_atual, w=110)
+        
+        # Conclusao no lado direito
+        pdf.set_xy(150, y_atual)
+        pdf.set_font(f_family, "B", 10)
+        pdf.cell(0, 6, "Principais conclusoes:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_x(150)
+        pdf.set_font(f_family, "", 8)
+        txt_conclusao = f"A receita realizada representa {a.get('pct_receita', 0):.2f}% da previsao atualizada, enquanto as despesas empenhadas representam {a.get('pct_despesa', 0):.2f}% da dotacao atualizada."
+        pdf.multi_cell(90, 4, txt_conclusao)
+        
+        pdf_bytes = bytes(pdf.output())
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={
+            "Content-Disposition": f"inline; filename=analise_orcamentaria_{id}.pdf"
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/analise_orcamentaria")
 async def serve_analise_orcamentaria():
