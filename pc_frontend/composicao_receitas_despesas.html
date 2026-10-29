@@ -23,6 +23,28 @@ document.addEventListener('DOMContentLoaded', function(){
   
 });
 
+function exibirSelecionado() {
+            const check = document.querySelector(".check-hist:checked");
+            if (!check) { alert("Selecione um item no histórico."); return; }
+
+            fetch('/historico_composicao_rd/' + check.value)
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.dados) {
+                        // Estrutura do JSON salvo:
+                        // { atual: { receitas: {...}, despesas: {...} }, anterior: { receitas: {...}, despesas: {...} } }
+                        const d = resp.dados;
+                        
+                        // Renderiza Tabelas
+                        renderTabela('tab-receitas', d.atual.receitas, d.anterior.receitas);
+                        renderTabela('tab-despesas', d.atual.despesas, d.anterior.despesas);
+
+                        // Renderiza Gráfico (a função renderChart espera {receitas: {...}})
+                        renderChart({receitas: d.atual.receitas}, {receitas: d.anterior.receitas});
+                    }
+                })
+                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
+        }
 </script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
@@ -224,13 +246,7 @@ function carregarHistorico(){
     .catch(()=>{ el.innerHTML='<li>Erro ao carregar.</li>'; });
 }
 
-function exibirSelecionado(){
-  const ck = document.querySelector('.check-hist:checked');
-  if(!ck){ alert('Selecione um item.'); return; }
-  fetch('/historico_composicao_receitas_despesas/'+ck.value)
-    .then(r=>r.json())
-    .then(d=>{ alert('Período: '+d.periodo); });
-}
+
 
 function excluirSelecionado(){
   const sel = document.querySelectorAll('.check-hist:checked');
@@ -266,5 +282,27 @@ document.addEventListener('DOMContentLoaded', function(){
   if(t){ t.addEventListener('change', function(){ ajustarOpcoes('tipo_atual','val_atual'); }); }
   ajustarOpcoes('tipo_atual','val_atual');
 });
+function exibirSelecionado() {
+            const check = document.querySelector(".check-hist:checked");
+            if (!check) { alert("Selecione um item no histórico."); return; }
+
+            fetch('/historico_composicao_rd/' + check.value)
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.dados) {
+                        // Estrutura do JSON salvo:
+                        // { atual: { receitas: {...}, despesas: {...} }, anterior: { receitas: {...}, despesas: {...} } }
+                        const d = resp.dados;
+                        
+                        // Renderiza Tabelas
+                        renderTabela('tab-receitas', d.atual.receitas, d.anterior.receitas);
+                        renderTabela('tab-despesas', d.atual.despesas, d.anterior.despesas);
+
+                        // Renderiza Gráfico (a função renderChart espera {receitas: {...}})
+                        renderChart({receitas: d.atual.receitas}, {receitas: d.anterior.receitas});
+                    }
+                })
+                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
+        }
 </script>
 </body></html>

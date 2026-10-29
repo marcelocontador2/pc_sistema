@@ -2695,6 +2695,33 @@ async def gerar_pdf_analise_patrimonial(id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/historico_composicao_rd/{id}")
+async def buscar_historico_composicao_rd(id: int):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    # A tabela pode ter colunas diferentes, vamos tentar resultado_json
+    try:
+        cursor.execute("SELECT periodo, resultado_json FROM historico_composicao_rd WHERE id = ?", (id,))
+    except:
+        # Se falhar, tenta sem o resultado_json
+        cursor.execute("SELECT * FROM historico_composicao_rd WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+    
+    # Tenta pegar o periodo e o json
+    periodo = row[0] if len(row) > 0 else "Desconhecido"
+    dados_json = row[1] if len(row) > 1 else "{}"
+    
+    # Se dados_json for uma string, converte para dict
+    if isinstance(dados_json, str):
+        try: dados_json = json.loads(dados_json)
+        except: dados_json = {}
+        
+    return {"periodo": periodo, "dados": dados_json}
+
 @app.get("/analise_orcamentaria")
 async def serve_analise_orcamentaria():
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_orcamentaria.html")
