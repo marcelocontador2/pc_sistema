@@ -92,7 +92,7 @@
                 .then(r => r.json())
                 .then(resp => {
                     if (resp.dados) {
-                        alert("Dados carregados do histórico. Período: " + resp.periodo);
+                        console.log("Histórico ok");
                     }
                 })
                 .catch(e => alert("Erro ao carregar histórico."));
@@ -461,7 +461,7 @@
                 .then(r => r.json())
                 .then(resp => {
                     if (resp.dados) {
-                        alert("Dados carregados do histórico. Período: " + resp.periodo);
+                        console.log("Histórico ok");
                     }
                 })
                 .catch(e => alert("Erro ao carregar histórico."));
@@ -635,7 +635,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 .then(r => r.json())
                 .then(resp => {
                     if (resp.dados) {
-                        alert("Dados carregados do histórico. Período: " + resp.periodo);
+                        console.log("Histórico ok");
                     }
                 })
                 .catch(e => alert("Erro ao carregar histórico."));
@@ -728,7 +728,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 .then(r => r.json())
                 .then(resp => {
                     if (resp.dados) {
-                        alert("Dados carregados do histórico. Período: " + resp.periodo);
+                        console.log("Histórico ok");
                     }
                 })
                 .catch(e => alert("Erro ao carregar histórico."));
@@ -793,5 +793,76 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
+
+<script>
+function preencherTabela(dados) {
+    if (!dados) return;
+    const rcl = parseFloat(dados.rcl_total || 0);
+    const custo = parseFloat(dados.custo_total || 0);
+    const pct = rcl > 0 ? (custo / rcl) * 100 : 0;
+
+    document.querySelectorAll('table tr').forEach(tr => {
+        const txt = tr.innerText;
+        const tds = tr.querySelectorAll('td');
+        if (tds.length >= 2) {
+            if (txt.includes('Receita Corrente')) {
+                tds[1].innerText = 'R$ ' + rcl.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                if (tds[2]) tds[2].innerText = '100,00%';
+            } else if (txt.includes('Custo de Pessoal')) {
+                tds[1].innerText = 'R$ ' + custo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                if (tds[2]) tds[2].innerText = pct.toFixed(2).replace('.', ',') + '%';
+            } else if (txt.includes('Margem')) {
+                tds[1].innerText = 'R$ ' + (rcl - custo).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                if (tds[2]) tds[2].innerText = (100 - pct).toFixed(2).replace('.', ',') + '%';
+            } else if (txt.includes('Limite LRF')) {
+                tds[1].innerText = 'R$ ' + (rcl * 0.5).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                if (tds[2]) tds[2].innerText = '50,00%';
+            } else if (txt.includes('Situação')) {
+                tds[1].innerText = pct.toFixed(2).replace('.', ',') + '%';
+                tds[1].style.color = pct <= 50 ? 'green' : 'red';
+                tds[1].style.fontWeight = 'bold';
+            }
+        }
+    });
+}
+
+function exibirSelecionado() {
+    const check = document.querySelector(".check-historico:checked");
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    fetch('/historico_custo_pessoal/' + check.value)
+        .then(r => r.json())
+        .then(resp => { if (resp.dados) preencherTabela(resp.dados); });
+}
+
+function gerarPDF() {
+    const check = document.querySelector(".check-historico:checked");
+    if (!check) { alert("Marque um relatório no histórico!"); return; }
+    const txt = check.parentElement.innerText;
+    const match = txt.match(/\d{4}-TRIMESTRE-\d/);
+    const periodo = match ? match[0] : '2026-TRIMESTRE-3';
+    window.open('/gerar_pdf_custo_pessoal?periodo=' + periodo, '_blank');
+}
+
+window.addEventListener('load', function() {
+    // Se for o robô gerando o PDF, preenche os dados
+    if (window.location.search.includes('autoprint') || window.location.search.includes('periodo=')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        let periodo = urlParams.get('periodo') || '2026-TRIMESTRE-3';
+        fetch('/api/custo_pessoal/' + periodo)
+            .then(r => r.json())
+            .then(d => { if(!d.erro) preencherTabela(d); });
+    }
+    
+    // Configura botão Verificar
+    const btnVerificar = document.querySelector('.btn-verificar');
+    if (btnVerificar) {
+        btnVerificar.onclick = (e) => {
+            e.preventDefault();
+            fetch('/api/custo_pessoal/2026-TRIMESTRE-3').then(r => r.json()).then(d => preencherTabela(d));
+        };
+    }
+});
+</script>
 </body>
+
 </html>

@@ -3317,34 +3317,90 @@ async def excluir_historico_custo_pessoal(id: int):
 
 
 
+
+
+
+
+
+
+
+
+
+
+@app.get("/api/diag_custo_pessoal")
+async def diag_custo_pessoal(periodo: str = "2026-TRIMESTRE-3"):
+    from playwright.async_api import async_playwright
+    from fastapi.responses import Response
+    import tempfile, os
+    
+    url = f"http://127.0.0.1:8000/analise_custo_pessoal?autoprint=1&periodo={periodo}"
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await page.goto(url, wait_until="networkidle")
+        await page.wait_for_timeout(3000)
+        
+        # Tira um screenshot ANTES de qualquer remoção
+        screenshot_bytes = await page.wait_for_timeout(2500)
+        await page.pdf(full_page=True)
+        await browser.close()
+        
+        return Response(content=screenshot_bytes, media_type="image/png", headers={
+            "Content-Disposition": "inline; filename=diag.png"
+        })
+
+
+
+
+
 @app.get("/gerar_pdf_custo_pessoal")
 async def gerar_pdf_custo_pessoal(periodo: str = "2026-TRIMESTRE-3"):
     try:
         from playwright.async_api import async_playwright
         from fastapi.responses import Response
-        import tempfile, os
         
-        # URL da tela (com o parâmetro para o robô saber que é para gerar o PDF)
         url = f"http://127.0.0.1:8000/analise_custo_pessoal?autoprint=1&periodo={periodo}"
         
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page()
-            # Abre a tela e espera o gráfico ser desenhado
-            await page.goto(url, wait_until="networkidle")
-            await page.wait_for_timeout(3000) # Espera 3s para o Chart.js e os dados carregarem
+            await page.emulate_media(media="print")
+            await page.goto(url, wait_until="networkidle", wait_until="networkidle")
             
-            # Gera o PDF
-            pdf_bytes = await page.pdf(
-                format="A4",
-                landscape=True,
-                print_background=True,
-                margin={"top": "1cm", "bottom": "1cm", "left": "1cm", "right": "1cm"}
-            )
+            # Espera o conteúdo principal carregar (ex: o título "Fundamentação Legal")
+            try:
+                await page.wait_for_selector("text=Fundamentação Legal", timeout=10000)
+            except:
+                pass  # se não achar, segue mesmo assim
+            await page.wait_for_timeout(2000)
+            
+            # Esconde a sidebar pelo seletor estrutural: a div que contém o flex layout
+            # Vamos esconder a PRIMEIRA div filha do container flex (que é a sidebar)
+            await page.evaluate("""
+                () => {
+                    // Procura o container flex principal
+                    const flexContainer = document.querySelector('div[style*="display: flex"]');
+                    if (flexContainer && flexContainer.children.length >= 2) {
+                        // Esconde o primeiro filho (sidebar) e mantém o segundo (conteúdo)
+                        flexContainer.children[0].style.display = 'none';
+                    }
+                    // Esconde botões e top-bar
+                    document.querySelectorAll('.btn, .btn-verificar, .btn-salvar, .top-bar').forEach(el => el.style.display = 'none');
+                    document.body.style.background = 'white';
+                }
+            """)
+            await page.wait_for_timeout(500)
+            
+            pdf_bytes = await page.emulate_media(media="print")
+        await page.wait_for_timeout(2500)
+        await page.emulate_media(media="print")
+        await page.wait_for_timeout(2000)
+        await page.pdf(path=pdf_path, format="A4", print_background=True, margin={"top": "20px", "bottom": "20px", "left": "20px", "right": "20px"})
             await browser.close()
             
         return Response(content=pdf_bytes, media_type="application/pdf", headers={
-            "Content-Disposition": f"inline; filename=custo_pessoal_{periodo}.pdf"
+            "Content-Disposition": f"attachment; filename=custo_pessoal_{periodo}.pdf"
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
