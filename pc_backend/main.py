@@ -2005,104 +2005,6 @@ async def excluir_composicao(id: int):
     conn.commit(); conn.close()
     return {"mensagem": "Excluido"}
 
-@app.get("/gerar_pdf_composicao_receitas_despesas/{id}")
-async def gerar_pdf_composicao_receitas_despesas(id: int):
-    try:
-        from fastapi.responses import Response
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-        cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_composicao_rd WHERE id=?", (id,))
-        row = cur.fetchone(); conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-        periodo, data_geracao, json_str = row
-        d = json.loads(json_str)
-        atual = d.get("atual", {})
-        anterior = d.get("anterior", {})
-        rec_at = atual.get("receitas", {})
-        rec_an = anterior.get("receitas", {})
-        desp_at = atual.get("despesas", {})
-        desp_an = anterior.get("despesas", {})
-
-        def fm(v):
-            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if v is not None else "0,00"
-        def varc(va, vb):
-            if vb is None or vb == 0: return "-"
-            return f"{((va-vb)/abs(vb))*100:+.2f}%".replace(".", ",")
-
-        pdf = FPDF(orientation="L", unit="mm", format="A4")
-        pdf.set_auto_page_break(auto=False)
-        pdf.add_page()
-
-        # Cabecalho compacto
-        pdf.set_font("helvetica", "B", 8); pdf.set_text_color(74,144,226)
-        pdf.cell(0, 5, "COMPOSIÇÃO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "B", 16); pdf.set_text_color(0,51,102)
-        pdf.cell(0, 9, "Receitas e Despesas Comparativas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "", 8); pdf.set_text_color(120,120,120)
-        pdf.cell(0, 5, f"Comparação: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(1)
-
-        Y_TAB = pdf.get_y() + 2
-        X_REC = 10
-        X_DESP = 152
-
-        def render_tabela(x0, y0, titulo, dados_at, dados_an):
-            pdf.set_xy(x0, y0)
-            pdf.set_font("helvetica","B",8); pdf.set_text_color(0,51,102)
-            pdf.cell(135, 5, titulo, border=0, align="L")
-            pdf.set_xy(x0, y0+5)
-            pdf.set_fill_color(0,51,102); pdf.set_text_color(255,255,255); pdf.set_font("helvetica","B",7)
-            pdf.cell(50, 4.5, "Conta", border=1, fill=True, align="L")
-            pdf.cell(30, 4.5, "Anterior", border=1, fill=True, align="R")
-            pdf.cell(30, 4.5, "Atual", border=1, fill=True, align="R")
-            pdf.cell(25, 4.5, "Var. (%)", border=1, fill=True, align="C")
-            pdf.set_text_color(0,0,0); pdf.set_font("helvetica","",6.5)
-            i = 0
-            for k, va in dados_at.items():
-                vb = dados_an.get(k, 0)
-                pdf.set_xy(x0, y0+5+4.5+i*4.5)
-                pdf.set_fill_color(248,251,255) if i%2==0 else pdf.set_fill_color(255,255,255)
-                pdf.cell(50, 4.5, k[:30], border=1, fill=True, align="L")
-                pdf.cell(30, 4.5, fm(vb), border=1, fill=True, align="R")
-                pdf.cell(30, 4.5, fm(va), border=1, fill=True, align="R")
-                pdf.cell(25, 4.5, varc(va, vb), border=1, fill=True, align="C")
-                i += 1
-            return y0 + 5 + 4.5 + i*4.5
-
-        fim_rec = render_tabela(X_REC, Y_TAB, "RECEITAS (R$ mil)", rec_at, rec_an)
-        fim_desp = render_tabela(X_DESP, Y_TAB, "DESPESAS (R$ mil)", desp_at, desp_an)
-        y_grafico = max(fim_rec, fim_desp) + 4
-
-        # Grafico compacto
-        pdf.set_xy(15, y_grafico)
-        pdf.set_font("helvetica","B",8); pdf.set_text_color(0,51,102)
-        
-        grupos = list(rec_at.keys())
-        vals_at = [rec_at.get(k, 0) for k in grupos]
-        vals_an = [rec_an.get(k, 0) for k in grupos]
-        max_v = max(max(vals_at), max(vals_an), 1)
-        chart_h = 18; base_y = y_grafico + 6 + chart_h + 3
-        bar_w = 12; gap = 3; group_w = 2*bar_w + gap; group_space = 14
-        total_w = group_w*len(grupos) + group_space*(len(grupos)-1)
-        start_x = (297 - total_w)/2
-        pdf.set_draw_color(160,160,160)
-        pdf.line(start_x-5, base_y, start_x+total_w+5, base_y)
-        labels_curtos = ["Rec. Correntes", "Rec. Patrim.", "Transf. Corr.", "Outras Rec.", "Rec. Capital"]
-        for i, (lbl, va, vb) in enumerate(zip(grupos, vals_at, vals_an)):
-            x = start_x + i*(group_w+group_space)
-            hb = (vb/max_v)*chart_h; ha = (va/max_v)*chart_h
-            pdf.set_fill_color(74,144,226); pdf.rect(x, base_y-hb, bar_w, hb, style="F")
-            pdf.set_fill_color(0,51,102); pdf.rect(x+bar_w+gap, base_y-ha, bar_w, ha, style="F")
-            pdf.set_xy(x-4, base_y+1); pdf.set_font("helvetica","",6); pdf.set_text_color(60,60,60)
-            pdf.cell(group_w+8, 3.5, labels_curtos[i] if i < len(labels_curtos) else lbl[:10], align="C")
-
-        pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Composicao_{periodo.replace(' ','_').replace('/','_')}.pdf"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/composicao_receitas_despesas")
 async def serve_composicao():
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "composicao_receitas_despesas.html")
@@ -2826,6 +2728,148 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf_bytes = bytes(pdf.output())
         return Response(content=pdf_bytes, media_type="application/pdf", headers={
             "Content-Disposition": f"inline; filename=analise_patrimonial_{id}.pdf"
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/gerar_pdf_composicao_receitas_despesas/{id}")
+async def gerar_pdf_composicao_receitas_despesas(id: int):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as ticker
+        import io, tempfile, os, json, sqlite3
+        
+        # 1. Busca o periodo e os dados no banco
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT periodo, resultado_json FROM historico_composicao_rd WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        periodo, d_json = row
+        d = json.loads(d_json)
+        
+        # Estrutura esperada: { atual: { receitas: {...}, despesas: {...} }, anterior: { receitas: {...}, despesas: {...} } }
+        a = d.get("atual", {})
+        b = d.get("anterior", {})
+        
+        # 2. Prepara os dados para o gráfico (Receitas)
+        labels = list(a.get("receitas", {}).keys())
+        data_a = [a.get("receitas", {}).get(k, 0) for k in labels]
+        data_b = [b.get("receitas", {}).get(k, 0) for k in labels]
+        
+        fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
+        x = range(len(labels))
+        ax.bar([i - 0.2 for i in x], data_a, width=0.4, label="Atual", color="#003366")
+        ax.bar([i + 0.2 for i in x], data_b, width=0.4, label="Anterior", color="#4a90e2")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, fontsize=8, rotation=15)
+        ax.legend(loc="upper right", fontsize=8, frameon=False)
+        formatter = ticker.FuncFormatter(lambda x, pos: f"{x*1e-6:,.1f} Mi")
+        ax.yaxis.set_major_formatter(formatter)
+        ax.tick_params(axis="y", labelsize=8)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", linestyle="--", alpha=0.5)
+        plt.tight_layout()
+        
+        img_path = os.path.join(tempfile.gettempdir(), f"grafico_comp_{id}.png")
+        plt.savefig(img_path, bbox_inches="tight"); plt.close()
+        
+        # 3. Monta o PDF
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.add_page()
+        
+        font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold = "C:/Windows/Fonts/arialbd.ttf"
+        if os.path.exists(font_path):
+            pdf.add_font("Arial", "", font_path)
+            pdf.add_font("Arial", "B", font_bold)
+            f_family = "Arial"
+        else:
+            f_family = "helvetica"
+        
+        pdf.set_font(f_family, "B", 16)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, "Composicao de Receitas e Despesas", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font(f_family, "", 10)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 5, f"Periodo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(5)
+        
+        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        
+        # --- Tabela de Receitas ---
+        pdf.set_font(f_family, "B", 10)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 6, "RECEITAS (R$ mil)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_fill_color(0, 51, 102)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(f_family, "B", 9)
+        pdf.cell(80, 7, "Conta", border=1, fill=True, align="L")
+        pdf.cell(45, 7, "Periodo Atual", border=1, fill=True, align="C")
+        pdf.cell(45, 7, "Periodo Anterior", border=1, fill=True, align="C")
+        pdf.cell(30, 7, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font(f_family, "", 8)
+        
+        for k, va in a.get("receitas", {}).items():
+            vb = b.get("receitas", {}).get(k, 0)
+            var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
+            pdf.cell(80, 6, k, border=1, align="L")
+            pdf.cell(45, 6, fmt(va), border=1, align="R")
+            pdf.cell(45, 6, fmt(vb), border=1, align="R")
+            if var >= 0: pdf.set_text_color(0, 128, 0)
+            else: pdf.set_text_color(220, 53, 69)
+            pdf.cell(30, 6, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+        
+        pdf.ln(5)
+        
+        # --- Tabela de Despesas ---
+        pdf.set_font(f_family, "B", 10)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 6, "DESPESAS (R$ mil)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_fill_color(0, 51, 102)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(f_family, "B", 9)
+        pdf.cell(80, 7, "Conta", border=1, fill=True, align="L")
+        pdf.cell(45, 7, "Periodo Atual", border=1, fill=True, align="C")
+        pdf.cell(45, 7, "Periodo Anterior", border=1, fill=True, align="C")
+        pdf.cell(30, 7, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font(f_family, "", 8)
+        
+        for k, va in a.get("despesas", {}).items():
+            vb = b.get("despesas", {}).get(k, 0)
+            var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
+            pdf.cell(80, 6, k, border=1, align="L")
+            pdf.cell(45, 6, fmt(va), border=1, align="R")
+            pdf.cell(45, 6, fmt(vb), border=1, align="R")
+            if var >= 0: pdf.set_text_color(0, 128, 0)
+            else: pdf.set_text_color(220, 53, 69)
+            pdf.cell(30, 6, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+            
+        # 4. Adiciona o gráfico no final
+        pdf.ln(8)
+        pdf.image(img_path, x=40, y=pdf.get_y(), w=160)
+        
+        pdf_bytes = bytes(pdf.output())
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={
+            "Content-Disposition": f"inline; filename=composicao_{id}.pdf"
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

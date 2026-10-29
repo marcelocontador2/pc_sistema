@@ -45,6 +45,26 @@ function exibirSelecionado() {
                 })
                 .catch(e => alert("Erro ao carregar o histórico: " + e.message));
         }
+
+        function renderChart(a, b) {
+            if(chart) chart.destroy();
+            const ctx = document.getElementById('graf').getContext('2d');
+            const labels = Object.keys(a.receitas || {});
+            const dataA = labels.map(k => a.receitas[k] || 0);
+            const dataB = labels.map(k => b.receitas[k] || 0);
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: labels, datasets: [
+                    { label: 'Período Atual', data: dataA, backgroundColor: '#003366', borderRadius: 4 },
+                    { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Composição de Receitas (R$ mil)', font: { size: 14, weight: 'bold' }, color: '#003366' }, legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                }
+            });
+        }
+
 </script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
@@ -202,24 +222,7 @@ function renderTabela(id, at, ant){
   tb.innerHTML = html;
 }
 
-function renderChart(a, b){
-  if(chart) chart.destroy();
-  const ctx = document.getElementById('graf').getContext('2d');
-  const labels = Object.keys(a.receitas);
-  const dataA = labels.map(k=>a.receitas[k]||0);
-  const dataB = labels.map(k=>b.receitas[k]||0);
-  chart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: labels, datasets: [
-      { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 },
-      { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 }
-    ]},
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { title: { display: true, text: 'Composição de Receitas (R$ mil)', font: { size: 14, weight: 'bold' }, color: '#003366' }, legend: { position: 'bottom' } },
-      scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
-    }
-  });
-}
+
 
 function salvarComposicao(){
   const ano = document.getElementById('ano_atual').value;
@@ -304,5 +307,25 @@ function exibirSelecionado() {
                 })
                 .catch(e => alert("Erro ao carregar o histórico: " + e.message));
         }
+
+        function renderChart(a, b) {
+            if(chart) chart.destroy();
+            const ctx = document.getElementById('graf').getContext('2d');
+            const labels = Object.keys(a.receitas || {});
+            const dataA = labels.map(k => a.receitas[k] || 0);
+            const dataB = labels.map(k => b.receitas[k] || 0);
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: labels, datasets: [
+                    { label: 'Período Atual', data: dataA, backgroundColor: '#003366', borderRadius: 4 },
+                    { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Composição de Receitas (R$ mil)', font: { size: 14, weight: 'bold' }, color: '#003366' }, legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                }
+            });
+        }
+
 </script>
 </body></html>
