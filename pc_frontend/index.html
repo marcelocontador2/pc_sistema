@@ -142,7 +142,7 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
 </head>
 <body>
 <aside class="sidebar">
-  <div class="logo-area"><h1>COFEN</h1><p>Sistema PC - Prestacao de Contas</p></div>
+  <div class="logo-area"><img src="/pc_frontend/logo-cofen.png" alt="Logo COFEN" style="max-height: 40px; width: auto; display: block;"></div>
   <ul style="padding-left: 60px; margin-left: 0; list-style: none;">
     
     <li><a href="#" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
@@ -175,12 +175,12 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
 </aside>
 <main class="main-content">
   <header class="header">
-    <h2 id="header-title">Painel de Controle</h2>
+    <h2 id="header-title" style="color: #0072BA; font-size: 18px; font-weight: bold; margin: 0;">SIGPC - SISTEMA DE GESTÃO DE PRESTAÇÃO DE CONTAS</h2>
     <div style="display:flex;align-items:center;gap:10px"><span>Marcelo Medeiros</span><div class="user-avatar">MM</div></div>
   </header>
   
   <div id="tela-dashboard" class="content-area active">
-    <h1 class="page-title">Resultados Gerais</h1>
+    
     <div class="cards-grid" id="cards-container"></div>
   </div>
   
