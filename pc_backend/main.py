@@ -3115,158 +3115,239 @@ async def api_analise_custo_pessoal(periodo: str):
 
 
 
+
+
+
 @app.get("/api/custo_pessoal/{periodo}")
 async def api_custo_pessoal(periodo: str):
-    import csv, os, re
+    from matriz_integridade import _get_csv, _ler_linhas, _limpar_valor
+    import re, os
     
-    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    def periodos_anteriores(p):
+        partes = p.split("-")
+        ano = int(partes[0]); tipo = partes[1]; valor = int(partes[2])
+        meses_faltando = 12 - (valor * 3)
+        periodos = []
+        while meses_faltando > 0:
+            if valor == 1: ano -= 1; valor = 4
+            elif valor == 2: ano -= 1; valor = 4
+            elif valor == 3: ano -= 1; valor = 4
+            else: valor = 3
+            periodos.append(f"{ano}-{tipo}-{valor}")
+            meses_faltando -= 3
+        return periodos
     
-    def ler_periodo_interno(caminho):
-        try:
-            with open(caminho, "r", encoding="latin-1") as f:
-                leitor = csv.reader(f, delimiter=";")
-                for i, linha in enumerate(leitor):
-                    if i > 10: break
-                    texto = " ".join(linha)
-                    match = re.search(r"Período:\s*(\d{2}/\d{2}/\d{4})\s*a\s*(\d{2}/\d{2}/\d{4})", texto)
-                    if match: return match.group(0)
-        except: pass
-        return None
+    periodos = [periodo] + periodos_anteriores(periodo)
+    faltando = []
+    for p in periodos:
+        if not _get_csv("BALANCO_ORCAMENTARIO", p):
+            faltando.append(f"BALANCO_ORCAMENTARIO ({p})")
     
-    def extrair_periodo(texto):
-        if not texto: return None
-        match = re.search(r"a\s*(\d{2})/(\d{2})/(\d{4})", texto)
-        if match:
-            mes = int(match.group(2)); ano = int(match.group(3))
-            if mes <= 3: t = 1
-            elif mes <= 6: t = 2
-            elif mes <= 9: t = 3
-            else: t = 4
-            return f"{ano}-TRIMESTRE-{t}"
-        return None
-    
-    # Mapeia todos os arquivos da pasta
-    mapa_arquivos = {}
-    for arq in os.listdir(pasta):
-        if arq.startswith("BALANCO_ORCAMENTARIO_") and arq.endswith(".csv"):
-            caminho = os.path.join(pasta, arq)
-            periodo_interno = extrair_periodo(ler_periodo_interno(caminho))
-            if periodo_interno:
-                mapa_arquivos[periodo_interno] = caminho
-    
-    if periodo not in mapa_arquivos:
-        return {"erro": "faltando", "pecas": [f"BALANCO_ORCAMENTARIO ({periodo})"]}
-    
-    # Calcula períodos anteriores
-    partes = periodo.split("-")
-    ano = int(partes[0]); tipo = partes[1]; valor = int(partes[2])
-    meses_faltando = 12 - (valor * 3)
-    periodos_anteriores = []
-    while meses_faltando > 0:
-        if valor == 1: ano -= 1; valor = 4
-        elif valor == 2: ano -= 1; valor = 4
-        elif valor == 3: ano -= 1; valor = 4
-        else: valor = 3
-        periodos_anteriores.append(f"{ano}-{tipo}-{valor}")
-        meses_faltando -= 3
-    
-    faltando = [p for p in periodos_anteriores if p not in mapa_arquivos]
     if faltando:
-        return {"erro": "faltando", "pecas": [f"BALANCO_ORCAMENTARIO ({p})" for p in faltando]}
+        return {"erro": "faltando", "pecas": faltando}
     
-    def limpar(v):
-        if not v: return 0.0
-        v = str(v).replace("R$", "").strip()
-        if v in ["-", "0,00", ""]: return 0.0
-        if "," in v and "." in v: v = v.replace(".", "").replace(",", ".")
-        elif "," in v: v = v.replace(",", ".")
-        try: return float(v)
-        except: return 0.0
-    
-    def extrair_bo(caminho, n_colunas):
-        v = {
+    def extrair_bo(p):
+        caminho = _get_csv("BALANCO_ORCAMENTARIO", p)
+        if not caminho:
+            return None
+        linhas = _ler_linhas(caminho)
+        
+        valores = {
             "pessoal": 0.0, "outras": 0.0, "terc": 0.0, "sent": 0.0,
             "receitas_realizadas": 0.0, "cota_parte": 0.0
         }
         
-        with open(caminho, "r", encoding="latin-1") as f:
-            leitor = list(csv.reader(f, delimiter=";"))
+        # Para Pessoal, vamos pegar a linha com o MAIOR valor que contenha "PESSOAL E ENCARGOS SOCIAIS"
+        maior_pessoal = 0.0
+        maior_outras = 0.0
+        maior_terc = 0.0
+        maior_sent = 0.0
         
-        # Define os índices com base no número de colunas
-        if n_colunas == 8:  # 2026
-            idx_receitas = 6
-            idx_pessoal = 5
-        else:  # 2025 (7 colunas)
-            idx_receitas = 5
-            idx_pessoal = 4
-        
-        for linha in leitor:
-            if len(linha) < n_colunas: continue
+        for linha in linhas:
+            if len(linha) < 7: continue
             nome = linha[0].strip().upper()
             
-            # Receitas Correntes Realizadas (linha principal, sem "OUTRAS" ou "DEMAIS")
+            # Receitas Correntes Realizadas
             if nome == "RECEITAS CORRENTE":
-                v["receitas_realizadas"] = limpar(linha[idx_receitas])
+                if len(linha) >= 8:
+                    valores["receitas_realizadas"] = _limpar_valor(linha[6])
+                elif len(linha) >= 7:
+                    valores["receitas_realizadas"] = _limpar_valor(linha[5])
             
-            # Despesa de Cota Parte (se existir, para CORENs)
+            # Cota Parte
             if "COTA PARTE" in nome or "COTA-PARTE" in nome:
-                if n_colunas == 8:
-                    v["cota_parte"] = limpar(linha[5])
-                else:
-                    v["cota_parte"] = limpar(linha[4])
+                if len(linha) >= 8:
+                    valores["cota_parte"] = _limpar_valor(linha[5])
+                elif len(linha) >= 7:
+                    valores["cota_parte"] = _limpar_valor(linha[4])
             
-            # Despesas de Pessoal
-            if "PESSOAL E ENCARGOS SOCIAIS" in nome and "OUTRAS" not in nome:
-                v["pessoal"] += limpar(linha[idx_pessoal])
-            elif "OUTRAS DESPESAS VARIÁVEIS" in nome and "PESSOAL" in nome:
-                v["outras"] += limpar(linha[idx_pessoal])
-            elif "OUTRAS DESPESAS DE PESSOAL DECORRENTES" in nome:
-                v["terc"] += limpar(linha[idx_pessoal])
-            elif "SENTENÇAS JUDICIAIS" in nome and "TRABALHISTAS" in nome:
-                v["sent"] += limpar(linha[idx_pessoal])
+            # Pessoal e Encargos Sociais - pega o maior valor
+            if "PESSOAL E ENCARGOS SOCIAIS" in nome:
+                if len(linha) >= 8:
+                    val = _limpar_valor(linha[5])
+                elif len(linha) >= 7:
+                    val = _limpar_valor(linha[4])
+                else:
+                    val = 0.0
+                if val > maior_pessoal:
+                    maior_pessoal = val
+            
+            # Outras Despesas Variáveis - pega o maior valor
+            if "OUTRAS DESPESAS VARIÁVEIS" in nome and "PESSOAL" in nome:
+                if len(linha) >= 8:
+                    val = _limpar_valor(linha[5])
+                elif len(linha) >= 7:
+                    val = _limpar_valor(linha[4])
+                else:
+                    val = 0.0
+                if val > maior_outras:
+                    maior_outras = val
+            
+            # Terceirização - pega o maior valor
+            if "OUTRAS DESPESAS DE PESSOAL DECORRENTES" in nome:
+                if len(linha) >= 8:
+                    val = _limpar_valor(linha[5])
+                elif len(linha) >= 7:
+                    val = _limpar_valor(linha[4])
+                else:
+                    val = 0.0
+                if val > maior_terc:
+                    maior_terc = val
+            
+            # Sentenças Judiciais Trabalhistas - pega o maior valor
+            if "SENTENÇAS JUDICIAIS" in nome and "TRABALHISTAS" in nome:
+                if len(linha) >= 8:
+                    val = _limpar_valor(linha[5])
+                elif len(linha) >= 7:
+                    val = _limpar_valor(linha[4])
+                else:
+                    val = 0.0
+                if val > maior_sent:
+                    maior_sent = val
         
-        return v
+        valores["pessoal"] = maior_pessoal
+        valores["outras"] = maior_outras
+        valores["terc"] = maior_terc
+        valores["sent"] = maior_sent
+        
+        return valores
     
-    # Detecta o número de colunas do arquivo atual
-    with open(mapa_arquivos[periodo], "r", encoding="latin-1") as f:
-        leitor = list(csv.reader(f, delimiter=";"))
-        n_colunas_atual = 0
-        for linha in leitor:
-            if len(linha) > 0 and "RECEITAS CORRENTE" in linha[0].strip().upper():
-                n_colunas_atual = len(linha)
-                break
+    dados_atual = extrair_bo(periodo)
+    dados_anteriores = [extrair_bo(p) for p in periodos_anteriores(periodo)]
     
-    # Detecta o número de colunas do arquivo anterior
-    with open(mapa_arquivos[periodos_anteriores[0]], "r", encoding="latin-1") as f:
-        leitor = list(csv.reader(f, delimiter=";"))
-        n_colunas_anterior = 0
-        for linha in leitor:
-            if len(linha) > 0 and "RECEITAS CORRENTE" in linha[0].strip().upper():
-                n_colunas_anterior = len(linha)
-                break
+    custo_atual = dados_atual["pessoal"] + dados_atual["outras"] + dados_atual["terc"] - dados_atual["sent"]
+    custo_anterior = sum(d["pessoal"] + d["outras"] + d["terc"] - d["sent"] for d in dados_anteriores)
     
-    d_atual = extrair_bo(mapa_arquivos[periodo], n_colunas_atual)
-    d_ant = [extrair_bo(mapa_arquivos[p], n_colunas_anterior) for p in periodos_anteriores]
-    
-    # Calcula custo de pessoal (bruto)
-    custo_atual = d_atual["pessoal"] + d_atual["outras"] + d_atual["terc"] - d_atual["sent"]
-    custo_anterior = sum(d["pessoal"] + d["outras"] + d["terc"] - d["sent"] for d in d_ant)
-    
-    # RCL = Receitas Correntes Realizadas - Cota Parte (0 no COFEN)
-    rcl_atual = d_atual["receitas_realizadas"] - d_atual["cota_parte"]
-    rcl_anterior = sum(d["receitas_realizadas"] - d["cota_parte"] for d in d_ant)
+    rcl_atual = dados_atual["receitas_realizadas"] - dados_atual["cota_parte"]
+    rcl_anterior = sum(d["receitas_realizadas"] - d["cota_parte"] for d in dados_anteriores)
     
     return {
         "erro": False,
-        "rcl_atual": rcl_atual, "rcl_anterior": rcl_anterior, "rcl_total": rcl_atual + rcl_anterior,
-        "pessoal_atual": d_atual["pessoal"], "pessoal_anterior": sum(d["pessoal"] for d in d_ant),
-        "pessoal_total": d_atual["pessoal"] + sum(d["pessoal"] for d in d_ant),
-        "outras_atual": d_atual["outras"], "outras_anterior": sum(d["outras"] for d in d_ant),
-        "outras_total": d_atual["outras"] + sum(d["outras"] for d in d_ant),
-        "terc_atual": d_atual["terc"], "terc_anterior": sum(d["terc"] for d in d_ant),
-        "terc_total": d_atual["terc"] + sum(d["terc"] for d in d_ant),
-        "custo_atual": custo_atual, "custo_anterior": custo_anterior, "custo_total": custo_atual + custo_anterior
+        "rcl_atual": rcl_atual,
+        "rcl_anterior": rcl_anterior,
+        "rcl_total": rcl_atual + rcl_anterior,
+        "pessoal_atual": dados_atual["pessoal"],
+        "pessoal_anterior": sum(d["pessoal"] for d in dados_anteriores),
+        "pessoal_total": dados_atual["pessoal"] + sum(d["pessoal"] for d in dados_anteriores),
+        "outras_atual": dados_atual["outras"],
+        "outras_anterior": sum(d["outras"] for d in dados_anteriores),
+        "outras_total": dados_atual["outras"] + sum(d["outras"] for d in dados_anteriores),
+        "terc_atual": dados_atual["terc"],
+        "terc_anterior": sum(d["terc"] for d in dados_anteriores),
+        "terc_total": dados_atual["terc"] + sum(d["terc"] for d in dados_anteriores),
+        "custo_atual": custo_atual,
+        "custo_anterior": custo_anterior,
+        "custo_total": custo_atual + custo_anterior
     }
+
+
+@app.get("/salvar_custo_pessoal/{periodo}")
+async def salvar_custo_pessoal(periodo: str):
+    try:
+        # Chama a API para pegar os dados calculados
+        dados = await api_custo_pessoal(periodo)
+        if dados.get("erro"):
+            raise HTTPException(status_code=400, detail="Dados faltando")
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_custo_pessoal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+        
+        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("INSERT INTO historico_custo_pessoal (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", 
+                       (periodo, data_agora, json.dumps(dados)))
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Salvo com sucesso!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/historico_custo_pessoal")
+async def listar_historico_custo_pessoal():
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, periodo, data_geracao FROM historico_custo_pessoal ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.get("/historico_custo_pessoal/{id}")
+async def buscar_historico_custo_pessoal(id: int):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT periodo, resultado_json FROM historico_custo_pessoal WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+    return {"periodo": row[0], "dados": json.loads(row[1])}
+
+@app.delete("/excluir_custo_pessoal/{id}")
+async def excluir_historico_custo_pessoal(id: int):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM historico_custo_pessoal WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"mensagem": "Excluido"}
+
+
+
+@app.get("/gerar_pdf_custo_pessoal")
+async def gerar_pdf_custo_pessoal(periodo: str = "2026-TRIMESTRE-3"):
+    try:
+        from playwright.async_api import async_playwright
+        from fastapi.responses import Response
+        import tempfile, os
+        
+        # URL da tela (com o parâmetro para o robô saber que é para gerar o PDF)
+        url = f"http://127.0.0.1:8000/analise_custo_pessoal?autoprint=1&periodo={periodo}"
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+            # Abre a tela e espera o gráfico ser desenhado
+            await page.goto(url, wait_until="networkidle")
+            await page.wait_for_timeout(3000) # Espera 3s para o Chart.js e os dados carregarem
+            
+            # Gera o PDF
+            pdf_bytes = await page.pdf(
+                format="A4",
+                landscape=True,
+                print_background=True,
+                margin={"top": "1cm", "bottom": "1cm", "left": "1cm", "right": "1cm"}
+            )
+            await browser.close()
+            
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={
+            "Content-Disposition": f"inline; filename=custo_pessoal_{periodo}.pdf"
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/analise_orcamentaria")
 async def serve_analise_orcamentaria():
