@@ -2528,140 +2528,6 @@ async def excluir_historico_patrimonial(id: int):
 
 
 
-@app.get("/gerar_pdf_analise_patrimonial/{id}")
-async def gerar_pdf_analise_patrimonial(id: int):
-    try:
-        from fastapi.responses import Response
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        import matplotlib.ticker as ticker
-        import io, tempfile, os, json, sqlite3
-        
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT periodo, resultado_json, data_geracao FROM historico_analise_patrimonial WHERE id = ?", (id,))
-        row = cursor.fetchone()
-        conn.close()
-        
-        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
-        periodo, d_json, data_ger = row
-        d = json.loads(d_json)
-        
-        # --- 1. GERA O GRÁFICO (BEM BAIXO) ---
-        labels = ['Var. Ativas', 'Var. Diminutivas', 'Superavit']
-        ant = [d["variacoes_ativas"]["anterior"], d["variacoes_diminutivas"]["anterior"], d["superavit_patrimonial"]["anterior"]]
-        atu = [d["variacoes_ativas"]["atual"], d["variacoes_diminutivas"]["atual"], d["superavit_patrimonial"]["atual"]]
-        
-        fig, ax = plt.subplots(figsize=(5, 2.0), dpi=150) # Reduzido para 2.0 de altura
-        x = range(len(labels))
-        ax.bar([i - 0.2 for i in x], ant, width=0.4, label='Anterior', color='#4a90e2')
-        ax.bar([i + 0.2 for i in x], atu, width=0.4, label='Atual', color='#003366')
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels, fontsize=8)
-        ax.legend(loc='upper right', fontsize=7, frameon=False)
-        formatter = ticker.FuncFormatter(lambda x, pos: f'{x*1e-6:,.0f} Mi')
-        ax.yaxis.set_major_formatter(formatter)
-        ax.tick_params(axis='y', labelsize=7)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.grid(axis='y', linestyle='--', alpha=0.5)
-        plt.tight_layout()
-        img_path = os.path.join(tempfile.gettempdir(), f"grafico_{id}.png")
-        plt.savefig(img_path, bbox_inches='tight'); plt.close()
-        
-        # --- 2. MONTA O PDF (SUPER COMPACTADO) ---
-        pdf = FPDF(orientation='L', unit='mm', format='A4')
-        pdf.add_page()
-        
-        font_path = "C:/Windows/Fonts/arial.ttf"
-        font_bold = "C:/Windows/Fonts/arialbd.ttf"
-        if os.path.exists(font_path):
-            pdf.add_font("Arial", "", font_path)
-            pdf.add_font("Arial", "B", font_bold)
-            f_family = "Arial"
-        else:
-            f_family = "helvetica"
-        
-        # Cabeçalho super reduzido
-        pdf.set_font(f_family, "B", 13)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 6, "Demonstração das Variações Patrimoniais (DVP)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.set_font(f_family, "", 8)
-        pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 4, f"Período: {periodo}  |  Emitido em: {data_ger}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.ln(2) # Quase zero de espaço
-        
-        # Tabela compactada
-        pdf.set_fill_color(0, 51, 102)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font(f_family, "B", 8)
-        pdf.cell(90, 6, "Indicador", border=1, fill=True, align="C")
-        pdf.cell(55, 6, "Período Anterior (R$)", border=1, fill=True, align="C")
-        pdf.cell(55, 6, "Período Atual (R$)", border=1, fill=True, align="C")
-        pdf.cell(40, 6, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font(f_family, "", 8)
-        
-        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        
-        ind = [
-            ("Variações Ativas", d["variacoes_ativas"]), ("Transferências Recebidas", d["transf_recebidas"]),
-            ("Reversão de Provisões", d["reversao_provisoes"]), ("Variações Diminutivas", d["variacoes_diminutivas"]),
-            ("Pessoal e Encargos", d["pessoal_encargos"]), ("Serviços de Terceiros", d["servicos_terceiros"]),
-            ("Transferências Concedidas", d["transf_concedidas"]), ("Superávit Patrimonial", d["superavit_patrimonial"])
-        ]
-        
-        for nome, val in ind:
-            at, an = val["atual"], val["anterior"]
-            var = ((at - an) / abs(an)) * 100 if an != 0 else 0
-            is_bold = "B" if "Superávit" in nome else ""
-            pdf.set_font(f_family, is_bold, 8)
-            
-            pdf.cell(90, 5, nome, border=1, align="L") # Altura 5
-            pdf.cell(55, 5, fmt(an), border=1, align="R")
-            pdf.cell(55, 5, fmt(at), border=1, align="R")
-            
-            if var >= 0: pdf.set_text_color(0, 128, 0)
-            else: pdf.set_text_color(220, 53, 69)
-            
-            pdf.cell(40, 5, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font(f_family, "", 8)
-            
-        # Gráfico e Card Azul
-        pdf.ln(4)
-        y_atual = pdf.get_y()
-        
-        pdf.image(img_path, x=25, y=y_atual, w=90) # Gráfico menor
-        
-        # Card Azul
-        pdf.set_xy(140, y_atual)
-        pdf.set_fill_color(0, 51, 102)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font(f_family, "B", 8)
-        
-        m_ant = d["margem_patrimonial"]["anterior"]
-        m_at = d["margem_patrimonial"]["atual"]
-        
-        pdf.cell(80, 6, "Margem Patrimonial", border=0, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_x(140)
-        pdf.set_font(f_family, "B", 11)
-        pdf.cell(80, 8, f"{m_ant:.2f}%  para  {m_at:.2f}%".replace(".", ","), border=0, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_x(140)
-        pdf.set_font(f_family, "", 7)
-        pdf.cell(80, 6, "(Superávit / Variações Ativas)", border=0, fill=True, align="C")
-        
-        pdf_bytes = bytes(pdf.output())
-        return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=analise_patrimonial_{id}.pdf"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/historico_composicao_rd/{id}")
 async def buscar_historico_composicao_rd(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -2820,6 +2686,146 @@ async def gerar_pdf_analise_orcamentaria(id: int):
         pdf_bytes = bytes(pdf.output())
         return Response(content=pdf_bytes, media_type="application/pdf", headers={
             "Content-Disposition": f"inline; filename=analise_orcamentaria_{id}.pdf"
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/gerar_pdf_analise_patrimonial/{id}")
+async def gerar_pdf_analise_patrimonial(id: int):
+    try:
+        from fastapi.responses import Response
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as ticker
+        import io, tempfile, os, json, sqlite3
+        
+        # 1. Busca o periodo no banco
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT periodo, resultado_json FROM historico_analise_patrimonial WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        periodo, d_json = row
+        d = json.loads(d_json)
+        
+        # 2. Extrai os dados da estrutura retornada (que tem 'atual' e 'anterior' dentro de cada chave)
+        # A estrutura é: { "variacoes_ativas": { "atual": X, "anterior": Y }, ... }
+        def get_val(chave, tipo):
+            obj = d.get(chave, {})
+            return obj.get(tipo, 0) if isinstance(obj, dict) else 0
+        
+        # 3. Gera o grafico (Atual primeiro)
+        labels = ["Variações Ativas", "Variações Diminutivas", "Superávit Patrimonial"]
+        ant = [get_val("variacoes_ativas", "anterior"), get_val("variacoes_diminutivas", "anterior"), get_val("superavit_patrimonial", "anterior")]
+        atu = [get_val("variacoes_ativas", "atual"), get_val("variacoes_diminutivas", "atual"), get_val("superavit_patrimonial", "atual")]
+        
+        fig, ax = plt.subplots(figsize=(5, 2.0), dpi=150)
+        x = range(len(labels))
+        ax.bar([i - 0.2 for i in x], atu, width=0.4, label="Atual", color="#003366")
+        ax.bar([i + 0.2 for i in x], ant, width=0.4, label="Anterior", color="#4a90e2")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, fontsize=9)
+        ax.legend(loc="upper right", fontsize=8, frameon=False)
+        formatter = ticker.FuncFormatter(lambda x, pos: f"{x*1e-6:,.0f} Mi")
+        ax.yaxis.set_major_formatter(formatter)
+        ax.tick_params(axis="y", labelsize=8)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", linestyle="--", alpha=0.5)
+        plt.tight_layout()
+        
+        img_path = os.path.join(tempfile.gettempdir(), f"grafico_pat_{id}.png")
+        plt.savefig(img_path, bbox_inches="tight"); plt.close()
+        
+        # 4. Monta o PDF
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.add_page()
+        
+        font_path = "C:/Windows/Fonts/arial.ttf"
+        font_bold = "C:/Windows/Fonts/arialbd.ttf"
+        if os.path.exists(font_path):
+            pdf.add_font("Arial", "", font_path)
+            pdf.add_font("Arial", "B", font_bold)
+            f_family = "Arial"
+        else:
+            f_family = "helvetica"
+        
+        pdf.set_font(f_family, "B", 16)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, "Demonstração das Variações Patrimoniais (DVP)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.set_font(f_family, "", 10)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 5, f"Período de Referência: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.ln(8)
+        
+        # Tabela: Indicador | Periodo Atual | Periodo Anterior | Var (%)
+        pdf.set_fill_color(0, 51, 102)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(f_family, "B", 10)
+        
+        pdf.cell(80, 8, "Indicador", border=1, fill=True, align="C")
+        pdf.cell(45, 8, "Periodo Atual", border=1, fill=True, align="C")
+        pdf.cell(45, 8, "Periodo Anterior", border=1, fill=True, align="C")
+        pdf.cell(30, 8, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font(f_family, "", 9)
+        
+        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        
+        ind = [
+            ("Variações Ativas", "variacoes_ativas"),
+            ("Transferências Recebidas", "transf_recebidas"),
+            ("Reversão de Provisões", "reversao_provisoes"),
+            ("Variações Diminutivas", "variacoes_diminutivas"),
+            ("Pessoal e Encargos", "pessoal_encargos"),
+            ("Serviços de Terceiros", "servicos_terceiros"),
+            ("Transferências Concedidas", "transf_concedidas"),
+            ("Superávit Patrimonial", "superavit_patrimonial"),
+        ]
+        
+        for nome, chave in ind:
+            va = get_val(chave, "atual")
+            vb = get_val(chave, "anterior")
+            var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
+            
+            is_bold = "B" if "Superávit" in nome else ""
+            pdf.set_font(f_family, is_bold, 9)
+            
+            pdf.cell(80, 7, nome, border=1, align="L")
+            pdf.cell(45, 7, fmt(va), border=1, align="R")
+            pdf.cell(45, 7, fmt(vb), border=1, align="R")
+            
+            if var >= 0: pdf.set_text_color(0, 128, 0)
+            else: pdf.set_text_color(220, 53, 69)
+            pdf.cell(30, 7, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font(f_family, "", 9)
+        
+        # Grafico e Card da Margem
+        pdf.ln(8)
+        y_atual = pdf.get_y()
+        pdf.image(img_path, x=30, y=y_atual, w=100)
+        
+        # Card da Margem
+        pdf.set_xy(140, y_atual)
+        pdf.set_fill_color(0, 51, 102)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(f_family, "B", 10)
+        margem_at = d.get("margem_patrimonial", {}).get("atual", 0)
+        margem_ant = d.get("margem_patrimonial", {}).get("anterior", 0)
+        pdf.multi_cell(60, 8, f"Margem Patrimonial:\n{margem_ant:.2f}% -> {margem_at:.2f}%\n\n(Superávit / Variações Ativas)", border=0, fill=True, align="C")
+        
+        pdf_bytes = bytes(pdf.output())
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={
+            "Content-Disposition": f"inline; filename=analise_patrimonial_{id}.pdf"
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

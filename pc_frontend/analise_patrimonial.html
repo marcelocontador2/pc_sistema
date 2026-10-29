@@ -68,7 +68,7 @@
                         <thead>
                             <tr>
                                 <th style="text-align:left;">Indicador</th>
-                                <th>Período Anterior (R$)</th>
+                                <th>Período Atual (R$)</th>
                                 <th>Período Anterior (R$)</th>
                                 <th>Var. (%)</th>
                             </tr>
@@ -113,7 +113,7 @@
                 
                 out += '<tr>';
                 out += '<td style="' + isBold + '">' + item.n + '</td>';
-                out += '<td style="text-align:right;">' + fmt(item.ant) + '</td>';
+                out += '<td style="text-align:right;">' + fmt(item.at) + '</td>';
                 out += '<td style="text-align:right;">' + fmt(item.ant) + '</td>';
                 out += '<td class="' + cls + '" style="text-align:right;">' + sg + fmtPct(v) + '</td>';
                 out += '</tr>';
@@ -134,11 +134,25 @@
                 data: {
                     labels: ['Variações Ativas', 'Variações Diminutivas', 'Superávit Patrimonial'],
                     datasets: [
-                        { label: 'Período Anterior', data: [d.variacoes_ativas.anterior, d.variacoes_diminutivas.anterior, d.superavit_patrimonial.anterior], backgroundColor: '#4a90e2', borderRadius: 4 },
-                        { label: 'Período Anterior', data: [d.variacoes_ativas.anterior, d.variacoes_diminutivas.anterior, d.superavit_patrimonial.anterior], backgroundColor: '#4a90e2', borderRadius: 4 }
+                        {
+                            label: 'Período Atual',
+                            data: [d.variacoes_ativas.atual, d.variacoes_diminutivas.atual, d.superavit_patrimonial.atual],
+                            backgroundColor: '#003366',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Período Anterior',
+                            data: [d.variacoes_ativas.anterior, d.variacoes_diminutivas.anterior, d.superavit_patrimonial.anterior],
+                            backgroundColor: '#4a90e2',
+                            borderRadius: 4
+                        }
                     ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
             });
         }
 
