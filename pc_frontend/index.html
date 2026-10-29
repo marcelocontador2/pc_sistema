@@ -203,7 +203,12 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
   </div>
   
   <div id="tela-upload" class="content-area">
-    <h1 class="page-title">Importar Relatórios</h1>
+    
+    <div style="margin-bottom: 20px;">
+        <button class="btn-voltar-laranja" onclick="window.location.href='/'">← Voltar</button>
+    </div>
+    
+<h1 class="page-title">Importar Relatórios</h1>
     
     <div style="background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 800px; margin-top: 20px;">
       <form id="form-upload" onsubmit="enviarArquivo(event)">
@@ -655,22 +660,7 @@ document.getElementById('filtro-periodo').addEventListener('change', () => { car
 
 
 
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    // Pega todos os links do menu lateral
-    const links = document.querySelectorAll('.nav-menu a, .submenu a');
-    
-    links.forEach(link => {
-        link.addEventListener('click', function() {
-            // Sempre que um link do menu for clicado, esconde o overlay
-            const overlay = document.getElementById('overlay-integridade');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
-        });
-    });
-});
-</script>
+
 
 
 <style>
@@ -766,6 +756,70 @@ document.addEventListener("DOMContentLoaded", function() {
             };
         }
     }
+});
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Encontra a lista principal do menu
+    const menuPrincipal = Array.from(document.querySelectorAll('ul')).find(ul => ul.textContent.includes('Importar Relatórios'));
+    if (!menuPrincipal) return;
+
+    // 2. Cria o novo item "Análises Contábeis" e seu submenu
+    const novoLi = document.createElement('li');
+    
+    const linkPai = document.createElement('a');
+    linkPai.href = '#';
+    linkPai.textContent = 'Análises Contábeis';
+    linkPai.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold; cursor:pointer;';
+    
+    const submenu = document.createElement('ul');
+    submenu.className = 'submenu';
+    submenu.id = 'submenu-analises';
+    submenu.style.cssText = 'list-style: none; padding-left: 0; margin-left: 0; display: none;';
+    
+    linkPai.addEventListener('click', function(e) {
+        e.preventDefault();
+        submenu.classList.toggle('open');
+        submenu.style.display = (submenu.style.display === 'none' || submenu.style.display === '') ? 'block' : 'none';
+    });
+
+    novoLi.appendChild(linkPai);
+    novoLi.appendChild(submenu);
+
+    // 3. Insere o novo item após "Demonstrações Contábeis"
+    const liDemonstracoes = Array.from(menuPrincipal.querySelectorAll('li')).find(li => li.textContent.includes('Demonstrações Contábeis'));
+    if (liDemonstracoes) {
+        liDemonstracoes.parentElement.insertBefore(novoLi, liDemonstracoes.nextSibling);
+    } else {
+        menuPrincipal.appendChild(novoLi);
+    }
+
+    // 4. Move os links de análise para dentro do novo submenu
+    const linksParaMover = [
+        'Conferência das Demonstrações',
+        'Integridade entre Demonstrações',
+        'Análise Orçamentária',
+        'Análise Financeira-BF',
+        'Análise Patrimonial',
+        'Composição Receitas/Despesas',
+        'Índices de Liquidez',
+        'Resultados Gerais'
+    ];
+
+    const todosLinks = Array.from(menuPrincipal.querySelectorAll('a'));
+    todosLinks.forEach(link => {
+        const texto = link.textContent.trim();
+        if (linksParaMover.includes(texto)) {
+            const novoSubLi = document.createElement('li');
+            const novoLink = link.cloneNode(true);
+            novoLink.style.cssText = 'display:block; padding:8px 20px 8px 40px; text-decoration:none; color:#666; font-weight:400; font-size:13px;';
+            novoSubLi.appendChild(novoLink);
+            submenu.appendChild(novoSubLi);
+            link.parentElement.remove();
+        }
+    });
 });
 </script>
 
