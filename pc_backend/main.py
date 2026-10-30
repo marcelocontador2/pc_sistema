@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 from historico_integridade import router as historico_router
 from fastapi import FastAPI
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
@@ -3366,7 +3366,7 @@ async def gerar_pdf_custo_pessoal(periodo: str = "2026-TRIMESTRE-3"):
             browser = await p.chromium.launch()
             page = await browser.new_page()
             await page.emulate_media(media="print")
-            await page.goto(url, wait_until="networkidle", wait_until="networkidle")
+            await page.goto(url, wait_until="networkidle")
             
             # Espera o conteúdo principal carregar (ex: o título "Fundamentação Legal")
             try:
@@ -3397,7 +3397,7 @@ async def gerar_pdf_custo_pessoal(periodo: str = "2026-TRIMESTRE-3"):
         await page.emulate_media(media="print")
         await page.wait_for_timeout(2000)
         await page.pdf(path=pdf_path, format="A4", print_background=True, margin={"top": "20px", "bottom": "20px", "left": "20px", "right": "20px"})
-            await browser.close()
+        await browser.close()
             
         return Response(content=pdf_bytes, media_type="application/pdf", headers={
             "Content-Disposition": f"attachment; filename=custo_pessoal_{periodo}.pdf"
