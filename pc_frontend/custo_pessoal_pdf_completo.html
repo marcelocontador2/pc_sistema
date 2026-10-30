@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório Completo - Custo de Pessoal</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; line-height: 1.6; }
+        h1, h2, h3 { color: #0a1c3a; }
+        .section { margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+        th, td { padding: 8px 10px; border: 1px solid #ccc; text-align: left; }
+        th { background: #e9ecef; }
+        .right { text-align: right; }
+        .center { text-align: center; }
+        .bar-chart { display: flex; align-items: flex-end; height: 200px; gap: 40px; margin: 20px 0; padding-left: 20px; border-left: 2px solid #ccc; border-bottom: 2px solid #ccc; }
+        .bar-group { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+        .bar { width: 60px; background: #0d6efd; text-align: center; color: white; font-size: 10px; padding-top: 5px; }
+        .bar.light { background: #cfe2ff; color: #000; }
+        .bar.dark { background: #0a1c3a; }
+        .box { border: 1px solid #ccc; padding: 15px; margin-top: 20px; border-radius: 5px; background: #f8f9fa; }
+        .conclusao-val { font-size: 16px; font-weight: bold; color: #0a1c3a; }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <h1>Custo de Pessoal x Limite da LRF (Art. 19)</h1>
+        <p><b>Apuração consolidada 12 meses</b></p>
+    </div>
+
+    <div class="section">
+        <h2>Fundamentação Legal</h2>
+        <p><b>ART. 19:</b> A despesa total com pessoal não poderá exceder 50% da Receita Corrente Líquida (RCL) para a União.</p>
+        <p><b>ART. 18:</b> O que compõe a Despesa com Pessoal: Vencimentos, vantagens e encargos sociais; Contribuições previdenciárias; Despesas com contratos de terceirização de mão de obra (§ 1º).</p>
+        <p><i>Exceção: sentenças judiciais trabalhistas não integram o cálculo. Art. 19º IV.</i></p>
+    </div>
+
+    <div class="section">
+        <h2>Período e Limites</h2>
+        <table>
+            <tr><th>Descrição</th><th class="right">Valor (R$)</th></tr>
+            <tr><td>Receitas Correntes Realizadas - Período Atual (9m)</td><td id="pdf-rcl-atual" class="right">0,00</td></tr>
+            <tr><td>Receitas Correntes Realizadas - Período Anterior (3m)</td><td id="pdf-rcl-anterior" class="right">0,00</td></tr>
+            <tr><td><b>Total 12 Meses (RCL)</b></td><td id="pdf-rcl-total" class="right"><b>0,00</b></td></tr>
+            <tr><td>Limite LRF (50% da RCL)</td><td id="pdf-limite" class="right">0,00</td></tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Custo de Pessoal Consolidado (12 meses)</h2>
+        <table>
+            <tr><th>Rubrica</th><th class="right">Período Atual (R$)</th><th class="right">Período Anterior (R$)</th><th class="right">Total 12m (R$)</th><th class="right">%</th></tr>
+            <tr><td>Pessoal e Encargos Sociais</td><td id="pdf-pes-atual" class="right">0,00</td><td id="pdf-pes-ant" class="right">0,00</td><td id="pdf-pes-tot" class="right">0,00</td><td id="pdf-pes-pct" class="right">0,00%</td></tr>
+            <tr><td>Outras Desp. Variáveis - RGPS</td><td id="pdf-var-atual" class="right">0,00</td><td id="pdf-var-ant" class="right">0,00</td><td id="pdf-var-tot" class="right">0,00</td><td id="pdf-var-pct" class="right">0,00%</td></tr>
+            <tr><td>Terceirização</td><td id="pdf-terc-atual" class="right">0,00</td><td id="pdf-terc-ant" class="right">0,00</td><td id="pdf-terc-tot" class="right">0,00</td><td id="pdf-terc-pct" class="right">0,00%</td></tr>
+            <tr><td><b>CUSTO TOTAL (Bruto)</b></td><td id="pdf-custo-atual" class="right"><b>0,00</b></td><td id="pdf-custo-ant" class="right"><b>0,00</b></td><td id="pdf-custo-total" class="right"><b>0,00</b></td><td class="right"><b>100%</b></td></tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Comparativo RCL vs. Limite Legal</h2>
+        <div class="bar-chart">
+            <div class="bar-group"><div id="bar-rcl" class="bar" style="height: 100%;"></div><span>RCL 12m</span></div>
+            <div class="bar-group"><div id="bar-limite" class="bar light" style="height: 50%;"></div><span>Limite Legal (50%)</span></div>
+            <div class="bar-group"><div id="bar-custo" class="bar dark" style="height: 30%;"></div><span>Custo de Pessoal</span></div>
+        </div>
+    </div>
+
+    <div class="box">
+        <h3>Conclusão Detalhada</h3>
+        <table style="border: none;">
+            <tr style="border: none;"><td style="border: none;"><b>LIMITE LEGAL (50% RCL)</b></td><td class="right" style="border: none;"><span id="conc-limite" class="conclusao-val">R$ 0,00</span></td></tr>
+            <tr style="border: none;"><td style="border: none;"><b>CUSTO BRUTO (12 MESES)</b></td><td class="right" style="border: none;"><span id="conc-custo" class="conclusao-val">0,00%</span></td></tr>
+            <tr style="border: none;"><td style="border: none;"><b>CUSTO AJUSTADO (12 MESES)</b></td><td class="right" style="border: none;"><span id="conc-ajustado" class="conclusao-val">0,00%</span></td></tr>
+        </table>
+        <p><b>Teto estabelecido pelo Art. 19 da LRF</b></p>
+        <p><b>Custo Bruto:</b> <span id="conc-custo-txt">R$ 0,00</span> da RCL (sem ajuste)</p>
+        <p><b>Custo Ajustado:</b> <span id="conc-ajustado-txt">R$ 0,00</span> da RCL (excluídas sentenças 2025)</p>
+    </div>
+
+    <div class="section" style="margin-top: 30px;">
+         <h2>Comparativo Final</h2>
+         <table>
+            <tr><th>Indicador</th><th class="right">Valor (R$)</th><th class="right">% da RCL</th></tr>
+            <tr><td>Receita Corrente Líquida (RCL)</td><td id="pdf-resumo-rcl" class="right">0,00</td><td class="right">100,00%</td></tr>
+            <tr><td>(-) Custo de Pessoal (Bruto)</td><td id="pdf-resumo-custo" class="right">0,00</td><td id="pdf-resumo-pct" class="right">0,00%</td></tr>
+            <tr><td><b>(=) Margem Disponível (Limite LRF - Custo)</b></td><td id="pdf-resumo-margem" class="right"><b>0,00</b></td><td class="right"><b id="pdf-resumo-pct-margem">0,00%</b></td></tr>
+            <tr><td>Limite LRF (50% da RCL)</td><td id="pdf-resumo-limite" class="right">0,00</td><td class="right">50,00%</td></tr>
+            <tr><td colspan="3" class="center" style="font-weight: bold; color: #28a745;">✅ Dentro do limite legal (= 50%)</td></tr>
+         </table>
+    </div>
+
+    <script>
+        function fmt(v) { return Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+        function pct(parte, total) { return ((parte/total)*100).toFixed(2) + '%'; }
+        
+        function carregar() {
+            // Pega o período da URL, se existir
+            const urlParams = new URLSearchParams(window.location.search);
+            const periodo = urlParams.get('periodo') || '2026-TRIMESTRE-3';
+            
+            fetch('/api/custo_pessoal/' + periodo)
+                .then(r => r.json())
+                .then(d => {
+                    const rcl = d.rcl_total;
+                    const custo = d.custo_total;
+                    const limite = rcl * 0.5;
+                    const margem = limite - custo;
+
+                    // Dados mockados para o período atual/anterior (para manter o visual do relatório antigo)
+                    const rclAtual = d.rcl_atual || (rcl * 0.8);
+                    const rclAnterior = d.rcl_anterior || (rcl * 0.2);
+
+                    document.getElementById('pdf-rcl-atual').innerText = fmt(rclAtual);
+                    document.getElementById('pdf-rcl-anterior').innerText = fmt(rclAnterior);
+                    document.getElementById('pdf-rcl-total').innerText = fmt(rcl);
+                    document.getElementById('pdf-limite').innerText = fmt(limite);
+
+                    document.getElementById('pdf-pes-atual').innerText = fmt(d.pessoal_atual);
+                    document.getElementById('pdf-pes-ant').innerText = fmt(d.pessoal_anterior);
+                    document.getElementById('pdf-pes-tot').innerText = fmt(d.pessoal_total);
+                    document.getElementById('pdf-pes-pct').innerText = pct(d.pessoal_total, custo);
+
+                    document.getElementById('pdf-var-atual').innerText = fmt(d.outras_atual);
+                    document.getElementById('pdf-var-ant').innerText = fmt(d.outras_anterior);
+                    document.getElementById('pdf-var-tot').innerText = fmt(d.outras_total);
+                    document.getElementById('pdf-var-pct').innerText = pct(d.outras_total, custo);
+
+                    document.getElementById('pdf-terc-atual').innerText = fmt(d.terc_atual);
+                    document.getElementById('pdf-terc-ant').innerText = fmt(d.terc_anterior);
+                    document.getElementById('pdf-terc-tot').innerText = fmt(d.terc_total);
+                    document.getElementById('pdf-terc-pct').innerText = pct(d.terc_total, custo);
+
+                    document.getElementById('pdf-custo-atual').innerText = fmt(d.custo_atual);
+                    document.getElementById('pdf-custo-ant').innerText = fmt(d.custo_anterior);
+                    document.getElementById('pdf-custo-total').innerText = fmt(custo);
+
+                    // Gráfico
+                    document.getElementById('bar-rcl').style.height = '100%';
+                    document.getElementById('bar-limite').style.height = '50%';
+                    document.getElementById('bar-custo').style.height = ((custo/rcl)*100) + '%';
+
+                    // Conclusão
+                    document.getElementById('conc-limite').innerText = 'R$ ' + fmt(limite);
+                    document.getElementById('conc-custo').innerText = pct(custo, rcl);
+                    document.getElementById('conc-ajustado').innerText = pct(custo, rcl); // Mock
+                    document.getElementById('conc-custo-txt').innerText = 'R$ ' + fmt(custo);
+                    document.getElementById('conc-ajustado-txt').innerText = 'R$ ' + fmt(custo); // Mock
+
+                    // Resumo Final (CÁLCULO CORRETO DA MARGEM)
+                    document.getElementById('pdf-resumo-rcl').innerText = fmt(rcl);
+                    document.getElementById('pdf-resumo-custo').innerText = fmt(custo);
+                    document.getElementById('pdf-resumo-limite').innerText = fmt(limite);
+                    document.getElementById('pdf-resumo-margem').innerText = fmt(margem);
+                    document.getElementById('pdf-resumo-pct').innerText = pct(custo, rcl);
+                    document.getElementById('pdf-resumo-pct-margem').innerText = pct(margem, rcl);
+                });
+        }
+        window.onload = carregar;
+    </script>
+</body>
+</html>

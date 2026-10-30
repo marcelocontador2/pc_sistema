@@ -25,6 +25,15 @@ from openpyxl.utils import get_column_letter
 
 app = FastAPI(title="PC - Prestacao de Contas API")
 
+@app.get("/custo_pessoal_pdf_completo", response_class=HTMLResponse)
+def serve_custo_pessoal_pdf_completo():
+    import os
+    from fastapi.responses import HTMLResponse
+    html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "custo_pessoal_pdf_completo.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        conteudo = f.read()
+    return HTMLResponse(content=conteudo)
+
 @app.get("/analise_custo_pessoal", response_class=HTMLResponse)
 def serve_analise_custo_pessoal():
     import os
@@ -3592,6 +3601,58 @@ if sys.platform == "win32":
     import asyncio
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
+
+@app.get("/custo_pessoal_pdf_completo", response_class=HTMLResponse)
+def serve_custo_pessoal_pdf_completo():
+    import os
+    from fastapi.responses import HTMLResponse
+    html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "custo_pessoal_pdf_completo.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            conteudo = f.read()
+        return HTMLResponse(content=conteudo)
+    return HTMLResponse(content="<h1>Template não encontrado.</h1>")
+
+
+@app.get("/gerar_pdf_completo_custo_pessoal")
+def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3"):
+    import os, sqlite3, asyncio
+    from fastapi.responses import JSONResponse, FileResponse
+    
+    try:
+        if id is not None:
+            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_storage", "banco_dados.db")
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            cur.execute("SELECT periodo FROM historico_custo_pessoal WHERE id = ?", (id,))
+            linha = cur.fetchone()
+            conn.close()
+            if linha: periodo = linha[0]
+
+        from playwright.async_api import async_playwright
+
+        async def gerar():
+            os.makedirs("pc_storage/pdfs", exist_ok=True)
+            pdf_path = f"pc_storage/pdfs/custo_pessoal_completo_{periodo}.pdf"
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                page = await browser.new_page()
+                await page.goto(f"http://127.0.0.1:8000/custo_pessoal_pdf_completo?periodo={periodo}")
+                await page.wait_for_timeout(2000)
+                await page.pdf(path=pdf_path, format="A4", print_background=True)
+                await browser.close()
+            return pdf_path
+
+        # Usa um loop de eventos novo para não conflitar com o Uvicorn
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        pdf_path = loop.run_until_complete(gerar())
+        loop.close()
+
+        return FileResponse(pdf_path, media_type="application/pdf", filename=f"relatorio_completo_{periodo}.pdf")
+    except Exception as e:
+        return JSONResponse({"erro": True, "mensagem": str(e)}, status_code=500)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
@@ -3600,4 +3661,5 @@ if __name__ == "__main__":
 # ==========================================
 # ROTAS DO CUSTO DE PESSOAL (ADICIONADAS NO FINAL)
 # ==========================================
+
 
