@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; }
+        h1, h3 { color: #0a1c3a; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border-bottom: 1px solid #ccc; text-align: left; }
+        th { background: #e9ecef; }
+        .right { text-align: right; }
+        .center { text-align: center; }
+        .destaque { background: #f8f9fa; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Custo de Pessoal x Limite da LRF</h1>
+    <h3>Apuração consolidada 12 meses</h3>
+    <table>
+        <tr><th>Indicador</th><th class="right">Valor (R$)</th><th class="center">% da RCL</th></tr>
+        <tr><td>Receita Corrente Líquida (RCL)</td><td id="pdf-rcl" class="right">0,00</td><td class="center">100,00%</td></tr>
+        <tr><td>(-) Custo de Pessoal (Bruto)</td><td id="pdf-custo" class="right">0,00</td><td id="pdf-pct-custo" class="center">0,00%</td></tr>
+        <tr class="destaque"><td>(=) Margem Disponível (Limite LRF - Custo)</td><td id="pdf-margem" class="right">0,00</td><td id="pdf-pct-margem" class="center">0,00%</td></tr>
+        <tr><td>Limite LRF (50% da RCL)</td><td id="pdf-limite" class="right">0,00</td><td class="center">50,00%</td></tr>
+    </table>
+    <script>
+        function fmt(v) { return Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+        function carregar() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const periodo = urlParams.get('periodo') || '2026-TRIMESTRE-3';
+            fetch('/api/custo_pessoal/' + periodo)
+                .then(r => r.json())
+                .then(d => {
+                    const rcl = d.rcl_total;
+                    const custo = d.custo_total;
+                    const limite = rcl * 0.5;
+                    const margem = limite - custo;
+                    document.getElementById('pdf-rcl').innerText = fmt(rcl);
+                    document.getElementById('pdf-custo').innerText = fmt(custo);
+                    document.getElementById('pdf-limite').innerText = fmt(limite);
+                    document.getElementById('pdf-margem').innerText = fmt(margem);
+                    document.getElementById('pdf-pct-custo').innerText = ((custo/rcl)*100).toFixed(2) + '%';
+                    document.getElementById('pdf-pct-margem').innerText = ((margem/rcl)*100).toFixed(2) + '%';
+                });
+        }
+        window.onload = carregar;
+    </script>
+</body>
+</html>

@@ -1542,7 +1542,7 @@ async def gerar_pdf_panorama(id: int):
 
         # 2. Consome a API do Painel para pegar os valores EXATOS do momento
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"http://127.0.0.1:8000/api/panorama/{periodo}")
+            response = await client.get(f"http://127.0.0.1:8001/api/panorama/{periodo}")
             if response.status_code != 200:
                 raise Exception(f"Erro ao buscar dados do painel: {response.status_code}")
             dados = response.json()
@@ -3506,7 +3506,7 @@ def salvar_custo_pessoal_rota(periodo: str):
     import sqlite3, json, os, datetime, urllib.request
     try:
         # Busca os dados via API
-        url_api = f"http://127.0.0.1:8000/api/custo_pessoal/{periodo}"
+        url_api = f"http://127.0.0.1:8001/api/custo_pessoal/{periodo}"
         response = urllib.request.urlopen(url_api, timeout=15)
         dados = json.loads(response.read().decode('utf-8'))
         if dados.get("erro"):
@@ -3533,55 +3533,6 @@ def salvar_custo_pessoal_rota(periodo: str):
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 
-@app.get("/gerar_pdf_custo_pessoal")
-def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3"):
-    import os, sqlite3, json
-    from fastapi.responses import JSONResponse
-    
-    try:
-        # Se veio um ID, pega o período exato do histórico
-        if id is not None:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_storage", "banco_dados.db")
-            conn = sqlite3.connect(db_path)
-            cur = conn.cursor()
-            cur.execute("SELECT periodo FROM historico_custo_pessoal WHERE id = ?", (id,))
-            linha = cur.fetchone()
-            conn.close()
-            if linha:
-                periodo = linha[0]
-            else:
-                return JSONResponse({"erro": True, "mensagem": "Registro não encontrado no histórico."}, status_code=404)
-        
-        # Aqui entra a lógica de gerar o PDF (Playwright)
-        # Para evitar erro 500 se o Playwright não estiver configurado, retornamos um JSON de aviso.
-        # Se você já tem o Playwright funcionando, o código abaixo deve gerar o PDF.
-        from playwright.async_api import async_playwright
-        import asyncio
-        
-        async def gerar():
-            os.makedirs("pc_storage/pdfs", exist_ok=True)
-            pdf_path = f"pc_storage/pdfs/custo_pessoal_{periodo}.pdf"
-            async with async_playwright() as p:
-                browser = await p.chromium.launch()
-                page = await browser.new_page()
-                # Abre a página com o período específico
-                await page.goto(f"http://127.0.0.1:8000/analise_custo_pessoal?autoprint=1&periodo={periodo}")
-                await page.pdf(path=pdf_path, format="A4", print_background=True)
-                await browser.close()
-            return pdf_path
-        
-        # Executa a geração
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        pdf_path = loop.run_until_complete(gerar())
-        loop.close()
-        
-        from fastapi.responses import FileResponse
-        return FileResponse(pdf_path, media_type="application/pdf", filename=f"custo_{periodo}.pdf")
-        
-    except Exception as e:
-        # Se der erro, retorna JSON em vez de quebrar a tela
-        return JSONResponse({"erro": True, "mensagem": str(e)}, status_code=500)
 
 @app.on_event("shutdown")
 async def shutdown_playwright():
@@ -3614,11 +3565,55 @@ def serve_custo_pessoal_pdf_completo():
     return HTMLResponse(content="<h1>Template não encontrado.</h1>")
 
 
+
+
 @app.get("/gerar_pdf_completo_custo_pessoal")
 def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3"):
     import os, sqlite3, asyncio
     from fastapi.responses import JSONResponse, FileResponse
-    
+    from playwright.async_api import async_playwright
+
+    try:
+        # Se veio um ID, pega o período exato do histórico
+        if id is not None:
+            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_storage", "banco_dados.db")
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            cur.execute("SELECT periodo FROM historico_custo_pessoal WHERE id = ?", (id,))
+            linha = cur.fetchone()
+            conn.close()
+            if linha: periodo = linha[0]
+
+        async def gerar():
+            os.makedirs("pc_storage/pdfs", exist_ok=True)
+            pdf_path = f"pc_storage/pdfs/custo_pessoal_completo_{periodo}.pdf"
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                page = await browser.new_page()
+                # IMPORTANTE: A URL agora aponta para a porta 9999
+                await page.goto(f"http://127.0.0.1:9999/custo_pessoal_pdf_completo?periodo={periodo}")
+                await page.wait_for_timeout(2000)
+                await page.pdf(path=pdf_path, format="A4", print_background=True)
+                await browser.close()
+            return pdf_path
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        pdf_path = loop.run_until_complete(gerar())
+        loop.close()
+        return FileResponse(pdf_path, media_type="application/pdf", filename=f"relatorio_completo_{periodo}.pdf")
+    except Exception as e:
+        return JSONResponse({"erro": True, "mensagem": str(e)}, status_code=500)
+
+
+
+
+@app.get("/gerar_pdf_custo_pessoal")
+def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3"):
+    import os, sqlite3, asyncio
+    from fastapi.responses import JSONResponse, FileResponse
+    from playwright.async_api import async_playwright
+
     try:
         if id is not None:
             db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_storage", "banco_dados.db")
@@ -3629,37 +3624,39 @@ def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMES
             conn.close()
             if linha: periodo = linha[0]
 
-        from playwright.async_api import async_playwright
-
         async def gerar():
             os.makedirs("pc_storage/pdfs", exist_ok=True)
-            pdf_path = f"pc_storage/pdfs/custo_pessoal_completo_{periodo}.pdf"
+            pdf_path = f"pc_storage/pdfs/custo_pessoal_resumo_{periodo}.pdf"
             async with async_playwright() as p:
                 browser = await p.chromium.launch()
                 page = await browser.new_page()
-                await page.goto(f"http://127.0.0.1:8000/custo_pessoal_pdf_completo?periodo={periodo}")
-                await page.wait_for_timeout(2000)
+                await page.goto(f"http://127.0.0.1:9999/custo_pessoal_pdf_resumo?periodo={periodo}")
+                
+                # Espera até 5 segundos para o elemento ser preenchido com algo diferente de "0,00"
+                try:
+                    await page.wait_for_function("document.getElementById('pdf-rcl').innerText !== '0,00'", timeout=5000)
+                except Exception:
+                    pass # Se não carregar, tira o print de qualquer forma
+                
+                await page.wait_for_timeout(500)
                 await page.pdf(path=pdf_path, format="A4", print_background=True)
                 await browser.close()
             return pdf_path
 
-        # Usa um loop de eventos novo para não conflitar com o Uvicorn
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         pdf_path = loop.run_until_complete(gerar())
         loop.close()
-
-        return FileResponse(pdf_path, media_type="application/pdf", filename=f"relatorio_completo_{periodo}.pdf")
+        return FileResponse(pdf_path, media_type="application/pdf", filename=f"custo_resumo_{periodo}.pdf")
     except Exception as e:
         return JSONResponse({"erro": True, "mensagem": str(e)}, status_code=500)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 
-
-# ==========================================
-# ROTAS DO CUSTO DE PESSOAL (ADICIONADAS NO FINAL)
-# ==========================================
-
-
+@app.get("/custo_pessoal_pdf_resumo", response_class=HTMLResponse)
+def serve_custo_pessoal_pdf_resumo():
+    import os
+    from fastapi.responses import HTMLResponse
+    html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "custo_pessoal_pdf_resumo.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        conteudo = f.read()
+    return HTMLResponse(content=conteudo)
