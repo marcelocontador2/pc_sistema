@@ -1,227 +1,227 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Custo de Pessoal - SIGPC</title>
-    <style>
-        body { font-family: Segoe UI, sans-serif; background-color: #f8f9fa; color: #333; display: flex; height: 100vh; margin: 0; overflow: hidden; }
-        .sidebar { width: 250px; background-color: #fff; border-right: 1px solid #dee2e6; padding: 20px; overflow-y: auto; }
-        .main { flex: 1; padding: 30px; overflow-y: auto; }
-        .hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .hdr h1 { font-size: 24px; color: #0a1c3a; margin: 0; }
-        .botoes { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: #fff; font-size: 14px; }
-        .btn-voltar { background-color: #fd7e14; }
-        .btn-azul { background-color: #004085; }
-        .btn-verde { background-color: #28a745; }
-        .btn-vermelho { background-color: #dc3545; }
-        .btn-ciano { background-color: #17a2b8; }
-        select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 20px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #dee2e6; }
-        th { background-color: #e9ecef; }
-        .linha-destaque { background-color: #f8f9fa; }
-        .historico-item { padding: 10px; border-bottom: 1px solid #eee; }
-        .texto-direita { text-align: right; }
-        .texto-centro { text-align: center; }
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Custo de Pessoal - SIGPC</title>
+    <style>
+        body { font-family: Segoe UI, sans-serif; background-color: #f8f9fa; color: #333; display: flex; height: 100vh; margin: 0; overflow: hidden; }
+        .sidebar { width: 250px; background-color: #fff; border-right: 1px solid #dee2e6; padding: 20px; overflow-y: auto; }
+        .main { flex: 1; padding: 30px; overflow-y: auto; }
+        .hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .hdr h1 { font-size: 24px; color: #0a1c3a; margin: 0; }
+        .botoes { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: #fff; font-size: 14px; }
+        .btn-voltar { background-color: #fd7e14; }
+        .btn-azul { background-color: #004085; }
+        .btn-verde { background-color: #28a745; }
+        .btn-vermelho { background-color: #dc3545; }
+        .btn-ciano { background-color: #17a2b8; }
+        select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 20px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #dee2e6; }
+        th { background-color: #e9ecef; }
+        .linha-destaque { background-color: #f8f9fa; }
+        .historico-item { padding: 10px; border-bottom: 1px solid #eee; }
+        .texto-direita { text-align: right; }
+        .texto-centro { text-align: center; }
+    
+        /* --- ESTILO DO CARD DE HISTÓRICO --- */
+        .historico-item-card {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .historico-item-card:hover { background-color: #f8f9fa; border-color: #004085; }
+        .historico-item-card input[type="radio"] { margin-top: 4px; margin-right: 12px; cursor: pointer; }
+        .historico-info { display: flex; flex-direction: column; }
+        .historico-periodo { font-size: 15px; font-weight: bold; color: #004085; margin-bottom: 2px; }
+        .historico-data { font-size: 12px; color: #6c757d; }
+
     
-        /* --- ESTILO DO CARD DE HISTÓRICO --- */
-        .historico-item-card {
-            display: flex;
-            align-items: flex-start;
-            padding: 12px;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            background-color: #fff;
-            cursor: pointer;
-            transition: 0.2s;
+        .historico_item_card {
+            display: flex; align-items: flex-start; padding: 12px;
+            border: 1px solid #dee2e6; border-radius: 6px; margin-bottom: 10px;
+            background-color: #fff; cursor: pointer; transition: 0.2s;
         }
-        .historico-item-card:hover { background-color: #f8f9fa; border-color: #004085; }
-        .historico-item-card input[type="radio"] { margin-top: 4px; margin-right: 12px; cursor: pointer; }
-        .historico-info { display: flex; flex-direction: column; }
-        .historico-periodo { font-size: 15px; font-weight: bold; color: #004085; margin-bottom: 2px; }
-        .historico-data { font-size: 12px; color: #6c757d; }
+        .historico_item_card:hover { background-color: #f8f9fa; border-color: #004085; }
+        .historico_item_card input[type="radio"] { margin-top: 4px; margin-right: 12px; cursor: pointer; }
+        .historico_info { display: flex; flex-direction: column; }
+        .historico_periodo { font-size: 15px; font-weight: bold; color: #004085; margin-bottom: 2px; }
+        .historico_data { font-size: 12px; color: #6c757d; }
 
-    
-        .historico_item_card {
-            display: flex; align-items: flex-start; padding: 12px;
-            border: 1px solid #dee2e6; border-radius: 6px; margin-bottom: 10px;
-            background-color: #fff; cursor: pointer; transition: 0.2s;
-        }
-        .historico_item_card:hover { background-color: #f8f9fa; border-color: #004085; }
-        .historico_item_card input[type="radio"] { margin-top: 4px; margin-right: 12px; cursor: pointer; }
-        .historico_info { display: flex; flex-direction: column; }
-        .historico_periodo { font-size: 15px; font-weight: bold; color: #004085; margin-bottom: 2px; }
-        .historico_data { font-size: 12px; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>Histórico Salvo</h3>
+        <div id="lista-historico">Carregando...</div>
+    </div>
+    <div class="main">
+        <div class="hdr">
+            <h1>Custo de Pessoal</h1>
+            <span style="color: #6c757d;">SIGPC</span>
+        </div>
+        <div class="botoes">
+            <button class="btn btn-voltar" id="btn-voltar">← Voltar</button>
+            <select id="periodo-select"><option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option></select>
+            <button class="btn btn-azul" id="btn-carregar">Verificar Análise</button>
+            <button class="btn btn-verde" id="btn-salvar">Confirmar e Salvar</button>
+            <button class="btn btn-verde" id="btn-exibir">Exibir Selecionado</button>
+            <button class="btn btn-vermelho" id="btn-excluir">Excluir Selecionado</button>
+            <button class="btn btn-azul" id="btn-pdf" >Gerar PDF (Resumo)</button>
+            <button class="btn btn-ciano" id="btn-pdf-completo" >Gerar PDF (Completo)</button>
+        </div>
+        <table>
+            <tr><th>Indicador</th><th class="texto-direita">Valor (R\$)</th><th class="texto-centro">% da RCL</th></tr>
+            <tr><td>RCL</td><td id="comp-rcl" class="texto-direita">0,00</td><td class="texto-centro">100,00%</td></tr>
+            <tr><td>(-) Custo</td><td id="comp-custo" class="texto-direita">0,00</td><td id="comp-pct-custo" class="texto-centro">0,00%</td></tr>
+            <tr class="linha-destaque"><td>(=) Margem</td><td id="comp-margem" class="texto-direita">0,00</td><td id="comp-pct-margem" class="texto-centro">0,00%</td></tr>
+            <tr><td>Limite LRF</td><td id="comp-limite" class="texto-direita">0,00</td><td class="texto-centro">50,00%</td></tr>
+        </table>
+    </div>
+    
 
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <h3>Histórico Salvo</h3>
-        <div id="lista-historico">Carregando...</div>
-    </div>
-    <div class="main">
-        <div class="hdr">
-            <h1>Custo de Pessoal</h1>
-            <span style="color: #6c757d;">SIGPC</span>
-        </div>
-        <div class="botoes">
-            <button class="btn btn-voltar" id="btn-voltar">← Voltar</button>
-            <select id="periodo-select"><option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option></select>
-            <button class="btn btn-azul" id="btn-carregar">Verificar Análise</button>
-            <button class="btn btn-verde" id="btn-salvar">Confirmar e Salvar</button>
-            <button class="btn btn-verde" id="btn-exibir">Exibir Selecionado</button>
-            <button class="btn btn-vermelho" id="btn-excluir">Excluir Selecionado</button>
-            <button class="btn btn-azul" id="btn-pdf" >Gerar PDF (Resumo)</button>
-            <button class="btn btn-ciano" id="btn-pdf-completo" >Gerar PDF (Completo)</button>
-        </div>
-        <table>
-            <tr><th>Indicador</th><th class="texto-direita">Valor (R\$)</th><th class="texto-centro">% da RCL</th></tr>
-            <tr><td>RCL</td><td id="comp-rcl" class="texto-direita">0,00</td><td class="texto-centro">100,00%</td></tr>
-            <tr><td>(-) Custo</td><td id="comp-custo" class="texto-direita">0,00</td><td id="comp-pct-custo" class="texto-centro">0,00%</td></tr>
-            <tr class="linha-destaque"><td>(=) Margem</td><td id="comp-margem" class="texto-direita">0,00</td><td id="comp-pct-margem" class="texto-centro">0,00%</td></tr>
-            <tr><td>Limite LRF</td><td id="comp-limite" class="texto-direita">0,00</td><td class="texto-centro">50,00%</td></tr>
-        </table>
-    </div>
-    
+<script>
+    (function () {
+        'use strict';
+        function el(id) { return document.getElementById(id); }
+        function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+        function fmt(v) { return num(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function pct(parte, total) { if (!total) return '0,00%'; return ((parte / total) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'; }
+        function lerJSON(resposta) { if (!resposta.ok) throw new Error('HTTP ' + resposta.status); return resposta.json(); }
+
+        function preencherTabela(d) {
+            var rcl = num(d.rcl_total), custo = num(d.custo_total);
+            var limite = rcl * 0.5, margem = limite - custo;
+            el('comp-rcl').textContent = fmt(rcl);
+            el('comp-custo').textContent = fmt(custo);
+            el('comp-limite').textContent = fmt(limite);
+            el('comp-margem').innerHTML = '<b>' + fmt(margem) + '</b>';
+            el('comp-pct-custo').textContent = pct(custo, rcl);
+            el('comp-pct-margem').innerHTML = '<b>' + pct(margem, rcl) + '</b>';
+        }
+
+        function itemSelecionado() { return document.querySelector('input[name="hist"]:checked'); }
+
+        function carregar() {
+            var periodo = encodeURIComponent(el('periodo-select').value);
+            fetch('/api/custo_pessoal/' + periodo).then(lerJSON).then(function (d) {
+                if (d.erro) { alert('Erro na API: ' + d.erro); return; }
+                preencherTabela(d);
+            }).catch(function (e) { console.error(e); alert('Erro de conexão.'); });
+        }
+
+        function salvar() {
+            var periodo = encodeURIComponent(el('periodo-select').value);
+            fetch('/salvar_custo_pessoal/' + periodo, { method: 'POST' }).then(lerJSON).then(function (d) {
+                if (d.erro) { alert('Erro ao salvar: ' + (d.mensagem || d.erro)); }
+                else { alert('Relatório salvo com sucesso!'); carregarHistorico(); }
+            }).catch(function (e) { console.error(e); alert('Erro de conexão.'); });
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_custo_pessoal').then(lerJSON).then(function (d) {
+                var lista = el('lista-historico');
+                lista.innerHTML = '';
+                if (!Array.isArray(d) || d.length === 0) { lista.textContent = 'Nenhum histórico salvo.'; return; }
+                d.forEach(function (item) {
+                    var div = document.createElement('label');
+                    div.className = 'historico_item_card';
+                    
+                    var radio = document.createElement('input');
+                    radio.type = 'radio'; radio.name = 'hist'; radio.value = item.id;
+                    
+                    var info = document.createElement('div');
+                    info.className = 'historico_info';
+                    
+                    var periodo = document.createElement('span');
+                    periodo.className = 'historico_periodo';
+                    periodo.textContent = item.periodo;
+                    
+                    var data = document.createElement('span');
+                    data.className = 'historico_data';
+                    data.textContent = 'Gerado em: ' + (item.data_geracao || 'sem data');
+                    
+                    info.appendChild(periodo);
+                    info.appendChild(data);
+                    div.appendChild(radio);
+                    div.appendChild(info);
+                    lista.appendChild(div);
+                });
+            }).catch(function (e) { console.error(e); el('lista-historico').textContent = 'Erro ao carregar histórico.'; });
+        }
+
+        function exibirSelecionado() {
+            var sel = itemSelecionado();
+            if (!sel) { alert('Selecione um item no histórico.'); return; }
+            fetch('/historico_custo_pessoal/' + encodeURIComponent(sel.value)).then(lerJSON).then(function (d) {
+                if (d.erro) { alert('Erro: ' + d.erro); return; }
+                preencherTabela(d);
+                alert('Dados exibidos!');
+            }).catch(function (e) { console.error(e); alert('Erro de conexão.'); });
+        }
+
+        function excluirSelecionado() {
+            var sel = itemSelecionado();
+            if (!sel) { alert('Selecione um item no histórico.'); return; }
+            if (!confirm('Excluir este item?')) return;
+            fetch('/excluir_custo_pessoal/' + encodeURIComponent(sel.value), { method: 'DELETE' }).then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                alert('Excluído!');
+                carregarHistorico();
+            }).catch(function (e) { console.error(e); alert('Erro ao excluir.'); });
+        }
+
+        window.gerarPDF = function() {
+            var sel = itemSelecionado();
+            if (!sel) { alert('Por favor, marque um item no histórico para gerar o PDF Resumo.'); return; }
+            window.open('/gerar_pdf_custo_pessoal?id=' + encodeURIComponent(sel.value), '_blank');
+        };
+
+        window.gerarPDFCompleto = function() {
+            var sel = itemSelecionado();
+            if (!sel) { alert('Por favor, marque um item no histórico para gerar o PDF Completo.'); return; }
+            window.open('/gerar_pdf_completo_custo_pessoal?id=' + encodeURIComponent(sel.value), '_blank');
+        };
+
+        document.addEventListener('DOMContentLoaded', function () {
+            el('btn-voltar').addEventListener('click', function () { window.history.back(); });
+            el('btn-carregar').addEventListener('click', carregar);
+            el('btn-salvar').addEventListener('click', salvar);
+            el('btn-exibir').addEventListener('click', exibirSelecionado);
+            el('btn-excluir').addEventListener('click', excluirSelecionado);
+            carregar();
+            carregarHistorico();
+        });
+    })();
 
-<script>
-    (function () {
-        'use strict';
-        function el(id) { return document.getElementById(id); }
-        function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
-        function fmt(v) { return num(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-        function pct(parte, total) { if (!total) return '0,00%'; return ((parte / total) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'; }
-        function lerJSON(resposta) { if (!resposta.ok) throw new Error('HTTP ' + resposta.status); return resposta.json(); }
+            // Eventos dos botões de PDF (com verificação de seleção)
+            document.getElementById('btn-pdf').addEventListener('click', function() {
+                var sel = document.querySelector('input[name="hist"]:checked');
+                if (!sel) {
+                    alert('Por favor, marque um item no histórico para gerar o PDF Resumo.');
+                    return;
+                }
+                window.open('/gerar_pdf_custo_pessoal?id=' + encodeURIComponent(sel.value), '_blank');
+            });
 
-        function preencherTabela(d) {
-            var rcl = num(d.rcl_total), custo = num(d.custo_total);
-            var limite = rcl * 0.5, margem = limite - custo;
-            el('comp-rcl').textContent = fmt(rcl);
-            el('comp-custo').textContent = fmt(custo);
-            el('comp-limite').textContent = fmt(limite);
-            el('comp-margem').innerHTML = '<b>' + fmt(margem) + '</b>';
-            el('comp-pct-custo').textContent = pct(custo, rcl);
-            el('comp-pct-margem').innerHTML = '<b>' + pct(margem, rcl) + '</b>';
-        }
+            document.getElementById('btn-pdf-completo').addEventListener('click', function() {
+                var sel = document.querySelector('input[name="hist"]:checked');
+                if (!sel) {
+                    alert('Por favor, marque um item no histórico para gerar o PDF Completo.');
+                    return;
+                }
+                window.open('/gerar_pdf_completo_custo_pessoal?id=' + encodeURIComponent(sel.value), '_blank');
+            });
 
-        function itemSelecionado() { return document.querySelector('input[name="hist"]:checked'); }
-
-        function carregar() {
-            var periodo = encodeURIComponent(el('periodo-select').value);
-            fetch('/api/custo_pessoal/' + periodo).then(lerJSON).then(function (d) {
-                if (d.erro) { alert('Erro na API: ' + d.erro); return; }
-                preencherTabela(d);
-            }).catch(function (e) { console.error(e); alert('Erro de conexão.'); });
-        }
-
-        function salvar() {
-            var periodo = encodeURIComponent(el('periodo-select').value);
-            fetch('/salvar_custo_pessoal/' + periodo, { method: 'POST' }).then(lerJSON).then(function (d) {
-                if (d.erro) { alert('Erro ao salvar: ' + (d.mensagem || d.erro)); }
-                else { alert('Relatório salvo com sucesso!'); carregarHistorico(); }
-            }).catch(function (e) { console.error(e); alert('Erro de conexão.'); });
-        }
-
-        function carregarHistorico() {
-            fetch('/historico_custo_pessoal').then(lerJSON).then(function (d) {
-                var lista = el('lista-historico');
-                lista.innerHTML = '';
-                if (!Array.isArray(d) || d.length === 0) { lista.textContent = 'Nenhum histórico salvo.'; return; }
-                d.forEach(function (item) {
-                    var div = document.createElement('label');
-                    div.className = 'historico_item_card';
-                    
-                    var radio = document.createElement('input');
-                    radio.type = 'radio'; radio.name = 'hist'; radio.value = item.id;
-                    
-                    var info = document.createElement('div');
-                    info.className = 'historico_info';
-                    
-                    var periodo = document.createElement('span');
-                    periodo.className = 'historico_periodo';
-                    periodo.textContent = item.periodo;
-                    
-                    var data = document.createElement('span');
-                    data.className = 'historico_data';
-                    data.textContent = 'Gerado em: ' + (item.data_geracao || 'sem data');
-                    
-                    info.appendChild(periodo);
-                    info.appendChild(data);
-                    div.appendChild(radio);
-                    div.appendChild(info);
-                    lista.appendChild(div);
-                });
-            }).catch(function (e) { console.error(e); el('lista-historico').textContent = 'Erro ao carregar histórico.'; });
-        }
-
-        function exibirSelecionado() {
-            var sel = itemSelecionado();
-            if (!sel) { alert('Selecione um item no histórico.'); return; }
-            fetch('/historico_custo_pessoal/' + encodeURIComponent(sel.value)).then(lerJSON).then(function (d) {
-                if (d.erro) { alert('Erro: ' + d.erro); return; }
-                preencherTabela(d);
-                alert('Dados exibidos!');
-            }).catch(function (e) { console.error(e); alert('Erro de conexão.'); });
-        }
-
-        function excluirSelecionado() {
-            var sel = itemSelecionado();
-            if (!sel) { alert('Selecione um item no histórico.'); return; }
-            if (!confirm('Excluir este item?')) return;
-            fetch('/excluir_custo_pessoal/' + encodeURIComponent(sel.value), { method: 'DELETE' }).then(function (r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                alert('Excluído!');
-                carregarHistorico();
-            }).catch(function (e) { console.error(e); alert('Erro ao excluir.'); });
-        }
-
-        window.gerarPDF = function() {
-            var sel = itemSelecionado();
-            if (!sel) { alert('Por favor, marque um item no histórico para gerar o PDF Resumo.'); return; }
-            window.open('/gerar_pdf_custo_pessoal?id=' + encodeURIComponent(sel.value), '_blank');
-        };
-
-        window.gerarPDFCompleto = function() {
-            var sel = itemSelecionado();
-            if (!sel) { alert('Por favor, marque um item no histórico para gerar o PDF Completo.'); return; }
-            window.open('/gerar_pdf_completo_custo_pessoal?id=' + encodeURIComponent(sel.value), '_blank');
-        };
-
-        document.addEventListener('DOMContentLoaded', function () {
-            el('btn-voltar').addEventListener('click', function () { window.history.back(); });
-            el('btn-carregar').addEventListener('click', carregar);
-            el('btn-salvar').addEventListener('click', salvar);
-            el('btn-exibir').addEventListener('click', exibirSelecionado);
-            el('btn-excluir').addEventListener('click', excluirSelecionado);
-            carregar();
-            carregarHistorico();
-        });
-    })();
-
-            // Eventos dos botões de PDF (com verificação de seleção)
-            document.getElementById('btn-pdf').addEventListener('click', function() {
-                var sel = document.querySelector('input[name="hist"]:checked');
-                if (!sel) {
-                    alert('Por favor, marque um item no histórico para gerar o PDF Resumo.');
-                    return;
-                }
-                window.open('/gerar_pdf_custo_pessoal?id=' + encodeURIComponent(sel.value), '_blank');
-            });
-
-            document.getElementById('btn-pdf-completo').addEventListener('click', function() {
-                var sel = document.querySelector('input[name="hist"]:checked');
-                if (!sel) {
-                    alert('Por favor, marque um item no histórico para gerar o PDF Completo.');
-                    return;
-                }
-                window.open('/gerar_pdf_completo_custo_pessoal?id=' + encodeURIComponent(sel.value), '_blank');
-            });
-
-</script>
-
-</body>
+</script>
+
+</body>
 </html>
