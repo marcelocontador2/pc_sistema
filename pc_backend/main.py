@@ -3261,28 +3261,6 @@ async def api_custo_pessoal(periodo: str):
     }
 
 
-@app.get("/salvar_custo_pessoal/{periodo}")
-async def salvar_custo_pessoal(periodo: str):
-    try:
-        # Chama a API para pegar os dados calculados
-        dados = await api_custo_pessoal(periodo)
-        if dados.get("erro"):
-            raise HTTPException(status_code=400, detail="Dados faltando")
-        
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_custo_pessoal (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-        
-        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cursor.execute("INSERT INTO historico_custo_pessoal (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", 
-                       (periodo, data_agora, json.dumps(dados)))
-        conn.commit()
-        conn.close()
-        return {"mensagem": "Salvo com sucesso!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/historico_custo_pessoal")
 async def listar_historico_custo_pessoal():
@@ -3354,56 +3332,6 @@ async def diag_custo_pessoal(periodo: str = "2026-TRIMESTRE-3"):
 
 
 
-@app.get("/gerar_pdf_custo_pessoal")
-async def gerar_pdf_custo_pessoal(periodo: str = "2026-TRIMESTRE-3"):
-    try:
-        from playwright.async_api import async_playwright
-        from fastapi.responses import Response
-        
-        url = f"http://127.0.0.1:8000/analise_custo_pessoal?autoprint=1&periodo={periodo}"
-        
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page()
-            await page.emulate_media(media="print")
-            await page.goto(url, wait_until="networkidle")
-            
-            # Espera o conteúdo principal carregar (ex: o título "Fundamentação Legal")
-            try:
-                await page.wait_for_selector("text=Fundamentação Legal", timeout=10000)
-            except:
-                pass  # se não achar, segue mesmo assim
-            await page.wait_for_timeout(2000)
-            
-            # Esconde a sidebar pelo seletor estrutural: a div que contém o flex layout
-            # Vamos esconder a PRIMEIRA div filha do container flex (que é a sidebar)
-            await page.evaluate("""
-                () => {
-                    // Procura o container flex principal
-                    const flexContainer = document.querySelector('div[style*="display: flex"]');
-                    if (flexContainer && flexContainer.children.length >= 2) {
-                        // Esconde o primeiro filho (sidebar) e mantém o segundo (conteúdo)
-                        flexContainer.children[0].style.display = 'none';
-                    }
-                    // Esconde botões e top-bar
-                    document.querySelectorAll('.btn, .btn-verificar, .btn-salvar, .top-bar').forEach(el => el.style.display = 'none');
-                    document.body.style.background = 'white';
-                }
-            """)
-            await page.wait_for_timeout(500)
-            
-            pdf_bytes = await page.emulate_media(media="print")
-        await page.wait_for_timeout(2500)
-        await page.emulate_media(media="print")
-        await page.wait_for_timeout(2000)
-        await page.pdf(path=pdf_path, format="A4", print_background=True, margin={"top": "20px", "bottom": "20px", "left": "20px", "right": "20px"})
-        await browser.close()
-            
-        return Response(content=pdf_bytes, media_type="application/pdf", headers={
-            "Content-Disposition": f"attachment; filename=custo_pessoal_{periodo}.pdf"
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/analise_orcamentaria")
 async def serve_analise_orcamentaria():
@@ -3764,6 +3692,68 @@ async def painel_integridade_html(periodo: str):
 
 
 
+
+@app.post("/salvar_custo_pessoal/{periodo}")
+async def salvar_custo_pessoal_rota(periodo: str):
+    import sqlite3, json, os, datetime
+    import urllib.request
+
+    try:
+        url_api = f"http://127.0.0.1:8000/api/custo_pessoal/{periodo}"
+        response = urllib.request.urlopen(url_api)
+        dados = json.loads(response.read().decode('utf-8'))
+
+        if dados.get("erro"):
+            return {"erro": True, "mensagem": "Dados não encontrados."}
+
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_custo_pessoal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("INSERT INTO historico_custo_pessoal (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+                       (periodo, data_agora, json.dumps(dados)))
+        conn.commit()
+        conn.close()
+        return {"status": "sucesso", "mensagem": "Relatório salvo!"}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+
+
+@app.get("/gerar_pdf_custo_pessoal")
+async def gerar_pdf_custo_pessoal(periodo: str = "2026-TRIMESTRE-3"):
+    import os
+    from playwright.async_api import async_playwright
+    from fastapi.responses import FileResponse
+    
+    os.makedirs("pc_storage/pdfs", exist_ok=True)
+    pdf_path = f"pc_storage/pdfs/custo_pessoal_{periodo}.pdf"
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        
+        url = f"http://127.0.0.1:8000/analise_custo_pessoal?autoprint=1&periodo={periodo}"
+        await page.goto(url, wait_until="networkidle")
+        await page.wait_for_selector("table", timeout=10000)
+        await page.emulate_media(media="print")
+        await page.pdf(
+            path=pdf_path,
+            format="A4",
+            print_background=True,
+            margin={"top": "20px", "bottom": "20px", "left": "20px", "right": "20px"}
+        )
+        await browser.close()
+    
+    return FileResponse(pdf_path, media_type="application/pdf", filename=f"custo_pessoal_{periodo}.pdf")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# ==========================================
+# ROTAS DO CUSTO DE PESSOAL (ADICIONADAS NO FINAL)
+# ==========================================
+
