@@ -1,5 +1,4 @@
-﻿c = open('../pc_frontend/custo_pessoal_pdf_completo.html', encoding='utf-8-sig').read()
-
+c = open('../pc_frontend/custo_pessoal_pdf_completo.html', encoding='utf-8-sig').read()
 # O novo script completo e mapeado
 novo_script = """
     <script>
@@ -88,10 +87,8 @@ novo_script = """
 </body>
 </html>
 """
-
 # Substitui o script antigo pelo novo (do "<script>" até o final do arquivo)
 import re
 c = re.sub(r'<script>.*?</html>', novo_script, c, flags=re.DOTALL)
-
 open('../pc_frontend/custo_pessoal_pdf_completo.html', 'w', encoding='utf-8').write(c)
 print("[OK] JavaScript do PDF Completo atualizado com todos os campos dinâmicos!")

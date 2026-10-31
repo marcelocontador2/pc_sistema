@@ -3,7 +3,6 @@ import hashlib
 import os
 import csv
 import re
-
 DB_CONFIG = {
     "host": "localhost",
     "port": 5433,
@@ -11,7 +10,6 @@ DB_CONFIG = {
     "user": "postgres",
     "password": "pc_admin_2026"
 }
-
 def limpar_valor(valor):
     if valor is None or str(valor).strip() == "":
         return 0.0
@@ -23,29 +21,24 @@ def limpar_valor(valor):
         return float(v)
     except:
         return 0.0
-
 def normalizar(texto):
     return re.sub(r'\s+', ' ', str(texto).strip().upper())
-
 def get_periodo_id(cursor, ano, periodo_acumulado):
     cursor.execute("SELECT id FROM periodo WHERE ano = %s AND periodo_acumulado = %s;", (ano, periodo_acumulado))
     res = cursor.fetchone()
     return res[0] if res else None
-
 def inserir_documento(cursor, periodo_id, tipo, nome_arquivo, hash_arquivo):
     cursor.execute("""
         INSERT INTO documento_importado (periodo_id, tipo, nome_arquivo, file_hash, status_processamento)
         VALUES (%s, %s, %s, %s, 'PROCESSADO') RETURNING id;
     """, (periodo_id, tipo, nome_arquivo, hash_arquivo))
     return cursor.fetchone()[0]
-
 def inserir_valor(cursor, doc_id, periodo_id, grupo, valor):
     if valor != 0.0:
         cursor.execute("""
             INSERT INTO demonstracao_resumo (documento_id, periodo_id, grupo_demonstrativo, valor_atual)
             VALUES (%s, %s, %s, %s);
         """, (doc_id, periodo_id, grupo, valor))
-
 def ler_linhas(caminho_csv):
     try:
         with open(caminho_csv, "r", encoding="utf-8") as f:
@@ -53,20 +46,16 @@ def ler_linhas(caminho_csv):
     except UnicodeDecodeError:
         with open(caminho_csv, "r", encoding="latin-1") as f:
             return list(csv.reader(f, delimiter=";"))
-
 def processar_bp_comparativo(caminho_csv):
     """Processa o BP comparativo (com 2026 e 2025)."""
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
     with open(caminho_csv, "rb") as f:
         file_hash = hashlib.sha256(f.read()).hexdigest()
-
     pid_2026 = get_periodo_id(cursor, 2026, "Jan-Set")
     pid_2025 = get_periodo_id(cursor, 2025, "Jan-Set")
-
     doc_2026 = inserir_documento(cursor, pid_2026, "BALANCO_PATRIMONIAL", os.path.basename(caminho_csv), file_hash)
     doc_2025 = inserir_documento(cursor, pid_2025, "BALANCO_PATRIMONIAL", os.path.basename(caminho_csv), file_hash)
-
     linhas = ler_linhas(caminho_csv)
     mapa = {
         "ATIVO CIRCULANTE": "Ativo Circulante",
@@ -85,7 +74,6 @@ def processar_bp_comparativo(caminho_csv):
             if d in mapa:
                 if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, mapa[d], v2026)
                 if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, mapa[d], v2025)
-
         # Passivo (2026 na coluna 4, 2025 na coluna 5)
         if len(row) >= 6:
             d = normalizar(row[3])
@@ -94,10 +82,8 @@ def processar_bp_comparativo(caminho_csv):
             if d in mapa:
                 if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, mapa[d], v2026)
                 if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, mapa[d], v2025)
-
     conn.commit(); cursor.close(); conn.close()
     print(f"BP Comparativo processado (2026 e 2025): {os.path.basename(caminho_csv)}")
-
 def processar_bo(caminho_csv, ano, periodo_acumulado):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
@@ -124,19 +110,15 @@ def processar_bo(caminho_csv, ano, periodo_acumulado):
             inserir_valor(cursor, doc_id, periodo_id, "Despesa Empenhada", limpar_valor(row[idx_desp]))
     conn.commit(); cursor.close(); conn.close()
     print(f"BO processado ({ano}/{periodo_acumulado}): {os.path.basename(caminho_csv)}")
-
 def processar_bf_comparativo(caminho_csv):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
     with open(caminho_csv, "rb") as f:
         file_hash = hashlib.sha256(f.read()).hexdigest()
-
     pid_2026 = get_periodo_id(cursor, 2026, "Jan-Set")
     pid_2025 = get_periodo_id(cursor, 2025, "Jan-Set")
-
     doc_2026 = inserir_documento(cursor, pid_2026, "BALANCO_FINANCEIRO", os.path.basename(caminho_csv), file_hash)
     doc_2025 = inserir_documento(cursor, pid_2025, "BALANCO_FINANCEIRO", os.path.basename(caminho_csv), file_hash)
-
     linhas = ler_linhas(caminho_csv)
     mapa = {
         "RECEITA ORÃ‡AMENTÃRIA": "Receita Orcamentaria",
@@ -152,22 +134,17 @@ def processar_bf_comparativo(caminho_csv):
             if d in mapa:
                 if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, mapa[d], v2026)
                 if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, mapa[d], v2025)
-
     conn.commit(); cursor.close(); conn.close()
     print(f"BF Comparativo processado (2026 e 2025): {os.path.basename(caminho_csv)}")
-
 def processar_dfc_comparativo(caminho_csv):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
     with open(caminho_csv, "rb") as f:
         file_hash = hashlib.sha256(f.read()).hexdigest()
-
     pid_2026 = get_periodo_id(cursor, 2026, "Jan-Set")
     pid_2025 = get_periodo_id(cursor, 2025, "Jan-Set")
-
     doc_2026 = inserir_documento(cursor, pid_2026, "DFC", os.path.basename(caminho_csv), file_hash)
     doc_2025 = inserir_documento(cursor, pid_2025, "DFC", os.path.basename(caminho_csv), file_hash)
-
     linhas = ler_linhas(caminho_csv)
     mapa = {
         "CAIXA E EQUIVALENTES DE CAIXA INICIAL": "Caixa Inicial",
@@ -182,22 +159,17 @@ def processar_dfc_comparativo(caminho_csv):
             if d in mapa:
                 if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, mapa[d], v2026)
                 if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, mapa[d], v2025)
-
     conn.commit(); cursor.close(); conn.close()
     print(f"DFC Comparativo processado (2026 e 2025): {os.path.basename(caminho_csv)}")
-
 def processar_dvp_comparativo(caminho_csv):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
     with open(caminho_csv, "rb") as f:
         file_hash = hashlib.sha256(f.read()).hexdigest()
-
     pid_2026 = get_periodo_id(cursor, 2026, "Jan-Set")
     pid_2025 = get_periodo_id(cursor, 2025, "Jan-Set")
-
     doc_2026 = inserir_documento(cursor, pid_2026, "DVP", os.path.basename(caminho_csv), file_hash)
     doc_2025 = inserir_documento(cursor, pid_2025, "DVP", os.path.basename(caminho_csv), file_hash)
-
     linhas = ler_linhas(caminho_csv)
     for row in linhas:
         if len(row) >= 7:
@@ -217,10 +189,8 @@ def processar_dvp_comparativo(caminho_csv):
                 v2025 = limpar_valor(row[7]) if len(row) > 7 else 0.0
                 if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, "Superavit Patrimonial", v2026)
                 if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, "Superavit Patrimonial", v2025)
-
     conn.commit(); cursor.close(); conn.close()
     print(f"DVP Comparativo processado (2026 e 2025): {os.path.basename(caminho_csv)}")
-
 def processar_dmpl(caminho_csv, ano):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
@@ -232,7 +202,6 @@ def processar_dmpl(caminho_csv, ano):
         file_hash = hashlib.sha256(f.read()).hexdigest()
     doc_id = inserir_documento(cursor, periodo_id, "DMPL", os.path.basename(caminho_csv), file_hash)
     linhas = ler_linhas(caminho_csv)
-    
     for row in linhas:
         if len(row) >= 8:
             d = normalizar(row[0])
@@ -244,21 +213,17 @@ def processar_dmpl(caminho_csv, ano):
                 inserir_valor(cursor, doc_id, periodo_id, "PL Final", abs(limpar_valor(row[7])))
     conn.commit(); cursor.close(); conn.close()
     print(f"DMPL processado ({ano}): {os.path.basename(caminho_csv)}")
-
 if __name__ == "__main__":
     pasta = r"C:\Users\Marcelo Medeiros\pc_sistema\pc_storage\uploads_raw"
     for arquivo in os.listdir(pasta):
         caminho = os.path.join(pasta, arquivo)
         nome = arquivo.lower()
-        
         ano = 2026
         if "2025" in nome:
             ano = 2025
-        
         periodo_acumulado = "Jan-Set"
         if "out" in nome.lower() or "dez" in nome.lower() or "out-dez" in nome.lower():
             periodo_acumulado = "Out-Dez"
-        
         # Prioridade: comparativo tem os dois anos
         if "comparativo" in nome and nome.startswith("balancopatrimonial"):
             processar_bp_comparativo(caminho)

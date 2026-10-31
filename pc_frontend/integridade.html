@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -11,12 +11,10 @@
         .btn-pdf { background: #0056b3; }
         .btn-exibir { background: #28a745; }
         .btn-excluir { background: #dc3545; }
-        
         .filtros-bar { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
         .form-group { display: flex; align-items: center; gap: 5px; }
         label { font-weight: bold; color: #444; font-size: 14px; }
         select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
-        
         .flex-layout { display: flex; gap: 20px; }
         .sidebar { width: 300px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; height: fit-content; }
         .main-content { flex: 1; overflow-x: auto; }
@@ -28,7 +26,6 @@
         .status-erro { color: red; font-weight: bold; }
         #lista-historico { list-style: none; padding: 0; }
     </style>
-
     <style id="estilo-voltar-laranja">
         .btn-voltar-laranja {
             background-color: #ff7f00 !important;
@@ -44,7 +41,6 @@
             cursor: pointer !important;
         }
     </style>
-
 </head>
 <body>
     <div class="top-bar">
@@ -53,7 +49,6 @@
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
     </div>
-
     <div class="filtros-bar">
         <div class="form-group"><label>Ano:</label><select id="ano"><option value="2026">2026</option><option value="2025">2025</option></select></div>
         <div class="form-group"><label>Tipo:</label><select id="tipo_periodo" onchange="ajustarPeriodo()"><option value="MES">Mensal</option><option value="TRIMESTRE" selected>Trimestral</option><option value="ANO">Exercício</option></select></div>
@@ -62,7 +57,6 @@
         <button class="btn btn-pdf" onclick="verificarEGerar()">Verificar Matriz</button>
             <button class="btn btn-salvar" id="btn-confirmar" onclick="salvarMatriz()" style="background:#28a745; display:none;">Confirmar e Salvar</button>
     </div>
-
     <div class="flex-layout">
         <div class="sidebar">
             <h3>Histórico Salvo</h3>
@@ -72,14 +66,12 @@
             <p>Selecione o período para gerar a matriz.</p>
         </div>
     </div>
-
     <script>
         function ajustarPeriodo() {
             const tipo = document.getElementById('tipo_periodo').value;
             document.getElementById('group-mes').style.display = (tipo === 'MES') ? 'flex' : 'none';
             document.getElementById('group-trimestre').style.display = (tipo === 'TRIMESTRE') ? 'flex' : 'none';
         }
-
         function verificarEGerar() {
             const ano = document.getElementById('ano').value;
             const tipo = document.getElementById('tipo_periodo').value;
@@ -89,7 +81,6 @@
             cards.innerHTML = '<p>Verificando...</p>';
             const btnSalvar = document.getElementById('btn-confirmar');
             btnSalvar.style.display = 'none';
-
             fetch('/api/integridade_matriz/' + periodo)
                 .then(r => r.json())
                 .then(data => {
@@ -117,7 +108,6 @@
                 })
                 .catch(err => cards.innerHTML = '<p style="color:red;">Erro: ' + err.message + '</p>');
         }
-
         function renderizarTabela(matriz) {
             let html = '<table class="matriz-tabela"><thead><tr>';
             html += '<th>NOMENCLATURA</th><th>BALANCETE</th><th>BP</th><th>BF</th><th>BO</th><th>DFC</th><th>DVP</th><th>DMPL</th><th>CONFERÊNCIA</th>';
@@ -134,7 +124,6 @@
             html += '</tbody></table>';
             document.getElementById('integridade-cards').innerHTML = html;
         }
-
                 async function salvarMatriz() {
             const btn = document.getElementById("btn-confirmar");
             const periodo = btn.getAttribute("data-periodo");
@@ -147,7 +136,6 @@
             } catch (e) { alert("Erro ao salvar."); }
             finally { btn.innerText = "Confirmar e Salvar"; btn.disabled = false; }
         }
-
         function carregarHistorico() {
             fetch('/historico_integridade_matriz').then(r => r.json()).then(data => {
                 let html = '';
@@ -162,7 +150,6 @@
                 document.getElementById('lista-historico').innerHTML = html;
             });
         }
-
         function exibirSelecionado() {
             const check = document.querySelector(".check-historico:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
@@ -170,7 +157,6 @@
                 if (data.matriz) renderizarTabela(data.matriz);
             });
         }
-
         function excluirSelecionado() {
             const selecionados = document.querySelectorAll(".check-historico:checked");
             if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
@@ -183,16 +169,12 @@
                 if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); }
             });
         }
-
         function gerarPDF() {
             const check = document.querySelector(".check-historico:checked");
             if (!check) { alert("Marque um relatório no histórico!"); return; }
             window.open('/gerar_pdf_integridade_matriz/' + check.value, '_blank');
         }
-
         document.addEventListener("DOMContentLoaded", () => { ajustarPeriodo(); carregarHistorico(); });
     </script>
 </body>
 </html>
-
-

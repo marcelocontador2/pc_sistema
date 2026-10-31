@@ -1,5 +1,4 @@
-﻿c = open('../pc_frontend/analise_custo_pessoal.html', encoding='utf-8-sig').read()
-
+c = open('../pc_frontend/analise_custo_pessoal.html', encoding='utf-8-sig').read()
 # 1. Substituir o botão usando texto exato
 if '>Gerar PDF</button>' in c:
     c = c.replace(
@@ -7,7 +6,6 @@ if '>Gerar PDF</button>' in c:
         '>Gerar PDF (Resumo)</button>\n<button class="btn" onclick="gerarPDFCompleto()" style="background-color: #17a2b8; color: white; margin-left: 10px;">Gerar PDF (Completo)</button>'
     )
     print("[OK] Botões substituídos por texto exato!")
-
 # 2. Adicionar a função JS do PDF Completo
 if "function gerarPDFCompleto()" not in c:
     js_func = """
@@ -22,5 +20,4 @@ if "function gerarPDFCompleto()" not in c:
     if pos != -1:
         c = c[:pos] + js_func + "\n" + c[pos:]
         print("[OK] Função gerarPDFCompleto() injetada!")
-
 open('../pc_frontend/analise_custo_pessoal.html', 'w', encoding='utf-8').write(c)

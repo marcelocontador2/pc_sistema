@@ -28,7 +28,6 @@
     <div class="container">
         <h1>Configurações do Sistema</h1>
         <p class="desc">Selecione o tipo de entidade para aplicar o limite correto de Custo de Pessoal, conforme a Resolução Cofen 814/2026.</p>
-        
         <label class="opcao" id="opcao-cofen">
             <input type="radio" name="entidade" value="COFEN" onchange="selecionar('COFEN')">
             <div>
@@ -36,7 +35,6 @@
                 <div class="sub">Limite de 50% da Receita Corrente Líquida (RCL)</div>
             </div>
         </label>
-        
         <label class="opcao" id="opcao-coren">
             <input type="radio" name="entidade" value="COREN" onchange="selecionar('COREN')">
             <div>
@@ -44,20 +42,16 @@
                 <div class="sub">Limite de 60% da Receita Corrente Líquida (RCL)</div>
             </div>
         </label>
-        
         <button class="btn-salvar" onclick="salvar()">Salvar Configuração</button>
         <div class="msg" id="msg"></div>
     </div>
-
     <script>
         var entidadeAtual = 'COFEN';
-
         function selecionar(ent) {
             entidadeAtual = ent;
             document.getElementById('opcao-cofen').classList.toggle('ativo', ent === 'COFEN');
             document.getElementById('opcao-coren').classList.toggle('ativo', ent === 'COREN');
         }
-
         function carregar() {
             fetch('/api/configuracoes')
                 .then(r => r.json())
@@ -68,7 +62,6 @@
                     selecionar(ent);
                 });
         }
-
         function salvar() {
             fetch('/api/configuracoes', {
                 method: 'POST',
@@ -88,7 +81,6 @@
                 msg.innerText = 'Erro ao salvar: ' + e.message;
             });
         }
-
         window.onload = carregar;
     </script>
 </body>

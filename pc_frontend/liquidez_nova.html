@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -21,7 +21,6 @@
         .card .formula { font-size: 11px; color: #666; margin-top: 5px; }
         .titulo { color: #003366; margin-bottom: 15px; border-bottom: 2px solid #0056b3; padding-bottom: 5px; }
     </style>
-
     <style id="estilo-voltar-laranja">
         .btn-voltar-laranja {
             background-color: #ff7f00 !important;
@@ -37,7 +36,6 @@
             cursor: pointer !important;
         }
     </style>
-
 </head>
 <body>
     <div class="top-bar">
@@ -46,44 +44,36 @@
         <button class="btn btn-vermelho" onclick="alert('Função de excluir em testes')">Excluir Selecionado</button>
         <button class="btn btn-azul" onclick="alert('Gerar PDF em testes')">Gerar PDF</button>
     </div>
-
     <div class="filtros">
         <label>Período:</label>
         <select id="periodo"><option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option></select>
         <button class="btn btn-azul" onclick="calcularLiquidez()">Verificar Índices</button>
     </div>
-
     <div class="layout">
         <div class="sidebar">
             <h3>Histórico Salvo</h3>
             <ul id="lista-historico"><li>Teste inicial</li></ul>
         </div>
-        
         <div class="conteudo">
             <h3 class="titulo">Índices de Liquidez</h3>
             <div class="grid" id="grid-liquidez">
                 <p>Aguardando clique...</p>
             </div>
-
             <h3 class="titulo">Índices de Estrutura</h3>
             <div class="grid" id="grid-estrutura">
                 <p>Aguardando clique...</p>
             </div>
         </div>
     </div>
-
     <script>
         function calcularLiquidez() {
             // Alerta para confirmar que o botão funciona
             alert("Botão clicado! Buscando dados...");
-            
             const periodo = document.getElementById('periodo').value;
             const divLiq = document.getElementById('grid-liquidez');
             const divEst = document.getElementById('grid-estrutura');
-            
             divLiq.innerHTML = '<p>Buscando dados no servidor...</p>';
             divEst.innerHTML = '';
-
             fetch('/api/calcular_liquidez/' + periodo)
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
@@ -91,13 +81,11 @@
                         divLiq.innerHTML = '<p style="color:red;">Erro: ' + (data.erro || data.detail) + '</p>';
                         return;
                     }
-
                     // Preenche Liquidez
                     divLiq.innerHTML = 
                         '<div class="card"><h4>Liquidez Imediata</h4><div class="valor">' + data.liquidez.liquidez_imediata + '</div><div class="formula">Caixa / Passivo Circulante</div></div>' +
                         '<div class="card"><h4>Liquidez Corrente</h4><div class="valor">' + data.liquidez.liquidez_corrente + '</div><div class="formula">Ativo Circulante / Passivo Circulante</div></div>' +
                         '<div class="card"><h4>Liquidez Seca</h4><div class="valor">' + data.liquidez.liquidez_seca + '</div><div class="formula">(Ativo Circ. - Estoques) / Passivo Circ.</div></div>';
-
                     // Preenche Estrutura
                     divEst.innerHTML = 
                         '<div class="card"><h4>Endividamento Geral</h4><div class="valor">' + data.estrutura.endividamento_geral + '%</div><div class="formula">Passivo Total / Ativo Total</div></div>' +
@@ -108,7 +96,6 @@
                     divLiq.innerHTML = '<p style="color:red;">Erro de rede: ' + err.message + '</p>';
                 });
         }
-
         function carregarHistorico() {
             alert("Botão de histórico clicado!");
         }

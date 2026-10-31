@@ -4,13 +4,9 @@ Rota do Balanco Financeiro — reescrita em 31/10/2026 com base nas coordenadas 
 import csv
 import os
 from fastapi import APIRouter, HTTPException
-
 router = APIRouter(prefix="/api/analise_financeira_bf", tags=["balanco_financeiro"])
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "..", "..", "..", "pc_storage", "uploads_raw")
-
-
 def limpar(v):
     if not v:
         return 0.0
@@ -25,15 +21,12 @@ def limpar(v):
         return float(v)
     except Exception:
         return 0.0
-
-
 def processar_bf(caminho):
     linhas = []
     with open(caminho, "r", encoding="latin-1", errors="ignore") as f:
         leitor = csv.reader(f, delimiter=";")
         for row in leitor:
             linhas.append(row)
-
     def buscar(termo):
         termo = termo.upper().strip()
         for p in linhas:
@@ -42,16 +35,13 @@ def processar_bf(caminho):
             if len(p) > 3 and termo in str(p[3]).upper():
                 return p
         return None
-
     def val(p, idx):
         if p and len(p) > idx:
             return abs(limpar(p[idx]))
         return 0.0
-
     # === GRUPOS DE RECEITAS ===
     l_rec_corrente = buscar("RECEITAS CORRENTE")
     l_rec_capital = buscar("RECEITAS DE CAPITAL")
-    
     # Detalhes da Receita Corrente
     l_contribuicoes = buscar("CONTRIBUIÇÕES")
     l_rec_aplic_fin = buscar("RECEITAS DE APLICAÇÃO FINANCEIRAS")
@@ -59,7 +49,6 @@ def processar_bf(caminho):
     l_transf_ant = buscar("TRANSFERÊNCIAS DOS CONSELHOS REGIONAIS DE ENFERMAGEM- EXERCÍCIOS ANTERIORES")
     l_indenizacoes = buscar("INDENIZAÇÕES, RESTITUIÇÕES E RESSARCIMENTO")
     l_doacoes = buscar("DOAÇÕES")
-
     # === GRUPOS DE DESPESAS ===
     l_desp_corrente = buscar("CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CORRENTE")
     l_pessoal = buscar("PESSOAL E ENCARGOS SOCIAIS")
@@ -67,13 +56,11 @@ def processar_bf(caminho):
     l_desp_capital = buscar("CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CAPITAL")
     l_investimentos = buscar("INVESTIMENTOS")
     l_inversoes = buscar("INVERSÕES FINANCEIRAS")
-
     # === CAIXA ===
     l_saldo_ant = buscar("Saldo em espécie do Exercício Anterior")
     l_saldo_seg = buscar("Saldo em espécie para o Exercício Seguinte")
     l_rec_extra = buscar("Recebimentos Extraorçamentários")
     l_pag_extra = buscar("Pagamentos Extraorçamentários")
-
     dados = {
         # Receitas
         "receitas": {
@@ -110,7 +97,6 @@ def processar_bf(caminho):
             "saldo_seguinte": {"atual": val(l_saldo_seg, 4), "anterior": val(l_saldo_seg, 5)},
         }
     }
-
     # Calculando os totais
     dados["receitas"]["total"] = {
         "atual": dados["receitas"]["corrente"]["atual"] + dados["receitas"]["capital"]["atual"],
@@ -120,7 +106,6 @@ def processar_bf(caminho):
         "atual": dados["despesas"]["corrente"]["atual"] + dados["despesas"]["capital"]["atual"],
         "anterior": dados["despesas"]["corrente"]["anterior"] + dados["despesas"]["capital"]["anterior"]
     }
-
     # Geração Líquida de Caixa
     geracao_atual = (
         dados["receitas"]["total"]["atual"] + dados["extra"]["recebimentos"]["atual"]
@@ -130,20 +115,14 @@ def processar_bf(caminho):
         dados["receitas"]["total"]["anterior"] + dados["extra"]["recebimentos"]["anterior"]
         - dados["despesas"]["total"]["anterior"] - dados["extra"]["pagamentos"]["anterior"]
     )
-    
     dados["caixa"]["geracao_liquida"] = {"atual": geracao_atual, "anterior": geracao_anterior}
-
     return {"erro": False, "dados": dados}
-
-
 @router.get("/{periodo}")
 async def api_analise_financeira_bf(periodo: str):
     p_limpo = periodo.replace("-", "_")
     caminho = os.path.join(UPLOADS_DIR, f"BALANCO_FINANCEIRO_{p_limpo}.csv")
-
     if not os.path.exists(caminho):
         return {"erro": "faltando", "pecas": ["Balanco Financeiro"]}
-
     try:
         return processar_bf(caminho)
     except Exception as e:

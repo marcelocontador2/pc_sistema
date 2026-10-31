@@ -25,7 +25,6 @@
         #lista-historico input { margin-right: 5px; }
         #lista-historico small { color: #666; margin-left: 20px; }
     </style>
-
     <style id="estilo-voltar-laranja">
         .btn-voltar-laranja {
             background-color: #ff7f00 !important;
@@ -41,7 +40,6 @@
             cursor: pointer !important;
         }
     </style>
-
 </head>
 <body>
     <div class="top-bar" style="margin-bottom: 20px;">
@@ -50,14 +48,12 @@
         <button class="btn btn-vermelho" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-azul" onclick="gerarPDF()">Gerar PDF</button>
     </div>
-
     <div class="filtros">
         <label>Período:</label>
         <select id="periodo"><option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option></select>
         <button class="btn btn-azul" onclick="calcularLiquidez()">Verificar Índices</button>
         <button class="btn btn-verde" onclick="salvarRelatorio()" id="btn-salvar" style="display: none;">Confirmar e Salvar</button>
     </div>
-
     <div class="layout">
         <div class="sidebar">
             <h3>Histórico Salvo</h3>
@@ -70,13 +66,11 @@
             </div>
         </div>
     </div>
-
     <script>
         function formatarMoeda(valor) {
             if (valor === undefined || valor === null) return "R$ 0,00";
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
         }
-
         function desenharCards(liq, est, val) {
             return `
                 <div class="card"><h4>Liquidez Imediata</h4><div class="valor">${liq.liquidez_imediata}</div><div class="formula">(Caixa) / (Passivo Circulante)<br>(${formatarMoeda(val.caixa)}) / (${formatarMoeda(val.passivo_circulante)})</div></div>
@@ -88,12 +82,10 @@
                 <div class="card"><h4>Imobilização do PL</h4><div class="valor">${est.imobilizacao_pl}%</div><div class="formula">Ativo Permanente / PL<br>(${formatarMoeda(val.ativo_permanente)}) / (${formatarMoeda(val.patrimonio_liquido)})</div></div>
             `;
         }
-
         function calcularLiquidez() {
             const periodo = document.getElementById('periodo').value;
             const div = document.getElementById('resultado');
             div.innerHTML = '<p>Calculando...</p>';
-
             fetch('/api/calcular_liquidez/' + periodo)
                 .then(r => r.json())
                 .then(data => {
@@ -111,7 +103,6 @@
                 divErro.innerHTML = html;
                 return;
             }
-
                     if (data.detail) { div.innerHTML = '<p style="color:red;">Erro: ' + data.detail + '</p>'; return; }
                     div.innerHTML = desenharCards(data.liquidez, data.estrutura, data.valores);
                     document.getElementById('btn-salvar').style.display = 'inline-block';
@@ -119,13 +110,11 @@
                 })
                 .catch(err => { div.innerHTML = '<p style="color:red;">Erro de conexão.</p>'; });
         }
-
         function salvarRelatorio() {
             const btn = document.getElementById('btn-salvar');
             const periodo = document.getElementById('periodo').value;
             btn.innerText = "Salvando...";
             btn.disabled = true;
-
             // O backend espera o periodo na URL: /salvar_liquidez/{periodo}
             fetch('/salvar_liquidez/' + periodo, {
                 method: 'POST'
@@ -143,7 +132,6 @@
                 btn.disabled = false;
             });
         }
-
         function carregarHistorico() {
             const lista = document.getElementById('lista-historico');
             fetch('/historico_liquidez')
@@ -158,7 +146,6 @@
                 })
                 .catch(() => { lista.innerHTML = '<li>Erro ao carregar histórico.</li>'; });
         }
-
         function exibirSelecionado() {
             const check = document.querySelector(".check-historico:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
@@ -171,17 +158,14 @@
                 })
                 .catch(() => { div.innerHTML = '<p style="color:red;">Erro ao carregar histórico.</p>'; });
         }
-
         function excluirSelecionado() {
             const selecionados = document.querySelectorAll(".check-historico:checked");
             if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
             if (!confirm("Excluir os itens selecionados?")) return;
-            
             let promessas = [];
             selecionados.forEach(check => {
                 promessas.push(fetch("/excluir_liquidez/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false));
             });
-            
             Promise.all(promessas).then(resultados => {
                 if (resultados.some(r => r === true)) {
                     alert("Excluído com sucesso!");
@@ -191,13 +175,11 @@
                 }
             });
         }
-
         function gerarPDF() {
             const check = document.querySelector(".check-historico:checked");
             if (!check) { alert("Marque um relatório no histórico!"); return; }
             window.open('/gerar_pdf_liquidez/' + check.value, '_blank');
         }
-
         document.addEventListener("DOMContentLoaded", carregarHistorico);
     </script>
 </body>

@@ -31,7 +31,6 @@
         <button class="btn btn-voltar" onclick="window.location.href='/analise_custo_pessoal'">Voltar para Análise</button>
         <div id="msg" class="msg"></div>
     </div>
-
     <script>
         fetch('/api/configuracoes/custo_pessoal')
             .then(r => r.json())
@@ -40,11 +39,9 @@
                 const radio = document.querySelector(`input[name="entidade"][value="${valor}"]`);
                 if (radio) radio.checked = true;
             });
-
         function salvar() {
             const selecionado = document.querySelector('input[name="entidade"]:checked');
             if (!selecionado) { alert('Selecione uma opção.'); return; }
-            
             fetch('/api/configuracoes/custo_pessoal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

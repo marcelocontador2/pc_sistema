@@ -36,12 +36,10 @@
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
     </div>
-
     <div style="margin-bottom: 20px;">
         <div style="color: #a0aec0; font-size: 12px; text-transform: uppercase;">Análise Patrimonial</div>
         <h1 style="color: #003366; margin: 5px 0 20px 0; font-size: 26px;">Demonstração das Variações Patrimoniais (DVP)</h1>
     </div>
-
     <div class="filtros">
         <div>
             <label style="display:block; font-size:12px; margin-bottom:5px;">Período:</label>
@@ -52,7 +50,6 @@
         <button class="btn btn-verificar" onclick="carregar()">Verificar Patrimônio</button>
         <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
     </div>
-
     <div class="flex-layout">
         <div class="sidebar">
             <h3 style="font-size: 14px; margin-top: 0;">Histórico Salvo</h3>
@@ -60,7 +57,6 @@
                 <li>Carregando...</li>
             </ul>
         </div>
-
         <div style="flex: 1;">
             <div class="layout">
                 <div class="esq">
@@ -85,12 +81,10 @@
             </div>
         </div>
     </div>
-
     <script>
         let chart = null;
         function fmt(v) { return (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
         function fmtPct(v) { return (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%'; }
-
         function desenharTela(d, periodo) {
             const tb = document.querySelector('#tab tbody');
             const fmt = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -103,9 +97,7 @@
                 return '<td class="' + cls + '" style="text-align:right;">' + sg + fmtPct(v) + '</td>';
             };
             const fmtTd = v => '<td style="text-align:right;">' + fmt(v) + '</td>';
-
             let out = '';
-
             // BLOCO VPA
             out += '<tr style="background:#e8f4f8; font-weight:bold;"><td colspan="4" style="color:#003366;">VPA - VARIAÇÕES PATRIMONIAIS AUMENTATIVAS</td></tr>';
             out += '<tr><td>VPA Financeiras</td>' + fmtTd(d.vpa_financeiras.atual) + fmtTd(d.vpa_financeiras.anterior) + varTd(d.vpa_financeiras.atual, d.vpa_financeiras.anterior) + '</tr>';
@@ -113,7 +105,6 @@
             out += '<tr><td>Outras Variações Patrimoniais Aumentativas</td>' + fmtTd(d.outras_vpa.atual) + fmtTd(d.outras_vpa.anterior) + varTd(d.outras_vpa.atual, d.outras_vpa.anterior) + '</tr>';
             out += '<tr><td>Reversão de Provisões e Ajustes de Perdas</td>' + fmtTd(d.reversao_provisoes.atual) + fmtTd(d.reversao_provisoes.anterior) + varTd(d.reversao_provisoes.atual, d.reversao_provisoes.anterior) + '</tr>';
             out += '<tr style="font-weight:bold; border-top:1px solid #ccc;"><td>TOTAL VPA</td>' + fmtTd(d.total_vpa.atual) + fmtTd(d.total_vpa.anterior) + varTd(d.total_vpa.atual, d.total_vpa.anterior) + '</tr>';
-
             // BLOCO VPD
             out += '<tr style="background:#f8e8e8; font-weight:bold;"><td colspan="4" style="color:#dc3545;">VPD - VARIAÇÕES PATRIMONIAIS DIMINUTIVAS</td></tr>';
             out += '<tr><td>VPD Financeiras</td>' + fmtTd(d.vpd_financeiras.atual) + fmtTd(d.vpd_financeiras.anterior) + varTd(d.vpd_financeiras.atual, d.vpd_financeiras.anterior) + '</tr>';
@@ -126,15 +117,12 @@
             out += '<tr><td>Outras Variações Patrimoniais Diminutivas</td>' + fmtTd(d.outras_vpd.atual) + fmtTd(d.outras_vpd.anterior) + varTd(d.outras_vpd.atual, d.outras_vpd.anterior) + '</tr>';
             out += '<tr><td>Tributárias</td>' + fmtTd(d.tributarias.atual) + fmtTd(d.tributarias.anterior) + varTd(d.tributarias.atual, d.tributarias.anterior) + '</tr>';
             out += '<tr style="font-weight:bold; border-top:1px solid #ccc;"><td>TOTAL VPD</td>' + fmtTd(d.total_vpd.atual) + fmtTd(d.total_vpd.anterior) + varTd(d.total_vpd.atual, d.total_vpd.anterior) + '</tr>';
-
             // BLOCO RESULTADO
             const tipo = d.tipo_resultado.atual;
             const cor = tipo.includes("Superávit") ? "#003366" : "#dc3545";
             out += '<tr style="background:#eef5e8; font-weight:bold;"><td colspan="4" style="color:' + cor + ';">RESULTADO PATRIMONIAL</td></tr>';
             out += '<tr style="font-weight:bold;"><td>' + tipo + '</td>' + fmtTd(d.resultado.atual) + fmtTd(d.resultado.anterior) + varTd(d.resultado.atual, d.resultado.anterior) + '</tr>';
-
             tb.innerHTML = out;
-
             // Card de resultado
             const tipoAtual = d.tipo_resultado.atual;
             const corTipo = tipoAtual.includes("Superávit") ? "#003366" : "#dc3545";
@@ -143,22 +131,18 @@
                     '<div style="color:#666; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Resultado Patrimonial</div>' +
                     '<div style="font-weight:bold; font-size:16px; color:' + corTipo + '; margin-bottom:5px;">' + tipoAtual + '</div>' +
                     '<div style="font-size:32px; font-weight:bold; color:#003366; margin-bottom:15px;">R$ ' + fmt(d.resultado.atual) + '</div>' +
-                    
                     '<div style="font-size:12px; color:#888; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:15px;">' +
                         '(Total VPA - Total VPD)' +
                     '</div>' +
-                    
                     '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">' +
                         '<span style="color:#666; font-size:13px;">Período Anterior:</span>' +
                         '<span style="font-weight:bold; color:#444; font-size:13px;">R$ ' + fmt(d.resultado.anterior) + '</span>' +
                     '</div>' +
-                    
                     '<div style="display:flex; justify-content:space-between; align-items:center;">' +
                         '<span style="color:#666; font-size:13px;">Margem do Resultado:</span>' +
                         '<span style="font-weight:bold; font-size:16px; color:' + corTipo + ';">' + fmtPct(d.margem_resultado.atual) + '</span>' +
                     '</div>' +
                 '</div>';document.getElementById('concl').style.display = 'block';
-
             // Grafico de barras
             const ctx = document.getElementById('grafico');
             if (window.chart) window.chart.destroy();
@@ -190,7 +174,6 @@
             tb.innerHTML = '<tr><td colspan="4" style="text-align:center">Buscando...</td></tr>';
             document.getElementById('concl').style.display = 'none';
             document.getElementById('btn-salvar').style.display = 'none';
-
             fetch('/api/analise_patrimonial/' + p)
                 .then(r => r.json())
                 .then(resp => {
@@ -216,7 +199,6 @@
                 })
                 .catch(e => { tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:red;">Erro de conexão.</td></tr>'; });
         }
-
         function salvar() {
             const p = document.getElementById('periodo').value;
             const btn = document.getElementById('btn-salvar');
@@ -226,15 +208,12 @@
                 .then(d => { alert('Relatório salvo!'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; carregarHistorico(); })
                 .catch(e => { alert('Erro ao salvar.'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; });
         }
-
         function exibirSelecionado() {
             const check = document.querySelector(".check-historico:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
-            
             const tb = document.querySelector('#tab tbody');
             tb.innerHTML = '<tr><td colspan="4" style="text-align:center">Carregando histórico...</td></tr>';
             document.getElementById('concl').style.display = 'none';
-
             fetch('/historico_analise_patrimonial/' + check.value)
                 .then(r => r.json())
                 .then(resp => {
@@ -248,12 +227,10 @@
                 })
                 .catch(e => alert("Erro ao carregar o histórico."));
         }
-
         function excluirSelecionado() {
             const selecionados = document.querySelectorAll(".check-historico:checked");
             if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
             if (!confirm("Excluir " + selecionados.length + " itens?")) return;
-            
             let promessas = [];
             selecionados.forEach(check => {
                 promessas.push(fetch("/excluir_analise_patrimonial/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false));
@@ -262,13 +239,11 @@
                 if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); }
             });
         }
-
         function gerarPDF() {
             const check = document.querySelector(".check-historico:checked");
             if (!check) { alert("Marque um relatório no histórico para gerar o PDF!"); return; }
             window.open('/gerar_pdf_analise_patrimonial/' + check.value, '_blank');
         }
-
         function carregarHistorico() {
             fetch('/historico_analise_patrimonial')
                 .then(r => r.json())
@@ -286,7 +261,6 @@
                     document.getElementById('historico-lista').innerHTML = html;
                 });
         }
-
         document.addEventListener("DOMContentLoaded", carregarHistorico);
     </script>
 </body>

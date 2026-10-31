@@ -1,5 +1,4 @@
-﻿import psycopg2
-
+import psycopg2
 DB_CONFIG = {
     "host": "localhost",
     "port": 5433,
@@ -7,7 +6,6 @@ DB_CONFIG = {
     "user": "postgres",
     "password": "pc_admin_2026"
 }
-
 def get_connection():
     try:
         conn = psycopg2.connect(**DB_CONFIG)
@@ -15,7 +13,6 @@ def get_connection():
     except Exception as e:
         print(f"Erro ao conectar ao banco: {e}")
         return None
-
 def testar_conexao():
     conn = get_connection()
     if conn:
@@ -29,6 +26,5 @@ def testar_conexao():
         conn.close()
     else:
         print("Falha na conexao.")
-
 if __name__ == "__main__":
     testar_conexao()

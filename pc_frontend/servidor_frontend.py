@@ -2,10 +2,8 @@ import http.server
 import socketserver
 import urllib.request
 import urllib.error
-
 PORT = 3000
 API_BASE = "http://localhost:8000"
-
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         # Se for requisição para a API, redireciona
@@ -25,7 +23,6 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         else:
             # Serve arquivos estáticos (index.html, etc.)
             super().do_GET()
-
     def do_POST(self):
         if self.path.startswith("/upload") or self.path.startswith("/gerar-pptx"):
             content_length = int(self.headers.get('Content-Length', 0))
@@ -45,7 +42,6 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(502, f"Erro no proxy: {e.reason}")
         else:
             super().do_POST()
-
 if __name__ == "__main__":
     with socketserver.TCPServer(("", PORT), ProxyHandler) as httpd:
         print(f"Servidor do frontend (com proxy para API) rodando em http://localhost:{PORT}")

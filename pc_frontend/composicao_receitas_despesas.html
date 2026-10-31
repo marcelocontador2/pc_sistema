@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><title>Composição de Receitas e Despesas</title>
@@ -18,15 +18,11 @@ function ajustarOpcoes(selTipo, selVal){
 }
 document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('tipo_atual').addEventListener('change', function(){ ajustarOpcoes('tipo_atual','val_atual'); });
-  
   ajustarOpcoes('tipo_atual','val_atual');
-  
 });
-
 function exibirSelecionado() {
             const check = document.querySelector(".check-hist:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
-
             fetch('/historico_composicao_rd/' + check.value)
                 .then(r => r.json())
                 .then(resp => {
@@ -34,18 +30,15 @@ function exibirSelecionado() {
                         // Estrutura do JSON salvo:
                         // { atual: { receitas: {...}, despesas: {...} }, anterior: { receitas: {...}, despesas: {...} } }
                         const d = resp.dados;
-                        
                         // Renderiza Tabelas
                         renderTabela('tab-receitas', d.atual.receitas, d.anterior.receitas);
                         renderTabela('tab-despesas', d.atual.despesas, d.anterior.despesas);
-
                         // Renderiza Gráfico (a função renderChart espera {receitas: {...}})
                         renderChart({receitas: d.atual.receitas}, {receitas: d.anterior.receitas});
                     }
                 })
                 .catch(e => alert("Erro ao carregar o histórico: " + e.message));
         }
-
         function renderChart(a, b) {
             if(chart) chart.destroy();
             const ctx = document.getElementById('graf').getContext('2d');
@@ -64,7 +57,6 @@ function exibirSelecionado() {
                 }
             });
         }
-
 </script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
@@ -89,7 +81,6 @@ tr:nth-child(even){background:#f8fbff}
 .graf-box{background:#fff;padding:20px;border-radius:6px;border:1px solid #cbd5e1}
 h3.secao{color:#003366;margin:15px 0 8px 0;font-size:16px}
 </style>
-
 <style id="css-tabela-align">
 #tab-receitas, #tab-despesas { table-layout: fixed; width: 100%; }
 #tab-receitas th:nth-child(1), #tab-despesas th:nth-child(1) { width: 35%; text-align: left; }
@@ -109,10 +100,8 @@ h3.secao{color:#003366;margin:15px 0 8px 0;font-size:16px}
 <button class="btn" style="background:#dc3545" onclick="excluirSelecionado()">Excluir</button>
 <button class="btn" style="background:#0056b3" onclick="gerarPDF()">Gerar PDF</button>
 </div>
-
 <div class="hdr-sub">Composição</div>
 <div class="hdr-tit">Receitas e Despesas Comparativas</div>
-
 <div class="filtros" style="flex-wrap:wrap;gap:12px">
 <div style="display:flex;gap:6px;align-items:center;padding:8px;border:1px solid #cbd5e1;border-radius:4px;background:#f0f9ff">
 <strong style="color:#003366;font-size:12px">ATUAL:</strong>
@@ -138,7 +127,6 @@ h3.secao{color:#003366;margin:15px 0 8px 0;font-size:16px}
 <ul id="historico-lista"><li>Carregando...</li></ul>
 </div>
 <div class="main">
-
 <h3 class="secao">Receitas — comparativo (R$ mil)</h3>
 <div class="tab">
 <table id="tab-receitas">
@@ -146,7 +134,6 @@ h3.secao{color:#003366;margin:15px 0 8px 0;font-size:16px}
 <tbody><tr><td colspan="4" style="text-align:center">Clique em Verificar</td></tr></tbody>
 </table>
 </div>
-
 <h3 class="secao">Despesas — comparativo (R$ mil)</h3>
 <div class="tab">
 <table id="tab-despesas">
@@ -154,21 +141,15 @@ h3.secao{color:#003366;margin:15px 0 8px 0;font-size:16px}
 <tbody><tr><td colspan="4" style="text-align:center">Clique em Verificar</td></tr></tbody>
 </table>
 </div>
-
 <div class="graf-box">
 <canvas id="graf" style="min-height:350px"></canvas>
 </div>
-
 </div>
 </div>
-
 <script>
 let chart=null;
-
 function mp(a, t, v){ if(t==='EXERCICIO') return a; return a+'-'+t+'-'+v; }
-
 function carregar(){
-  
 const ano = document.getElementById('ano_atual').value;
   const tipo = document.getElementById('tipo_atual').value;
   const val = document.getElementById('val_atual').value;
@@ -198,7 +179,6 @@ const ano = document.getElementById('ano_atual').value;
             if (typeof chart !== 'undefined' && chart) { chart.destroy(); chart = null; }
             return;
         }
-
     if(a.erro){alert('Atual: '+a.mensagem);return;}
     if(b.erro){alert('Anterior: '+b.mensagem);return;}
     renderTabela('tab-receitas', a.receitas, b.receitas);
@@ -206,10 +186,8 @@ const ano = document.getElementById('ano_atual').value;
     renderChart(a, b);
   }).catch(e=>alert('Erro: '+e.message));
 }
-
 function fmtV(v){ return (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function pctVar(va, vb){ if(!vb||vb===0) return '-'; return (((va-vb)/Math.abs(vb))*100).toFixed(2).replace('.',',')+'%'; }
-
 function renderTabela(id, at, ant){
   const tb = document.querySelector('#'+id+' tbody');
   let html = '';
@@ -221,9 +199,6 @@ function renderTabela(id, at, ant){
   });
   tb.innerHTML = html;
 }
-
-
-
 function salvarComposicao(){
   const ano = document.getElementById('ano_atual').value;
   const tipo = document.getElementById('tipo_atual').value;
@@ -235,7 +210,6 @@ function salvarComposicao(){
     .then(()=>{ alert('Relatorio salvo com sucesso!'); carregarHistorico(); })
     .catch(e=>alert('Erro ao salvar: '+e.message));
 }
-
 function carregarHistorico(){
   const el = document.getElementById('historico-lista');
   fetch('/historico_composicao_receitas_despesas')
@@ -248,9 +222,6 @@ function carregarHistorico(){
     })
     .catch(()=>{ el.innerHTML='<li>Erro ao carregar.</li>'; });
 }
-
-
-
 function excluirSelecionado(){
   const sel = document.querySelectorAll('.check-hist:checked');
   if(sel.length===0){ alert('Selecione um item.'); return; }
@@ -258,13 +229,11 @@ function excluirSelecionado(){
   Promise.all([...sel].map(c=>fetch('/excluir_composicao_receitas_despesas/'+c.value,{method:'DELETE'}).then(r=>r.ok).catch(()=>false)))
     .then(rs=>{ if(rs.some(x=>x)){ alert('Excluído!'); carregarHistorico(); } });
 }
-
 function gerarPDF(){
   const ck = document.querySelector('.check-hist:checked');
   if(!ck){ alert('Marque um item.'); return; }
   window.open('/gerar_pdf_composicao_receitas_despesas/'+ck.value, '_blank');
 }
-
 function ajustarOpcoes(selTipo, selVal){
   const tipo = document.getElementById(selTipo).value;
   const val = document.getElementById(selVal);
@@ -278,7 +247,6 @@ function ajustarOpcoes(selTipo, selVal){
     val.innerHTML = '<option value="">Anual</option>';
   }
 }
-
 document.addEventListener('DOMContentLoaded', function(){
   carregarHistorico();
   const t = document.getElementById('tipo_atual');
@@ -288,7 +256,6 @@ document.addEventListener('DOMContentLoaded', function(){
 function exibirSelecionado() {
             const check = document.querySelector(".check-hist:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
-
             fetch('/historico_composicao_rd/' + check.value)
                 .then(r => r.json())
                 .then(resp => {
@@ -296,18 +263,15 @@ function exibirSelecionado() {
                         // Estrutura do JSON salvo:
                         // { atual: { receitas: {...}, despesas: {...} }, anterior: { receitas: {...}, despesas: {...} } }
                         const d = resp.dados;
-                        
                         // Renderiza Tabelas
                         renderTabela('tab-receitas', d.atual.receitas, d.anterior.receitas);
                         renderTabela('tab-despesas', d.atual.despesas, d.anterior.despesas);
-
                         // Renderiza Gráfico (a função renderChart espera {receitas: {...}})
                         renderChart({receitas: d.atual.receitas}, {receitas: d.anterior.receitas});
                     }
                 })
                 .catch(e => alert("Erro ao carregar o histórico: " + e.message));
         }
-
         function renderChart(a, b) {
             if(chart) chart.destroy();
             const ctx = document.getElementById('graf').getContext('2d');
@@ -326,6 +290,5 @@ function exibirSelecionado() {
                 }
             });
         }
-
 </script>
 </body></html>

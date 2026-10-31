@@ -1,766 +1,175 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-
-
-
-
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-
-
 <title>PC - Prestacao de Contas | COFEN</title>
-
-
-
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-
-
-
 <style>
-
-
-
 :root{--cofen-blue:#0072BA;--cofen-gray:#878787;--cofen-dark:#1D1D1D;--cofen-white:#FFF;--cofen-light-gray:#F5F5F5;--cofen-border:#E0E0E0}
-
-
-
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif}
-
-
-
 body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;height:100vh}
-
-
-
 .sidebar{width:280px;background:var(--cofen-white);border-right:1px solid var(--cofen-border);display:flex;flex-direction:column;padding:20px 0;overflow-y:auto}
-
-
-
 .logo-area{padding:0 20px 20px;border-bottom:1px solid var(--cofen-border);margin-bottom:20px}
-
-
-
 .logo-area h1{color:var(--cofen-blue);font-size:24px}
-
-
-
 .logo-area p{color:var(--cofen-gray);font-size:12px;margin-top:5px}
-
-
-
 .nav-menu{list-style:none;padding:0 10px}
-
-
-
 .nav-menu a{display:flex;align-items:center;padding:12px 15px;text-decoration:none;color:var(--cofen-dark);font-weight:500;font-size:14px;border-radius:8px;cursor:pointer}
-
-
-
 .nav-menu a:hover,.nav-menu a.active{background:var(--cofen-blue);color:#fff}
-
-
-
 .submenu{list-style:none;padding-left:35px;display:none}
-
-
-
 .submenu.open{display:block}
-
-
-
 .submenu li a{padding:8px 15px;font-size:13px;color:var(--cofen-gray)}
-
-
-
 .submenu li a.active{color:var(--cofen-blue);font-weight:700;background:transparent}
-
-
-
 .main-content{flex:1;display:flex;flex-direction:column;overflow-y:auto}
-
-
-
 .header{background:var(--cofen-white);padding:15px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--cofen-border)}
-
-
-
 .user-avatar{width:32px;height:32px;background:var(--cofen-blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600}
-
-
-
 .content-area{padding:30px;display:none}
-
-
-
 .content-area.active{display:block}
-
-
-
 .page-title{font-size:24px;font-weight:700;margin-bottom:20px}
-
-
-
 .top-bar{display:flex;justify-content:space-between;align-items:center;background:#fff;padding:15px 20px;border-radius:8px;border:1px solid var(--cofen-border);margin-bottom:30px;flex-wrap:wrap;gap:15px}
-
-
-
 .filter-group{display:flex;align-items:center;gap:10px}
-
-
-
 .filter-group select{padding:10px 15px;border:1px solid var(--cofen-border);border-radius:6px;min-width:200px;font-size:14px;outline:none}
-
-
-
 .filter-group select:focus{border-color:var(--cofen-blue)}
-
-
-
 .action-group{display:flex;gap:10px;opacity:0;pointer-events:none;transition:opacity .3s}
-
-
-
 .action-group.active{opacity:1;pointer-events:auto}
-
-
-
 .btn-action{padding:10px 16px;font-size:13px;font-weight:600;border-radius:6px;cursor:pointer;border:1px solid transparent;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .2s}
-
-
-
 .btn-pdf{color:#c62828;border-color:#ffcdd2;background:#ffebee}
-
-
-
 .btn-pdf:hover{background:#ffcdd2}
-
-
-
 .btn-excel{color:#2e7d32;border-color:#c8e6c9;background:#e8f5e9}
-
-
-
 .btn-excel:hover{background:#c8e6c9}
-
-
-
 .btn-pptx{color:#ef6c00;border-color:#ffe0b2;background:#fff3e0}
-
-
-
 .btn-pptx:hover{background:#ffe0b2}
-
-
-
 .reports-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:20px}
-
-
-
 .report-card{background:#fff;border-radius:12px;border:1px solid var(--cofen-border);box-shadow:0 4px 10px rgba(0,0,0,0.05);display:flex;align-items:center;padding:25px;text-decoration:none;color:inherit;transition:transform .2s,box-shadow .2s;cursor:pointer}
-
-
-
 .report-card:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,0.1);border-color:var(--cofen-blue)}
-
-
-
 .report-icon{width:56px;height:56px;background:#e3f2fd;color:var(--cofen-blue);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-right:20px;flex-shrink:0}
-
-
-
 .report-icon svg{width:32px;height:32px}
-
-
-
 .report-info h3{font-size:20px;color:var(--cofen-blue);margin-bottom:6px}
-
-
-
 .report-info p{font-size:14px;color:var(--cofen-gray)}
-
-
-
 .report-info span{font-size:13px;color:var(--cofen-blue);font-weight:600;margin-top:8px;display:block}
-
-
-
 .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:15px;margin-bottom:20px}
-
-
-
 .card{background:#fff;padding:20px;border-radius:12px;border:1px solid var(--cofen-border)}
-
-
-
 .card-label{display:block;font-size:12px;color:var(--cofen-gray);margin-bottom:5px}
-
-
-
 .card-value{font-size:20px;font-weight:700;color:var(--cofen-blue)}
-
-
-
 .empty-state{text-align:center;padding:40px;color:var(--cofen-gray);background:#fff;border-radius:12px;border:1px dashed var(--cofen-border)}
-
-
-
 .upload-box{display:none}
-
-
-
 </style>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         <style>
-
-
-
             /* Força o alinhamento à esquerda em todos os links do menu lateral */
-
-
-
             .menu-lateral a, .sidebar a, ul li a {
-
-
-
                 padding-left: 10px !important;
-
-
-
                 display: block;
-
-
-
             }
-
-
-
             /* Zera a margem padrão das listas para não empurrar */
-
-
-
             .menu-lateral ul, .sidebar ul, ul {
-
-
-
                 padding-left: 0 !important;
-
-
-
                 margin-left: 0 !important;
-
-
-
                 list-style: none !important;
-
-
-
             }
-
-
-
         </style>
-
-
-
-
-
-
-
-
-
-
-
         <style>
-
-
-
             /* Efeito sensível (hover) no menu */
-
-
-
             ul li a:hover {
-
-
-
                 background-color: #0056b3 !important;
-
-
-
                 color: #ffffff !important;
-
-
-
                 border-radius: 6px;
-
-
-
                 transition: background-color 0.2s ease;
-
-
-
             }
-
-
-
         </style>
-
-
-
-
-
-
-
-
-
-
-
         <style>
-
-
-
             /* Efeito sensível (hover) no menu */
-
-
-
             ul li a:hover {
-
-
-
                 background-color: #0056b3 !important;
-
-
-
                 color: #ffffff !important;
-
-
-
                 border-radius: 6px;
-
-
-
                 transition: background-color 0.2s ease;
-
-
-
             }
-
-
-
         </style>
-
-
-
-
-
-
-
-
-
-
-
         <style>
-
-
-
             /* 1. Tira o sublinhado e ajusta o tamanho dos menus principais */
-
-
-
             ul li a {
-
-
-
                 padding: 12px 20px !important; /* 20px de respiro na esquerda */
-
-
-
                 font-size: 15px !important;
-
-
-
                 font-weight: 600 !important;
-
-
-
                 color: #2c3e50 !important;
-
-
-
                 letter-spacing: 0.3px;
-
-
-
                 border-radius: 4px;
-
-
-
                 transition: all 0.2s;
-
-
-
             }
-
-
-
-
-
-
-
             /* 2. Deixa os submenus (Balancete, DFC, etc.) mais delicados */
-
-
-
             ul.submenu li a {
-
-
-
                 padding: 8px 20px 8px 40px !important; /* 40px de recuo para mostrar hierarquia */
-
-
-
                 font-size: 13px !important;
-
-
-
                 font-weight: 400 !important;
-
-
-
                 color: #666666 !important;
-
-
-
                 letter-spacing: 0.1px;
-
-
-
             }
-
-
-
-
-
-
-
             /* 3. Efeito de hover (fundo azul) para dar sensação de clique */
-
-
-
             ul li a:hover {
-
-
-
                 background-color: #0056b3 !important;
-
-
-
                 color: #ffffff !important;
-
-
-
             }
-
-
-
         </style>
-
-
-
-
-
-
-
-
-
-
-
     <style id="estilo-voltar-laranja">
-
-
-
         .btn-voltar-laranja {
-
-
-
             background-color: #ff7f00 !important;
-
-
-
             border-color: #ff7f00 !important;
-
-
-
             border-radius: 50px !important;
-
-
-
             color: white !important;
-
-
-
             padding: 8px 20px !important;
-
-
-
             font-weight: bold !important;
-
-
-
             text-decoration: none !important;
-
-
-
             display: inline-block !important;
-
-
-
             border: none !important;
-
-
-
             box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-
-
-
             cursor: pointer !important;
-
-
-
         }
-
-
-
     </style>
-
-
-
-
-
-
-
-
 </head>
 <body>
 <aside class="sidebar">
-
-
-
   <div class="logo-area"><img src="/pc_frontend/logo-cofen.png" alt="Logo COFEN" style="max-height: 40px; width: auto; display: block;"></div>
-
-
-
   <ul style="padding-left: 60px; margin-left: 0; list-style: none;">
-
-
-
-    
-
-
-
     <li><a href="#" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
-
-
-
     <li><a href="/base_legal" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Base Legal</a></li>
-
-
-
-    
-
-
-
     <li>
-
-
-
       <a id="menu-demonstracoes" class="active" onclick="toggleSubmenu(this)">Demonstrações Contábeis</a>
-
-
-
       <ul class="submenu" id="submenu-demonstracoes" style="list-style: none; padding-left: 0; margin-left: 0;">
-
-
-
         <li><a id="submenu-balancete" onclick="carregarRelatorio(\'BALANCETE\')">Balancete</a></li>
-
-
-
         <li><a id="submenu-bp" onclick="carregarRelatorio(\'BALANCO_PATRIMONIAL\')">Balanço Patrimonial</a></li>
-
-
-
         <li><a id="submenu-bo" onclick="mostrarTela('demonstracoes','BALANCO_ORCAMENTARIO')">Balanço Orçamentário</a></li>
-
-
-
         <li><a id="submenu-bf" onclick="mostrarTela('demonstracoes','BALANCO_FINANCEIRO')">Balanço Financeiro</a></li>
-
-
-
         <li><a id="submenu-dfc" onclick="mostrarTela('demonstracoes','DFC')">DFC</a></li>
-
-
-
         <li><a id="submenu-dvp" onclick="mostrarTela('demonstracoes','DVP')">DVP</a></li>
-
-
-
         <li><a id="submenu-dmpl" onclick="mostrarTela('demonstracoes','DMPL')">DMPL</a></li>
-
-
-
-      
-
-
-
         <li><a href="/conferencia" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Conferência das Demonstrações</a></li>
-
-
-
         <li><a href="/integridade" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
-
-
-
     <li><a href="/analise_orcamentaria" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Análise Orçamentária</a>
-
-
-
         <a href="/analise_financeira_bf" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Análise Financeira-BF</a>
-
-
-
             <a href="/analise_patrimonial" style="text-decoration:none; color:inherit;" class="menu-item">Análise Patrimonial</a></li>
-
-
-
     <li><a href="/composicao_receitas_despesas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Composição Receitas/Despesas</a></li>
-
-
-
 <li><a href="/liquidez" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Índices de Liquidez</a></li>
-
-
-
     <li><a href="/panorama" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Resultados Gerais</a></li>
-
-
-
-        
-
-
-
     </ul>
-
-
-
     </li>
-
-
-
-    
-
-
-
   </ul>
-
-
-
 </aside>
 <main class="main-content">
     <header class="header">
-
-
-
     <h2 id="header-title" style="color: #0072BA; font-size: 18px; font-weight: bold; margin: 0;">SIGPC - SISTEMA DE GESTÃO DE PRESTAÇÃO DE CONTAS</h2>
-
-
-
     <div style="display:flex;align-items:center;gap:10px"><span>Marcelo Medeiros</span><div class="user-avatar">MM</div></div>
-
-
-
   </header>
     <div style="padding: 30px;">
         <h1 style="color: #0a1c3a;">Normas e Legislação</h1>
         <div style="flex: 1; background: #e9f2fa; padding: 20px; border-radius: 8px;">
-
-
-
-
                 <h3 style="color: #003366; margin-top: 0;">Legislação e Normas Aplicadas</h3>
-
-
-
-
                 <ul style="line-height: 2;">
-
-
-
-
                     <li>Lei nº 4.320/1964</li>
-
-
-
-
                     <li>Resolução Cofen nº 814/2026</li>
-
-
-
-
                     <li>Manual de Contabilidade Aplicada ao Setor Público (MCASP)</li>
-
-
-
-
                     <li>Resolução COFEN nº 340/2008 (Regulamento da Administração Financeira e Contábil)</li>
-
-
-
-
 <li>Resolução COFEN nº 764/2024 (Prestação de Contas)</li>
-
-
-
-
                     <li>Normas Brasileiras de Contabilidade – Setor Público (NBC TSP)</li>
-
-
-
-
-                    
-
-
-
-
-                    
-
-
-
-
                 </ul>
-
-
-
-
             </div>
         <div class="card-legislacao" style="margin-top: 20px; background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px;">
             <h4 style="color: #0a1c3a; margin-top: 0;">Resolução COFEN nº 814, de 20 de agosto de 2026</h4>

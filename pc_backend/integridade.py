@@ -1,17 +1,14 @@
-﻿import os
+import os
 import re
 import csv
 from fastapi import APIRouter
-
 router = APIRouter()
-
 def _get_csv(tipo, periodo):
     pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
     p_limpo = re.sub(r'[^A-Z0-9]', '_', str(periodo).upper()).strip('_')
     nome = f"{tipo}_{p_limpo}.csv"
     caminho = os.path.join(pasta, nome)
     return caminho if os.path.exists(caminho) else None
-
 def _limpar_valor(valor):
     if not valor: return 0.0
     v = str(valor).upper().replace("R$", "").replace(" ", "").replace("\n", "").replace("\r", "").strip()
@@ -22,18 +19,14 @@ def _limpar_valor(valor):
     elif ',' in v: v = v.replace(",", ".")
     try: return float(v) * mult
     except: return 0.0
-
 def _fmt(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
 def _ler_linhas(caminho):
     with open(caminho, 'r', encoding='latin-1', errors='ignore') as f:
         reader = csv.reader(f, delimiter=';')
         return [row for row in reader]
-
 @router.get("/analise_integridade/{periodo}")
 async def analise_integridade(periodo: str):
     resultados = []
-    
     # ==========================================
     # 1. BALANÇO PATRIMONIAL (BP)
     # ==========================================
@@ -41,14 +34,12 @@ async def analise_integridade(periodo: str):
     if path_bp:
         linhas = _ler_linhas(path_bp)
         ativo, passivo = 0.0, 0.0
-        
         for p in linhas:
             if len(p) >= 4:
                 if p[0].strip().upper() == "TOTAL":
                     ativo = _limpar_valor(p[1])
                     passivo = _limpar_valor(p[3])
                     break
-                    
         diff = ativo - passivo
         status = "OK" if abs(diff) < 0.05 else "ERRO"
         resultados.append({
@@ -62,7 +53,6 @@ async def analise_integridade(periodo: str):
             "status": status,
             "mensagem": "Ativo e Passivo estão perfeitamente equilibrados." if status == "OK" else f"Atenção: Diferença de {_fmt(diff)}."
         })
-
     # ==========================================
     # ==========================================
     # ==========================================
@@ -86,21 +76,16 @@ async def analise_integridade(periodo: str):
     path_bf = _get_csv("BALANCO_FINANCEIRO", periodo)
     if path_bf:
         linhas = _ler_linhas(path_bf)
-        
         saldo_ant, rec_orc, rec_extra = 0.0, 0.0, 0.0
         desp_orc, desp_extra, saldo_seg = 0.0, 0.0, 0.0
-        
         def norm(t):
             if not t: return ""
             t = str(t).upper().replace("Ç", "C")
             return re.sub(r'[^A-Z0-9]', '', t)
-
         for p in linhas:
             if not p or len(p) < 5: continue
-            
             c0 = norm(p[0])
             c3 = norm(p[3])
-            
             # ==========================================
             # LADO ESQUERDO (INGRESSOS)
             # ==========================================
@@ -111,7 +96,6 @@ async def analise_integridade(periodo: str):
                 rec_extra = _limpar_valor(p[1])
             elif "SALDO" in c0 and "ANTERIOR" in c0:
                 saldo_ant = _limpar_valor(p[1])
-                
             # ==========================================
             # LADO DIREITO (DISPÊNDIOS)
             # ==========================================
@@ -122,14 +106,11 @@ async def analise_integridade(periodo: str):
                 desp_extra = _limpar_valor(p[4])
             elif "SALDO" in c3 and "SEGUINTE" in c3:
                 saldo_seg = _limpar_valor(p[4])
-
         # Cálculo conforme a IPC 06
         total_ingressos = rec_orc + rec_extra
         total_dispendios = desp_orc + desp_extra
-        
         diff = abs((saldo_ant + total_ingressos) - (total_dispendios + saldo_seg))
         status = "OK" if diff < 0.05 else "ERRO"
-        
         resultados.append({
             "titulo": "Balanço Financeiro (BF)",
             "conceito": "Conforme a IPC 06 da STN: Total de Ingressos = Receita Orçamentária + Recebimentos Extraorçamentários. Total de Dispêndios = Despesa Orçamentária + Pagamentos Extraorçamentários.",
@@ -147,14 +128,12 @@ async def analise_integridade(periodo: str):
             "status": status,
             "mensagem": "A conta fecha perfeitamente com os valores do Exercício Atual." if status == "OK" else f"Atenção: Diferença de {_fmt(diff)}."
         })
-
     # ==========================================# 3. DEMONSTRAÇÃO DO FLUXO DE CAIXA (DFC)
     # ==========================================
     path_dfc = _get_csv("DFC", periodo)
     if path_dfc:
         linhas = _ler_linhas(path_dfc)
         caixa_ini, geracao_liq, caixa_fim = 0.0, 0.0, 0.0
-        
         for p in linhas:
             l_up = ";".join(p).upper()
             if "CAIXA E EQUIVALENTES DE CAIXA INICIAL" in l_up:
@@ -172,7 +151,6 @@ async def analise_integridade(periodo: str):
                     if any(c.isdigit() for c in val):
                         caixa_fim = _limpar_valor(val)
                         break
-
         diff = abs((caixa_ini + geracao_liq) - caixa_fim)
         status = "OK" if diff < 0.05 else "ERRO"
         resultados.append({
@@ -188,7 +166,6 @@ async def analise_integridade(periodo: str):
             "status": status,
             "mensagem": "O fluxo de caixa fecha perfeitamente com a IPC 08." if status == "OK" else f"Erro: Diferença de {_fmt(diff)}."
         })
-
     # ==========================================
     # 4. DEMONSTRAÇÃO DAS VARIAÇÕES PATRIMONIAIS (DVP)
     # ==========================================
@@ -196,20 +173,16 @@ async def analise_integridade(periodo: str):
     if path_dvp:
         linhas = _ler_linhas(path_dvp)
         vpa, vpd = 0.0, 0.0
-        
         for p in linhas:
             l_up = ";".join(p).upper()
             if "PATRIMONIAL AUMENTATIVA" in l_up and len(p) > 2:
                 vpa = _limpar_valor(p[2])
             if "PATRIMONIAL DIMINUTIVA" in l_up and len(p) > 6:
                 vpd = _limpar_valor(p[6])
-
         resultado_patrimonial = vpa - vpd
         total_dvp = resultado_patrimonial + vpd
-        
         diff = abs(total_dvp - vpa)
         status = "OK" if diff < 0.05 else "ERRO"
-        
         resultados.append({
             "titulo": "Demonstração das Variações Patrimoniais (DVP)",
             "conceito": "Conforme a IPC 05 da STN e NBC TSP 13, o Resultado Patrimonial (VPA - VPD) deve fechar a equação.",
@@ -223,7 +196,6 @@ async def analise_integridade(periodo: str):
             "status": status,
             "mensagem": "A DVP está matematicamente fechada conforme a IPC 05." if status == "OK" else f"Atenção: Diferença de {_fmt(diff)}."
         })
-
     # ==========================================
     # 5. BALANÇO ORÇAMENTÁRIO (BO)
     # ==========================================
@@ -231,7 +203,6 @@ async def analise_integridade(periodo: str):
     if path_bo:
         linhas = _ler_linhas(path_bo)
         rec_real, desp_emp, sup_def = 0.0, 0.0, 0.0
-        
         for p in linhas:
             l_up = ";".join(p).upper()
             if "RECEITAS CORRENTE" in l_up and len(p) > 6:
@@ -243,7 +214,6 @@ async def analise_integridade(periodo: str):
                     if any(c.isdigit() for c in val):
                         sup_def = _limpar_valor(val)
                         break
-
         status = "OK" if rec_real > 0 and desp_emp > 0 else "ALERTA"
         resultados.append({
             "titulo": "Balanço Orçamentário (BO)",
@@ -256,7 +226,6 @@ async def analise_integridade(periodo: str):
             "status": status,
             "mensagem": "Execução orçamentária calculada." if status == "OK" else "Verifique os totais do BO."
         })
-
     # ==========================================
     # ==========================================
     # ==========================================
@@ -267,45 +236,37 @@ async def analise_integridade(periodo: str):
     if path_dmpl:
         linhas = _ler_linhas(path_dmpl)
         saldo_ini, res_exerc, saldo_fim = 0.0, 0.0, 0.0
-        
         import unicodedata
-        
         def norm(t):
             if not t: return ""
             # Remove acentos mantendo a letra base (ex: í -> i)
             t = str(t).upper().replace("Ç", "C")
             t = ''.join(c for c in unicodedata.normalize('NFD', t) if unicodedata.category(c) != 'Mn')
             return re.sub(r'[^A-Z0-9]', '', t)
-
         for p in linhas:
             if not p or len(p) < 5: continue
             c0 = norm(p[0])
-
             # 1. Saldos Iniciais (Última coluna válida)
             if "SALDOSINICIAIS" in c0:
                 for val in reversed(p):
                     if val and any(char.isdigit() for char in val):
                         saldo_ini = _limpar_valor(val)
                         break
-                        
             # 2. Resultado do Período
             elif "RESULTADODOPERIODO" in c0:
                 for val in reversed(p):
                     if val and any(char.isdigit() for char in val):
                         res_exerc = _limpar_valor(val)
                         break
-                        
             # 3. Saldos Finais (Última coluna válida)
             elif "SALDOSFINAIS" in c0:
                 for val in reversed(p):
                     if val and any(char.isdigit() for char in val):
                         saldo_fim = _limpar_valor(val)
                         break
-
         # Fórmula: Saldo Inicial + Resultado = Saldo Final
         diff = abs((saldo_ini + res_exerc) - saldo_fim)
         status = "OK" if diff < 0.05 else "ALERTA"
-        
         resultados.append({
             "titulo": "Demonstração das Mutações do PL (DMPL)",
             "conceito": "Conforme o MCASP e a NBC TSP 11, o Saldo Final do PL é a soma do Saldo Inicial com o Resultado do Período.",
@@ -318,6 +279,5 @@ async def analise_integridade(periodo: str):
             "status": status,
             "mensagem": "Mutações do PL consistentes." if status == "OK" else "Atenção ao fechamento do DMPL."
         })
-
     # ==========================================
     return {"analises": resultados}

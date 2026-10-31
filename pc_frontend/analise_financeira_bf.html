@@ -1,18 +1,16 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><title>Análise Financeira-BF</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js">function exibirSelecionado() {
             const check = document.querySelector(".check-hist:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
-
             fetch('/historico_analise_financeira_bf/' + check.value)
                 .then(r => r.json())
                 .then(resp => {
                     if (resp.periodo_atual) {
                         // Extrai o período atual salvo (ex: 2026-TRIMESTRE-3)
                         const periodoSalvo = resp.periodo_atual;
-                        
                         // Reconstrói os selects (ano, tipo, val) com base no período
                         const partes = periodoSalvo.split('-');
                         if (partes.length === 3) {
@@ -20,7 +18,6 @@
                             document.getElementById('tipo').value = partes[1];
                             document.getElementById('val').value = partes[2];
                         }
-                        
                         // Chama a mesma função do botão "Verificar" para recalcular e desenhar
                         // Isso garante que os dados do período anterior sejam buscados novamente
                         carregar(); 
@@ -28,13 +25,6 @@
                 })
                 .catch(e => alert("Erro ao carregar o histórico: " + e.message));
         }
-
-        
-
-
-        
-
-
         function render(at, ant) {
             const tb = document.querySelector('#tab tbody');
             const fmtV = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -55,7 +45,6 @@
             };
             const header = (label, color) => '<tr style="background:' + color + '; font-weight:bold; color:#fff;"><td colspan="4">' + label + '</td></tr>';
             const blank = () => '<tr><td colspan="4" style="height:5px; border:none;"></td></tr>';
-
             const R = {
                 rec: {
                     corr: safe(at.receitas && at.receitas.corrente),
@@ -77,7 +66,6 @@
                     seg: safe(at.caixa && at.caixa.saldo_seguinte),
                 }
             };
-
             let out = '';
             out += header('RECEITAS', '#003366');
             out += line('Receitas Correntes', R.rec.corr.atual, R.rec.corr.anterior);
@@ -97,9 +85,7 @@
             out += line('Saldo em Especie do Exerc. Anterior', R.caixa.ant.atual, R.caixa.ant.anterior);
             out += line('Geracao Liquida de Caixa', R.caixa.ger.atual, R.caixa.ger.anterior, true);
             out += line('Saldo em Especie para o Exerc. Seguinte', R.caixa.seg.atual, R.caixa.seg.anterior, true);
-
             tb.innerHTML = out;
-
             const ctx = document.getElementById('graf');
             if (!ctx) return;
             if (typeof chart !== 'undefined' && chart) chart.destroy();
@@ -295,7 +281,6 @@
                     }
                 }
             });        }
-
 </script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
@@ -358,9 +343,7 @@ let chart=null;
 function mp(a,t,v){ if(t==='EXERCICIO') return a; return a+'-'+t+'-'+v; }
 function fmt(v){ return (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function pct(va,vb){ if(!vb||vb===0) return '-'; return (((va-vb)/Math.abs(vb))*100).toFixed(2).replace('.',',')+'%'; }
-
 function carregar(){
-  
 const ano = document.getElementById('ano').value;
   const tipo = document.getElementById('tipo').value;
   const val = document.getElementById('val').value;
@@ -386,7 +369,6 @@ const ano = document.getElementById('ano').value;
             if (typeof chart !== 'undefined' && chart) { chart.destroy(); chart = null; }
             return;
         }
-
       if(a.erro){alert(a.mensagem);return;}
       // Os dois periodos ja vem no mesmo JSON: a.dados
       document.getElementById('btn-confirmar').style.display = 'inline-block';
@@ -395,9 +377,6 @@ const ano = document.getElementById('ano').value;
       render(a.dados, a.dados);
     }).catch(e=>alert('Erro: '+e.message));
 }
-
-
-
 function salvar(){
   const btn = document.getElementById('btn-confirmar');
   const pA = btn.getAttribute('data-periodo-atual');
@@ -417,7 +396,6 @@ function salvar(){
       .catch(e=>alert('Erro: '+e.message));
   });
 }
-
 function carregarHistorico(){
   const el = document.getElementById('historico-lista');
   fetch('/historico_analise_financeira_bf').then(r=>r.json()).then(d=>{
@@ -427,7 +405,6 @@ function carregarHistorico(){
     el.innerHTML = html;
   }).catch(()=>{el.innerHTML='<li>Erro.</li>';});
 }
-
 function excluirSelecionado(){
   const sel = document.querySelectorAll('.check-hist:checked');
   if(sel.length===0){alert('Selecione um item.');return;}
@@ -444,14 +421,12 @@ document.addEventListener('DOMContentLoaded', carregarHistorico);
 function exibirSelecionado() {
             const check = document.querySelector(".check-hist:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
-
             fetch('/historico_analise_financeira_bf/' + check.value)
                 .then(r => r.json())
                 .then(resp => {
                     if (resp.periodo_atual) {
                         // Extrai o período atual salvo (ex: 2026-TRIMESTRE-3)
                         const periodoSalvo = resp.periodo_atual;
-                        
                         // Reconstrói os selects (ano, tipo, val) com base no período
                         const partes = periodoSalvo.split('-');
                         if (partes.length === 3) {
@@ -459,7 +434,6 @@ function exibirSelecionado() {
                             document.getElementById('tipo').value = partes[1];
                             document.getElementById('val').value = partes[2];
                         }
-                        
                         // Chama a mesma função do botão "Verificar" para recalcular e desenhar
                         // Isso garante que os dados do período anterior sejam buscados novamente
                         carregar(); 
@@ -467,7 +441,6 @@ function exibirSelecionado() {
                 })
                 .catch(e => alert("Erro ao carregar o histórico: " + e.message));
         }
-
         function render(at, ant) {
             const tb = document.querySelector('#tab tbody');
             const fmtV = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -488,7 +461,6 @@ function exibirSelecionado() {
             };
             const header = (label, color) => '<tr style="background:' + color + '; font-weight:bold; color:#fff;"><td colspan="4">' + label + '</td></tr>';
             const blank = () => '<tr><td colspan="4" style="height:5px; border:none;"></td></tr>';
-
             const R = {
                 rec: {
                     corr: safe(at.receitas && at.receitas.corrente),
@@ -510,7 +482,6 @@ function exibirSelecionado() {
                     seg: safe(at.caixa && at.caixa.saldo_seguinte),
                 }
             };
-
             let out = '';
             out += header('RECEITAS', '#003366');
             out += line('Receitas Correntes', R.rec.corr.atual, R.rec.corr.anterior);
@@ -530,9 +501,7 @@ function exibirSelecionado() {
             out += line('Saldo em Especie do Exerc. Anterior', R.caixa.ant.atual, R.caixa.ant.anterior);
             out += line('Geracao Liquida de Caixa', R.caixa.ger.atual, R.caixa.ger.anterior, true);
             out += line('Saldo em Especie para o Exerc. Seguinte', R.caixa.seg.atual, R.caixa.seg.anterior, true);
-
             tb.innerHTML = out;
-
             const ctx = document.getElementById('graf');
             if (!ctx) return;
             if (typeof chart !== 'undefined' && chart) chart.destroy();
@@ -607,8 +576,6 @@ function exibirSelecionado() {
                 }
             });
         }
-
-
         function render(at, ant) {
             const tb = document.querySelector('#tab tbody');
             const fmtV = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -629,7 +596,6 @@ function exibirSelecionado() {
             };
             const header = (label, color) => '<tr style="background:' + color + '; font-weight:bold; color:#fff;"><td colspan="4">' + label + '</td></tr>';
             const blank = () => '<tr><td colspan="4" style="height:5px; border:none;"></td></tr>';
-
             const R = {
                 rec: {
                     corr: safe(at.receitas && at.receitas.corrente),
@@ -651,7 +617,6 @@ function exibirSelecionado() {
                     seg: safe(at.caixa && at.caixa.saldo_seguinte),
                 }
             };
-
             let out = '';
             out += header('RECEITAS', '#003366');
             out += line('Receitas Correntes', R.rec.corr.atual, R.rec.corr.anterior);
@@ -671,9 +636,7 @@ function exibirSelecionado() {
             out += line('Saldo em Especie do Exerc. Anterior', R.caixa.ant.atual, R.caixa.ant.anterior);
             out += line('Geracao Liquida de Caixa', R.caixa.ger.atual, R.caixa.ger.anterior, true);
             out += line('Saldo em Especie para o Exerc. Seguinte', R.caixa.seg.atual, R.caixa.seg.anterior, true);
-
             tb.innerHTML = out;
-
             const ctx = document.getElementById('graf');
             if (!ctx) return;
             if (typeof chart !== 'undefined' && chart) chart.destroy();
@@ -748,8 +711,6 @@ function exibirSelecionado() {
                 }
             });
         }
-
-
         function render(at, ant) {
             const tb = document.querySelector('#tab tbody');
             const fmtV = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -770,7 +731,6 @@ function exibirSelecionado() {
             };
             const header = (label, color) => '<tr style="background:' + color + '; font-weight:bold; color:#fff;"><td colspan="4">' + label + '</td></tr>';
             const blank = () => '<tr><td colspan="4" style="height:5px; border:none;"></td></tr>';
-
             const R = {
                 rec: {
                     corr: safe(at.receitas && at.receitas.corrente),
@@ -792,7 +752,6 @@ function exibirSelecionado() {
                     seg: safe(at.caixa && at.caixa.saldo_seguinte),
                 }
             };
-
             let out = '';
             out += header('RECEITAS', '#003366');
             out += line('Receitas Correntes', R.rec.corr.atual, R.rec.corr.anterior);
@@ -812,9 +771,7 @@ function exibirSelecionado() {
             out += line('Saldo em Especie do Exerc. Anterior', R.caixa.ant.atual, R.caixa.ant.anterior);
             out += line('Geracao Liquida de Caixa', R.caixa.ger.atual, R.caixa.ger.anterior, true);
             out += line('Saldo em Especie para o Exerc. Seguinte', R.caixa.seg.atual, R.caixa.seg.anterior, true);
-
             tb.innerHTML = out;
-
             const ctx = document.getElementById('graf');
             if (!ctx) return;
             if (typeof chart !== 'undefined' && chart) chart.destroy();
@@ -889,6 +846,5 @@ function exibirSelecionado() {
                 }
             });
         }
-
 </script>
 </body></html>

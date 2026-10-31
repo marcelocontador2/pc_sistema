@@ -1,9 +1,7 @@
-﻿import os
+import os
 import csv
-
 base = r"C:\Users\Marcelo Medeiros\pc_sistema"
 pasta = os.path.join(base, "pc_storage", "uploads_raw")
-
 print("--- Buscando CORRENTE no DFC ---")
 for arquivo in os.listdir(pasta):
     if arquivo.upper().startswith("DFC_2026"):

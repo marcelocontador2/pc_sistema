@@ -7,19 +7,15 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f8f9fa; color: #333; display: flex; height: 100vh; overflow: hidden; }
-        
         .sidebar { width: 260px; background: #fff; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
         .sidebar-header { padding: 20px; border-bottom: 1px solid #e0e0e0; }
         .sidebar-header h1 { color: #0072BA; font-size: 24px; font-weight: 800; }
         .sidebar-header span { color: #888; font-size: 12px; font-weight: normal; display: block; margin-top: 4px; }
-        
         .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: calc(100vw - 260px); }
         .topbar { height: 70px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; }
         .topbar h2 { font-size: 20px; color: #333; }
-        
         .content { flex: 1; padding: 30px; overflow-y: auto; }
         .card { background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 6px solid #0072BA; padding: 30px; width: 100%; max-width: 1200px; margin: 0 auto; }
-        
         .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; margin-right: 10px; font-size: 14px; }
         .btn-voltar { background: #ff8c00; }
         .btn-exibir { background: #28a745; }
@@ -27,17 +23,14 @@
         .btn-pdf { background: #003366; }
         .btn-verificar { background: #003366; }
         .btn-salvar { background: #28a745; }
-        
         .top-bar { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .top-bar select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th { background: #eef4fa; color: #333; padding: 12px; text-align: left; font-size: 14px; font-weight: bold; }
         td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
         .total-row td { font-weight: bold; background: #eef4fa; }
         .situacao-verde { color: #28a745; font-weight: bold; }
         .situacao-vermelho { color: #dc3545; font-weight: bold; }
-        
         .historico-item { display: block; padding: 8px 10px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 13px; }
     </style>
 </head>
@@ -51,13 +44,11 @@
             <div style="padding: 15px; color: #888; font-size: 13px;">Carregando...</div>
         </div>
     </div>
-    
     <div class="main">
         <div class="topbar">
             <h2>Custo de Pessoal</h2>
             <div style="font-size: 13px; color: #888;">SIGPC - Sistema de Gestão</div>
         </div>
-        
         <div class="content">
             <div class="card">
                 <div class="top-bar">
@@ -73,10 +64,8 @@
                     <a href="/configuracoes_custo_pessoal" class="btn" style="background-color: #6c757d; text-decoration: none; display: inline-block; padding: 10px 20px; border-radius: 5px; color: white; margin-right: 10px; font-weight: bold;">⚙️ Configurações</a><button class="btn btn-pdf" onclick="window.open('/gerar_pdf_custo_pessoal', '_blank')">Gerar PDF (Resumo)</button>
 <button class="btn" onclick="gerarPDFCompleto()" style="background-color: #17a2b8; color: white; margin-left: 10px;">Gerar PDF (Completo)</button>
                 </div>
-                
                 <div class="hdr-sub">Custo de Pessoal x Limite da Resolução Cofen 814/2026</div>
                 <h1 style="font-size: 28px; color: #0a1c3a; margin-bottom: 20px;">Apuração consolidada 12 meses</h1>
-                
                 <table>
                     <thead>
                         <tr>
@@ -116,24 +105,19 @@
             </div>
         </div>
     </div>
-
     <script>
         function fmt(v) {
             return (parseFloat(v) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
-
         function fmtPct(v) {
             return (parseFloat(v) || 0).toFixed(2).replace('.', ',') + '%';
         }
-
         function preencherTabela(d) {
             if (!d || d.erro) return;
-            
             const rcl = d.rcl_total || 0;
             const custo = d.custo_total || 0;
             const limite = d.limite_atual || d.limite || (rcl * 0.5);
             const margem = d.margem_disponivel_atual || d.margem || (limite - custo);
-            
             document.getElementById('comp-rcl').innerText = fmt(rcl);
             document.getElementById('comp-custo').innerText = fmt(custo);
             document.getElementById('comp-margem').innerText = fmt(margem);
@@ -142,14 +126,12 @@
             const lblLimite = document.getElementById('lbl-pct-limite'); if(lblLimite) lblLimite.innerText = fmtPct((limite/rcl)*100);
             document.getElementById('comp-pct-custo').innerText = fmtPct((custo/rcl)*100);
             document.getElementById('comp-pct-margem').innerText = fmtPct((margem/rcl)*100);
-            
             const sit = document.getElementById('comp-situacao');
             const pct = (custo/rcl)*100;
             sit.innerText = fmtPct(pct);
             sit.style.color = pct <= 50 ? '#28a745' : '#dc3545';
             sit.style.fontWeight = 'bold';
         }
-
         function carregar() {
             const periodo = document.getElementById('periodo-select').value;
             fetch('/api/custo_pessoal/' + periodo + '?_t=' + Date.now(), { cache: 'no-store' })
@@ -157,7 +139,6 @@
                 .then(d => preencherTabela(d))
                 .catch(e => console.error('Erro API:', e));
         }
-
         function salvar() {
             const periodo = document.getElementById('periodo-select').value;
             const btn = document.getElementById('btn-salvar');
@@ -177,7 +158,6 @@
                     if(btn) { btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; }
                 });
         }
-
         function carregarHistorico() {
             fetch('/historico_custo_pessoal')
                 .then(r => r.json())
@@ -200,7 +180,6 @@
                     }
                 });
         }
-
         function exibirSelecionado() {
             const check = document.querySelector('.check-historico:checked');
             if (!check) { alert('Selecione um item no histórico.'); return; }
@@ -208,7 +187,6 @@
                 .then(r => r.json())
                 .then(resp => { if (resp.dados) preencherTabela(resp.dados); });
         }
-
         function excluirSelecionado() {
             const check = document.querySelector('.check-historico:checked');
             if (!check) { alert('Selecione um item no histórico.'); return; }
@@ -217,18 +195,15 @@
                     .then(() => carregarHistorico());
             }
         }
-
         document.addEventListener('DOMContentLoaded', function() {
             carregar();
             carregarHistorico();
         });
-    
         function gerarPDFCompleto() {
             const check = document.querySelector('.check-historico:checked');
             if (!check) { alert('Selecione um item no histórico.'); return; }
             window.open('/gerar_pdf_completo_custo_pessoal?id=' + check.value, '_blank');
         }
-        
 </script>
 </body>
 </html>

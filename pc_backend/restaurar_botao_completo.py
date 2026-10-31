@@ -1,7 +1,5 @@
-﻿import re
-
+import re
 c = open('../pc_frontend/analise_custo_pessoal.html', encoding='utf-8-sig').read()
-
 # 1. Substitui o botão atual por dois botões (Resumo e Completo)
 # Usamos regex para encontrar o botão independentemente de pequenas variações de espaços
 c = re.sub(
@@ -9,7 +7,6 @@ c = re.sub(
     '<button class="btn" onclick="gerarPDF()" style="margin-right: 10px;">Gerar PDF (Resumo)</button>\n<button class="btn" onclick="gerarPDFCompleto()">Gerar PDF (Completo)</button>',
     c
 )
-
 # 2. Cria a função gerarPDFCompleto() baseada na função gerarPDF() existente
 if "function gerarPDFCompleto()" not in c:
     # Encontra a função gerarPDF atual no código
@@ -33,6 +30,5 @@ if "function gerarPDFCompleto()" not in c:
         }
         """
         c = c.replace("</script>", fallback_js + "\n</script>")
-
 open('../pc_frontend/analise_custo_pessoal.html', 'w', encoding='utf-8').write(c)
 print("[OK] HTML atualizado com os dois botões de PDF!")
