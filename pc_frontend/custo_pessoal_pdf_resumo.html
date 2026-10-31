@@ -14,26 +14,27 @@
     </style>
 </head>
 <body>
-    <h1>Custo de Pessoal x Limite da LRF</h1>
+    <h1>Custo de Pessoal x Limite da Resolução Cofen 814/2026</h1>
     <h3>Apuração consolidada 12 meses</h3>
     <table>
         <tr><th>Indicador</th><th class="right">Valor (R$)</th><th class="center">% da RCL</th></tr>
         <tr><td>Receita Corrente Líquida (RCL)</td><td id="pdf-rcl" class="right">0,00</td><td class="center">100,00%</td></tr>
         <tr><td>(-) Custo de Pessoal (Bruto)</td><td id="pdf-custo" class="right">0,00</td><td id="pdf-pct-custo" class="center">0,00%</td></tr>
-        <tr class="destaque"><td>(=) Margem Disponível (Limite LRF - Custo)</td><td id="pdf-margem" class="right">0,00</td><td id="pdf-pct-margem" class="center">0,00%</td></tr>
-        <tr><td>Limite LRF (50% da RCL)</td><td id="pdf-limite" class="right">0,00</td><td class="center">50,00%</td></tr>
+        <tr class="destaque"><td>(=) Margem Disponível (Limite Resolução Cofen 814/2026 - Custo)</td><td id="pdf-margem" class="right">0,00</td><td id="pdf-pct-margem" class="center">0,00%</td></tr>
+        <tr><td>Limite Resolução Cofen 814/2026 (50% da RCL)</td><td id="pdf-limite" class="right">0,00</td><td class="right">50,00%</td></tr>
     </table>
     <script>
         function fmt(v) { return Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
         function carregar() {
             const urlParams = new URLSearchParams(window.location.search);
             const periodo = urlParams.get('periodo') || '2026-TRIMESTRE-3';
-            fetch('/api/custo_pessoal/' + periodo)
+            const entidade = urlParams.get('entidade') || 'COREN';
+            fetch('/api/custo_pessoal/' + periodo + '?entidade=' + entidade)
                 .then(r => r.json())
                 .then(d => {
                     const rcl = d.rcl_total;
                     const custo = d.custo_total;
-                    const limite = rcl * 0.5;
+                    const limite = d.limite_atual || (rcl * (d.limite_pct || 0.5));
                     const margem = limite - custo;
                     document.getElementById('pdf-rcl').innerText = fmt(rcl);
                     document.getElementById('pdf-custo').innerText = fmt(custo);

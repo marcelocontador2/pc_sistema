@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Configurações - Limite de Custo de Pessoal</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 40px; display: flex; justify-content: center; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        h2 { color: #0a1c3a; margin-bottom: 20px; }
+        .radio-group { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
+        .radio-group label { font-size: 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        input[type="radio"] { width: 20px; height: 20px; cursor: pointer; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; display: block; margin-top: 15px; }
+        .btn-salvar { background: #0d6efd; color: white; }
+        .btn-salvar:hover { background: #0b5ed7; }
+        .btn-voltar { background: #ff8c00; color: white; }
+        .btn-voltar:hover { background: #e67e00; }
+        .msg { margin-top: 15px; padding: 10px; border-radius: 5px; text-align: center; display: none; }
+        .msg.sucesso { background: #d1e7dd; color: #0f5132; display: block; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Configurações do Limite de Custo</h2>
+        <p>Selecione a entidade para definir o limite aplicado sobre a RCL:</p>
+        <div class="radio-group">
+            <label><input type="radio" name="entidade" value="COFEN"> COFEN (50% da RCL)</label>
+            <label><input type="radio" name="entidade" value="COREN"> COREN (60% da RCL)</label>
+        </div>
+        <button class="btn btn-salvar" onclick="salvar()">Salvar Configuração</button>
+        <button class="btn btn-voltar" onclick="window.location.href='/analise_custo_pessoal'">Voltar para Análise</button>
+        <div id="msg" class="msg"></div>
+    </div>
+
+    <script>
+        fetch('/api/configuracoes/custo_pessoal')
+            .then(r => r.json())
+            .then(data => {
+                const valor = data.tipo_entidade || 'COFEN';
+                const radio = document.querySelector(`input[name="entidade"][value="${valor}"]`);
+                if (radio) radio.checked = true;
+            });
+
+        function salvar() {
+            const selecionado = document.querySelector('input[name="entidade"]:checked');
+            if (!selecionado) { alert('Selecione uma opção.'); return; }
+            
+            fetch('/api/configuracoes/custo_pessoal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tipo_entidade: selecionado.value })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    const msg = document.getElementById('msg');
+                    msg.className = 'msg sucesso';
+                    msg.innerText = 'Configuração salva com sucesso!';
+                } else {
+                    alert('Erro ao salvar.');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -23,7 +23,7 @@
 </head>
 <body>
     <div class="section">
-        <h1>Custo de Pessoal x Limite da LRF (Art. 19)</h1>
+        <h1>Custo de Pessoal x Limite da Resolução Cofen 814/2026</h1>
         <p><b>Apuração consolidada 12 meses</b></p>
     </div>
 
@@ -41,7 +41,7 @@
             <tr><td>Receitas Correntes Realizadas - Período Atual (9m)</td><td id="pdf-rcl-atual" class="right">0,00</td></tr>
             <tr><td>Receitas Correntes Realizadas - Período Anterior (3m)</td><td id="pdf-rcl-anterior" class="right">0,00</td></tr>
             <tr><td><b>Total 12 Meses (RCL)</b></td><td id="pdf-rcl-total" class="right"><b>0,00</b></td></tr>
-            <tr><td>Limite LRF (50% da RCL)</td><td id="pdf-limite" class="right">0,00</td></tr>
+            <tr><td>Limite Resolução Cofen 814/2026</td><td id="pdf-limite" class="right">0,00</td></tr>
         </table>
     </div>
 
@@ -72,7 +72,7 @@
             <tr style="border: none;"><td style="border: none;"><b>CUSTO BRUTO (12 MESES)</b></td><td class="right" style="border: none;"><span id="conc-custo" class="conclusao-val">0,00%</span></td></tr>
             <tr style="border: none;"><td style="border: none;"><b>CUSTO AJUSTADO (12 MESES)</b></td><td class="right" style="border: none;"><span id="conc-ajustado" class="conclusao-val">0,00%</span></td></tr>
         </table>
-        <p><b>Teto estabelecido pelo Art. 19 da LRF</b></p>
+        <p><b>Teto estabelecido pela Resolução Cofen 814/2026</b></p>
         <p><b>Custo Bruto:</b> <span id="conc-custo-txt">R$ 0,00</span> da RCL (sem ajuste)</p>
         <p><b>Custo Ajustado:</b> <span id="conc-ajustado-txt">R$ 0,00</span> da RCL (excluídas sentenças 2025)</p>
     </div>
@@ -83,9 +83,9 @@
             <tr><th>Indicador</th><th class="right">Valor (R$)</th><th class="right">% da RCL</th></tr>
             <tr><td>Receita Corrente Líquida (RCL)</td><td id="pdf-resumo-rcl" class="right">0,00</td><td class="right">100,00%</td></tr>
             <tr><td>(-) Custo de Pessoal (Bruto)</td><td id="pdf-resumo-custo" class="right">0,00</td><td id="pdf-resumo-pct" class="right">0,00%</td></tr>
-            <tr><td><b>(=) Margem Disponível (Limite LRF - Custo)</b></td><td id="pdf-resumo-margem" class="right"><b>0,00</b></td><td class="right"><b id="pdf-resumo-pct-margem">0,00%</b></td></tr>
-            <tr><td>Limite LRF (50% da RCL)</td><td id="pdf-resumo-limite" class="right">0,00</td><td class="right">50,00%</td></tr>
-            <tr><td colspan="3" class="center" style="font-weight: bold; color: #28a745;">✅ Dentro do limite legal (= 50%)</td></tr>
+            <tr><td><b>(=) Margem Disponível (Limite Resolução Cofen 814/2026 - Custo)</b></td><td id="pdf-resumo-margem" class="right"><b>0,00</b></td><td class="right"><b id="pdf-resumo-pct-margem">0,00%</b></td></tr>
+            <tr><td>Limite Resolução Cofen 814/2026</td><td id="pdf-resumo-limite" class="right">0,00</td><td class="right">50,00%</td></tr>
+            <tr><td colspan="3" class="center" style="font-weight: bold; color: #28a745;" id="pdf-resumo-status">✅ Dentro do limite legal (= 50%)</td></tr>
          </table>
     </div>
 
@@ -97,23 +97,25 @@
             // Pega o período da URL, se existir
             const urlParams = new URLSearchParams(window.location.search);
             const periodo = urlParams.get('periodo') || '2026-TRIMESTRE-3';
+            const entidade = urlParams.get('entidade') || 'COFEN';
             
-            fetch('/api/custo_pessoal/' + periodo)
+            fetch('/api/custo_pessoal/' + periodo + '?entidade=' + entidade)
                 .then(r => r.json())
                 .then(d => {
-                    const rcl = d.rcl_total;
-                    const custo = d.custo_total;
-                    const limite = rcl * 0.5;
-                    const margem = limite - custo;
+                    const rcl = d.rcl_atual || d.rcl_total || 0;
+                    const custo = d.custo_atual || d.custo_total || 0;
+                    const limite = d.limite_atual || (rcl * (d.limite_pct || 0.5));
+                    const margem = d.margem_disponivel_atual || (limite - custo);
+                    const limite_pct = d.limite_pct || 0.5;
 
                     // Dados mockados para o período atual/anterior (para manter o visual do relatório antigo)
-                    const rclAtual = d.rcl_atual || (rcl * 0.8);
-                    const rclAnterior = d.rcl_anterior || (rcl * 0.2);
+                    const rclAtual = d.rcl_atual || 0;
+                    const rclAnterior = d.rcl_anterior || 0;
 
                     document.getElementById('pdf-rcl-atual').innerText = fmt(rclAtual);
                     document.getElementById('pdf-rcl-anterior').innerText = fmt(rclAnterior);
                     document.getElementById('pdf-rcl-total').innerText = fmt(rcl);
-                    document.getElementById('pdf-limite').innerText = fmt(limite);
+                    document.getElementById('pdf-limite').innerText = fmt(limite); var pctEl = document.getElementById('pdf-limite-pct-text'); if (pctEl) pctEl.innerText = (limite_pct * 100).toFixed(2) + '%';
 
                     document.getElementById('pdf-pes-atual').innerText = fmt(d.pessoal_atual);
                     document.getElementById('pdf-pes-ant').innerText = fmt(d.pessoal_anterior);
@@ -149,7 +151,14 @@
                     // Resumo Final (CÁLCULO CORRETO DA MARGEM)
                     document.getElementById('pdf-resumo-rcl').innerText = fmt(rcl);
                     document.getElementById('pdf-resumo-custo').innerText = fmt(custo);
-                    document.getElementById('pdf-resumo-limite').innerText = fmt(limite);
+                    document.getElementById('pdf-resumo-limite').innerText = fmt(limite); var pctEl2 = document.getElementById('pdf-resumo-limite-pct'); if (pctEl2) pctEl2.innerText = (limite_pct * 100).toFixed(2) + '%'; var pctEl2 = document.getElementById('pdf-resumo-limite-pct'); if (pctEl2) pctEl2.innerText = (limite_pct * 100).toFixed(2) + '%';
+                    document.getElementById('pdf-resumo-limite-pct').innerText = (limite_pct * 100).toFixed(2) + '%';
+                    var statusEl = document.getElementById('pdf-resumo-status');
+                    if (statusEl) {
+                        var dentro = custo <= limite;
+                        statusEl.innerText = dentro ? '✅ Dentro do limite legal (= ' + (limite_pct * 100).toFixed(2) + '%)' : '❌ Acima do limite legal (= ' + (limite_pct * 100).toFixed(2) + '%)';
+                        statusEl.style.color = dentro ? '#28a745' : '#dc3545';
+                    }
                     document.getElementById('pdf-resumo-margem').innerText = fmt(margem);
                     document.getElementById('pdf-resumo-pct').innerText = pct(custo, rcl);
                     document.getElementById('pdf-resumo-pct-margem').innerText = pct(margem, rcl);
@@ -159,3 +168,4 @@
     </script>
 </body>
 </html>
+

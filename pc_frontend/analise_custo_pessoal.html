@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custo de Pessoal x Limite da LRF (Art. 19)</title>
+    <title>Custo de Pessoal x Limite da Resolução Cofen 814/2026</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f8f9fa; color: #333; display: flex; height: 100vh; overflow: hidden; }
@@ -70,10 +70,10 @@
                     <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()">Confirmar e Salvar</button>
                     <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
                     <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
-                    <button class="btn btn-pdf" onclick="window.open('/gerar_pdf_custo_pessoal', '_blank')">Gerar PDF</button>
+                    <a href="/configuracoes_custo_pessoal" class="btn" style="background-color: #6c757d; text-decoration: none; display: inline-block; padding: 10px 20px; border-radius: 5px; color: white; margin-right: 10px; font-weight: bold;">⚙️ Configurações</a><button class="btn btn-pdf" onclick="window.open('/gerar_pdf_custo_pessoal', '_blank')">Gerar PDF</button>
                 </div>
                 
-                <div class="hdr-sub">Custo de Pessoal x Limite da LRF (Art. 19)</div>
+                <div class="hdr-sub">Custo de Pessoal x Limite da Resolução Cofen 814/2026</div>
                 <h1 style="font-size: 28px; color: #0a1c3a; margin-bottom: 20px;">Apuração consolidada 12 meses</h1>
                 
                 <table>
@@ -96,14 +96,14 @@
                             <td id="comp-pct-custo">0,00%</td>
                         </tr>
                         <tr class="total-row">
-                            <td>(=) Margem Disponível (Limite LRF - Custo)</td>
+                            <td>(=) Margem Disponível (Limite Resolução Cofen 814/2026 - Custo)</td>
                             <td id="comp-margem">0,00</td>
                             <td id="comp-pct-margem">0,00%</td>
                         </tr>
                         <tr>
-                            <td>Limite LRF (50% da RCL)</td>
+                            <td>Limite Resolução Cofen 814/2026 (<span id='lbl-pct-limite'>50%</span> da RCL)</td>
                             <td id="comp-limite">0,00</td>
-                            <td>50,00%</td>
+                            <td id="comp-pct-limite">50,00%</td>
                         </tr>
                         <tr>
                             <td>Situação</td>
@@ -130,13 +130,15 @@
             
             const rcl = d.rcl_total || 0;
             const custo = d.custo_total || 0;
-            const limite = d.limite || (rcl * 0.5);
-            const margem = d.margem || (limite - custo);
+            const limite = d.limite_atual || d.limite || (rcl * 0.5);
+            const margem = d.margem_disponivel_atual || d.margem || (limite - custo);
             
             document.getElementById('comp-rcl').innerText = fmt(rcl);
             document.getElementById('comp-custo').innerText = fmt(custo);
             document.getElementById('comp-margem').innerText = fmt(margem);
             document.getElementById('comp-limite').innerText = fmt(limite);
+            const pctLimite = document.getElementById('comp-pct-limite'); if(pctLimite) pctLimite.innerText = fmtPct((limite/rcl)*100);
+            const lblLimite = document.getElementById('lbl-pct-limite'); if(lblLimite) lblLimite.innerText = fmtPct((limite/rcl)*100);
             document.getElementById('comp-pct-custo').innerText = fmtPct((custo/rcl)*100);
             document.getElementById('comp-pct-margem').innerText = fmtPct((margem/rcl)*100);
             
@@ -149,7 +151,7 @@
 
         function carregar() {
             const periodo = document.getElementById('periodo-select').value;
-            fetch('/api/custo_pessoal/' + periodo)
+            fetch('/api/custo_pessoal/' + periodo + '?_t=' + Date.now(), { cache: 'no-store' })
                 .then(r => r.json())
                 .then(d => preencherTabela(d))
                 .catch(e => console.error('Erro API:', e));

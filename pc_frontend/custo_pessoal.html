@@ -361,7 +361,8 @@
 
 
 
-        <h3>Histórico Salvo</h3>
+        <h3>Histórico Salvo</h3> <button onclick="carregarHistorico()" style="font-size:12px; padding:5px 10px; cursor:pointer;">Recarregar</button>
+        <div id="historico"><p style="color:#666; padding:10px;">Carregando...</p></div>
 
 
 
@@ -446,35 +447,35 @@
 
 
 
-            <button class="btn btn-verde" id="btn-salvar">Confirmar e Salvar</button>
+            <button class="btn btn-verde" id="btn-salvar" onclick="salvarCusto()">Confirmar e Salvar</button>
 
 
 
 
 
 
-            <button class="btn btn-verde" id="btn-exibir">Exibir Selecionado</button>
+            <button class="btn btn-verde" id="btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
 
 
 
 
 
 
-            <button class="btn btn-vermelho" id="btn-excluir">Excluir Selecionado</button>
+            <button class="btn btn-vermelho" id="btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
 
 
 
 
 
 
-            <button class="btn btn-azul" id="btn-pdf" >Gerar PDF (Resumo)</button>
+            <button class="btn btn-azul" id="btn-pdf" onclick="gerarPDF()" >Gerar PDF (Resumo)</button>
 
 
 
 
 
 
-            <button class="btn btn-ciano" id="btn-pdf-completo" >Gerar PDF (Completo)</button>
+            <button class="btn btn-ciano" id="btn-pdf-completo" onclick="gerarPDFCompleto()" >Gerar PDF (Completo)</button>
 
 
 
@@ -598,6 +599,83 @@
             console.log("[ONLOAD] Pagina carregada");
             carregar();
         };
+
+        // === FUNCOES DOS BOTOES ===
+        function salvarCusto() {
+            var periodo = document.getElementById('periodo-select').value;
+            fetch('/salvar_custo_pessoal/' + periodo, {method: 'POST'})
+                .then(r => r.json())
+                .then(d => { alert('Custo salvo com sucesso!'); carregarHistorico(); })
+                .catch(e => alert('Erro ao salvar: ' + e.message));
+        }
+        
+        function exibirSelecionado() {
+            var check = document.querySelector('.check-historico:checked');
+            if (!check) { alert('Selecione um item no historico.'); return; }
+            fetch('/historico_custo_pessoal/' + check.value)
+                .then(r => r.json())
+                .then(d => {
+                    if (d.dados) {
+                        document.getElementById('periodo-select').value = d.periodo || '2026-TRIMESTRE-3';
+                        carregar();
+                    }
+                })
+                .catch(e => alert('Erro ao carregar historico: ' + e.message));
+        }
+        
+        function excluirSelecionado() {
+            var checks = document.querySelectorAll('.check-historico:checked');
+            if (checks.length === 0) { alert('Selecione pelo menos um item.'); return; }
+            var promessas = [];
+            checks.forEach(c => {
+                promessas.push(fetch('/excluir_custo_pessoal/' + c.value, {method: 'DELETE'}).then(r => r.ok).catch(() => false));
+            });
+            Promise.all(promessas).then(results => {
+                if (results.some(r => r === true)) { alert('Excluido!'); carregarHistorico(); }
+            });
+        }
+        
+        function gerarPDF() {
+            var check = document.querySelector('.check-historico:checked');
+            if (!check) { 
+                alert('Selecione um historico antes de gerar o PDF.'); 
+                return; 
+            }
+            window.open('/gerar_pdf_custo_pessoal?id=' + check.value, '_blank');
+        }
+        
+        function gerarPDFCompleto() {
+            var check = document.querySelector('.check-historico:checked');
+            if (!check) { 
+                alert('Selecione um historico antes de gerar o PDF.'); 
+                return; 
+            }
+            window.open('/gerar_pdf_completo_custo_pessoal?id=' + check.value, '_blank');
+        }
+        
+        function carregarHistorico() {
+            fetch('/historico_custo_pessoal')
+                .then(r => r.json())
+                .then(data => {
+                    var div = document.getElementById('historico');
+                    if (!div) return;
+                    if (!data || data.length === 0) {
+                        div.innerHTML = '<p style="color:#666;">Nenhum historico salvo.</p>';
+                        return;
+                    }
+                    var html = '';
+                    data.forEach(item => {
+                        html += '<div style="padding:10px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:8px;">';
+                        html += '<input type="checkbox" class="check-historico" value="' + item.id + '" style="cursor:pointer;">';
+                        html += '<div>';
+                        html += '<b>' + item.periodo + '</b><br>';
+                        html += '<small style="color:#666;">' + (item.data_geracao || '') + '</small>';
+                        html += '</div></div>';
+                    });
+                    div.innerHTML = html;
+                })
+                .catch(e => console.error('Erro ao carregar historico:', e));
+        }
 </script>
 
 

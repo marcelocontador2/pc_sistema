@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 
 
@@ -76,26 +76,6 @@ from fastapi.staticfiles import StaticFiles
 
 
 import sqlite3
-
-
-
-
-
-
-
-
-
-
-import os
-
-
-
-
-
-
-
-
-
 
 import shutil
 
@@ -361,209 +341,7 @@ if os.path.exists(frontend_path):
 
 
     print(f"âœ… Arquivos estÃ¡ticos montados em: {frontend_path}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@app.get("/analise_custo_pessoal", response_class=HTMLResponse)
-
-
-
-
-
-
-
-
-
-
-def serve_analise_custo_pessoal():
-
-
-
-
-
-
-
-
-
-
-    import os
-
-
-
-
-
-
-
-
-
-
-    from fastapi.responses import HTMLResponse
-
-
-
-
-
-
-
-
-
-
-    # Caminho absoluto correto
-
-
-
-
-
-
-
-
-
-
-    html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "custo_pessoal.html")
-
-
-
-
-
-
-
-
-
-
-    with open(html_path, "r", encoding="utf-8") as f:
-
-
-
-
-
-
-
-
-
-
-        conteudo = f.read()
-
-
-
-
-
-
-
-
-
-
-    headers = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache", "Expires": "0"}
-
-
-
-
-
-
-
-
-
-
-    return HTMLResponse(content=conteudo, headers=headers)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 from fastapi.responses import HTMLResponse
-
-
-
-
-
-
-
-
-
-
-import os
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @app.get("/", response_class=HTMLResponse)
 
@@ -15230,26 +15008,6 @@ async def api_analise_orcamentaria_bo(periodo: str):
 
         from matriz_integridade import _get_csv
 
-
-
-
-
-
-
-
-
-
-        import os
-
-
-
-
-
-
-
-
-
-
         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
 
 
@@ -15295,26 +15053,6 @@ async def api_analise_orcamentaria_bo(periodo: str):
 
 
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
-
-
-
-
-
-
-
-
-
-
-        import os
-
-
-
-
-
-
-
-
-
 
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
 
@@ -16099,26 +15837,6 @@ async def api_composicao_rd(periodo: str):
 
         from matriz_integridade import _get_csv
 
-
-
-
-
-
-
-
-
-
-        import os
-
-
-
-
-
-
-
-
-
-
         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
 
 
@@ -16164,26 +15882,6 @@ async def api_composicao_rd(periodo: str):
 
 
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
-
-
-
-
-
-
-
-
-
-
-        import os
-
-
-
-
-
-
-
-
-
 
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
 
@@ -17056,26 +16754,6 @@ async def api_analise_financeira_bf(periodo: str):
 
         from matriz_integridade import _get_csv
 
-
-
-
-
-
-
-
-
-
-        import os
-
-
-
-
-
-
-
-
-
-
         caminho_check = _get_csv("BALANCO_FINANCEIRO", periodo)
 
 
@@ -17121,26 +16799,6 @@ async def api_analise_financeira_bf(periodo: str):
 
 
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
-
-
-
-
-
-
-
-
-
-
-        import os
-
-
-
-
-
-
-
-
-
 
         caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
 
@@ -18336,26 +17994,6 @@ async def api_periodos_disponiveis(tipo_demonstrativo: str):
 
 
     try:
-
-
-
-
-
-
-
-
-
-
-        import os
-
-
-
-
-
-
-
-
-
 
         pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
 
@@ -26093,10 +25731,13 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
 
 
         "custo_atual": custo_atual,
+        # Calcular totais (antes de usar no retorno)
         "limite_pct": 0.6 if entidade.upper() == "COREN" else 0.5,
-        "limite_atual": rcl_atual * (0.6 if entidade.upper() == "COREN" else 0.5),
+        "limite_total": (rcl_atual + rcl_anterior) * (0.6 if entidade.upper() == "COREN" else 0.5),
+        "margem_disponivel_total": ((rcl_atual + rcl_anterior) * (0.6 if entidade.upper() == "COREN" else 0.5)) - (custo_atual + custo_anterior),
+        "limite_atual": (rcl_atual + rcl_anterior) * (0.6 if entidade.upper() == "COREN" else 0.5),
         "limite_anterior": rcl_anterior * (0.6 if entidade.upper() == "COREN" else 0.5),
-        "margem_disponivel_atual": (rcl_atual * (0.6 if entidade.upper() == "COREN" else 0.5)) - custo_atual,
+        "margem_disponivel_atual": ((rcl_atual + rcl_anterior) * (0.6 if entidade.upper() == "COREN" else 0.5)) - (custo_atual + custo_anterior),
         "margem_disponivel_anterior": (rcl_anterior * (0.6 if entidade.upper() == "COREN" else 0.5)) - custo_anterior,
         "entidade": entidade.upper(),
 
@@ -26165,28 +25806,6 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
 
 
 
-
-
-
-
-
-
-
-
-
-
-@app.get("/historico_custo_pessoal")
-
-
-
-
-
-
-
-
-
-
-async def listar_historico_custo_pessoal():
 
 
 
@@ -30256,7 +29875,6 @@ async def painel_integridade_html(periodo: str):
 
 
 
-    from fastapi.responses import HTMLResponse
 
 
 
@@ -30889,1265 +30507,6 @@ if sys.platform == "win32":
 
 
 
-@app.get("/custo_pessoal_pdf_completo", response_class=HTMLResponse)
-
-
-
-
-
-
-
-
-
-
-def serve_custo_pessoal_pdf_completo():
-
-
-
-
-
-
-
-
-
-
-    import os
-
-
-
-
-
-
-
-
-
-
-    from fastapi.responses import HTMLResponse
-
-
-
-
-
-
-
-
-
-
-    html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "custo_pessoal_pdf_completo.html")
-
-
-
-
-
-
-
-
-
-
-    if os.path.exists(html_path):
-
-
-
-
-
-
-
-
-
-
-        with open(html_path, "r", encoding="utf-8") as f:
-
-
-
-
-
-
-
-
-
-
-            conteudo = f.read()
-
-
-
-
-
-
-
-
-
-
-        return HTMLResponse(content=conteudo)
-
-
-
-
-
-
-
-
-
-
-    return HTMLResponse(content="<h1>Template nÃ£o encontrado.</h1>")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@app.get("/gerar_pdf_completo_custo_pessoal")
-
-
-
-
-
-
-
-
-
-
-def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", entidade: str = "COFEN"):
-
-
-
-
-
-
-
-
-
-
-    import os, sqlite3, asyncio
-
-
-
-
-
-
-
-
-
-
-    from fastapi.responses import JSONResponse, FileResponse
-
-
-
-
-
-
-
-
-
-
-    from playwright.async_api import async_playwright
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    try:
-
-
-
-
-
-
-
-
-
-
-        # Se veio um ID, pega o perÃ­odo exato do histÃ³rico
-
-
-
-
-
-
-
-
-
-
-        if id is not None:
-
-
-
-
-
-
-
-
-
-
-            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_storage", "banco_dados.db")
-
-
-
-
-
-
-
-
-
-
-            conn = sqlite3.connect(db_path)
-
-
-
-
-
-
-
-
-
-
-            cur = conn.cursor()
-
-
-
-
-
-
-
-
-
-
-            cur.execute("SELECT periodo FROM historico_custo_pessoal WHERE id = ?", (id,))
-
-
-
-
-
-
-
-
-
-
-            linha = cur.fetchone()
-
-
-
-
-
-
-
-
-
-
-            conn.close()
-
-
-
-
-
-
-
-
-
-
-            if linha: periodo = linha[0]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        async def gerar():
-
-
-
-
-
-
-
-
-
-
-            os.makedirs("pc_storage/pdfs", exist_ok=True)
-
-
-
-
-
-
-
-
-
-
-            pdf_path = f"pc_storage/pdfs/custo_pessoal_completo_{periodo}.pdf"
-
-
-
-
-
-
-
-
-
-
-            async with async_playwright() as p:
-
-
-
-
-
-
-
-
-
-
-                browser = await p.chromium.launch()
-
-
-
-
-
-
-
-
-
-
-                page = await browser.new_page()
-
-
-
-
-
-
-
-
-
-
-                # IMPORTANTE: A URL agora aponta para a porta 9999
-
-
-
-
-
-
-
-
-
-
-                await page.goto(f"http://127.0.0.1:9999/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}")
-                await page.wait_for_timeout(1000)
-                
-                # INJECAO DIRETA DOS DADOS (para garantir que o PDF nao fique zerado)
-                import httpx
-                async with httpx.AsyncClient() as client:
-                    resp = await client.get(f"http://127.0.0.1:9999/api/custo_pessoal/{periodo}?entidade={entidade}")
-                    d = resp.json()
-                
-                # Formatar numeros
-                def fmt_br(v):
-                    try:
-                        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    except:
-                        return "0,00"
-                
-                rcl = d.get("rcl_total", 0)
-                custo = d.get("custo_total", 0)
-                limite = d.get("limite_atual", rcl * 0.5)
-                margem = d.get("margem_disponivel_atual", limite - custo)
-                limite_pct = d.get("limite_pct", 0.5)
-                
-                # Injetar via JavaScript
-                await page.evaluate(f"""
-                    document.getElementById('pdf-rcl-total').innerText = '{fmt_br(rcl)}';
-                    document.getElementById('pdf-custo-total').innerText = '{fmt_br(custo)}';
-                    document.getElementById('pdf-resumo-rcl').innerText = '{fmt_br(rcl)}';
-                    document.getElementById('pdf-resumo-custo').innerText = '{fmt_br(custo)}';
-                    document.getElementById('pdf-resumo-limite').innerText = '{fmt_br(limite)}';
-                    document.getElementById('pdf-resumo-margem').innerText = '{fmt_br(margem)}';
-                    document.getElementById('pdf-resumo-pct').innerText = '{(custo/rcl*100 if rcl else 0):.2f}%';
-                    document.getElementById('pdf-resumo-pct-margem').innerText = '{(margem/rcl*100 if rcl else 0):.2f}%';
-                    document.getElementById('pdf-limite').innerText = '{fmt_br(limite)} ({limite_pct*100:.2f}%)';
-                    document.getElementById('conc-limite').innerText = 'R$ {fmt_br(limite)}';
-                    document.getElementById('conc-custo').innerText = '{(custo/rcl*100 if rcl else 0):.2f}%';
-                    document.getElementById('conc-custo-txt').innerText = 'R$ {fmt_br(custo)}';
-                """)
-                await page.wait_for_timeout(500)
-                await page.wait_for_timeout(2000)  # Espera o fetch terminar
-                await page.wait_for_timeout(2000)  # Espera o fetch terminar
-
-
-
-
-
-
-
-
-
-
-                await page.wait_for_timeout(2000)
-
-
-
-
-
-
-
-
-
-
-                await page.pdf(path=pdf_path, format="A4", print_background=True)
-
-
-
-
-
-
-
-
-
-
-                await browser.close()
-
-
-
-
-
-
-
-
-
-
-            return pdf_path
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        loop = asyncio.new_event_loop()
-
-
-
-
-
-
-
-
-
-
-        asyncio.set_event_loop(loop)
-
-
-
-
-
-
-
-
-
-
-        pdf_path = loop.run_until_complete(gerar())
-
-
-
-
-
-
-
-
-
-
-        loop.close()
-
-
-
-
-
-
-
-
-
-
-        return FileResponse(pdf_path, media_type="application/pdf", filename=f"relatorio_completo_{periodo}.pdf")
-
-
-
-
-
-
-
-
-
-
-    except Exception as e:
-
-
-
-
-
-
-
-
-
-
-        return JSONResponse({"erro": True, "mensagem": str(e)}, status_code=500)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@app.get("/gerar_pdf_custo_pessoal")
-
-
-
-
-
-
-
-
-
-
-def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", entidade: str = "COFEN"):
-
-
-
-
-
-
-
-
-
-
-    import os, sqlite3, asyncio
-
-
-
-
-
-
-
-
-
-
-    from fastapi.responses import JSONResponse, FileResponse
-
-
-
-
-
-
-
-
-
-
-    from playwright.async_api import async_playwright
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    try:
-
-
-
-
-
-
-
-
-
-
-        if id is not None:
-
-
-
-
-
-
-
-
-
-
-            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_storage", "banco_dados.db")
-
-
-
-
-
-
-
-
-
-
-            conn = sqlite3.connect(db_path)
-
-
-
-
-
-
-
-
-
-
-            cur = conn.cursor()
-
-
-
-
-
-
-
-
-
-
-            cur.execute("SELECT periodo FROM historico_custo_pessoal WHERE id = ?", (id,))
-
-
-
-
-
-
-
-
-
-
-            linha = cur.fetchone()
-
-
-
-
-
-
-
-
-
-
-            conn.close()
-
-
-
-
-
-
-
-
-
-
-            if linha: periodo = linha[0]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        async def gerar():
-
-
-
-
-
-
-
-
-
-
-            os.makedirs("pc_storage/pdfs", exist_ok=True)
-
-
-
-
-
-
-
-
-
-
-            pdf_path = f"pc_storage/pdfs/custo_pessoal_resumo_{periodo}.pdf"
-
-
-
-
-
-
-
-
-
-
-            async with async_playwright() as p:
-
-
-
-
-
-
-
-
-
-
-                browser = await p.chromium.launch()
-
-
-
-
-
-
-
-
-
-
-                page = await browser.new_page()
-
-
-
-
-
-
-
-
-
-
-                await page.goto(f"http://127.0.0.1:9999/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}")
-                await page.wait_for_timeout(1000)
-                
-                import httpx
-                async with httpx.AsyncClient() as client:
-                    resp = await client.get(f"http://127.0.0.1:9999/api/custo_pessoal/{periodo}?entidade={entidade}")
-                    d = resp.json()
-                
-                def fmt_br(v):
-                    try:
-                        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    except:
-                        return "0,00"
-                
-                rcl = d.get("rcl_total", 0)
-                custo = d.get("custo_total", 0)
-                limite = d.get("limite_atual", rcl * 0.5)
-                margem = d.get("margem_disponivel_atual", limite - custo)
-                limite_pct = d.get("limite_pct", 0.5)
-                
-                await page.evaluate(f"""
-                    document.getElementById('pdf-rcl').innerText = '{fmt_br(rcl)}';
-                    document.getElementById('pdf-custo').innerText = '{fmt_br(custo)}';
-                    document.getElementById('pdf-limite').innerText = '{fmt_br(limite)} ({limite_pct*100:.2f}%)';
-                    document.getElementById('pdf-margem').innerText = '{fmt_br(margem)}';
-                    document.getElementById('pdf-pct-margem').innerText = '{(margem/rcl*100 if rcl else 0):.2f}%';
-                """)
-                await page.wait_for_timeout(500)
-                await page.wait_for_timeout(2000)  # Espera o fetch terminar
-                await page.wait_for_timeout(2000)  # Espera o fetch terminar
-
-
-
-
-
-
-
-
-
-
-                
-
-
-
-
-
-
-
-
-
-
-                # Espera atÃ© 5 segundos para o elemento ser preenchido com algo diferente de "0,00"
-
-
-
-
-
-
-
-
-
-
-                try:
-
-
-
-
-
-
-
-
-
-
-                    await page.wait_for_function("document.getElementById('pdf-rcl').innerText !== '0,00'", timeout=5000)
-
-
-
-
-
-
-
-
-
-
-                except Exception:
-
-
-
-
-
-
-
-
-
-
-                    pass # Se nÃ£o carregar, tira o print de qualquer forma
-
-
-
-
-
-
-
-
-
-
-                
-
-
-
-
-
-
-
-
-
-
-                await page.wait_for_timeout(500)
-
-
-
-
-
-
-
-
-
-
-                await page.pdf(path=pdf_path, format="A4", print_background=True)
-
-
-
-
-
-
-
-
-
-
-                await browser.close()
-
-
-
-
-
-
-
-
-
-
-            return pdf_path
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        loop = asyncio.new_event_loop()
-
-
-
-
-
-
-
-
-
-
-        asyncio.set_event_loop(loop)
-
-
-
-
-
-
-
-
-
-
-        pdf_path = loop.run_until_complete(gerar())
-
-
-
-
-
-
-
-
-
-
-        loop.close()
-
-
-
-
-
-
-
-
-
-
-        return FileResponse(pdf_path, media_type="application/pdf", filename=f"custo_resumo_{periodo}.pdf")
-
-
-
-
-
-
-
-
-
-
-    except Exception as e:
-
-
-
-
-
-
-
-
-
-
-        return JSONResponse({"erro": True, "mensagem": str(e)}, status_code=500)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@app.get("/custo_pessoal_pdf_resumo", response_class=HTMLResponse)
-
-
-
-
-
-
-
-
-
-
-def serve_custo_pessoal_pdf_resumo():
-
-
-
-
-
-
-
-
-
-
-    import os
-
-
-
-
-
-
-
-
-
-
-    from fastapi.responses import HTMLResponse
-
-
-
-
-
-
-
-
-
-
-    html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "custo_pessoal_pdf_resumo.html")
-
-
-
-
-
-
-
-
-
-
-    with open(html_path, "r", encoding="utf-8") as f:
-
-
-
-
-
-
-
-
-
-
-        conteudo = f.read()
-
-
-
-
-
-
-
-
-
-
-    return HTMLResponse(content=conteudo)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 @app.get("/demonstracoes", response_class=HTMLResponse)
@@ -32369,3 +30728,199 @@ app.include_router(bf_router)
 
 
 
+
+
+
+
+
+
+
+@app.get("/custo_pessoal_pdf_completo", response_class=HTMLResponse)
+def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_completo.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    
+    pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
+    # Substitui o texto descritivo
+    html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
+    # Substitui o valor na coluna % da RCL
+    html_content = html_content.replace('<td class="right">50,00%</td>', f'<td class="right">{pct}</td>')
+    
+    return HTMLResponse(content=html_content, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+@app.get("/custo_pessoal_pdf_resumo", response_class=HTMLResponse)
+def serve_custo_pessoal_pdf_resumo(entidade: str = "COFEN"):
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_resumo.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    
+    pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
+    # Substitui o texto descritivo
+    html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
+    # Substitui o valor na coluna % da RCL
+    html_content = html_content.replace('<td class="right">50,00%</td>', f'<td class="right">{pct}</td>')
+    
+    return HTMLResponse(content=html_content, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+
+@app.get("/gerar_pdf_custo_pessoal")
+def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", entidade: str = None):
+    try:
+        from playwright.sync_api import sync_playwright
+        import sqlite3, os, time
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        
+        if id:
+            cur.execute("SELECT periodo FROM historico_custo_pessoal WHERE id = ?", (id,))
+            row = cur.fetchone()
+            if row:
+                periodo = row[0]
+                print(f"[PDF RESUMO] Historico ID {id} -> periodo {periodo}")
+        
+        if not entidade:
+            cur.execute("SELECT valor FROM configuracoes WHERE chave = 'tipo_entidade'")
+            row = cur.fetchone()
+            entidade = row[0] if row else "COFEN"
+        
+        conn.close()
+        print(f"[PDF RESUMO] periodo={periodo}, entidade={entidade}")
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            context = browser.new_context(bypass_csp=True)
+            page = context.new_page()
+            page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
+            url = f"http://127.0.0.1:9999/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
+            page.goto(url, wait_until="networkidle")
+            page.wait_for_timeout(2000)
+            pdf_bytes = page.pdf(format="A4", print_background=True)
+            context.close()
+            browser.close()
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=custo_pessoal_resumo_{periodo}.pdf"}
+        )
+    except Exception as e:
+        print(f"[ERRO PDF RESUMO] {e}")
+        return Response(content=str(e), media_type="text/plain", status_code=500)
+
+@app.get("/gerar_pdf_completo_custo_pessoal")
+def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", entidade: str = None):
+    try:
+        from playwright.sync_api import sync_playwright
+        import sqlite3, os, time
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        
+        if id:
+            cur.execute("SELECT periodo FROM historico_custo_pessoal WHERE id = ?", (id,))
+            row = cur.fetchone()
+            if row:
+                periodo = row[0]
+                print(f"[PDF COMPLETO] Historico ID {id} -> periodo {periodo}")
+        
+        if not entidade:
+            cur.execute("SELECT valor FROM configuracoes WHERE chave = 'tipo_entidade'")
+            row = cur.fetchone()
+            entidade = row[0] if row else "COFEN"
+        
+        conn.close()
+        print(f"[PDF COMPLETO] periodo={periodo}, entidade={entidade}")
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            context = browser.new_context(bypass_csp=True)
+            page = context.new_page()
+            page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
+            url = f"http://127.0.0.1:9999/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
+            page.goto(url, wait_until="networkidle")
+            page.wait_for_timeout(2000)
+            pdf_bytes = page.pdf(format="A4", print_background=True)
+            context.close()
+            browser.close()
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=custo_pessoal_completo_{periodo}.pdf"}
+        )
+    except Exception as e:
+        print(f"[ERRO PDF COMPLETO] {e}")
+        return Response(content=str(e), media_type="text/plain", status_code=500)
+@app.get("/analise_custo_pessoal", response_class=HTMLResponse)
+def serve_analise_custo_pessoal():
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_custo_pessoal.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return HTMLResponse(content="<h1>Arquivo analise_custo_pessoal.html não encontrado!</h1>", status_code=404)
+
+
+@app.get("/historico_custo_pessoal")
+async def listar_historico_custo_pessoal():
+    import sqlite3, os
+    from fastapi.responses import JSONResponse
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, periodo, data_geracao FROM historico_custo_pessoal ORDER BY id DESC")
+        rows = cur.fetchall()
+        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    except Exception as e:
+        return JSONResponse(content={"erro": str(e)}, status_code=500)
+    finally:
+        conn.close()
+
+
+@app.get("/api/configuracoes/custo_pessoal")
+def api_configuracoes_custo_pessoal_get():
+    import sqlite3, os
+    from fastapi.responses import JSONResponse
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT valor FROM configuracoes WHERE chave = 'tipo_entidade'")
+        row = cur.fetchone()
+        conn.close()
+        entidade = row[0] if row else "COFEN"
+        return {"tipo_entidade": entidade}
+    except Exception as e:
+        return JSONResponse(content={"erro": str(e)}, status_code=500)
+
+@app.post("/api/configuracoes/custo_pessoal")
+async def api_configuracoes_custo_pessoal_post(request: Request):
+    import sqlite3, os
+    from fastapi.responses import JSONResponse
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    try:
+        dados = await request.json()
+        entidade = dados.get("tipo_entidade", "COFEN").upper()
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("INSERT OR REPLACE INTO configuracoes (chave, valor) VALUES ('tipo_entidade', ?)", (entidade,))
+        conn.commit()
+        conn.close()
+        return {"ok": True, "tipo_entidade": entidade}
+    except Exception as e:
+        return JSONResponse(content={"erro": str(e)}, status_code=500)
+
+
+@app.get("/configuracoes_custo_pessoal", response_class=HTMLResponse)
+def serve_configuracoes_custo_pessoal():
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "configuracoes_custo_pessoal.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
+    return HTMLResponse(content="<h1>Arquivo de configurações não encontrado</h1>", status_code=404)
