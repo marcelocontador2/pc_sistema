@@ -266,8 +266,6 @@ from openpyxl.utils import get_column_letter
 app = FastAPI(title="PC - Prestacao de Contas API")
 
 # Router novo do Panorama (31/10/2026)
-from app.routers.panorama import router as panorama_router
-app.include_router(panorama_router)
 
 
 
@@ -34942,6 +34940,10 @@ def salvar_custo_pessoal_rota(periodo: str):
 
 
         return {"erro": True, "mensagem": str(e)}
+
+# === ROUTER DO PANORAMA (registrado por ultimo para vencer a rota antiga) ===
+from app.routers.panorama import router as panorama_router
+app.include_router(panorama_router)
 
 
 

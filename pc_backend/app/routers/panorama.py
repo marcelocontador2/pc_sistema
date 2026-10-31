@@ -7,6 +7,9 @@ import json
 import os
 import sqlite3
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
+from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 try:
     from matriz_integridade import _limpar_valor
@@ -226,3 +229,132 @@ async def api_panorama(periodo: str):
     except Exception as e:
         print(f"[PANORAMA] ERRO: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/gerar_pdf_panorama_v2/{id}")
+async def gerar_pdf_panorama(id: str):
+    """Gera PDF do Panorama com visual moderno."""
+    try:
+        from fpdf import FPDF
+        from fpdf.enums import XPos, YPos
+        from fastapi.responses import Response
+
+        if id.isdigit():
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT periodo FROM historico_panorama WHERE id = ?", (int(id),))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                raise HTTPException(status_code=404, detail=f"Historico com ID {id} nao encontrado")
+            periodo = row[0]
+        else:
+            periodo = id
+
+        linhas_bp = buscar_arquivo(periodo, "BALANCO_PATRIMONIAL")
+        if not linhas_bp:
+            raise HTTPException(status_code=404, detail=f"Balanco Patrimonial nao encontrado para {periodo}")
+
+        bp = calcular_bp(linhas_bp)
+        caixa = buscar_valor(linhas_bp, "CAIXA E EQUIVALENTES", 1) or buscar_valor(linhas_bp, "CAIXA", 1)
+        linhas_bo = buscar_arquivo(periodo, "BALANCO_ORCAMENTARIO")
+        bo = calcular_bo(linhas_bo)
+        superavit_orc = bo["receita_realizada"] - bo["despesa_empenhada"]
+        linhas_dvp = buscar_arquivo(periodo, "DVP")
+        superavit_patrimonial = calcular_dvp(linhas_dvp)
+        superavit_financeiro = calcular_superavit_financeiro(linhas_bp)
+
+        # PDF moderno
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=False)
+
+        # Cabecalho azul escuro
+        pdf.set_fill_color(0, 51, 102)
+        pdf.rect(0, 0, 210, 35, "F")
+        pdf.set_font("Helvetica", "B", 22)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_xy(15, 8)
+        pdf.cell(180, 10, "PANORAMA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 13)
+        pdf.set_xy(15, 20)
+        pdf.cell(180, 8, f"Resultados Gerais - {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+        # Linha amarela de destaque
+        pdf.set_draw_color(245, 180, 0)
+        pdf.set_line_width(1.5)
+        pdf.line(0, 35, 210, 35)
+
+        # Funcao para formatar valor em milhoes
+        def fmt_mi(v):
+            try:
+                s = f"R$ {v/1000000:,.1f} mi"
+                return s.replace(",", "X").replace(".", ",").replace("X", ".")
+            except Exception:
+                return str(v)
+
+        cards = [
+            ("Caixa e Equivalente de Caixa (BP)", caixa),
+            ("Ativo Total", bp["ativo_total"]),
+            ("Passivo Total", bp["passivo_total"]),
+            ("Patrimonio Liquido", bp["patrimonio_liquido"]),
+            ("Receitas Realizadas (BO)", bo["receita_realizada"]),
+            ("Despesas Empenhadas (BO)", bo["despesa_empenhada"]),
+            ("Superavit/Deficit Orcamentario", superavit_orc),
+            ("Superavit Patrimonial (DVP)", superavit_patrimonial),
+            ("Superavit Financeiro (BP)", superavit_financeiro),
+        ]
+
+        # Grid 3x3 de cards
+        x_start = 15
+        y_start = 48
+        card_w = 55
+        card_h = 32
+        gap_x = 5
+        gap_y = 8
+
+        for i, (nome, valor) in enumerate(cards):
+            col = i % 3
+            lin = i // 3
+            x = x_start + col * (card_w + gap_x)
+            y = y_start + lin * (card_h + gap_y)
+
+            # Fundo do card (azul claro)
+            pdf.set_fill_color(233, 242, 250)
+            pdf.rect(x, y, card_w, card_h, "F")
+
+            # Valor em azul escuro
+            pdf.set_text_color(0, 51, 102)
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.set_xy(x + 2, y + 4)
+            pdf.cell(card_w - 4, 8, fmt_mi(valor), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+            # Label em cinza escuro
+            pdf.set_text_color(80, 80, 80)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_xy(x + 2, y + 18)
+            pdf.multi_cell(card_w - 4, 3.5, nome)
+
+        # Rodape
+        pdf.set_draw_color(200, 200, 200)
+        pdf.set_line_width(0.3)
+        pdf.line(15, 285, 195, 285)
+        pdf.set_text_color(120, 120, 120)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_xy(15, 287)
+        pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
+        from datetime import datetime
+        pdf.set_xy(135, 287)
+        pdf.cell(60, 5, f"Gerado em: {datetime.now():%d/%m/%Y %H:%M}", align="R")
+
+        pdf_bytes = bytes(pdf.output())
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=panorama_{periodo}.pdf"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
