@@ -265,6 +265,14 @@ from openpyxl.utils import get_column_letter
 
 app = FastAPI(title="PC - Prestacao de Contas API")
 
+@app.get("/configuracoes", response_class=HTMLResponse)
+async def serve_configuracoes():
+    import os
+    html_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "configuracoes.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
 # === CONFIGURACOES GLOBAIS (31/10/2026) ===
 @app.get("/api/configuracoes")
 async def get_configuracoes():
