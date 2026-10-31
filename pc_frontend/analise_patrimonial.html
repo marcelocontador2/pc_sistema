@@ -93,69 +93,97 @@
 
         function desenharTela(d, periodo) {
             const tb = document.querySelector('#tab tbody');
-            const ind = [
-                { n: 'Variações Ativas', at: d.variacoes_ativas.atual, ant: d.variacoes_ativas.anterior },
-                { n: 'Transferências Recebidas', at: d.transf_recebidas.atual, ant: d.transf_recebidas.anterior },
-                { n: 'Reversão de Provisões', at: d.reversao_provisoes.atual, ant: d.reversao_provisoes.anterior },
-                { n: 'Variações Diminutivas', at: d.variacoes_diminutivas.atual, ant: d.variacoes_diminutivas.anterior },
-                { n: 'Pessoal e Encargos', at: d.pessoal_encargos.atual, ant: d.pessoal_encargos.anterior },
-                { n: 'Serviços de Terceiros', at: d.servicos_terceiros.atual, ant: d.servicos_terceiros.anterior },
-                { n: 'Transferências Concedidas', at: d.transf_concedidas.atual, ant: d.transf_concedidas.anterior },
-                { n: 'Superávit Patrimonial', at: d.superavit_patrimonial.atual, ant: d.superavit_patrimonial.anterior }
-            ];
-
-            let out = '';
-            ind.forEach(item => {
-                const v = item.ant !== 0 ? ((item.at - item.ant) / Math.abs(item.ant)) * 100 : 0;
+            const fmt = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const fmtPct = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+            const calcVar = (at, ant) => ant !== 0 ? ((at - ant) / Math.abs(ant)) * 100 : 0;
+            const varTd = (at, ant) => {
+                const v = calcVar(at, ant);
                 const cls = v >= 0 ? 'pos' : 'neg';
                 const sg = v >= 0 ? '+' : '';
-                const isBold = item.n === 'Superávit Patrimonial' ? 'font-weight:bold;' : '';
-                
-                out += '<tr>';
-                out += '<td style="' + isBold + '">' + item.n + '</td>';
-                out += '<td style="text-align:right;">' + fmt(item.at) + '</td>';
-                out += '<td style="text-align:right;">' + fmt(item.ant) + '</td>';
-                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fmtPct(v) + '</td>';
-                out += '</tr>';
-            });
+                return '<td class="' + cls + '" style="text-align:right;">' + sg + fmtPct(v) + '</td>';
+            };
+            const fmtTd = v => '<td style="text-align:right;">' + fmt(v) + '</td>';
+
+            let out = '';
+
+            // BLOCO VPA
+            out += '<tr style="background:#e8f4f8; font-weight:bold;"><td colspan="4" style="color:#003366;">VPA - VARIAÇÕES PATRIMONIAIS AUMENTATIVAS</td></tr>';
+            out += '<tr><td>VPA Financeiras</td>' + fmtTd(d.vpa_financeiras.atual) + fmtTd(d.vpa_financeiras.anterior) + varTd(d.vpa_financeiras.atual, d.vpa_financeiras.anterior) + '</tr>';
+            out += '<tr><td>Transferências Recebidas</td>' + fmtTd(d.transf_recebidas.atual) + fmtTd(d.transf_recebidas.anterior) + varTd(d.transf_recebidas.atual, d.transf_recebidas.anterior) + '</tr>';
+            out += '<tr><td>Outras Variações Patrimoniais Aumentativas</td>' + fmtTd(d.outras_vpa.atual) + fmtTd(d.outras_vpa.anterior) + varTd(d.outras_vpa.atual, d.outras_vpa.anterior) + '</tr>';
+            out += '<tr><td>Reversão de Provisões e Ajustes de Perdas</td>' + fmtTd(d.reversao_provisoes.atual) + fmtTd(d.reversao_provisoes.anterior) + varTd(d.reversao_provisoes.atual, d.reversao_provisoes.anterior) + '</tr>';
+            out += '<tr style="font-weight:bold; border-top:1px solid #ccc;"><td>TOTAL VPA</td>' + fmtTd(d.total_vpa.atual) + fmtTd(d.total_vpa.anterior) + varTd(d.total_vpa.atual, d.total_vpa.anterior) + '</tr>';
+
+            // BLOCO VPD
+            out += '<tr style="background:#f8e8e8; font-weight:bold;"><td colspan="4" style="color:#dc3545;">VPD - VARIAÇÕES PATRIMONIAIS DIMINUTIVAS</td></tr>';
+            out += '<tr><td>VPD Financeiras</td>' + fmtTd(d.vpd_financeiras.atual) + fmtTd(d.vpd_financeiras.anterior) + varTd(d.vpd_financeiras.atual, d.vpd_financeiras.anterior) + '</tr>';
+            out += '<tr><td>Pessoal e Encargos</td>' + fmtTd(d.pessoal_encargos.atual) + fmtTd(d.pessoal_encargos.anterior) + varTd(d.pessoal_encargos.atual, d.pessoal_encargos.anterior) + '</tr>';
+            out += '<tr><td>Uso de Material de Consumo</td>' + fmtTd(d.uso_material_consumo.atual) + fmtTd(d.uso_material_consumo.anterior) + varTd(d.uso_material_consumo.atual, d.uso_material_consumo.anterior) + '</tr>';
+            out += '<tr><td>Serviços</td>' + fmtTd(d.servicos.atual) + fmtTd(d.servicos.anterior) + varTd(d.servicos.atual, d.servicos.anterior) + '</tr>';
+            out += '<tr><td>Depreciação</td>' + fmtTd(d.depreciacao.atual) + fmtTd(d.depreciacao.anterior) + varTd(d.depreciacao.atual, d.depreciacao.anterior) + '</tr>';
+            out += '<tr><td>Amortização</td>' + fmtTd(d.amortizacao.atual) + fmtTd(d.amortizacao.anterior) + varTd(d.amortizacao.atual, d.amortizacao.anterior) + '</tr>';
+            out += '<tr><td>Transferências e Delegações Concedidas</td>' + fmtTd(d.transf_concedidas.atual) + fmtTd(d.transf_concedidas.anterior) + varTd(d.transf_concedidas.atual, d.transf_concedidas.anterior) + '</tr>';
+            out += '<tr><td>Outras Variações Patrimoniais Diminutivas</td>' + fmtTd(d.outras_vpd.atual) + fmtTd(d.outras_vpd.anterior) + varTd(d.outras_vpd.atual, d.outras_vpd.anterior) + '</tr>';
+            out += '<tr><td>Tributárias</td>' + fmtTd(d.tributarias.atual) + fmtTd(d.tributarias.anterior) + varTd(d.tributarias.atual, d.tributarias.anterior) + '</tr>';
+            out += '<tr style="font-weight:bold; border-top:1px solid #ccc;"><td>TOTAL VPD</td>' + fmtTd(d.total_vpd.atual) + fmtTd(d.total_vpd.anterior) + varTd(d.total_vpd.atual, d.total_vpd.anterior) + '</tr>';
+
+            // BLOCO RESULTADO
+            const tipo = d.tipo_resultado.atual;
+            const cor = tipo.includes("Superávit") ? "#003366" : "#dc3545";
+            out += '<tr style="background:#eef5e8; font-weight:bold;"><td colspan="4" style="color:' + cor + ';">RESULTADO PATRIMONIAL</td></tr>';
+            out += '<tr style="font-weight:bold;"><td>' + tipo + '</td>' + fmtTd(d.resultado.atual) + fmtTd(d.resultado.anterior) + varTd(d.resultado.atual, d.resultado.anterior) + '</tr>';
+
             tb.innerHTML = out;
 
+            // Card de resultado
+            const tipoAtual = d.tipo_resultado.atual;
+            const corTipo = tipoAtual.includes("Superávit") ? "#003366" : "#dc3545";
             document.getElementById('concl').innerHTML = 
-                '<div style="font-size:13px; opacity:0.8; margin-bottom:10px;">Margem patrimonial</div>' +
-                '<div class="valor">' + fmtPct(d.margem_patrimonial.anterior) + ' ➔ ' + fmtPct(d.margem_patrimonial.atual) + '</div>' +
-                '<div class="formula">(Superávit Patrimonial / Variações Ativas)</div>';
-            document.getElementById('concl').style.display = 'block';
-            document.getElementById('concl').style.background = '#003366';
-            document.getElementById('concl').style.color = 'white';
+                '<div style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); padding:24px; border-top:5px solid ' + corTipo + '; height:100%;">' +
+                    '<div style="color:#666; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Resultado Patrimonial</div>' +
+                    '<div style="font-weight:bold; font-size:16px; color:' + corTipo + '; margin-bottom:5px;">' + tipoAtual + '</div>' +
+                    '<div style="font-size:32px; font-weight:bold; color:#003366; margin-bottom:15px;">R$ ' + fmt(d.resultado.atual) + '</div>' +
+                    
+                    '<div style="font-size:12px; color:#888; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:15px;">' +
+                        '(Total VPA - Total VPD)' +
+                    '</div>' +
+                    
+                    '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">' +
+                        '<span style="color:#666; font-size:13px;">Período Anterior:</span>' +
+                        '<span style="font-weight:bold; color:#444; font-size:13px;">R$ ' + fmt(d.resultado.anterior) + '</span>' +
+                    '</div>' +
+                    
+                    '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+                        '<span style="color:#666; font-size:13px;">Margem do Resultado:</span>' +
+                        '<span style="font-weight:bold; font-size:16px; color:' + corTipo + ';">' + fmtPct(d.margem_resultado.atual) + '</span>' +
+                    '</div>' +
+                '</div>';document.getElementById('concl').style.display = 'block';
 
-            if (chart) chart.destroy();
-            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+            // Grafico de barras
+            const ctx = document.getElementById('grafico');
+            if (window.chart) window.chart.destroy();
+            window.chart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Variações Ativas', 'Variações Diminutivas', 'Superávit Patrimonial'],
+                    labels: ['Total VPA', 'Total VPD', 'Resultado'],
                     datasets: [
                         {
                             label: 'Período Atual',
-                            data: [d.variacoes_ativas.atual, d.variacoes_diminutivas.atual, d.superavit_patrimonial.atual],
-                            backgroundColor: '#003366',
+                            data: [d.total_vpa.atual, d.total_vpd.atual, d.resultado.atual],
+                            backgroundColor: ['#003366', '#dc3545', '#28a745'],
                             borderRadius: 4
                         },
                         {
                             label: 'Período Anterior',
-                            data: [d.variacoes_ativas.anterior, d.variacoes_diminutivas.anterior, d.superavit_patrimonial.anterior],
-                            backgroundColor: '#4a90e2',
+                            data: [d.total_vpa.anterior, d.total_vpd.anterior, d.resultado.anterior],
+                            backgroundColor: ['#4a90e2', '#e68a8a', '#7ec87e'],
                             borderRadius: 4
                         }
                     ]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } }
-                }
+                options: { responsive: true, maintainAspectRatio: false }
             });
         }
-
         function carregar() {
             const p = document.getElementById('periodo').value;
             const tb = document.querySelector('#tab tbody');

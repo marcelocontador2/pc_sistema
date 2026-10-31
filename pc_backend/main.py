@@ -20062,7 +20062,7 @@ async def serve_analise_patrimonial():
 
 
 
-@app.get("/api/analise_patrimonial/{periodo}")
+# @app.get("/api/analise_patrimonial/{periodo}")  # MIGRADO para app/routers/dvp.py
 
 
 
@@ -23385,1543 +23385,201 @@ async def gerar_pdf_analise_orcamentaria(id: int):
 
 
 @app.get("/gerar_pdf_analise_patrimonial/{id}")
-
-
-
-
-
-
-
-
-
-
 async def gerar_pdf_analise_patrimonial(id: int):
-
-
-
-
-
-
-
-
-
-
     try:
-
-
-
-
-
-
-
-
-
-
-        from fastapi.responses import Response
-
-
-
-
-
-
-
-
-
-
         from fpdf import FPDF
-
-
-
-
-
-
-
-
-
-
         from fpdf.enums import XPos, YPos
-
-
-
-
-
-
-
-
-
-
-        import matplotlib
-
-
-
-
-
-
-
-
-
-
-        matplotlib.use('Agg')
-
-
-
-
-
-
-
-
-
-
-        import matplotlib.pyplot as plt
-
-
-
-
-
-
-
-
-
-
-        import matplotlib.ticker as ticker
-
-
-
-
-
-
-
-
-
-
-        import io, tempfile, os, json, sqlite3
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        # 1. Busca o periodo no banco
-
-
-
-
-
-
-
-
-
-
+        from fastapi.responses import Response
+        from app.routers.dvp import processar_dvp
+        import sqlite3, os
+
+        # 1. Busca o periodo no historico (ou usa fallback)
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-
-
-
-
-
-
-
-
-
-
         conn = sqlite3.connect(db_path)
-
-
-
-
-
-
-
-
-
-
         cursor = conn.cursor()
-
-
-
-
-
-
-
-
-
-
-        cursor.execute("SELECT periodo, resultado_json FROM historico_analise_patrimonial WHERE id = ?", (id,))
-
-
-
-
-
-
-
-
-
-
+        cursor.execute("SELECT periodo FROM historico_analise_patrimonial WHERE id = ?", (id,))
         row = cursor.fetchone()
-
-
-
-
-
-
-
-
-
-
         conn.close()
-
-
-
-
-
-
-
-
-
-
         
-
-
-
-
-
-
-
-
-
-
-        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
-
-
-
-
-
-
-
-
-
-
-        periodo, d_json = row
-
-
-
-
-
-
-
-
-
-
-        d = json.loads(d_json)
-
-
-
-
-
-
-
-
-
-
+        periodo = row[0] if row else "2026-TRIMESTRE-3"
         
-
-
-
-
-
-
-
-
-
-
-        # 2. Extrai os dados da estrutura retornada (que tem 'atual' e 'anterior' dentro de cada chave)
-
-
-
-
-
-
-
-
-
-
-        # A estrutura Ã©: { "variacoes_ativas": { "atual": X, "anterior": Y }, ... }
-
-
-
-
-
-
-
-
-
-
-        def get_val(chave, tipo):
-
-
-
-
-
-
-
-
-
-
-            obj = d.get(chave, {})
-
-
-
-
-
-
-
-
-
-
-            return obj.get(tipo, 0) if isinstance(obj, dict) else 0
-
-
-
-
-
-
-
-
-
-
+        # 2. Calcula os dados do DVP
+        p_limpo = periodo.replace("-", "_")
+        caminho_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", f"DVP_{p_limpo}.csv")
         
-
-
-
-
-
-
-
-
-
-
-        # 3. Gera o grafico (Atual primeiro)
-
-
-
-
-
-
-
-
-
-
-        labels = ["VariaÃ§Ãµes Ativas", "VariaÃ§Ãµes Diminutivas", "SuperÃ¡vit Patrimonial"]
-
-
-
-
-
-
-
-
-
-
-        ant = [get_val("variacoes_ativas", "anterior"), get_val("variacoes_diminutivas", "anterior"), get_val("superavit_patrimonial", "anterior")]
-
-
-
-
-
-
-
-
-
-
-        atu = [get_val("variacoes_ativas", "atual"), get_val("variacoes_diminutivas", "atual"), get_val("superavit_patrimonial", "atual")]
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        fig, ax = plt.subplots(figsize=(5, 2.0), dpi=150)
-
-
-
-
-
-
-
-
-
-
-        x = range(len(labels))
-
-
-
-
-
-
-
-
-
-
-        ax.bar([i - 0.2 for i in x], atu, width=0.4, label="Atual", color="#003366")
-
-
-
-
-
-
-
-
-
-
-        ax.bar([i + 0.2 for i in x], ant, width=0.4, label="Anterior", color="#4a90e2")
-
-
-
-
-
-
-
-
-
-
-        ax.set_xticks(x)
-
-
-
-
-
-
-
-
-
-
-        ax.set_xticklabels(labels, fontsize=9)
-
-
-
-
-
-
-
-
-
-
-        ax.legend(loc="upper right", fontsize=8, frameon=False)
-
-
-
-
-
-
-
-
-
-
-        formatter = ticker.FuncFormatter(lambda x, pos: f"{x*1e-6:,.0f} Mi")
-
-
-
-
-
-
-
-
-
-
-        ax.yaxis.set_major_formatter(formatter)
-
-
-
-
-
-
-
-
-
-
-        ax.tick_params(axis="y", labelsize=8)
-
-
-
-
-
-
-
-
-
-
-        ax.spines["top"].set_visible(False)
-
-
-
-
-
-
-
-
-
-
-        ax.spines["right"].set_visible(False)
-
-
-
-
-
-
-
-
-
-
-        ax.grid(axis="y", linestyle="--", alpha=0.5)
-
-
-
-
-
-
-
-
-
-
-        plt.tight_layout()
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        img_path = os.path.join(tempfile.gettempdir(), f"grafico_pat_{id}.png")
-
-
-
-
-
-
-
-
-
-
-        plt.savefig(img_path, bbox_inches="tight"); plt.close()
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        # 4. Monta o PDF
-
-
-
-
-
-
-
-
-
-
-        pdf = FPDF(orientation="L", unit="mm", format="A4")
-
-
-
-
-
-
-
-
-
-
+        if not os.path.exists(caminho_csv):
+            raise Exception(f"Arquivo DVP nao encontrado para {periodo}")
+            
+        resultado = processar_dvp(caminho_csv)
+        d = resultado["dados"]
+
+        # 3. Monta o PDF Moderno
+        pdf = FPDF()
         pdf.add_page()
+        pdf.set_auto_page_break(auto=False)
 
+        # Cabecalho azul escuro
+        pdf.set_fill_color(0, 51, 102)
+        pdf.rect(0, 0, 210, 35, "F")
+        pdf.set_font("Helvetica", "B", 22)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_xy(15, 8)
+        pdf.cell(180, 10, "DVP - Demonstração das Variações Patrimoniais", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 13)
+        pdf.set_xy(15, 20)
+        pdf.cell(180, 8, f"Período: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+        # Linha amarela
+        pdf.set_draw_color(0, 51, 102)  # Linha azul (era amarela)
+        pdf.set_line_width(1.5)
+        pdf.line(0, 35, 210, 35)
 
+        # Funcao para formatar valores
+        def fmt_mi(v):
+            try:
+                s = f"R$ {v:,.2f}"
+                return s.replace(",", "X").replace(".", ",").replace("X", ".")
+            except Exception:
+                return str(v)
 
-
-
-
-
-
-
+        # Cards de totais
+        y_pos = 50
+        card_w = 90
+        card_h = 35
         
-
-
-
-
-
-
-
-
-
-
-        font_path = "C:/Windows/Fonts/arial.ttf"
-
-
-
-
-
-
-
-
-
-
-        font_bold = "C:/Windows/Fonts/arialbd.ttf"
-
-
-
-
-
-
-
-
-
-
-        if os.path.exists(font_path):
-
-
-
-
-
-
-
-
-
-
-            pdf.add_font("Arial", "", font_path)
-
-
-
-
-
-
-
-
-
-
-            pdf.add_font("Arial", "B", font_bold)
-
-
-
-
-
-
-
-
-
-
-            f_family = "Arial"
-
-
-
-
-
-
-
-
-
-
-        else:
-
-
-
-
-
-
-
-
-
-
-            f_family = "helvetica"
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        pdf.set_font(f_family, "B", 16)
-
-
-
-
-
-
-
-
-
-
+        # Card 1: Total VPA
+        pdf.set_fill_color(232, 244, 248)
+        pdf.rect(15, y_pos, card_w, card_h, "F")
         pdf.set_text_color(0, 51, 102)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_xy(20, y_pos + 5)
+        pdf.cell(card_w, 10, fmt_mi(d['total_vpa']['atual']), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(80, 80, 80)
+        pdf.set_xy(20, y_pos + 20)
+        pdf.cell(card_w, 5, "Total VPA (Variações Aumentativas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+        # Card 2: Total VPD
+        pdf.set_fill_color(248, 232, 232)
+        pdf.rect(105, y_pos, card_w, card_h, "F")
+        pdf.set_text_color(220, 53, 69)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_xy(110, y_pos + 5)
+        pdf.cell(card_w, 10, fmt_mi(d['total_vpd']['atual']), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(80, 80, 80)
+        pdf.set_xy(110, y_pos + 20)
+        pdf.cell(card_w, 5, "Total VPD (Variações Diminutivas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-
-
-
-
-
-
-
-
-        pdf.cell(0, 10, "DemonstraÃ§Ã£o das VariaÃ§Ãµes Patrimoniais (DVP)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-
-
-
-
-
-
-
-
-
-
-        pdf.set_font(f_family, "", 10)
-
-
-
-
-
-
-
-
-
-
+        # Card 3: Resultado
+        y_pos += 45
+        pdf.set_fill_color(238, 245, 232)
+        pdf.rect(15, y_pos, 180, 40, "F")
+        
+        cor_res = (0, 51, 102) if d['resultado']['atual'] >= 0 else (220, 53, 69)
+        pdf.set_text_color(*cor_res)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_xy(20, y_pos + 5)
+        pdf.cell(180, 5, d['tipo_resultado']['atual'], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_font("Helvetica", "B", 24)
+        pdf.set_xy(20, y_pos + 12)
+        pdf.cell(180, 10, fmt_mi(d['resultado']['atual']), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(100, 100, 100)
+        pdf.set_xy(20, y_pos + 28)
+        pdf.cell(180, 5, "(Total VPA - Total VPD)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-
-
-
-
-
-
-
-
-
-        pdf.cell(0, 5, f"PerÃ­odo de ReferÃªncia: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-
-
-
-
-
-
-
-
-
-
-        pdf.ln(8)
-
-
-
-
-
-
-
-
-
-
+        # Tabela detalhada
+        y_pos += 55
+        pdf.set_draw_color(0, 51, 102)
+        pdf.set_line_width(0.2)
         
-
-
-
-
-
-
-
-
-
-
-        # Tabela: Indicador | Periodo Atual | Periodo Anterior | Var (%)
-
-
-
-
-
-
-
-
-
-
-        pdf.set_fill_color(0, 51, 102)
-
-
-
-
-
-
-
-
-
-
-        pdf.set_text_color(255, 255, 255)
-
-
-
-
-
-
-
-
-
-
-        pdf.set_font(f_family, "B", 10)
-
-
-
-
-
-
-
-
-
-
+        # Definir borda fina azul escuro
+        pdf.set_draw_color(0, 51, 102)
+        pdf.set_line_width(0.2)
         
-
-
-
-
-
-
-
-
-
-
-        pdf.cell(80, 8, "Indicador", border=1, fill=True, align="C")
-
-
-
-
-
-
-
-
-
-
-        pdf.cell(45, 8, "Periodo Atual", border=1, fill=True, align="C")
-
-
-
-
-
-
-
-
-
-
-        pdf.cell(45, 8, "Periodo Anterior", border=1, fill=True, align="C")
-
-
-
-
-
-
-
-
-
-
-        pdf.cell(30, 8, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
         pdf.set_text_color(0, 0, 0)
-
-
-
-
-
-
-
-
-
-
-        pdf.set_font(f_family, "", 9)
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        ind = [
-
-
-
-
-
-
-
-
-
-
-            ("VariaÃ§Ãµes Ativas", "variacoes_ativas"),
-
-
-
-
-
-
-
-
-
-
-            ("TransferÃªncias Recebidas", "transf_recebidas"),
-
-
-
-
-
-
-
-
-
-
-            ("ReversÃ£o de ProvisÃµes", "reversao_provisoes"),
-
-
-
-
-
-
-
-
-
-
-            ("VariaÃ§Ãµes Diminutivas", "variacoes_diminutivas"),
-
-
-
-
-
-
-
-
-
-
-            ("Pessoal e Encargos", "pessoal_encargos"),
-
-
-
-
-
-
-
-
-
-
-            ("ServiÃ§os de Terceiros", "servicos_terceiros"),
-
-
-
-
-
-
-
-
-
-
-            ("TransferÃªncias Concedidas", "transf_concedidas"),
-
-
-
-
-
-
-
-
-
-
-            ("SuperÃ¡vit Patrimonial", "superavit_patrimonial"),
-
-
-
-
-
-
-
-
-
-
-        ]
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        for nome, chave in ind:
-
-
-
-
-
-
-
-
-
-
-            va = get_val(chave, "atual")
-
-
-
-
-
-
-
-
-
-
-            vb = get_val(chave, "anterior")
-
-
-
-
-
-
-
-
-
-
-            var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
-
-
-
-
-
-
-
-
-
-
-            
-
-
-
-
-
-
-
-
-
-
-            is_bold = "B" if "SuperÃ¡vit" in nome else ""
-
-
-
-
-
-
-
-
-
-
-            pdf.set_font(f_family, is_bold, 9)
-
-
-
-
-
-
-
-
-
-
-            
-
-
-
-
-
-
-
-
-
-
-            pdf.cell(80, 7, nome, border=1, align="L")
-
-
-
-
-
-
-
-
-
-
-            pdf.cell(45, 7, fmt(va), border=1, align="R")
-
-
-
-
-
-
-
-
-
-
-            pdf.cell(45, 7, fmt(vb), border=1, align="R")
-
-
-
-
-
-
-
-
-
-
-            
-
-
-
-
-
-
-
-
-
-
-            if var >= 0: pdf.set_text_color(0, 128, 0)
-
-
-
-
-
-
-
-
-
-
-            else: pdf.set_text_color(220, 53, 69)
-
-
-
-
-
-
-
-
-
-
-            pdf.cell(30, 7, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
-
-
-
-
-
-
-
-
-
-            pdf.set_text_color(0, 0, 0)
-
-
-
-
-
-
-
-
-
-
-            pdf.set_font(f_family, "", 9)
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        # Grafico e Card da Margem
-
-
-
-
-
-
-
-
-
-
-        pdf.ln(8)
-
-
-
-
-
-
-
-
-
-
-        y_atual = pdf.get_y()
-
-
-
-
-
-
-
-
-
-
-        pdf.image(img_path, x=30, y=y_atual, w=100)
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-        # Card da Margem
-
-
-
-
-
-
-
-
-
-
-        pdf.set_xy(140, y_atual)
-
-
-
-
-
-
-
-
-
-
+        pdf.set_font("Helvetica", "B", 10)
         pdf.set_fill_color(0, 51, 102)
-
-
-
-
-
-
-
-
-
-
         pdf.set_text_color(255, 255, 255)
-
-
-
-
-
-
-
-
-
-
-        pdf.set_font(f_family, "B", 10)
-
-
-
-
-
-
-
-
-
-
-        margem_at = d.get("margem_patrimonial", {}).get("atual", 0)
-
-
-
-
-
-
-
-
-
-
-        margem_ant = d.get("margem_patrimonial", {}).get("anterior", 0)
-
-
-
-
-
-
-
-
-
-
-        pdf.multi_cell(60, 8, f"Margem Patrimonial:\n{margem_ant:.2f}% -> {margem_at:.2f}%\n\n(SuperÃ¡vit / VariaÃ§Ãµes Ativas)", border=0, fill=True, align="C")
-
-
-
-
-
-
-
-
-
-
+        pdf.set_xy(15, y_pos)
+        pdf.cell(90, 8, "Indicador", border=1, fill=True)
+        pdf.cell(40, 8, "Período Atual", border=1, fill=True, align="R")
+        pdf.cell(40, 8, "Período Anterior", border=1, fill=True, align="R")
+        pdf.ln()
         
+        y_pos += 8
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 9)
 
+        def add_linha(nome, at, ant, bold=False):
+            nonlocal y_pos
+            if bold:
+                pdf.set_font("Helvetica", "B", 9)
+            else:
+                pdf.set_font("Helvetica", "", 9)
+            pdf.set_xy(15, y_pos)
+            pdf.cell(90, 7, nome, border=1)
+            pdf.cell(40, 7, f"R$ {fmt_mi(at)}", border=1, align="R")
+            pdf.cell(40, 7, f"R$ {fmt_mi(ant)}", border=1, align="R")
+            pdf.ln()
+            y_pos += 7
 
+        # Bloco VPA
+        pdf.set_fill_color(232, 244, 248)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_xy(15, y_pos)
+        pdf.cell(170, 7, "VPA - VARIAÇÕES PATRIMONIAIS AUMENTATIVAS", border=1, fill=True)
+        pdf.ln()
+        y_pos += 7
+        add_linha("VPA Financeiras", d['vpa_financeiras']['atual'], d['vpa_financeiras']['anterior'])
+        add_linha("Transferências Recebidas", d['transf_recebidas']['atual'], d['transf_recebidas']['anterior'])
+        add_linha("Outras VPA", d['outras_vpa']['atual'], d['outras_vpa']['anterior'])
+        add_linha("Reversão de Provisões", d['reversao_provisoes']['atual'], d['reversao_provisoes']['anterior'])
+        add_linha("TOTAL VPA", d['total_vpa']['atual'], d['total_vpa']['anterior'], bold=True)
 
+        # Bloco VPD
+        pdf.set_fill_color(248, 232, 232)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_xy(15, y_pos)
+        pdf.cell(170, 7, "VPD - VARIAÇÕES PATRIMONIAIS DIMINUTIVAS", border=1, fill=True)
+        pdf.ln()
+        y_pos += 7
+        add_linha("VPD Financeiras", d['vpd_financeiras']['atual'], d['vpd_financeiras']['anterior'])
+        add_linha("Pessoal e Encargos", d['pessoal_encargos']['atual'], d['pessoal_encargos']['anterior'])
+        add_linha("Uso de Material de Consumo", d['uso_material_consumo']['atual'], d['uso_material_consumo']['anterior'])
+        add_linha("Serviços", d['servicos']['atual'], d['servicos']['anterior'])
+        add_linha("Depreciação", d['depreciacao']['atual'], d['depreciacao']['anterior'])
+        add_linha("Amortização", d['amortizacao']['atual'], d['amortizacao']['anterior'])
+        add_linha("Transferências Concedidas", d['transf_concedidas']['atual'], d['transf_concedidas']['anterior'])
+        add_linha("Outras VPD", d['outras_vpd']['atual'], d['outras_vpd']['anterior'])
+        add_linha("Tributárias", d['tributarias']['atual'], d['tributarias']['anterior'])
+        add_linha("TOTAL VPD", d['total_vpd']['atual'], d['total_vpd']['anterior'], bold=True)
 
-
-
-
-
-
+        # Rodape
+        pdf.set_draw_color(200, 200, 200)
+        pdf.set_line_width(0.3)
+        pdf.line(15, 285, 195, 285)
+        pdf.set_text_color(120, 120, 120)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_xy(15, 287)
+        pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
+        from datetime import datetime
+        pdf.set_xy(135, 287)
+        pdf.cell(60, 5, f"Gerado em: {datetime.now():%d/%m/%Y %H:%M}", align="R")
 
         pdf_bytes = bytes(pdf.output())
-
-
-
-
-
-
-
-
-
-
-        return Response(content=pdf_bytes, media_type="application/pdf", headers={
-
-
-
-
-
-
-
-
-
-
-            "Content-Disposition": f"inline; filename=analise_patrimonial_{id}.pdf"
-
-
-
-
-
-
-
-
-
-
-        })
-
-
-
-
-
-
-
-
-
-
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=dvp_{periodo}.pdf"}
+        )
     except Exception as e:
-
-
-
-
-
-
-
-
-
-
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
 
 
 @app.get("/gerar_pdf_composicao_receitas_despesas/{id}")
@@ -34999,6 +33657,10 @@ def salvar_custo_pessoal_rota(periodo: str):
 # === ROUTER DO PANORAMA (registrado por ultimo para vencer a rota antiga) ===
 from app.routers.panorama import router as panorama_router
 app.include_router(panorama_router)
+
+# === ROUTER DO DVP ===
+from app.routers.dvp import router as dvp_router
+app.include_router(dvp_router)
 
 
 
