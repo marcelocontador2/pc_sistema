@@ -37,75 +37,264 @@
 
         function render(at, ant) {
             const tb = document.querySelector('#tab tbody');
-            const ind = [
-                { n: 'Receita Realizada (Ingressos)', k: 'receita_realizada' },
-                { n: 'Despesa Orçamentária', k: 'despesa_orcamentaria' },
-                { n: 'Recebimentos Extraorçamentários', k: 'recebimentos_extra' },
-                { n: 'Pagamentos Extraorçamentários', k: 'pagamentos_extra' },
-                { n: 'Saldo em Espécie do Exerc. Anterior', k: 'saldo_anterior' },
-                { n: 'Saldo em Espécie para o Exerc. Seguinte', k: 'saldo_seguinte' },
-                { n: 'Total (Ingressos)', k: 'total_ingressos' },
-                { n: 'Total (Dispêndios)', k: 'total_dispendios' }
-            ];
-
-            let out = '';
-            ind.forEach(item => {
-                // Extrai os valores: se for objeto, pega .atual ou .anterior; se for número, usa direto
-                let va = at[item.k];
-                let vb = ant[item.k];
-                if (typeof va === 'object' && va !== null) va = va.atual || 0;
-                if (typeof vb === 'object' && vb !== null) vb = vb.anterior || 0;
-                va = parseFloat(va) || 0;
-                vb = parseFloat(vb) || 0;
-                
-                const v = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+            const fmtV = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const fmtP = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+            const pct = (a, b) => b !== 0 ? ((a - b) / Math.abs(b)) * 100 : 0;
+            const safe = (v) => (v && typeof v === 'object') ? v : {atual: 0, anterior: 0};
+            const line = (label, va, vb, bold) => {
+                const v = pct(va, vb);
                 const cls = v >= 0 ? 'pos' : 'neg';
                 const sg = v >= 0 ? '+' : '';
-                const fa = (num) => num.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                
-                out += '<tr>';
-                out += '<td>' + item.n + '</td>';
-                out += '<td style="text-align:right;">' + fa(va) + '</td>';
-                out += '<td style="text-align:right;">' + fa(vb) + '</td>';
-                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fa(v) + '%</td>';
-                out += '</tr>';
-            });
+                const trStyle = bold ? 'font-weight:bold;' : '';
+                return '<tr style="' + trStyle + '">' +
+                    '<td>' + label + '</td>' +
+                    '<td style="text-align:right;">' + fmtV(va) + '</td>' +
+                    '<td style="text-align:right;">' + fmtV(vb) + '</td>' +
+                    '<td class="' + cls + '" style="text-align:right;">' + sg + fmtP(v) + '</td>' +
+                '</tr>';
+            };
+            const header = (label, color) => '<tr style="background:' + color + '; font-weight:bold; color:#fff;"><td colspan="4">' + label + '</td></tr>';
+            const blank = () => '<tr><td colspan="4" style="height:5px; border:none;"></td></tr>';
+
+            const R = {
+                rec: {
+                    corr: safe(at.receitas && at.receitas.corrente),
+                    cap: safe(at.receitas && at.receitas.capital),
+                    tot: safe(at.receitas && at.receitas.total),
+                },
+                desp: {
+                    corr: safe(at.despesas && at.despesas.corrente),
+                    cap: safe(at.despesas && at.despesas.capital),
+                    tot: safe(at.despesas && at.despesas.total),
+                },
+                extra: {
+                    rec: safe(at.extra && at.extra.recebimentos),
+                    pag: safe(at.extra && at.extra.pagamentos),
+                },
+                caixa: {
+                    ant: safe(at.caixa && at.caixa.saldo_anterior),
+                    ger: safe(at.caixa && at.caixa.geracao_liquida),
+                    seg: safe(at.caixa && at.caixa.saldo_seguinte),
+                }
+            };
+
+            let out = '';
+            out += header('RECEITAS', '#003366');
+            out += line('Receitas Correntes', R.rec.corr.atual, R.rec.corr.anterior);
+            out += line('Receitas de Capital', R.rec.cap.atual, R.rec.cap.anterior);
+            out += line('Total de Receitas', R.rec.tot.atual, R.rec.tot.anterior, true);
+            out += blank();
+            out += header('DESPESAS', '#dc3545');
+            out += line('Despesas Correntes', R.desp.corr.atual, R.desp.corr.anterior);
+            out += line('Despesas de Capital', R.desp.cap.atual, R.desp.cap.anterior);
+            out += line('Total de Despesas', R.desp.tot.atual, R.desp.tot.anterior, true);
+            out += blank();
+            out += header('EXTRAORCAMENTARIO', '#6c757d');
+            out += line('Recebimentos Extraorcamentarios', R.extra.rec.atual, R.extra.rec.anterior);
+            out += line('Pagamentos Extraorcamentarios', R.extra.pag.atual, R.extra.pag.anterior);
+            out += blank();
+            out += header('CAIXA E EQUIVALENTES', '#28a745');
+            out += line('Saldo em Especie do Exerc. Anterior', R.caixa.ant.atual, R.caixa.ant.anterior);
+            out += line('Geracao Liquida de Caixa', R.caixa.ger.atual, R.caixa.ger.anterior, true);
+            out += line('Saldo em Especie para o Exerc. Seguinte', R.caixa.seg.atual, R.caixa.seg.anterior, true);
+
             tb.innerHTML = out;
 
-            // Gráfico: Atual primeiro (azul escuro), Anterior depois (azul claro)
-            const saldo_ant_at = (at.saldo_anterior || {}).atual || 0;
-            const saldo_ant_an = (ant.saldo_anterior || {}).anterior || 0;
-            const saldo_seg_at = (at.saldo_seguinte || {}).atual || 0;
-            const saldo_seg_an = (ant.saldo_seguinte || {}).anterior || 0;
-
-            if (chart) chart.destroy();
-            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+            const ctx = document.getElementById('graf');
+            if (!ctx) return;
+            if (typeof chart !== 'undefined' && chart) chart.destroy();
+            const chartCtx = ctx.getContext ? ctx.getContext('2d') : ctx;
+            window.chart = new Chart(chartCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+                    labels: ['Receitas', 'Despesas', 'Saldo Ant.', 'Saldo Seg.'],
                     datasets: [
                         {
-                            label: 'Período Atual',
-                            data: [saldo_ant_at, saldo_seg_at, saldo_seg_at - saldo_ant_at],
+                            label: 'Receitas (Atual)',
+                            data: [R.rec.tot.atual, null, null, null],
                             backgroundColor: '#003366',
-                            borderRadius: 4
+                            borderColor: '#002244',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
                         },
                         {
-                            label: 'Período Anterior',
-                            data: [saldo_ant_an, saldo_seg_an, saldo_seg_an - saldo_ant_an],
+                            label: 'Despesas (Atual)',
+                            data: [null, R.desp.tot.atual, null, null],
+                            backgroundColor: '#dc3545',
+                            borderColor: '#a71d2a',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Atual)',
+                            data: [null, null, R.caixa.ant.atual, null],
                             backgroundColor: '#4a90e2',
-                            borderRadius: 4
+                            borderColor: '#2c6fbb',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Atual)',
+                            data: [null, null, null, R.caixa.seg.atual],
+                            backgroundColor: '#28a745',
+                            borderColor: '#1e7e34',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Receitas (Anterior)',
+                            data: [R.rec.tot.anterior, null, null, null],
+                            backgroundColor: '#4a90e2',
+                            borderColor: '#357abd',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Despesas (Anterior)',
+                            data: [null, R.desp.tot.anterior, null, null],
+                            backgroundColor: '#e68a8a',
+                            borderColor: '#c96b6b',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Anterior)',
+                            data: [null, null, R.caixa.ant.anterior, null],
+                            backgroundColor: '#90c2e7',
+                            borderColor: '#6ba8d4',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Anterior)',
+                            data: [null, null, null, R.caixa.seg.anterior],
+                            backgroundColor: '#7ec87e',
+                            borderColor: '#5fa85f',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        }
+                    ]
+                }ata: {
+                    labels: ['Receitas', 'Despesas', 'Saldo Ant.', 'Saldo Seg.'],
+                    datasets: [
+                        // --- ATUAL ---
+                        {
+                            label: 'Receitas (Atual)',
+                            data: [R.rec.tot.atual, null, null, null],
+                            backgroundColor: '#003366',
+                            borderColor: '#002244',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Despesas (Atual)',
+                            data: [null, R.desp.tot.atual, null, null],
+                            backgroundColor: '#dc3545',
+                            borderColor: '#a71d2a',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Atual)',
+                            data: [null, null, R.caixa.ant.atual, null],
+                            backgroundColor: '#4a90e2',
+                            borderColor: '#2c6fbb',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Atual)',
+                            data: [null, null, null, R.caixa.seg.atual],
+                            backgroundColor: '#28a745',
+                            borderColor: '#1e7e34',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        // --- ANTERIOR ---
+                        {
+                            label: 'Receitas (Anterior)',
+                            data: [R.rec.tot.anterior, null, null, null],
+                            backgroundColor: '#4a90e2',
+                            borderColor: '#357abd',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Despesas (Anterior)',
+                            data: [null, R.desp.tot.anterior, null, null],
+                            backgroundColor: '#e68a8a',
+                            borderColor: '#c96b6b',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Anterior)',
+                            data: [null, null, R.caixa.ant.anterior, null],
+                            backgroundColor: '#90c2e7',
+                            borderColor: '#6ba8d4',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Anterior)',
+                            data: [null, null, null, R.caixa.seg.anterior],
+                            backgroundColor: '#7ec87e',
+                            borderColor: '#5fa85f',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 12, weight: 'bold' },
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'rectRounded'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += 'R$ ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#eef2f7' },
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + (value / 1000000).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' mi';
+                                },
+                                font: { size: 11 }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 12, weight: 'bold' } }
+                        }
+                    }
                 }
-            });
-        }
+            });                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#eef2f7' },
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + (value / 1000000).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' mi';
+                                },
+                                font: { size: 11 }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 12, weight: 'bold' } }
+                        }
+                    }
+                }
+            });        }
 
 </script>
 <style>
@@ -280,68 +469,141 @@ function exibirSelecionado() {
         }
 
         function render(at, ant) {
-            // Preenche a tabela
             const tb = document.querySelector('#tab tbody');
-            const ind = [
-                { n: 'Receita Realizada (Ingressos)', k: 'receita_realizada' },
-                { n: 'Despesa Orçamentária', k: 'despesa_orcamentaria' },
-                { n: 'Recebimentos Extraorçamentários', k: 'recebimentos_extra' },
-                { n: 'Pagamentos Extraorçamentários', k: 'pagamentos_extra' },
-                { n: 'Saldo em Espécie do Exerc. Anterior', k: 'saldo_anterior', isSaldo: true },
-                { n: 'Saldo em Espécie para o Exerc. Seguinte', k: 'saldo_seguinte', isSaldo: true },
-                { n: 'Total (Ingressos)', k: 'total_ingressos' },
-                { n: 'Total (Dispêndios)', k: 'total_dispendios' }
-            ];
-
-            let out = '';
-            ind.forEach(item => {
-                let va, vb;
-                if (item.isSaldo) {
-                    va = (at[item.k] || {}).atual || 0;
-                    vb = (ant[item.k] || {}).anterior || 0;
-                } else {
-                    va = at[item.k] || 0;
-                    vb = ant[item.k] || 0;
-                }
-                const v = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+            const fmtV = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const fmtP = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+            const pct = (a, b) => b !== 0 ? ((a - b) / Math.abs(b)) * 100 : 0;
+            const safe = (v) => (v && typeof v === 'object') ? v : {atual: 0, anterior: 0};
+            const line = (label, va, vb, bold) => {
+                const v = pct(va, vb);
                 const cls = v >= 0 ? 'pos' : 'neg';
                 const sg = v >= 0 ? '+' : '';
-                
-                out += '<tr>';
-                out += '<td>' + item.n + '</td>';
-                out += '<td style="text-align:right;">' + fmt(va) + '</td>';
-                out += '<td style="text-align:right;">' + fmt(vb) + '</td>';
-                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fmtPct(v) + '</td>';
-                out += '</tr>';
-            });
+                const trStyle = bold ? 'font-weight:bold;' : '';
+                return '<tr style="' + trStyle + '">' +
+                    '<td>' + label + '</td>' +
+                    '<td style="text-align:right;">' + fmtV(va) + '</td>' +
+                    '<td style="text-align:right;">' + fmtV(vb) + '</td>' +
+                    '<td class="' + cls + '" style="text-align:right;">' + sg + fmtP(v) + '</td>' +
+                '</tr>';
+            };
+            const header = (label, color) => '<tr style="background:' + color + '; font-weight:bold; color:#fff;"><td colspan="4">' + label + '</td></tr>';
+            const blank = () => '<tr><td colspan="4" style="height:5px; border:none;"></td></tr>';
+
+            const R = {
+                rec: {
+                    corr: safe(at.receitas && at.receitas.corrente),
+                    cap: safe(at.receitas && at.receitas.capital),
+                    tot: safe(at.receitas && at.receitas.total),
+                },
+                desp: {
+                    corr: safe(at.despesas && at.despesas.corrente),
+                    cap: safe(at.despesas && at.despesas.capital),
+                    tot: safe(at.despesas && at.despesas.total),
+                },
+                extra: {
+                    rec: safe(at.extra && at.extra.recebimentos),
+                    pag: safe(at.extra && at.extra.pagamentos),
+                },
+                caixa: {
+                    ant: safe(at.caixa && at.caixa.saldo_anterior),
+                    ger: safe(at.caixa && at.caixa.geracao_liquida),
+                    seg: safe(at.caixa && at.caixa.saldo_seguinte),
+                }
+            };
+
+            let out = '';
+            out += header('RECEITAS', '#003366');
+            out += line('Receitas Correntes', R.rec.corr.atual, R.rec.corr.anterior);
+            out += line('Receitas de Capital', R.rec.cap.atual, R.rec.cap.anterior);
+            out += line('Total de Receitas', R.rec.tot.atual, R.rec.tot.anterior, true);
+            out += blank();
+            out += header('DESPESAS', '#dc3545');
+            out += line('Despesas Correntes', R.desp.corr.atual, R.desp.corr.anterior);
+            out += line('Despesas de Capital', R.desp.cap.atual, R.desp.cap.anterior);
+            out += line('Total de Despesas', R.desp.tot.atual, R.desp.tot.anterior, true);
+            out += blank();
+            out += header('EXTRAORCAMENTARIO', '#6c757d');
+            out += line('Recebimentos Extraorcamentarios', R.extra.rec.atual, R.extra.rec.anterior);
+            out += line('Pagamentos Extraorcamentarios', R.extra.pag.atual, R.extra.pag.anterior);
+            out += blank();
+            out += header('CAIXA E EQUIVALENTES', '#28a745');
+            out += line('Saldo em Especie do Exerc. Anterior', R.caixa.ant.atual, R.caixa.ant.anterior);
+            out += line('Geracao Liquida de Caixa', R.caixa.ger.atual, R.caixa.ger.anterior, true);
+            out += line('Saldo em Especie para o Exerc. Seguinte', R.caixa.seg.atual, R.caixa.seg.anterior, true);
+
             tb.innerHTML = out;
 
-            // Gráfico corrigido: Atual (azul escuro) na esquerda, Anterior (azul claro) na direita
-            if (chart) chart.destroy();
-            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+            const ctx = document.getElementById('graf');
+            if (!ctx) return;
+            if (typeof chart !== 'undefined' && chart) chart.destroy();
+            const chartCtx = ctx.getContext ? ctx.getContext('2d') : ctx;
+            window.chart = new Chart(chartCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+                    labels: ['Receitas', 'Despesas', 'Saldo Ant.', 'Saldo Seg.'],
                     datasets: [
                         {
-                            label: 'Período Atual',
-                            data: [(at.saldo_anterior || {}).atual || 0, (at.saldo_seguinte || {}).atual || 0, ((at.saldo_seguinte || {}).atual || 0) - ((at.saldo_anterior || {}).atual || 0)],
+                            label: 'Receitas (Atual)',
+                            data: [R.rec.tot.atual, null, null, null],
                             backgroundColor: '#003366',
-                            borderRadius: 4
+                            borderColor: '#002244',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
                         },
                         {
-                            label: 'Período Anterior',
-                            data: [(ant.saldo_anterior || {}).anterior || 0, (ant.saldo_seguinte || {}).anterior || 0, ((ant.saldo_seguinte || {}).anterior || 0) - ((ant.saldo_anterior || {}).anterior || 0)],
+                            label: 'Despesas (Atual)',
+                            data: [null, R.desp.tot.atual, null, null],
+                            backgroundColor: '#dc3545',
+                            borderColor: '#a71d2a',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Atual)',
+                            data: [null, null, R.caixa.ant.atual, null],
                             backgroundColor: '#4a90e2',
-                            borderRadius: 4
+                            borderColor: '#2c6fbb',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Atual)',
+                            data: [null, null, null, R.caixa.seg.atual],
+                            backgroundColor: '#28a745',
+                            borderColor: '#1e7e34',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Receitas (Anterior)',
+                            data: [R.rec.tot.anterior, null, null, null],
+                            backgroundColor: '#4a90e2',
+                            borderColor: '#357abd',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Despesas (Anterior)',
+                            data: [null, R.desp.tot.anterior, null, null],
+                            backgroundColor: '#e68a8a',
+                            borderColor: '#c96b6b',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Anterior)',
+                            data: [null, null, R.caixa.ant.anterior, null],
+                            backgroundColor: '#90c2e7',
+                            borderColor: '#6ba8d4',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Anterior)',
+                            data: [null, null, null, R.caixa.seg.anterior],
+                            backgroundColor: '#7ec87e',
+                            borderColor: '#5fa85f',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                    plugins: { legend: { position: 'bottom' } }
                 }
             });
         }
@@ -349,67 +611,140 @@ function exibirSelecionado() {
 
         function render(at, ant) {
             const tb = document.querySelector('#tab tbody');
-            const ind = [
-                { n: 'Receita Realizada (Ingressos)', k: 'receita_realizada' },
-                { n: 'Despesa Orçamentária', k: 'despesa_orcamentaria' },
-                { n: 'Recebimentos Extraorçamentários', k: 'recebimentos_extra' },
-                { n: 'Pagamentos Extraorçamentários', k: 'pagamentos_extra' },
-                { n: 'Saldo em Espécie do Exerc. Anterior', k: 'saldo_anterior', isSaldo: true },
-                { n: 'Saldo em Espécie para o Exerc. Seguinte', k: 'saldo_seguinte', isSaldo: true },
-                { n: 'Total (Ingressos)', k: 'total_ingressos' },
-                { n: 'Total (Dispêndios)', k: 'total_dispendios' }
-            ];
-
-            let out = '';
-            ind.forEach(item => {
-                let va, vb;
-                if (item.isSaldo) {
-                    va = (at[item.k] || {}).atual || 0;
-                    vb = (ant[item.k] || {}).anterior || 0;
-                } else {
-                    va = at[item.k] || 0;
-                    vb = ant[item.k] || 0;
-                }
-                const v = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+            const fmtV = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const fmtP = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+            const pct = (a, b) => b !== 0 ? ((a - b) / Math.abs(b)) * 100 : 0;
+            const safe = (v) => (v && typeof v === 'object') ? v : {atual: 0, anterior: 0};
+            const line = (label, va, vb, bold) => {
+                const v = pct(va, vb);
                 const cls = v >= 0 ? 'pos' : 'neg';
                 const sg = v >= 0 ? '+' : '';
-                const fa = (num) => num.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                
-                out += '<tr>';
-                out += '<td>' + item.n + '</td>';
-                out += '<td style="text-align:right;">' + fa(va) + '</td>';
-                out += '<td style="text-align:right;">' + fa(vb) + '</td>';
-                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fa(v) + '%</td>';
-                out += '</tr>';
-            });
+                const trStyle = bold ? 'font-weight:bold;' : '';
+                return '<tr style="' + trStyle + '">' +
+                    '<td>' + label + '</td>' +
+                    '<td style="text-align:right;">' + fmtV(va) + '</td>' +
+                    '<td style="text-align:right;">' + fmtV(vb) + '</td>' +
+                    '<td class="' + cls + '" style="text-align:right;">' + sg + fmtP(v) + '</td>' +
+                '</tr>';
+            };
+            const header = (label, color) => '<tr style="background:' + color + '; font-weight:bold; color:#fff;"><td colspan="4">' + label + '</td></tr>';
+            const blank = () => '<tr><td colspan="4" style="height:5px; border:none;"></td></tr>';
+
+            const R = {
+                rec: {
+                    corr: safe(at.receitas && at.receitas.corrente),
+                    cap: safe(at.receitas && at.receitas.capital),
+                    tot: safe(at.receitas && at.receitas.total),
+                },
+                desp: {
+                    corr: safe(at.despesas && at.despesas.corrente),
+                    cap: safe(at.despesas && at.despesas.capital),
+                    tot: safe(at.despesas && at.despesas.total),
+                },
+                extra: {
+                    rec: safe(at.extra && at.extra.recebimentos),
+                    pag: safe(at.extra && at.extra.pagamentos),
+                },
+                caixa: {
+                    ant: safe(at.caixa && at.caixa.saldo_anterior),
+                    ger: safe(at.caixa && at.caixa.geracao_liquida),
+                    seg: safe(at.caixa && at.caixa.saldo_seguinte),
+                }
+            };
+
+            let out = '';
+            out += header('RECEITAS', '#003366');
+            out += line('Receitas Correntes', R.rec.corr.atual, R.rec.corr.anterior);
+            out += line('Receitas de Capital', R.rec.cap.atual, R.rec.cap.anterior);
+            out += line('Total de Receitas', R.rec.tot.atual, R.rec.tot.anterior, true);
+            out += blank();
+            out += header('DESPESAS', '#dc3545');
+            out += line('Despesas Correntes', R.desp.corr.atual, R.desp.corr.anterior);
+            out += line('Despesas de Capital', R.desp.cap.atual, R.desp.cap.anterior);
+            out += line('Total de Despesas', R.desp.tot.atual, R.desp.tot.anterior, true);
+            out += blank();
+            out += header('EXTRAORCAMENTARIO', '#6c757d');
+            out += line('Recebimentos Extraorcamentarios', R.extra.rec.atual, R.extra.rec.anterior);
+            out += line('Pagamentos Extraorcamentarios', R.extra.pag.atual, R.extra.pag.anterior);
+            out += blank();
+            out += header('CAIXA E EQUIVALENTES', '#28a745');
+            out += line('Saldo em Especie do Exerc. Anterior', R.caixa.ant.atual, R.caixa.ant.anterior);
+            out += line('Geracao Liquida de Caixa', R.caixa.ger.atual, R.caixa.ger.anterior, true);
+            out += line('Saldo em Especie para o Exerc. Seguinte', R.caixa.seg.atual, R.caixa.seg.anterior, true);
+
             tb.innerHTML = out;
 
-            // Gráfico: Atual primeiro (azul escuro), Anterior depois (azul claro)
-            if (chart) chart.destroy();
-            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+            const ctx = document.getElementById('graf');
+            if (!ctx) return;
+            if (typeof chart !== 'undefined' && chart) chart.destroy();
+            const chartCtx = ctx.getContext ? ctx.getContext('2d') : ctx;
+            window.chart = new Chart(chartCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+                    labels: ['Receitas', 'Despesas', 'Saldo Ant.', 'Saldo Seg.'],
                     datasets: [
                         {
-                            label: 'Período Atual',
-                            data: [(at.saldo_anterior || {}).atual || 0, (at.saldo_seguinte || {}).atual || 0, ((at.saldo_seguinte || {}).atual || 0) - ((at.saldo_anterior || {}).atual || 0)],
+                            label: 'Receitas (Atual)',
+                            data: [R.rec.tot.atual, null, null, null],
                             backgroundColor: '#003366',
-                            borderRadius: 4
+                            borderColor: '#002244',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
                         },
                         {
-                            label: 'Período Anterior',
-                            data: [(ant.saldo_anterior || {}).anterior || 0, (ant.saldo_seguinte || {}).anterior || 0, ((ant.saldo_seguinte || {}).anterior || 0) - ((ant.saldo_anterior || {}).anterior || 0)],
+                            label: 'Despesas (Atual)',
+                            data: [null, R.desp.tot.atual, null, null],
+                            backgroundColor: '#dc3545',
+                            borderColor: '#a71d2a',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Atual)',
+                            data: [null, null, R.caixa.ant.atual, null],
                             backgroundColor: '#4a90e2',
-                            borderRadius: 4
+                            borderColor: '#2c6fbb',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Atual)',
+                            data: [null, null, null, R.caixa.seg.atual],
+                            backgroundColor: '#28a745',
+                            borderColor: '#1e7e34',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Receitas (Anterior)',
+                            data: [R.rec.tot.anterior, null, null, null],
+                            backgroundColor: '#4a90e2',
+                            borderColor: '#357abd',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Despesas (Anterior)',
+                            data: [null, R.desp.tot.anterior, null, null],
+                            backgroundColor: '#e68a8a',
+                            borderColor: '#c96b6b',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Anterior)',
+                            data: [null, null, R.caixa.ant.anterior, null],
+                            backgroundColor: '#90c2e7',
+                            borderColor: '#6ba8d4',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Anterior)',
+                            data: [null, null, null, R.caixa.seg.anterior],
+                            backgroundColor: '#7ec87e',
+                            borderColor: '#5fa85f',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                    plugins: { legend: { position: 'bottom' } }
                 }
             });
         }
@@ -417,72 +752,140 @@ function exibirSelecionado() {
 
         function render(at, ant) {
             const tb = document.querySelector('#tab tbody');
-            const ind = [
-                { n: 'Receita Realizada (Ingressos)', k: 'receita_realizada' },
-                { n: 'Despesa Orçamentária', k: 'despesa_orcamentaria' },
-                { n: 'Recebimentos Extraorçamentários', k: 'recebimentos_extra' },
-                { n: 'Pagamentos Extraorçamentários', k: 'pagamentos_extra' },
-                { n: 'Saldo em Espécie do Exerc. Anterior', k: 'saldo_anterior' },
-                { n: 'Saldo em Espécie para o Exerc. Seguinte', k: 'saldo_seguinte' },
-                { n: 'Total (Ingressos)', k: 'total_ingressos' },
-                { n: 'Total (Dispêndios)', k: 'total_dispendios' }
-            ];
-
-            let out = '';
-            ind.forEach(item => {
-                // Extrai os valores: se for objeto, pega .atual ou .anterior; se for número, usa direto
-                let va = at[item.k];
-                let vb = ant[item.k];
-                if (typeof va === 'object' && va !== null) va = va.atual || 0;
-                if (typeof vb === 'object' && vb !== null) vb = vb.anterior || 0;
-                va = parseFloat(va) || 0;
-                vb = parseFloat(vb) || 0;
-                
-                const v = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+            const fmtV = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const fmtP = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+            const pct = (a, b) => b !== 0 ? ((a - b) / Math.abs(b)) * 100 : 0;
+            const safe = (v) => (v && typeof v === 'object') ? v : {atual: 0, anterior: 0};
+            const line = (label, va, vb, bold) => {
+                const v = pct(va, vb);
                 const cls = v >= 0 ? 'pos' : 'neg';
                 const sg = v >= 0 ? '+' : '';
-                const fa = (num) => num.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                
-                out += '<tr>';
-                out += '<td>' + item.n + '</td>';
-                out += '<td style="text-align:right;">' + fa(va) + '</td>';
-                out += '<td style="text-align:right;">' + fa(vb) + '</td>';
-                out += '<td class="' + cls + '" style="text-align:right;">' + sg + fa(v) + '%</td>';
-                out += '</tr>';
-            });
+                const trStyle = bold ? 'font-weight:bold;' : '';
+                return '<tr style="' + trStyle + '">' +
+                    '<td>' + label + '</td>' +
+                    '<td style="text-align:right;">' + fmtV(va) + '</td>' +
+                    '<td style="text-align:right;">' + fmtV(vb) + '</td>' +
+                    '<td class="' + cls + '" style="text-align:right;">' + sg + fmtP(v) + '</td>' +
+                '</tr>';
+            };
+            const header = (label, color) => '<tr style="background:' + color + '; font-weight:bold; color:#fff;"><td colspan="4">' + label + '</td></tr>';
+            const blank = () => '<tr><td colspan="4" style="height:5px; border:none;"></td></tr>';
+
+            const R = {
+                rec: {
+                    corr: safe(at.receitas && at.receitas.corrente),
+                    cap: safe(at.receitas && at.receitas.capital),
+                    tot: safe(at.receitas && at.receitas.total),
+                },
+                desp: {
+                    corr: safe(at.despesas && at.despesas.corrente),
+                    cap: safe(at.despesas && at.despesas.capital),
+                    tot: safe(at.despesas && at.despesas.total),
+                },
+                extra: {
+                    rec: safe(at.extra && at.extra.recebimentos),
+                    pag: safe(at.extra && at.extra.pagamentos),
+                },
+                caixa: {
+                    ant: safe(at.caixa && at.caixa.saldo_anterior),
+                    ger: safe(at.caixa && at.caixa.geracao_liquida),
+                    seg: safe(at.caixa && at.caixa.saldo_seguinte),
+                }
+            };
+
+            let out = '';
+            out += header('RECEITAS', '#003366');
+            out += line('Receitas Correntes', R.rec.corr.atual, R.rec.corr.anterior);
+            out += line('Receitas de Capital', R.rec.cap.atual, R.rec.cap.anterior);
+            out += line('Total de Receitas', R.rec.tot.atual, R.rec.tot.anterior, true);
+            out += blank();
+            out += header('DESPESAS', '#dc3545');
+            out += line('Despesas Correntes', R.desp.corr.atual, R.desp.corr.anterior);
+            out += line('Despesas de Capital', R.desp.cap.atual, R.desp.cap.anterior);
+            out += line('Total de Despesas', R.desp.tot.atual, R.desp.tot.anterior, true);
+            out += blank();
+            out += header('EXTRAORCAMENTARIO', '#6c757d');
+            out += line('Recebimentos Extraorcamentarios', R.extra.rec.atual, R.extra.rec.anterior);
+            out += line('Pagamentos Extraorcamentarios', R.extra.pag.atual, R.extra.pag.anterior);
+            out += blank();
+            out += header('CAIXA E EQUIVALENTES', '#28a745');
+            out += line('Saldo em Especie do Exerc. Anterior', R.caixa.ant.atual, R.caixa.ant.anterior);
+            out += line('Geracao Liquida de Caixa', R.caixa.ger.atual, R.caixa.ger.anterior, true);
+            out += line('Saldo em Especie para o Exerc. Seguinte', R.caixa.seg.atual, R.caixa.seg.anterior, true);
+
             tb.innerHTML = out;
 
-            // Gráfico: Atual primeiro (azul escuro), Anterior depois (azul claro)
-            const saldo_ant_at = (at.saldo_anterior || {}).atual || 0;
-            const saldo_ant_an = (ant.saldo_anterior || {}).anterior || 0;
-            const saldo_seg_at = (at.saldo_seguinte || {}).atual || 0;
-            const saldo_seg_an = (ant.saldo_seguinte || {}).anterior || 0;
-
-            if (chart) chart.destroy();
-            chart = new Chart(document.getElementById('graf').getContext('2d'), {
+            const ctx = document.getElementById('graf');
+            if (!ctx) return;
+            if (typeof chart !== 'undefined' && chart) chart.destroy();
+            const chartCtx = ctx.getContext ? ctx.getContext('2d') : ctx;
+            window.chart = new Chart(chartCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['Saldo Inicial', 'Saldo Final', 'Variação'],
+                    labels: ['Receitas', 'Despesas', 'Saldo Ant.', 'Saldo Seg.'],
                     datasets: [
                         {
-                            label: 'Período Atual',
-                            data: [saldo_ant_at, saldo_seg_at, saldo_seg_at - saldo_ant_at],
+                            label: 'Receitas (Atual)',
+                            data: [R.rec.tot.atual, null, null, null],
                             backgroundColor: '#003366',
-                            borderRadius: 4
+                            borderColor: '#002244',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
                         },
                         {
-                            label: 'Período Anterior',
-                            data: [saldo_ant_an, saldo_seg_an, saldo_seg_an - saldo_ant_an],
+                            label: 'Despesas (Atual)',
+                            data: [null, R.desp.tot.atual, null, null],
+                            backgroundColor: '#dc3545',
+                            borderColor: '#a71d2a',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Atual)',
+                            data: [null, null, R.caixa.ant.atual, null],
                             backgroundColor: '#4a90e2',
-                            borderRadius: 4
+                            borderColor: '#2c6fbb',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Atual)',
+                            data: [null, null, null, R.caixa.seg.atual],
+                            backgroundColor: '#28a745',
+                            borderColor: '#1e7e34',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Receitas (Anterior)',
+                            data: [R.rec.tot.anterior, null, null, null],
+                            backgroundColor: '#4a90e2',
+                            borderColor: '#357abd',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Despesas (Anterior)',
+                            data: [null, R.desp.tot.anterior, null, null],
+                            backgroundColor: '#e68a8a',
+                            borderColor: '#c96b6b',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Ant. (Anterior)',
+                            data: [null, null, R.caixa.ant.anterior, null],
+                            backgroundColor: '#90c2e7',
+                            borderColor: '#6ba8d4',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
+                        },
+                        {
+                            label: 'Saldo Seg. (Anterior)',
+                            data: [null, null, null, R.caixa.seg.anterior],
+                            backgroundColor: '#7ec87e',
+                            borderColor: '#5fa85f',
+                            borderWidth: 1, borderRadius: 6, barPercentage: 0.6
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
+                    plugins: { legend: { position: 'bottom' } }
                 }
             });
         }
