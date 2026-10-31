@@ -265,6 +265,10 @@ from openpyxl.utils import get_column_letter
 
 app = FastAPI(title="PC - Prestacao de Contas API")
 
+# Router novo do Panorama (31/10/2026)
+from app.routers.panorama import router as panorama_router
+app.include_router(panorama_router)
+
 
 
 
@@ -10050,7 +10054,7 @@ def _calc_panorama(periodo):
 
 
 
-@app.get("/api/panorama/{periodo}")
+# @app.get("/api/panorama/{periodo}")  # MIGRADO
 
 
 
