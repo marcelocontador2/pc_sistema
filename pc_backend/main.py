@@ -23803,7 +23803,7 @@ async def gerar_pdf_base_legal(periodo: str):
 
 
 
-            "Lei Complementar no 101/2000 (LRF)",
+            "Resolução Cofen nº 814/2026",
 
 
 
