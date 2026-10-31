@@ -30383,6 +30383,7 @@ def _calc_liquidez(periodo):
 
 
     estoques = buscar("ESTOQUES", 1) or buscar("ESTOQUES", 3)
+# Realizavel a Longo Prazo (RLP)
 
 
 
@@ -30393,7 +30394,51 @@ def _calc_liquidez(periodo):
 
 
 
-    realizavel = buscar("ATIVO REALIZÃVEL A LONGO PRAZO", 1)
+    realizavel = 0.0
+
+
+
+
+
+
+
+
+
+
+    for _p in l_bp:
+
+
+
+
+
+
+
+
+
+
+        if len(_p) > 1 and "REALIZ" in str(_p[0]).upper():
+
+
+
+
+
+
+
+
+
+
+            realizavel = abs(_limpar_valor(_p[1]))
+
+
+
+
+
+
+
+
+
+
+            break
 
 
 
@@ -30448,7 +30493,12 @@ def _calc_liquidez(periodo):
 
 
 
-    ativo_permanente = buscar("ATIVO PERMANENTE", 1)
+    ativo_permanente = 0.0
+    for _p in l_bp:
+        if len(_p) > 1:
+            _t0 = str(_p[0]).upper()
+            if "IMOBILIZADO" in _t0 or "INTANGIVEL" in _t0 or "INTANGÍVEL" in _t0:
+                ativo_permanente += abs(_limpar_valor(_p[1])) or (buscar("IMOBILIZADO", 1) + buscar("INTANGIVEL", 1))
 
 
 
@@ -30459,7 +30509,7 @@ def _calc_liquidez(periodo):
 
 
 
-    patrimonio_liquido = buscar("TOTAL DO PATRIMÃ”NIO LÃQUIDO", 3)
+    patrimonio_liquido = buscar("TOTAL DO PATRIM", 3)
 
 
 
@@ -30580,7 +30630,12 @@ def _calc_liquidez(periodo):
 
 
 
-    ativo_total = buscar("ATIVO NÃƒO CIRCULANTE", 1) + ativo_circulante or buscar("TOTAL DO ATIVO", 1) or (ativo_circulante + realizavel + ativo_permanente)
+    ativo_total = 0.0
+    for _p in l_bp:
+        if len(_p) > 1 and str(_p[0]).upper().strip() == "TOTAL":
+            _v = abs(_limpar_valor(_p[1]))
+            if _v > ativo_total:
+                ativo_total = _v
 
 
 
