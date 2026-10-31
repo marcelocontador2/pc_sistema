@@ -70,7 +70,8 @@
                     <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()">Confirmar e Salvar</button>
                     <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
                     <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
-                    <a href="/configuracoes_custo_pessoal" class="btn" style="background-color: #6c757d; text-decoration: none; display: inline-block; padding: 10px 20px; border-radius: 5px; color: white; margin-right: 10px; font-weight: bold;">⚙️ Configurações</a><button class="btn btn-pdf" onclick="window.open('/gerar_pdf_custo_pessoal', '_blank')">Gerar PDF</button>
+                    <a href="/configuracoes_custo_pessoal" class="btn" style="background-color: #6c757d; text-decoration: none; display: inline-block; padding: 10px 20px; border-radius: 5px; color: white; margin-right: 10px; font-weight: bold;">⚙️ Configurações</a><button class="btn btn-pdf" onclick="window.open('/gerar_pdf_custo_pessoal', '_blank')">Gerar PDF (Resumo)</button>
+<button class="btn" onclick="gerarPDFCompleto()" style="background-color: #17a2b8; color: white; margin-left: 10px;">Gerar PDF (Completo)</button>
                 </div>
                 
                 <div class="hdr-sub">Custo de Pessoal x Limite da Resolução Cofen 814/2026</div>
@@ -221,6 +222,13 @@
             carregar();
             carregarHistorico();
         });
-    </script>
+    
+        function gerarPDFCompleto() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert('Selecione um item no histórico.'); return; }
+            window.open('/gerar_pdf_completo_custo_pessoal?id=' + check.value, '_blank');
+        }
+        
+</script>
 </body>
 </html>
