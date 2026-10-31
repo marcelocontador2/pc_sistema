@@ -1,22 +1,66 @@
-﻿# Ambiente Virtual
-pc_venv/
+﻿# ===== Python =====
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
 
-# Backups gerados durante os ajustes
+# ===== Ambiente virtual =====
+pc_venv/
+.venv/
+venv/
+ENV/
+
+# ===== Backups e snapshots =====
+_backups_arquivo/
+backup_*/
+backup_2026*/
+backup_202610*/
+snapshot_*/
+_arquivo_20261031/
 *.bak
-*.backup
+*.bak2_*
+*.bak_*
 
-# Banco de dados e arquivos locais
-*.db
-pc_storage/uploads_raw/*
-pc_storage/*.db
+# ===== Compactados grandes =====
+*.zip
+*.7z
+*.rar
+*.tar.gz
+*.bundle
 
-# Sistema
-.DS_Store
+# ===== Dados gerados =====
+pc_storage/banco_dados.db
+pc_storage/banco_dados.db-journal
+pc_storage/banco_dados.db-wal
+pc_storage/banco_dados.db-shm
+pc_storage/temp_downloads/
+pc_storage/uploads_raw/*.csv
+pc_storage/output_documentos/*.pptx
+pc_storage/pdfs/*.pdf
+
+# ===== Logs =====
+*.log
+out_log.txt
+erro_log.txt
+
+# ===== PDFs gerados em pc_frontend/ =====
+pc_frontend/*.pdf
+
+# ===== IDE / Editor =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== OS =====
 Thumbs.db
-*.bak*
+.DS_Store
+desktop.ini
+
+# Arvore fantasma (a ser arquivada)
 pc_sistema/
-*.bak*
-pc_sistema/
-backup_*
+
+# Duplicacao de storage em pc_backend (espelho)
+pc_backend/pc_storage/
