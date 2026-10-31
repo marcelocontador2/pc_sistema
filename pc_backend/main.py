@@ -24577,7 +24577,7 @@ async def gerar_pdf_base_legal(periodo: str):
 
 
 
-async def api_custo_pessoal(periodo: str, entidade: str = "COFEN"):
+async def api_custo_pessoal(periodo: str, entidade: str = None):
 
 
 
@@ -24600,6 +24600,17 @@ async def api_custo_pessoal(periodo: str, entidade: str = "COFEN"):
 
 
     import re, os
+    import sqlite3 as _sqlite3
+    # Ler configuracao global
+    if not entidade:
+        _db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        _conn = _sqlite3.connect(_db_path)
+        _cur = _conn.cursor()
+        _cur.execute("SELECT valor FROM configuracoes WHERE chave = 'tipo_entidade'")
+        _row = _cur.fetchone()
+        _conn.close()
+        entidade = _row[0] if _row else "COFEN"
+    print(f"[CUSTO PESSOAL] entidade={entidade}")
 
 
 
