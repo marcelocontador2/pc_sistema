@@ -265,6 +265,37 @@ from openpyxl.utils import get_column_letter
 
 app = FastAPI(title="PC - Prestacao de Contas API")
 
+# === CONFIGURACOES GLOBAIS (31/10/2026) ===
+@app.get("/api/configuracoes")
+async def get_configuracoes():
+    """Retorna as configuracoes globais (tipo_entidade: COFEN ou COREN)."""
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT chave, valor FROM configuracoes")
+    rows = cur.fetchall()
+    conn.close()
+    return {k: v for k, v in rows}
+
+
+@app.post("/api/configuracoes")
+async def post_configuracoes(config: dict):
+    """Salva as configuracoes globais. Ex: {"tipo_entidade": "COREN"}."""
+    import sqlite3, os, datetime
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    for chave, valor in config.items():
+        cur.execute(
+            "INSERT OR REPLACE INTO configuracoes (chave, valor, data_atualizacao) VALUES (?, ?, ?)",
+            (chave, str(valor), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "configuracoes": config}
+
+
 # Router novo do Panorama (31/10/2026)
 
 
@@ -26043,6 +26074,12 @@ async def api_custo_pessoal(periodo: str, entidade: str = "COFEN"):
 
 
         "custo_atual": custo_atual,
+        "limite_pct": 0.6 if entidade.upper() == "COREN" else 0.5,
+        "limite_atual": rcl_atual * (0.6 if entidade.upper() == "COREN" else 0.5),
+        "limite_anterior": rcl_anterior * (0.6 if entidade.upper() == "COREN" else 0.5),
+        "margem_disponivel_atual": (rcl_atual * (0.6 if entidade.upper() == "COREN" else 0.5)) - custo_atual,
+        "margem_disponivel_anterior": (rcl_anterior * (0.6 if entidade.upper() == "COREN" else 0.5)) - custo_anterior,
+        "entidade": entidade.upper(),
 
 
 
@@ -30998,7 +31035,7 @@ def serve_custo_pessoal_pdf_completo():
 
 
 
-def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3"):
+def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", entidade: str = "COFEN"):
 
 
 
@@ -31251,7 +31288,46 @@ def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMES
 
 
 
-                await page.goto(f"http://127.0.0.1:9999/custo_pessoal_pdf_completo?periodo={periodo}")
+                await page.goto(f"http://127.0.0.1:9999/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}")
+                await page.wait_for_timeout(1000)
+                
+                # INJECAO DIRETA DOS DADOS (para garantir que o PDF nao fique zerado)
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(f"http://127.0.0.1:9999/api/custo_pessoal/{periodo}?entidade={entidade}")
+                    d = resp.json()
+                
+                # Formatar numeros
+                def fmt_br(v):
+                    try:
+                        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    except:
+                        return "0,00"
+                
+                rcl = d.get("rcl_total", 0)
+                custo = d.get("custo_total", 0)
+                limite = d.get("limite_atual", rcl * 0.5)
+                margem = d.get("margem_disponivel_atual", limite - custo)
+                limite_pct = d.get("limite_pct", 0.5)
+                
+                # Injetar via JavaScript
+                await page.evaluate(f"""
+                    document.getElementById('pdf-rcl-total').innerText = '{fmt_br(rcl)}';
+                    document.getElementById('pdf-custo-total').innerText = '{fmt_br(custo)}';
+                    document.getElementById('pdf-resumo-rcl').innerText = '{fmt_br(rcl)}';
+                    document.getElementById('pdf-resumo-custo').innerText = '{fmt_br(custo)}';
+                    document.getElementById('pdf-resumo-limite').innerText = '{fmt_br(limite)}';
+                    document.getElementById('pdf-resumo-margem').innerText = '{fmt_br(margem)}';
+                    document.getElementById('pdf-resumo-pct').innerText = '{(custo/rcl*100 if rcl else 0):.2f}%';
+                    document.getElementById('pdf-resumo-pct-margem').innerText = '{(margem/rcl*100 if rcl else 0):.2f}%';
+                    document.getElementById('pdf-limite').innerText = '{fmt_br(limite)} ({limite_pct*100:.2f}%)';
+                    document.getElementById('conc-limite').innerText = 'R$ {fmt_br(limite)}';
+                    document.getElementById('conc-custo').innerText = '{(custo/rcl*100 if rcl else 0):.2f}%';
+                    document.getElementById('conc-custo-txt').innerText = 'R$ {fmt_br(custo)}';
+                """)
+                await page.wait_for_timeout(500)
+                await page.wait_for_timeout(2000)  # Espera o fetch terminar
+                await page.wait_for_timeout(2000)  # Espera o fetch terminar
 
 
 
@@ -31449,7 +31525,7 @@ def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMES
 
 
 
-def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3"):
+def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", entidade: str = "COFEN"):
 
 
 
@@ -31680,7 +31756,36 @@ def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3"):
 
 
 
-                await page.goto(f"http://127.0.0.1:9999/custo_pessoal_pdf_resumo?periodo={periodo}")
+                await page.goto(f"http://127.0.0.1:9999/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}")
+                await page.wait_for_timeout(1000)
+                
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(f"http://127.0.0.1:9999/api/custo_pessoal/{periodo}?entidade={entidade}")
+                    d = resp.json()
+                
+                def fmt_br(v):
+                    try:
+                        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    except:
+                        return "0,00"
+                
+                rcl = d.get("rcl_total", 0)
+                custo = d.get("custo_total", 0)
+                limite = d.get("limite_atual", rcl * 0.5)
+                margem = d.get("margem_disponivel_atual", limite - custo)
+                limite_pct = d.get("limite_pct", 0.5)
+                
+                await page.evaluate(f"""
+                    document.getElementById('pdf-rcl').innerText = '{fmt_br(rcl)}';
+                    document.getElementById('pdf-custo').innerText = '{fmt_br(custo)}';
+                    document.getElementById('pdf-limite').innerText = '{fmt_br(limite)} ({limite_pct*100:.2f}%)';
+                    document.getElementById('pdf-margem').innerText = '{fmt_br(margem)}';
+                    document.getElementById('pdf-pct-margem').innerText = '{(margem/rcl*100 if rcl else 0):.2f}%';
+                """)
+                await page.wait_for_timeout(500)
+                await page.wait_for_timeout(2000)  # Espera o fetch terminar
+                await page.wait_for_timeout(2000)  # Espera o fetch terminar
 
 
 
