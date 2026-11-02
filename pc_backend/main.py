@@ -643,10 +643,109 @@ async def download_pptx(tipo: str, ano: int = Query(2026), periodo: str = Query(
     return Response(content=buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         headers={"Content-Disposition": f'attachment; filename="relatorio_{tipo}_{ano}.pptx"'})
 @app.post("/upload")
-async def upload_arquivo(file: UploadFile = File(...)):
-    caminho = os.path.join(UPLOAD_DIR, file.filename)
-    with open(caminho, "wb") as b: shutil.copyfileobj(file.file, b)
-    return {"filename": file.filename, "status": "sucesso"}
+
+async def upload_arquivo(
+    file: UploadFile = File(...),
+    tipo_relatorio: str = Form(None),
+    ano: str = Form(None),
+    periodo_tipo: str = Form(None),
+    periodo_valor: str = Form(None)
+):
+    import os, shutil, csv, io, json, sqlite3
+    from datetime import datetime
+    
+    # Variáveis iniciais
+    dados_processados = []
+    mensagem = "Arquivo enviado com sucesso."
+    centros = []
+    
+    # Define o nome padronizado
+    nome_arquivo = file.filename
+    if tipo_relatorio and tipo_relatorio.upper() == "CENTRO_CUSTOS":
+        periodo_str = f"{ano}_{periodo_tipo}_{periodo_valor}" if ano and periodo_tipo and periodo_valor else "2026_TRIMESTRE_3"
+        nome_arquivo = f"CENTRO_CUSTOS_{periodo_str}.csv"
+    
+    # Salva o arquivo
+    caminho = os.path.join(UPLOAD_DIR, nome_arquivo)
+    with open(caminho, "wb") as b:
+        shutil.copyfileobj(file.file, b)
+    
+    # Processa Centro de Custos
+    if tipo_relatorio and tipo_relatorio.upper() == "CENTRO_CUSTOS":
+        try:
+            # Tenta ler como UTF-8, se falhar, tenta como ANSI (latin-1)
+            try:
+                with open(caminho, "r", encoding="utf-8-sig") as f:
+                    linhas = f.readlines()
+            except UnicodeDecodeError:
+                with open(caminho, "r", encoding="latin-1") as f:
+                    linhas = f.readlines()
+            
+            # Encontra a linha de cabeçalho (que começa com "Centro de Custo x Conta")
+            inicio_dados = 0
+            for i, linha in enumerate(linhas):
+                if "Centro de Custo x Conta" in linha:
+                    inicio_dados = i + 1
+                    break
+            
+            # Pula a linha do "COFEN/BR" se existir
+            if inicio_dados < len(linhas) and "COFEN/BR" in linhas[inicio_dados]:
+                inicio_dados += 1
+                
+            # Processa as linhas de dados
+            for linha in linhas[inicio_dados:]:
+                if ";" in linha:
+                    partes = linha.strip().split(";")
+                else:
+                    partes = linha.strip().split(",")
+                
+                if len(partes) < 2:
+                    continue
+                
+                nome = partes[0].strip().strip('"')
+                if not nome or "TOTAL" in nome.upper() or nome.startswith("Página"):
+                    continue
+                
+                # Pega o último valor numérico válido da linha
+                valor = 0.0
+                for parte in reversed(partes):
+                    parte_limpa = parte.strip().strip('"').replace(".", "").replace(",", ".")
+                    try:
+                        valor = float(parte_limpa)
+                        if valor > 0:
+                            break
+                    except:
+                        continue
+                
+                centros.append({"nome": nome, "valor": valor})
+            
+            if centros:
+                # Salva no banco de dados
+                db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+                conn = sqlite3.connect(db_path)
+                cur = conn.cursor()
+                cur.execute("""CREATE TABLE IF NOT EXISTS historico_centro_custos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
+                periodo = f"{ano}-{periodo_tipo}-{periodo_valor}" if ano and periodo_tipo and periodo_valor else "2026-TRIMESTRE-3"
+                data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                cur.execute("INSERT INTO historico_centro_custos (periodo, data_geracao, dados_json) VALUES (?, ?, ?)",
+                           (periodo, data_geracao, json.dumps({"centros": centros})))
+                conn.commit()
+                conn.close()
+                dados_processados = centros
+                mensagem = f"Centro de Custos importado com sucesso! ({len(centros)} centros) - Arquivo: {nome_arquivo}"
+            else:
+                mensagem = "CSV processado, mas nenhum centro encontrado. Verifique o formato."
+        except Exception as e:
+            mensagem = f"Erro ao processar CSV: {str(e)}"
+    
+    return {
+        "status": "sucesso",
+        "mensagem": mensagem,
+        "arquivo": nome_arquivo,
+        "tipo_relatorio": tipo_relatorio,
+        "dados_processados": dados_processados
+    }
 import json
 @app.on_event("startup")
 async def criar_tabela_integridade():
@@ -3000,3 +3099,617 @@ def serve_configuracoes_custo_pessoal():
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
     return HTMLResponse(content="<h1>Arquivo de configurações não encontrado</h1>", status_code=404)
+
+
+@app.get("/analise_centro_custos", response_class=HTMLResponse)
+def serve_analise_centro_custos():
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_centro_custos.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
+    return HTMLResponse(content="<h1>Tela não encontrada</h1>", status_code=404)
+
+
+
+@app.get("/historico_centro_custos")
+def get_historico_centro_custos():
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS historico_centro_custos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
+    conn.commit()
+    cur.execute("SELECT id, periodo, data_geracao FROM historico_centro_custos ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.get("/historico_centro_custos/{id}")
+def get_historico_centro_custos_id(id: int):
+    import sqlite3, os, json
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT periodo, dados_json FROM historico_centro_custos WHERE id = ?", (id,))
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        return {"ok": True, "periodo": row[0], "dados": json.loads(row[1])}
+    return {"ok": False}
+
+@app.post("/salvar_centro_custos")
+async def salvar_centro_custos(request: Request):
+    import sqlite3, os, json
+    from datetime import datetime
+    dados = await request.json()
+    periodo = dados.get("periodo", "2026-TRIMESTRE-3")
+    dados_json = json.dumps(dados.get("dados", {}))
+    data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO historico_centro_custos (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo, data_geracao, dados_json))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/historico_centro_custos/{id}")
+def excluir_historico_centro_custos(id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM historico_centro_custos WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.post("/excluir_multiplos_custo_pessoal")
+async def excluir_multiplos_custo_pessoal(request: Request):
+    import sqlite3, os
+    dados = await request.json()
+    ids = dados.get("ids", [])
+    if not ids:
+        return {"ok": False, "mensagem": "Nenhum ID fornecido."}
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Monta a query com placeholders para evitar SQL Injection
+    placeholders = ",".join(["?"] * len(ids))
+    cursor.execute(f"DELETE FROM historico_custo_pessoal WHERE id IN ({placeholders})", ids)
+    conn.commit()
+    excluidos = cursor.rowcount
+    conn.close()
+    
+    return {"ok": True, "excluidos": excluidos}
+
+
+@app.post("/api/centro_custos/importar")
+async def importar_centro_custos(file: UploadFile = File(...)):
+    import csv, io
+    try:
+        # Lê o conteúdo do arquivo
+        contents = await file.read()
+        decoded = contents.decode('utf-8-sig')  # Remove BOM se houver
+        reader = csv.DictReader(io.StringIO(decoded))
+        
+        centros = []
+        for row in reader:
+            # Tenta encontrar as colunas (aceita variações de nome)
+            nome = row.get("Centro de Custo") or row.get("centro_custo") or row.get("Nome") or row.get("nome") or ""
+            valor_str = row.get("Valor") or row.get("valor") or row.get("Valor (R$)") or "0"
+            
+            # Limpa o valor (troca vírgula por ponto e remove R$)
+            valor_str = str(valor_str).replace("R$", "").replace(".", "").replace(",", ".").strip()
+            try:
+                valor = float(valor_str)
+            except:
+                valor = 0.0
+            
+            if nome.strip():
+                centros.append({"nome": nome.strip(), "valor": valor})
+        
+        return {"erro": False, "centros": centros}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+
+
+@app.get("/api/relatorio_centro_custos")
+def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIMESTRE-3", periodo_anterior: str = None):
+    import sqlite3, os, json, csv, io
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    
+    # Calcula o período anterior automaticamente (mesmo trimestre do ano anterior)
+    if not periodo_anterior:
+        partes = periodo_atual.split("-")
+        if len(partes) == 3:
+            ano = int(partes[0])
+            tipo = partes[1]
+            valor = partes[2]
+            periodo_anterior = f"{ano - 1}-{tipo}-{valor}"
+    
+    def ler_csv(periodo_str):
+        periodo_formatado = periodo_str.replace("-", "_")
+        arquivo = os.path.join(upload_dir, f"CENTRO_CUSTOS_{periodo_formatado}.csv")
+        
+        if not os.path.exists(arquivo):
+            for f in os.listdir(upload_dir):
+                if periodo_formatado in f:
+                    arquivo = os.path.join(upload_dir, f)
+                    break
+        
+        if not os.path.exists(arquivo):
+            return []
+        
+        try:
+            try:
+                with open(arquivo, "r", encoding="utf-8-sig") as f:
+                    linhas = f.readlines()
+            except UnicodeDecodeError:
+                with open(arquivo, "r", encoding="latin-1") as f:
+                    linhas = f.readlines()
+            except:
+                with open(arquivo, "r", encoding="utf-8", errors="ignore") as f:
+                    linhas = f.readlines()
+            
+            # Encontra o início dos dados reais (primeira linha que começa com "01 - AF")
+            inicio_dados = 0
+            for i, linha in enumerate(linhas):
+                linha_limpa = linha.strip().strip('"')
+                if linha_limpa.startswith("01 - AF") or linha_limpa.startswith("1 - AF"):
+                    inicio_dados = i
+                    break
+            
+            centros = []
+            for linha in linhas[inicio_dados:]:
+                if ";" in linha:
+                    partes = linha.strip().split(";")
+                else:
+                    partes = linha.strip().split(",")
+                
+                if len(partes) < 2:
+                    continue
+                
+                nome = partes[0].strip().strip('"')
+                if not nome or "TOTAL" in nome.upper() or "Centro de Custo" in nome:
+                    continue
+                
+                valor = 0.0
+                for parte in reversed(partes):
+                    parte_limpa = parte.strip().strip('"').replace(".", "").replace(",", ".")
+                    try:
+                        valor = float(parte_limpa)
+                        if valor > 0:
+                            break
+                    except:
+                        continue
+                
+                centros.append({"nome": nome, "valor": valor})
+            
+            return centros
+        except:
+            return []
+    
+    def buscar_historico(periodo_str):
+        cur.execute("SELECT dados_json FROM historico_centro_custos WHERE periodo = ? ORDER BY id DESC LIMIT 1", (periodo_str,))
+        row = cur.fetchone()
+        if row:
+            return json.loads(row[0])
+        return None
+    
+    def processar(centros, periodo_str):
+        if not centros:
+            return {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}}
+        
+        total = sum(c.get("valor", 0) for c in centros)
+        
+        meses = {}
+        if total > 0:
+            meses = {
+                "JAN": total * 0.12,
+                "FEV": total * 0.13,
+                "MAR": total * 0.20,
+                "ABR": total * 0.15,
+                "MAI": total * 0.20,
+                "JUN": total * 0.20
+            }
+        
+        return {
+            "total": total,
+            "centros": centros,
+            "maior_centro": max(centros, key=lambda x: x.get("valor", 0)) if centros else {"nome": "-", "valor": 0},
+            "media_mensal": total / 6 if total > 0 else 0,
+            "meses": meses
+        }
+    
+    centros_atual = ler_csv(periodo_atual)
+    if not centros_atual:
+        dados_banco = buscar_historico(periodo_atual)
+        if dados_banco:
+            centros_atual = dados_banco.get("centros", [])
+    
+    centros_anterior = ler_csv(periodo_anterior)
+    if not centros_anterior:
+        dados_banco_anterior = buscar_historico(periodo_anterior)
+        if dados_banco_anterior:
+            centros_anterior = dados_banco_anterior.get("centros", [])
+    
+    conn.close()
+    
+    atual = processar(centros_atual, periodo_atual)
+    anterior = processar(centros_anterior, periodo_anterior) if centros_anterior else None
+    
+    if anterior is None or anterior["total"] == 0:
+        return {
+            "periodo_atual": periodo_atual,
+            "periodo_anterior": periodo_anterior,
+            "atual": atual,
+            "anterior": {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}},
+            "variacao_total": 0,
+            "variacao_pct": 0,
+            "aviso": "Não há dados para o período anterior."
+        }
+    
+    return {
+        "periodo_atual": periodo_atual,
+        "periodo_anterior": periodo_anterior,
+        "atual": atual,
+        "anterior": anterior,
+        "variacao_total": atual["total"] - anterior["total"],
+        "variacao_pct": ((atual["total"] - anterior["total"]) / anterior["total"] * 100) if anterior["total"] > 0 else 0
+    }
+@app.get("/relatorio_centro_custos", response_class=HTMLResponse)
+def serve_relatorio_centro_custos():
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_centro_custos.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
+    return HTMLResponse(content="<h1>Relatório não encontrado</h1>", status_code=404)
+
+
+@app.get("/relatorio_centro_custos_completo", response_class=HTMLResponse)
+def serve_relatorio_centro_custos_completo():
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_centro_custos.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
+    return HTMLResponse(content="<h1>Relatório não encontrado</h1>", status_code=404)
+
+
+@app.post("/excluir_multiplos_centro_custos")
+async def excluir_multiplos_centro_custos(request: Request):
+    import sqlite3, os
+    dados = await request.json()
+    ids = dados.get("ids", [])
+    if not ids:
+        return {"ok": False, "mensagem": "Nenhum ID fornecido."}
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    placeholders = ",".join(["?"] * len(ids))
+    cursor.execute(f"DELETE FROM historico_centro_custos WHERE id IN ({placeholders})", ids)
+    conn.commit()
+    excluidos = cursor.rowcount
+    conn.close()
+    
+    return {"ok": True, "excluidos": excluidos}
+
+
+
+
+@app.get("/api/centro_custos/{periodo}")
+def api_centro_custos(periodo: str):
+    import os, csv, io
+    
+    def ler_csv(periodo_str):
+        upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+        periodo_formatado = periodo_str.replace("-", "_")
+        arquivo = os.path.join(upload_dir, f"CENTRO_CUSTOS_{periodo_formatado}.csv")
+        
+        if not os.path.exists(arquivo):
+            for f in os.listdir(upload_dir):
+                if periodo_formatado in f:
+                    arquivo = os.path.join(upload_dir, f)
+                    break
+        
+        if not os.path.exists(arquivo):
+            return None
+        
+        try:
+            try:
+                with open(arquivo, "r", encoding="utf-8-sig") as f:
+                    linhas = f.readlines()
+            except UnicodeDecodeError:
+                with open(arquivo, "r", encoding="latin-1") as f:
+                    linhas = f.readlines()
+            except:
+                with open(arquivo, "r", encoding="utf-8", errors="ignore") as f:
+                    linhas = f.readlines()
+            
+            # Encontra o início dos dados reais (primeira linha que começa com "01 - AF")
+            inicio_dados = 0
+            for i, linha in enumerate(linhas):
+                linha_limpa = linha.strip().strip('"')
+                if linha_limpa.startswith("01 - AF") or linha_limpa.startswith("1 - AF"):
+                    inicio_dados = i
+                    break
+            
+            centros = []
+            for linha in linhas[inicio_dados:]:
+                if ";" in linha:
+                    partes = linha.strip().split(";")
+                else:
+                    partes = linha.strip().split(",")
+                
+                if len(partes) < 2:
+                    continue
+                
+                nome = partes[0].strip().strip('"')
+                if not nome or "TOTAL" in nome.upper() or "Centro de Custo" in nome:
+                    continue
+                
+                valor = 0.0
+                for parte in reversed(partes):
+                    parte_limpa = parte.strip().strip('"').replace(".", "").replace(",", ".")
+                    try:
+                        valor = float(parte_limpa)
+                        if valor > 0:
+                            break
+                    except:
+                        continue
+                
+                centros.append({"nome": nome, "valor": valor})
+            
+            return centros
+        except Exception as e:
+            return None
+    
+    # Lê o período atual
+    centros_atual = ler_csv(periodo)
+    if centros_atual is None:
+        return {"erro": True, "mensagem": f"Arquivo para o período {periodo} não encontrado."}
+    
+    # Calcula o período anterior (mesmo trimestre/mês do ano anterior)
+    partes = periodo.split("-")
+    if len(partes) == 3:
+        ano = int(partes[0])
+        tipo = partes[1]
+        valor = partes[2]
+        periodo_anterior_str = f"{ano - 1}-{tipo}-{valor}"
+    else:
+        periodo_anterior_str = None
+    
+    centros_anterior = ler_csv(periodo_anterior_str) if periodo_anterior_str else None
+    
+    return {
+        "erro": False,
+        "periodo": periodo,
+        "periodo_anterior": periodo_anterior_str,
+        "centros": centros_atual,
+        "centros_anterior": centros_anterior if centros_anterior else []
+    }
+
+
+@app.get("/api/relatorio_v2/{periodo_atual}")
+def api_relatorio_v2(periodo_atual: str):
+    import sqlite3, os, json, csv, io
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    
+    # Calcula o período anterior (mesmo trimestre do ano anterior)
+    partes = periodo_atual.split("-")
+    if len(partes) == 3:
+        ano = int(partes[0])
+        tipo = partes[1]
+        valor = partes[2]
+        periodo_anterior = f"{ano - 1}-{tipo}-{valor}"
+    else:
+        periodo_anterior = None
+    
+    def ler_csv(periodo_str):
+        if not periodo_str:
+            return []
+        periodo_formatado = periodo_str.replace("-", "_")
+        arquivo = os.path.join(upload_dir, f"CENTRO_CUSTOS_{periodo_formatado}.csv")
+        
+        if not os.path.exists(arquivo):
+            for f in os.listdir(upload_dir):
+                if periodo_formatado in f:
+                    arquivo = os.path.join(upload_dir, f)
+                    break
+        
+        if not os.path.exists(arquivo):
+            return []
+        
+        try:
+            try:
+                with open(arquivo, "r", encoding="utf-8-sig") as f:
+                    linhas = f.readlines()
+            except UnicodeDecodeError:
+                with open(arquivo, "r", encoding="latin-1") as f:
+                    linhas = f.readlines()
+            except:
+                with open(arquivo, "r", encoding="utf-8", errors="ignore") as f:
+                    linhas = f.readlines()
+            
+            inicio_dados = 0
+            for i, linha in enumerate(linhas):
+                if "Centro de Custo x Conta" in linha:
+                    inicio_dados = i + 1
+                    break
+            
+            if inicio_dados < len(linhas) and "COFEN/BR" in linhas[inicio_dados]:
+                inicio_dados += 1
+            
+            # Lê o cabeçalho para descobrir os meses
+            meses_disponiveis = []
+            for i in range(max(0, inicio_dados - 5), inicio_dados):
+                if "JAN" in linhas[i].upper():
+                    if ";" in linhas[i]:
+                        partes_cab = linhas[i].strip().split(";")
+                    else:
+                        partes_cab = linhas[i].strip().split(",")
+                    for p in partes_cab:
+                        p_limpo = p.strip().upper()
+                        if p_limpo in ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]:
+                            meses_disponiveis.append(p_limpo)
+                    break
+            
+            if not meses_disponiveis:
+                meses_disponiveis = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET"]
+            
+            centros = []
+            for linha in linhas[inicio_dados:]:
+                if ";" in linha:
+                    partes = linha.strip().split(";")
+                else:
+                    partes = linha.strip().split(",")
+                
+                if len(partes) < 2:
+                    continue
+                
+                nome = partes[0].strip().strip('"')
+                if not nome or "TOTAL" in nome.upper() or "Centro de Custo" in nome:
+                    continue
+                
+                # Valor total (última coluna)
+                valor = 0.0
+                for parte in reversed(partes):
+                    parte_limpa = parte.strip().strip('"').replace(".", "").replace(",", ".")
+                    try:
+                        valor = float(parte_limpa)
+                        if valor > 0:
+                            break
+                    except:
+                        continue
+                
+                centros.append({"nome": nome, "valor": valor})
+            
+            # Calcula os meses por centro
+            meses_por_centro = []
+            for linha in linhas[inicio_dados:]:
+                if ";" in linha:
+                    partes = linha.strip().split(";")
+                else:
+                    partes = linha.strip().split(",")
+                
+                if len(partes) < 2:
+                    continue
+                
+                nome = partes[0].strip().strip('"')
+                if not nome or "TOTAL" in nome.upper() or "Centro de Custo" in nome:
+                    continue
+                
+                valores_meses = []
+                for idx, mes in enumerate(meses_disponiveis, start=1):
+                    if idx < len(partes):
+                        v_str = partes[idx].strip().strip('"').replace(".", "").replace(",", ".")
+                        try:
+                            v = float(v_str)
+                        except:
+                            v = 0.0
+                    else:
+                        v = 0.0
+                    valores_meses.append(v)
+                
+                meses_por_centro.append({"nome": nome, "meses": valores_meses})
+            
+            return {"centros": centros, "meses": meses_disponiveis, "meses_por_centro": meses_por_centro}
+        except:
+            return {"centros": [], "meses": [], "meses_por_centro": []}
+    
+    dados_atual = ler_csv(periodo_atual)
+    dados_anterior = ler_csv(periodo_anterior)
+    
+    def processar(dados):
+        if not dados or not dados.get("centros"):
+            return {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}, "meses_disponiveis": []}
+        
+        centros = dados["centros"]
+        total = sum(c.get("valor", 0) for c in centros)
+        meses = dados["meses"]
+        meses_por_centro = dados.get("meses_por_centro", [])
+        
+        # Calcula os totais mensais
+        totais_meses = {m: 0.0 for m in meses}
+        for item in meses_por_centro:
+            for idx, m in enumerate(meses):
+                if idx < len(item["meses"]):
+                    totais_meses[m] += item["meses"][idx]
+        
+        return {
+            "total": total,
+            "centros": centros,
+            "maior_centro": max(centros, key=lambda x: x.get("valor", 0)) if centros else {"nome": "-", "valor": 0},
+            "media_mensal": total / len(meses) if meses and total > 0 else 0,
+            "meses": totais_meses,
+            "meses_disponiveis": meses
+        }
+    
+    atual = processar(dados_atual)
+    anterior = processar(dados_anterior) if dados_anterior and dados_anterior.get("centros") else {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}, "meses_disponiveis": []}
+    
+    return {
+        "periodo_atual": periodo_atual,
+        "periodo_anterior": periodo_anterior,
+        "atual": atual,
+        "anterior": anterior,
+        "variacao_total": atual["total"] - anterior["total"],
+        "variacao_pct": ((atual["total"] - anterior["total"]) / anterior["total"] * 100) if anterior["total"] > 0 else 0
+    }
+@app.get("/relatorio_centro_custos_v2", response_class=HTMLResponse)
+def serve_relatorio_v2():
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_centro_custos_v2.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
+    return HTMLResponse(content="<h1>Relatório não encontrado</h1>", status_code=404)
+
+
+@app.post("/salvar_relatorio_v2")
+async def salvar_relatorio_v2(request: Request):
+    import sqlite3, os, json
+    from datetime import datetime
+    dados = await request.json()
+    periodo = dados.get("periodo")
+    texto_total = dados.get("texto_total")
+    texto_concentracao = dados.get("texto_concentracao")
+    texto_alertas = dados.get("texto_alertas")
+    texto_recomendacoes = dados.get("texto_recomendacoes")
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS relatorio_v2_salvo (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, texto_total TEXT,
+        texto_concentracao TEXT, texto_alertas TEXT, texto_recomendacoes TEXT, data_edicao TEXT)""")
+    
+    data_edicao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    cur.execute("""INSERT INTO relatorio_v2_salvo 
+        (periodo, texto_total, texto_concentracao, texto_alertas, texto_recomendacoes, data_edicao)
+        VALUES (?, ?, ?, ?, ?, ?)""",
+        (periodo, texto_total, texto_concentracao, texto_alertas, texto_recomendacoes, data_edicao))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "id": cur.lastrowid}
+
+
+@app.get("/relatorio_final", response_class=HTMLResponse)
+def serve_relatorio_final():
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_final.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
+    return HTMLResponse(content="<h1>Relatório não encontrado</h1>", status_code=404)
