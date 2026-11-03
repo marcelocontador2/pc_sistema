@@ -35,8 +35,9 @@
             page-break-after: always;
             position: relative;
             box-sizing: border-box;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            height: auto;
+            overflow: visible;
         }
         .page:last-child { page-break-after: auto; }
 
@@ -278,6 +279,7 @@
         .nota strong { color: var(--primary); }
 
         @media print {
+            .btn-salvar { display: none !important; }
             @page {
                 size: A4;
                 margin: 15mm 15mm 15mm 15mm;
@@ -348,9 +350,6 @@
                 flex-direction: column !important;
                 gap: 8px !important;
             }
-            .btn-salvar {
-                display: none !important;
-            }
             .leitura-box {
                 padding: 8px !important;
                 font-size: 9px !important;
@@ -368,6 +367,11 @@
                 margin-top: 10px !important;
             }
         }
+    
+        @media print {
+            .nota-instrucao { display: none !important; }
+        }
+    
     </style>
 </head>
 <body>
@@ -503,7 +507,7 @@
     </div>
 
     <!-- CONCLUSÃO -->
-    <div class="page">
+    <div class="page" style="display: flex; flex-direction: column; justify-content: space-between;">
         <div class="section-subtitle">CONCLUSÃO</div>
         <h2 class="section-title">Conclusão e Recomendações</h2>
         <div style="background: var(--bg-light); padding: 25px; border-radius: 12px; border-left: 4px solid var(--primary); margin-bottom: 20px;">
@@ -522,7 +526,7 @@
             <h3 style="color: #22543d; margin-top: 0; font-size: 16px;">4. Recomendações</h3>
             <ul id="conclusao-recomendacoes" contenteditable="true" style="font-size: 14px; line-height: 1.7; padding-left: 20px; margin: 0; border: 1px dashed #ccc; padding: 12px; border-radius: 8px; background: #fff;"></ul>
         </div>
-        <div class="nota" style="margin-top: 25px;">
+        <div class="nota nota-instrucao" style="margin-top: 25px;">
             <strong>Nota 5:</strong> A conclusão acima foi gerada automaticamente com base nos dados do período. Os textos são editáveis (clique e digite) para ajustes antes da impressão. Use o botão abaixo para imprimir ou salvar como PDF.
         </div>
         <div style="text-align: right; margin-top: 25px;">
