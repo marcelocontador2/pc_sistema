@@ -980,6 +980,9 @@
 
 
 
+
+
+
 <script id="js-carregar-conclusao-salva">
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -999,8 +1002,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     : dados.conclusao_personalizada;
             } catch(e) { return; }
             
+            // Se for formato antigo (objeto chave-valor), converte
+            if (!salvos.blocos && typeof salvos === 'object') {
+                const titulosAntigos = {
+                    'conclusao-total': '1. Conclusão sobre o Total Executado',
+                    'conclusao-concentracao': '2. Análise de Concentração',
+                    'conclusao-alertas': '3. Alertas e Pontos de Atenção',
+                    'conclusao-recomendacoes': '4. Recomendações'
+                };
+                const blocosConvertidos = Object.entries(titulosAntigos).map(([id, titulo]) => ({
+                    id: id,
+                    titulo: titulo,
+                    html: salvos[id] || '',
+                    excluido: false
+                }));
+                salvos = { blocos: blocosConvertidos };
+            }
+            
             if (!salvos.blocos || !Array.isArray(salvos.blocos)) return;
             
+            // Encontra o container (div após o h2 de conclusão)
             const h2 = Array.from(document.querySelectorAll('h2')).find(h => 
                 h.innerText.includes('Conclusão e Recomendações')
             );
@@ -1009,31 +1030,43 @@ document.addEventListener('DOMContentLoaded', function() {
             const container = h2.nextElementSibling;
             if (!container) return;
             
-            // Aplica edicoes, exclusoes e extras
+            // Para cada bloco salvo (fixos ou extras)
             salvos.blocos.forEach(b => {
-                if (!b.id || b.id.startsWith('novo-')) return;
+                if (!b.id) return;
                 
-                const el = document.getElementById(b.id);
-                if (!el) return;
-                
-                const card = el.closest('div[style*="padding: 25px"]') || 
-                             el.closest('div[style*="background"]') || 
-                             el.parentElement;
-                
-                if (b.excluido) {
-                    if (card) card.style.display = 'none';
-                } else if (b.html) {
-                    el.innerHTML = b.html;
+                if (b.id.startsWith('novo-')) {
+                    // Bloco NOVO: adiciona no final (se não estiver excluido)
+                    if (!b.excluido) {
+                        const novoCard = document.createElement('div');
+                        novoCard.style.cssText = 'background: var(--bg-light); padding: 25px; border-radius: 8px; border-left: 4px solid #3182ce; margin-top: 20px; page-break-inside: avoid;';
+                        novoCard.innerHTML = '<h3 style="color: var(--primary); margin-top: 0;">' + (b.titulo || 'Bloco Adicional') + '</h3>' + 
+                                            '<div style="font-size: 14px; line-height: 1.6; background: #fff; padding: 10px; border-radius: 4px;">' + (b.html || '') + '</div>';
+                        container.appendChild(novoCard);
+                    }
+                } else {
+                    // Bloco ORIGINAL: encontra e aplica
+                    const el = document.getElementById(b.id);
+                    if (!el) return;
+                    
+                    // Sobe até achar o card (div que tem background/padding)
+                    let card = el.parentElement;
+                    for (let i = 0; i < 3 && card; i++) {
+                        if (card.style.background && card.style.padding) break;
+                        card = card.parentElement;
+                    }
+                    if (!card) card = el.parentElement;
+                    
+                    if (b.excluido) {
+                        card.style.display = 'none';
+                    } else {
+                        if (b.html) el.innerHTML = b.html;
+                        // Atualiza o título do h3 dentro do card (se mudou)
+                        if (b.titulo && card) {
+                            const h3 = card.querySelector('h3');
+                            if (h3) h3.innerText = b.titulo;
+                        }
+                    }
                 }
-            });
-            
-            // Adiciona extras no final
-            salvos.blocos.filter(b => b.id && b.id.startsWith('novo-') && !b.excluido).forEach(b => {
-                const novoCard = document.createElement('div');
-                novoCard.style.cssText = 'background: var(--bg-light); padding: 25px; border-radius: 8px; border-left: 4px solid #3182ce; margin-top: 20px; page-break-inside: avoid;';
-                novoCard.innerHTML = '<h3 style="color: var(--primary); margin-top: 0;">' + b.titulo + '</h3>' + 
-                                    '<div style="font-size: 14px; line-height: 1.6; background: #fff; padding: 10px; border-radius: 4px;">' + b.html + '</div>';
-                container.appendChild(novoCard);
             });
             
             window.conclusaoPersonalizada = true;
