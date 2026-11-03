@@ -94,14 +94,14 @@
         <div class="section-title">Resumo Geral das Receitas</div>
         <div class="cards-grid" id="cards-resumo">
             <div class="card receita">
-                <div class="card-title">Receita Orçada</div>
-                <div class="card-value" id="resumo-orcado">R$ 0,00</div>
-                <div class="card-sub" id="resumo-orcado-anterior">Anterior: R$ 0,00</div>
-            </div>
-            <div class="card receita">
                 <div class="card-title">Receita Realizada</div>
                 <div class="card-value" id="resumo-realizado">R$ 0,00</div>
                 <div class="card-sub" id="resumo-realizado-anterior">Anterior: R$ 0,00</div>
+            </div>
+            <div class="card receita">
+                <div class="card-title">Receita Orçada</div>
+                <div class="card-value" id="resumo-orcado">R$ 0,00</div>
+                <div class="card-sub" id="resumo-orcado-anterior">Anterior: R$ 0,00</div>
             </div>
             <div class="card receita">
                 <div class="card-title">Execução Orçamentária</div>
@@ -119,6 +119,29 @@
         function fmt(v) {
             if (v === undefined || v === null || isNaN(v)) return '0,00';
             return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function carregarHistorico() {
+            fetch(`/historico_comparativo_receitas?_t=${Date.now()}`)
+                .then(res => res.json())
+                .then(data => {
+                    const div = document.getElementById('historico-lista');
+                    if (data.length === 0) {
+                        div.innerHTML = '<p style="color:#718096;font-size:13px;">Nenhum histórico.</p>';
+                        return;
+                    }
+                    let html = '<ul>';
+                    data.forEach(item => {
+                        html += `<li>
+                            <input type="radio" name="historico" value="${item.id}">
+                            <span><b>Período:</b> ${item.periodo} | <b>Gerado em:</b> ${item.data_geracao}</span>
+                        </li>`;
+                    });
+                    html += '</ul>';
+                    div.innerHTML = html;
+                }).catch(() => {
+                    document.getElementById('historico-lista').innerHTML = 'Erro ao carregar.';
+                });
         }
 
         function carregarDados() {
@@ -170,7 +193,7 @@
             const grupos = gruposAt.filter(g => (g.realizado || 0) > 0 || (g.orcado || 0) > 0);
             const totalAtual = grupos.reduce((acc, g) => acc + (g.realizado || 0), 0);
             
-            let html = '<table class="data-table"><thead><tr><th>Grupo de Receita</th><th class="text-right">Realizada (Per. Atual) R$</th><th class="text-right">Realizada (Per. Anterior) R$</th><th class="text-right">Variação (R$)</th><th class="text-right">Variação (%)</th></tr></thead><tbody>';
+            let html = '<table class="data-table"><thead><tr><th>Grupo de Receita</th><th class="text-right">Período Atual (R$)</th><th class="text-right">Período Anterior (R$)</th><th class="text-right">Variação (R$)</th><th class="text-right">Variação (%)</th></tr></thead><tbody>';
             
             grupos.forEach(g => {
                 const anGrupo = gruposAn.find(x => x.nome === g.nome);
@@ -204,7 +227,6 @@
             document.getElementById('tabela-container').innerHTML = html;
         }
 
-        // Funções de Histórico (Mantidas)
         function salvarAtual() {
             if (!dadosAtuais) { alert("Clique em Verificar antes de salvar."); return; }
             const periodo = dadosAtuais.periodo_atual;
@@ -217,27 +239,14 @@
                 }).catch(() => alert("Erro ao salvar."));
         }
 
-        function carregarHistorico() {
-            fetch(`/historico_comparativo_receitas?_t=${Date.now()}`)
-                .then(res => res.json())
-                .then(data => {
-                    const div = document.getElementById('historico-lista');
-                    if (data.length === 0) {
-                        div.innerHTML = '<p style="color:#718096;font-size:13px;">Nenhum histórico.</p>';
-                        return;
-                    }
-                    let html = '<ul>';
-                    data.forEach(item => {
-                        html += `<li>
-                            <input type="radio" name="historico" value="${item.id}">
-                            <span><b>Período:</b> ${item.periodo} | <b>Gerado em:</b> ${item.data_geracao}</span>
-                        </li>`;
-                    });
-                    html += '</ul>';
-                    div.innerHTML = html;
-                }).catch(() => {
-                    document.getElementById('historico-lista').innerHTML = 'Erro ao carregar.';
-                });
+        function gerarPDF() {
+            const sel = document.querySelector('input[name="historico"]:checked');
+            if (!sel) {
+                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
+                return;
+            }
+            const url = `/gerar_pdf_comparativo_receitas?historico_id=${sel.value}`;
+            window.open(url, '_blank');
         }
 
         function exibirSelecionado() {
@@ -267,35 +276,10 @@
                 .catch(() => alert("Erro ao excluir."));
         }
 
-
-        
-        
         document.addEventListener('DOMContentLoaded', () => {
             carregarHistorico();
             carregarDados();
         });
-    
-        
-    
-    
-        function gerarPDF() {
-            const sel = document.querySelector('input[name="historico"]:checked');
-            if (!sel) {
-                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
-                return;
-            }
-            
-            const url = `/gerar_pdf_comparativo_receitas?historico_id=${sel.value}`;
-            
-            // Cria um link temporário para abrir em nova aba
-            const a = document.createElement('a');
-            a.href = url;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-    
     </script>
 </body>
 </html>

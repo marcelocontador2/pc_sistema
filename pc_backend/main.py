@@ -3892,17 +3892,9 @@ def api_comparativo_receitas_v2(periodo_atual: str):
     }
 
 
-@app.get("/relatorio_comparativo_receitas_v2", response_class=HTMLResponse)
-def serve_relatorio_comparativo_receitas_v2():
-    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_comparativo_receitas.html")
-    if os.path.exists(html_path):
-        with open(html_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>Relatório não encontrado</h1>", status_code=404)
-
 
 @app.get("/gerar_pdf_comparativo_receitas")
-def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3"):
+def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3", historico_id: int = None):
     from playwright.sync_api import sync_playwright
     from fastapi.responses import Response
     import time, os
@@ -4175,11 +4167,14 @@ def gerar_pdf_conferencia(check_id: str):
 
 
 @app.get("/gerar_pdf_comparativo_despesas")
-def gerar_pdf_comparativo_despesas(periodo_atual: str = "2026-TRIMESTRE-3"):
+def gerar_pdf_comparativo_despesas(periodo_atual: str = "2026-TRIMESTRE-3", historico_id: int = None):
     from playwright.sync_api import sync_playwright
     from fastapi.responses import Response
     import time, os
-    url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas?periodo_atual={periodo_atual}&_t={int(time.time())}"
+    if historico_id:
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas?historico_id={historico_id}&_t={int(time.time())}"
+    else:
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas?periodo_atual={periodo_atual}&_t={int(time.time())}"
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(bypass_csp=True)
@@ -4340,3 +4335,63 @@ async def salvar_conclusao_centro_custos(historico_id: int, request: Request):
         return {"erro": True, "mensagem": "Histórico não encontrado."}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
+
+@app.get("/relatorio_comparativo_receitas_v2")
+def serve_relatorio_receitas_v2():
+    from fastapi.responses import FileResponse
+    import os
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Tenta v2, senão a versão sem v2
+    for nome in ["relatorio_comparativo_receitas_v2.html", "relatorio_comparativo_receitas.html"]:
+        caminho = os.path.join(base, "pc_frontend", nome)
+        if os.path.exists(caminho):
+            return FileResponse(caminho)
+    return {"erro": True, "mensagem": "Relatório não encontrado"}
+
+
+
+# ============================================================
+# ROTAS DE SALVAR E EXCLUIR - COMPARATIVO DE RECEITAS
+# ============================================================
+
+@app.post("/api/comparativo_receitas_v2/{periodo_atual}/salvar")
+def salvar_comparativo_receitas(periodo_atual: str):
+    import sqlite3, os, json
+    from datetime import datetime
+    
+    # Pega os dados atuais via API
+    try:
+        dados = api_comparativo_receitas_v2(periodo_atual)
+    except Exception as e:
+        return {"erro": True, "mensagem": f"Erro ao buscar dados: {str(e)}"}
+    
+    if dados.get("erro"):
+        return {"erro": True, "mensagem": dados.get("mensagem", "Dados não encontrados")}
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_receitas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
+    
+    data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
+    dados_json = json.dumps(dados)
+    
+    cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", 
+                (periodo_atual, data_geracao, dados_json))
+    conn.commit()
+    conn.close()
+    return {"erro": False, "mensagem": "Salvo com sucesso!"}
+
+
+@app.delete("/historico_comparativo_receitas/{id}")
+def excluir_historico_receitas(id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM historico_comparativo_receitas WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"erro": False}
+
