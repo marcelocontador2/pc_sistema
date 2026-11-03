@@ -4,10 +4,21 @@
     <meta charset="UTF-8">
     <title>Comparativo de Despesas</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; padding: 20px; color: #333; }
-        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { font-size: 24px; margin-bottom: 5px; color: #1a202c; }
-        .subtitle { color: #718096; margin-bottom: 20px; font-size: 14px; }
+        :root {
+            --primary: #2b6cb0;
+            --bg: #f4f6f9;
+            --card-bg: #ffffff;
+            --text: #2d3748;
+            --text-light: #718096;
+            --green: #38a169;
+            --red: #e53e3e;
+        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
+        .container { max-width: 1200px; margin: 0 auto; background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        .header-title h1 { margin: 0 0 5px 0; font-size: 24px; color: #1a202c; }
+        .header-title p { margin: 0 0 20px 0; color: var(--text-light); font-size: 14px; }
+
         .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; color: #fff; font-weight: bold; font-size: 14px; }
         .btn-voltar { background: #ed8936; }
@@ -16,30 +27,52 @@
         .btn-pdf { background: #3182ce; }
         .btn-salvar { background: #38a169; }
         .btn-verificar { background: #3182ce; }
-        .filters { display: flex; gap: 10px; align-items: center; background: #f7fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
-        .filters label { font-size: 14px; font-weight: 600; }
-        .filters select { padding: 6px; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .btn:hover { opacity: 0.9; }
+
         .historico-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; margin-bottom: 20px; }
-        .historico-box h3 { font-size: 14px; color: #4a5568; margin-bottom: 10px; text-transform: uppercase; }
+        .historico-box h3 { font-size: 14px; color: #4a5568; margin-bottom: 10px; text-transform: uppercase; margin-top: 0;}
         .historico-box ul { list-style: none; padding: 0; margin: 0; }
         .historico-box li { padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 14px; display: flex; align-items: center; gap: 10px; }
-        .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-        .card { background: #f8fafc; border-left: 4px solid #3182ce; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .card-title { font-size: 12px; font-weight: bold; color: #4a5568; text-transform: uppercase; margin-bottom: 5px; }
-        .card-value { font-size: 22px; font-weight: bold; color: #1a202c; }
-        .card-sub { font-size: 12px; color: #718096; margin-top: 5px; }
-        table.data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        table.data-table th, table.data-table td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        table.data-table th { background: #edf2f7; font-weight: bold; color: #2d3748; font-size: 13px; text-transform: uppercase; }
-        .text-right { text-align: right; }
-        .total-row td { font-weight: bold; background: #f7fafc; }
-        .loading { color: #718096; font-size: 14px; padding: 20px; text-align: center; }
+        .historico-box li:last-child { border-bottom: none; }
+
+        .filters { display: flex; gap: 10px; align-items: center; background: #f7fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .filters label { font-size: 14px; font-weight: 600; }
+        .filters select { padding: 6px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 14px; }
+
+        .section-title { 
+            font-size: 16px; 
+            font-weight: 700; 
+            margin: 30px 0 15px 0; 
+            color: #ffffff; 
+            background-color: var(--primary); 
+            text-align: center; 
+            padding: 10px 15px; 
+            border-radius: 4px; 
+            text-transform: uppercase; 
+            letter-spacing: 1px; 
+        }
+        .cards-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .card { background: #f8fafc; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-top: 4px solid var(--primary); }
+        .card-title { font-size: 13px; text-transform: uppercase; color: var(--text-light); font-weight: bold; margin-bottom: 10px; }
+        .card-value { font-size: 22px; font-weight: bold; margin-bottom: 5px; color: #1a202c; }
+        .card-sub { font-size: 12px; color: var(--text-light); }
+        
+        .val-positive { color: var(--green); }
+        .val-negative { color: var(--red); }
+        
+        .card.corrente { border-top-color: #3182ce; }
+        .card.capital { border-top-color: #ed8936; }
+        .card.total-geral { border-top-color: #2d3748; background-color: #edf2f7; }
+        
+        .loading { text-align: center; padding: 20px; font-size: 14px; color: var(--text-light); }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Comparativo de Despesas</h1>
-        <div class="subtitle">Apuração consolidada 12 meses</div>
+        <div class="header-title">
+            <h1>Comparativo de Despesas</h1>
+            <p>Apuração consolidada 12 meses</p>
+        </div>
 
         <div class="actions">
             <button class="btn btn-voltar" onclick="window.location.href='/'">← Voltar</button>
@@ -61,28 +94,10 @@
             <select id="tipo"><option value="TRIMESTRE" selected>Trimestral</option><option value="MES">Mensal</option></select>
             <label>Período:</label>
             <select id="valor"><option value="1">1º</option><option value="2">2º</option><option value="3" selected>3º</option><option value="4">4º</option></select>
-            <button class="btn btn-verificar" onclick="verificar()">Verificar</button>
+            <button class="btn btn-verificar" onclick="carregarDados()">Verificar</button>
         </div>
 
-        <div class="cards-grid" id="cards-resumo">
-            <div class="card">
-                <div class="card-title">Despesa Orçada</div>
-                <div class="card-value" id="resumo-orcado">R$ 0,00</div>
-                <div class="card-sub" id="resumo-orcado-anterior">Anterior: R$ 0,00</div>
-            </div>
-            <div class="card">
-                <div class="card-title">Despesa Empenhada</div>
-                <div class="card-value" id="resumo-empenhado">R$ 0,00</div>
-                <div class="card-sub" id="resumo-empenhado-anterior">Anterior: R$ 0,00</div>
-            </div>
-            <div class="card">
-                <div class="card-title">Execução Orçamentária</div>
-                <div class="card-value" id="resumo-execucao">0,00%</div>
-                <div class="card-sub" id="resumo-execucao-delta">—</div>
-            </div>
-        </div>
-
-        <div id="tabela-container"></div>
+        <div id="painel-cards"></div>
     </div>
 
     <script>
@@ -93,86 +108,115 @@
             return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        function atualizarCards(d) {
-            const at = d.atual || {};
-            const an = d.anterior || {};
-            const varExec = (at.percentual_total || 0) - (an.percentual_total || 0);
-            
-            document.getElementById('resumo-orcado').innerText = 'R$ ' + fmt(at.orcado_total);
-            document.getElementById('resumo-orcado-anterior').innerText = 'Anterior: R$ ' + fmt(an.orcado_total);
-            
-            document.getElementById('resumo-empenhado').innerText = 'R$ ' + fmt(at.empenhado_total);
-            document.getElementById('resumo-empenhado-anterior').innerText = 'Anterior: R$ ' + fmt(an.empenhado_total);
-            
-            document.getElementById('resumo-execucao').innerText = fmt(at.percentual_total) + '%';
-            
-            const deltaEl = document.getElementById('resumo-execucao-delta');
-            deltaEl.innerText = (varExec >= 0 ? '+' : '') + fmt(varExec) + ' p.p.';
-            deltaEl.style.color = varExec >= 0 ? '#28a745' : '#dc3545';
+        function corVariacao(v) {
+            if (v > 0) return 'val-negative'; 
+            if (v < 0) return 'val-positive'; 
+            return '';
         }
 
-        function renderizarTabela(d) {
-            const gruposAt = (d.atual && d.atual.grupos) ? d.atual.grupos : [];
-            const gruposAn = (d.anterior && d.anterior.grupos) ? d.anterior.grupos : [];
-            const grupos = gruposAt.filter(g => (g.empenhado || 0) > 0 || (g.orcado || 0) > 0);
-            const totalAtual = grupos.reduce((acc, g) => acc + (g.empenhado || 0), 0);
+        function renderizarCards(data) {
+            const painel = document.getElementById('painel-cards');
             
-            let html = '<table class="data-table"><thead><tr><th>Grupo de Despesa</th><th class="text-right">Período Atual (R$)</th><th class="text-right">Período Anterior (R$)</th><th class="text-right">Variação (R$)</th><th class="text-right">Variação (%)</th></tr></thead><tbody>';
+            if (!data || data.erro) {
+                painel.innerHTML = `<div class="loading" style="color:red;">${data ? data.mensagem : 'Erro ao carregar dados.'}</div>`;
+                return;
+            }
+
+            const getGrupo = (lista, termo) => lista.find(g => g.nome.toUpperCase().includes(termo)) || {orcado:0, empenhado:0};
             
-            grupos.forEach(g => {
-                const anGrupo = gruposAn.find(x => x.nome === g.nome);
-                const valorAnterior = anGrupo ? (anGrupo.empenhado || 0) : 0;
-                const variacao = (g.empenhado || 0) - valorAnterior;
-                const variacaoPct = valorAnterior > 0 ? (variacao / valorAnterior) * 100 : 0;
-                const cor = variacao >= 0 ? '#28a745' : '#dc3545';
-                
-                html += `<tr>
-                    <td>${g.nome}</td>
-                    <td class="text-right">${fmt(g.empenhado)}</td>
-                    <td class="text-right">${fmt(valorAnterior)}</td>
-                    <td class="text-right" style="color: ${cor};">${fmt(variacao)}</td>
-                    <td class="text-right" style="color: ${cor};">${fmt(variacaoPct)}%</td>
-                </tr>`;
-            });
-            
-            const totalAnterior = gruposAn.reduce((acc, g) => acc + (g.empenhado || 0), 0);
-            const varTotal = totalAtual - totalAnterior;
-            const varTotalPct = totalAnterior > 0 ? (varTotal / totalAnterior) * 100 : 0;
-            const corTotal = varTotal >= 0 ? '#28a745' : '#dc3545';
-            
-            html += `<tr class="total-row">
-                <td>TOTAL</td>
-                <td class="text-right">${fmt(totalAtual)}</td>
-                <td class="text-right">${fmt(totalAnterior)}</td>
-                <td class="text-right" style="color: ${corTotal};">${fmt(varTotal)}</td>
-                <td class="text-right" style="color: ${corTotal};">${fmt(varTotalPct)}%</td>
-            </tr></tbody></table>`;
-            
-            document.getElementById('tabela-container').innerHTML = html;
+            const at = data.atual;
+            const an = data.anterior;
+
+            // Mapeamento
+            const aPessoal = getGrupo(at.grupos, 'PESSOAL');
+            const aOutras = getGrupo(at.grupos, 'OUTRAS DESPESAS CORRENTES');
+            const aJuros = getGrupo(at.grupos, 'JUROS');
+            const aInvest = getGrupo(at.grupos, 'INVESTIMENTOS');
+            const aInversoes = getGrupo(at.grupos, 'INVERSOES');
+            const aAmort = getGrupo(at.grupos, 'AMORTIZACAO');
+
+            const pPessoal = getGrupo(an.grupos, 'PESSOAL');
+            const pOutras = getGrupo(an.grupos, 'OUTRAS DESPESAS CORRENTES');
+            const pJuros = getGrupo(an.grupos, 'JUROS');
+            const pInvest = getGrupo(an.grupos, 'INVESTIMENTOS');
+            const pInversoes = getGrupo(an.grupos, 'INVERSOES');
+            const pAmort = getGrupo(an.grupos, 'AMORTIZACAO');
+
+            // Cálculos
+            const aCorrenteOrc = aPessoal.orcado + aOutras.orcado + aJuros.orcado;
+            const aCorrenteEmp = aPessoal.empenhado + aOutras.empenhado + aJuros.empenhado;
+            const pCorrenteOrc = pPessoal.orcado + pOutras.orcado + pJuros.orcado;
+            const pCorrenteEmp = pPessoal.empenhado + pOutras.empenhado + pJuros.empenhado;
+
+            const aCapitalOrc = aInvest.orcado + aInversoes.orcado + aAmort.orcado;
+            const aCapitalEmp = aInvest.empenhado + aInversoes.empenhado + aAmort.empenhado;
+            const pCapitalOrc = pInvest.orcado + pInversoes.orcado + pAmort.orcado;
+            const pCapitalEmp = pInvest.empenhado + pInversoes.empenhado + pAmort.empenhado;
+
+            const aTotalOrc = aCorrenteOrc + aCapitalOrc;
+            const aTotalEmp = aCorrenteEmp + aCapitalEmp;
+            const pTotalOrc = pCorrenteOrc + pCapitalOrc;
+            const pTotalEmp = pCorrenteEmp + pCapitalEmp;
+
+            const gerarBloco = (titulo, classeCard, orcAt, empAt, orcAn, empAn) => {
+                const varEmp = empAt - empAn;
+                const exec = orcAt > 0 ? (empAt / orcAt) * 100 : 0;
+                return `
+                    <div class="section-title">${titulo}</div>
+                    <div class="cards-grid">
+                        <div class="card ${classeCard}">
+                            <div class="card-title">Orçado</div>
+                            <div class="card-value">R$ ${fmt(orcAt)}</div>
+                            <div class="card-sub">Anterior: R$ ${fmt(orcAn)}</div>
+                        </div>
+                        <div class="card ${classeCard}">
+                            <div class="card-title">Empenhado</div>
+                            <div class="card-value">R$ ${fmt(empAt)}</div>
+                            <div class="card-sub">Anterior: R$ ${fmt(empAn)}</div>
+                        </div>
+                        <div class="card ${classeCard}">
+                            <div class="card-title">Variação Empenhada</div>
+                            <div class="card-value ${corVariacao(varEmp)}">R$ ${fmt(varEmp)}</div>
+                            <div class="card-sub">Frente ao ano anterior</div>
+                        </div>
+                        <div class="card ${classeCard}">
+                            <div class="card-title">Execução Orçamentária</div>
+                            <div class="card-value">${fmt(exec)}%</div>
+                            <div class="card-sub">Do total orçado</div>
+                        </div>
+                    </div>
+                `;
+            };
+
+            let html = '';
+            html += gerarBloco("Despesas Correntes (Pessoal + Outras + Juros)", "corrente", aCorrenteOrc, aCorrenteEmp, pCorrenteOrc, pCorrenteEmp);
+            html += gerarBloco("Despesas de Capital (Investimentos + Inversões)", "capital", aCapitalOrc, aCapitalEmp, pCapitalOrc, pCapitalEmp);
+            html += gerarBloco("TOTAL GERAL DAS DESPESAS (Correntes + Capital)", "total-geral", aTotalOrc, aTotalEmp, pTotalOrc, pTotalEmp);
+
+            painel.innerHTML = html;
         }
 
-        async function verificar() {
+        async function carregarDados() {
             const ano = document.getElementById('ano').value;
             const tipo = document.getElementById('tipo').value;
             const valor = document.getElementById('valor').value;
             const periodo = `${ano}-${tipo}-${valor}`;
 
+            document.getElementById('painel-cards').innerHTML = '<div class="loading">Buscando dados...</div>';
+
             try {
                 const res = await fetch(`/api/comparativo_despesas_v2/${periodo}?_t=${Date.now()}`);
                 const data = await res.json();
-                if (data.erro) { alert("Aviso: " + data.mensagem); return; }
-                
-                dadosAtuais = data;
-                atualizarCards(data);
-                renderizarTabela(data);
+                dadosAtuais = data; // Salva na memória para o botão Salvar
+                renderizarCards(data);
             } catch (e) {
-                console.error("Erro ao buscar dados:", e);
-                alert("Falha ao carregar os dados.");
+                console.error(e);
+                document.getElementById('painel-cards').innerHTML = '<div class="loading" style="color:red;">Erro de conexão.</div>';
             }
         }
 
         async function salvarAtual() {
-            if (!dadosAtuais) { alert("Clique em Verificar antes de salvar."); return; }
+            if (!dadosAtuais || dadosAtuais.erro) { alert("Clique em Verificar antes de salvar."); return; }
             const periodo = dadosAtuais.periodo_atual;
             try {
                 const res = await fetch(`/api/comparativo_despesas_v2/${periodo}/salvar`, { method: 'POST' });
@@ -217,8 +261,7 @@
                 const data = await res.json();
                 if (data.ok) {
                     dadosAtuais = data.dados;
-                    atualizarCards(data.dados);
-                    renderizarTabela(data.dados);
+                    renderizarCards(data.dados);
                 } else {
                     alert("Erro ao carregar o histórico.");
                 }
@@ -240,8 +283,11 @@
             }
         }
 
-        // Carrega o histórico ao abrir a página
-        document.addEventListener('DOMContentLoaded', carregarHistorico);
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarHistorico();
+            carregarDados(); // Já carrega os dados visuais ao abrir a tela
+        });
     </script>
 </body>
 </html>

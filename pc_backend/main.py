@@ -22,6 +22,16 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 app = FastAPI(title="PC - Prestacao de Contas API")
+
+@app.get("/dashboard_despesas")
+def get_dashboard_despesas():
+    from fastapi.responses import FileResponse
+    import os
+    caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "dashboard_despesas.html")
+    if os.path.exists(caminho):
+        return FileResponse(caminho)
+    return {"erro": True, "mensagem": "Arquivo dashboard_despesas.html nao encontrado"}
+
 @app.get("/configuracoes", response_class=HTMLResponse)
 async def serve_configuracoes():
     import os
