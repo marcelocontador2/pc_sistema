@@ -28,11 +28,18 @@
         .historico-item { display: block; padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; }
         .historico-item:hover { background: #eef4f9; }
         
+        .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .card { background: #eef4f9; padding: 15px; border-radius: 6px; border-left: 4px solid #0a1c3a; }
+        .card .card-title { font-size: 11px; color: #718096; text-transform: uppercase; font-weight: 600; }
+        .card .card-value { font-size: 24px; font-weight: bold; color: #0a1c3a; }
+        .card .card-sub { font-size: 11px; color: #718096; }
+        
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
         th { background-color: #eef4f9; color: #0a1c3a; font-weight: 600; }
         tr:hover { background-color: #f9f9f9; }
         .total-row td { font-weight: bold; background-color: #e6f0fa; }
+        .text-right { text-align: right; }
     </style>
 </head>
 <body>
@@ -65,8 +72,27 @@
             <div id="historico-lista">Carregando...</div>
         </div>
 
+        <!-- CARDS DE RESUMO -->
+        <div class="cards-grid" id="cards-resumo">
+            <div class="card">
+                <div class="card-title">Receita Realizada</div>
+                <div class="card-value" id="resumo-realizado">R$ 0,00</div>
+                <div class="card-sub" id="resumo-realizado-anterior">Anterior: R$ 0,00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Receita Orçada</div>
+                <div class="card-value" id="resumo-orcado">R$ 0,00</div>
+                <div class="card-sub" id="resumo-orcado-anterior">Anterior: R$ 0,00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Execução Orçamentária</div>
+                <div class="card-value" id="resumo-execucao">0,00%</div>
+                <div class="card-sub" id="resumo-execucao-delta">—</div>
+            </div>
+        </div>
+
         <div id="tabela-container">
-            <div style="text-align: center; padding: 20px; color: #888;">Clique em "Verificar" para carregar os dados.</div>
+            <div style="text-align: center; padding: 20px; color: #888;">Clique em "Verificar" ou "Exibir Selecionado" para carregar os dados.</div>
         </div>
     </div>
 
@@ -97,23 +123,66 @@
             const periodo = `${ano}-${tipo}-${trimestre}`;
             try {
                 document.getElementById('tabela-container').innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Verificando...</div>';
-                const r = await fetch(`/api/comparativo_receitas/${periodo}?_t=${Date.now()}`, { cache: 'no-store' });
+                const r = await fetch(`/api/comparativo_receitas_v2/${periodo}?_t=${Date.now()}`, { cache: 'no-store' });
                 const d = await r.json();
                 if (d.erro) { document.getElementById('tabela-container').innerHTML = '<div style="color: red; text-align: center; padding: 20px;">' + d.mensagem + '</div>'; return; }
                 dadosAtuais = d;
                 renderizarTabela(d);
+                atualizarCards(d);
             } catch (e) { console.error(e); }
         }
 
+        async function exibirSelecionado() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert('Selecione um item no histórico.'); return; }
+            const periodo = check.parentElement.querySelector('strong').innerText;
+            try {
+                const r = await fetch(`/api/comparativo_receitas_v2/${periodo}?_t=${Date.now()}`, { cache: 'no-store' });
+                const d = await r.json();
+                if (d.erro) { alert(d.mensagem); return; }
+                dadosAtuais = d;
+                renderizarTabela(d);
+                atualizarCards(d);
+            } catch (e) { console.error(e); alert('Erro ao carregar dados.'); }
+        }
+
+        function atualizarCards(d) {
+            const at = d.atual;
+            const an = d.anterior;
+            const varExec = at.percentual_total - an.percentual_total;
+            document.getElementById('resumo-realizado').innerText = 'R$ ' + fmt(at.realizado_total);
+            document.getElementById('resumo-realizado-anterior').innerText = 'Anterior: R$ ' + fmt(an.realizado_total);
+            document.getElementById('resumo-orcado').innerText = 'R$ ' + fmt(at.orcado_total);
+            document.getElementById('resumo-orcado-anterior').innerText = 'Anterior: R$ ' + fmt(an.orcado_total);
+            document.getElementById('resumo-execucao').innerText = fmt(at.percentual_total) + '%';
+            const deltaEl = document.getElementById('resumo-execucao-delta');
+            deltaEl.innerText = (varExec >= 0 ? '+' : '') + fmt(varExec) + ' p.p.';
+            deltaEl.style.color = varExec >= 0 ? '#28a745' : '#dc3545';
+        }
+
         function renderizarTabela(d) {
-            let html = '<table><thead><tr><th>Centro de Receita</th><th>Valor (R$)</th><th>% do Total</th></tr></thead><tbody>';
-            let total = 0;
-            d.receitas.forEach(c => { total += c.valor; });
-            d.receitas.forEach(c => {
-                const pct = total > 0 ? (c.valor / total) * 100 : 0;
-                html += `<tr><td>${c.nome}</td><td>${fmt(c.valor)}</td><td>${fmt(pct)}%</td></tr>`;
+            const gruposAt = d.atual.grupos || [];
+            const gruposAn = d.anterior.grupos || [];
+            const grupos = gruposAt.filter(g => g.realizado > 0 || g.orcado > 0);
+            const totalAtual = grupos.reduce((acc, g) => acc + g.realizado, 0);
+            
+            let html = '<table><thead><tr><th>Grupo de Receita</th><th class="text-right">Período Atual (R$)</th><th class="text-right">Período Anterior (R$)</th><th class="text-right">Variação (R$)</th><th class="text-right">Variação (%)</th></tr></thead><tbody>';
+            
+            grupos.forEach(g => {
+                const anGrupo = gruposAn.find(x => x.nome === g.nome);
+                const valorAnterior = anGrupo ? anGrupo.realizado : 0;
+                const variacao = g.realizado - valorAnterior;
+                const variacaoPct = valorAnterior > 0 ? (variacao / valorAnterior) * 100 : 0;
+                const cor = variacao >= 0 ? '#28a745' : '#dc3545';
+                html += `<tr><td>${g.nome}</td><td class="text-right">${fmt(g.realizado)}</td><td class="text-right">${fmt(valorAnterior)}</td><td class="text-right" style="color: ${cor};">${fmt(variacao)}</td><td class="text-right" style="color: ${cor};">${fmt(variacaoPct)}%</td></tr>`;
             });
-            html += `<tr class="total-row"><td>TOTAL</td><td>${fmt(total)}</td><td>100%</td></tr></tbody></table>`;
+            
+            const totalAnterior = gruposAn.reduce((acc, g) => acc + g.realizado, 0);
+            const varTotal = totalAtual - totalAnterior;
+            const varTotalPct = totalAnterior > 0 ? (varTotal / totalAnterior) * 100 : 0;
+            const corTotal = varTotal >= 0 ? '#28a745' : '#dc3545';
+            html += `<tr class="total-row"><td>TOTAL</td><td class="text-right">${fmt(totalAtual)}</td><td class="text-right">${fmt(totalAnterior)}</td><td class="text-right" style="color: ${corTotal};">${fmt(varTotal)}</td><td class="text-right" style="color: ${corTotal};">${fmt(varTotalPct)}%</td></tr></tbody></table>`;
+            
             document.getElementById('tabela-container').innerHTML = html;
         }
 
@@ -133,14 +202,6 @@
                 if (res.ok) { alert('Salvo com sucesso!'); carregarHistorico(); }
                 else { alert('Erro ao salvar.'); }
             } catch (e) { console.error(e); }
-        }
-
-        async function exibirSelecionado() {
-            const check = document.querySelector('.check-historico:checked');
-            if (!check) { alert('Selecione um item no histórico.'); return; }
-            const r = await fetch('/historico_comparativo_receitas/' + check.value);
-            const d = await r.json();
-            if (d.dados) { dadosAtuais = d.dados; renderizarTabela(d.dados); }
         }
 
         async function excluirSelecionado() {
@@ -163,7 +224,8 @@
         function gerarPDF() {
             const check = document.querySelector('.check-historico:checked');
             if (!check) { alert('Selecione um item no histórico para gerar o PDF.'); return; }
-            window.open('/relatorio_comparativo_receitas?periodo_atual=' + encodeURIComponent(check.parentElement.querySelector('strong').innerText), '_blank');
+            const periodo = check.parentElement.querySelector('strong').innerText;
+            window.open('/gerar_pdf_comparativo_receitas?periodo_atual=' + encodeURIComponent(periodo), '_blank');
         }
     </script>
 </body>

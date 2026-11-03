@@ -189,7 +189,11 @@
         function exibirSelecionado() {
             const check = document.querySelector(".check-historico:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
-            fetch('/historico_panorama/' + check.value).then(r => r.json()).then(data => { aplicarValores(data); });
+            const periodo = check.parentElement.querySelector('strong').innerText;
+            fetch(`/api/panorama/${periodo}?_t=${Date.now()}`, { cache: 'no-store' })
+                .then(r => r.json())
+                .then(data => { aplicarValores(data); })
+                .catch(e => { console.error(e); alert('Erro ao carregar dados.'); });
         }
         function excluirSelecionado() {
             const selecionados = document.querySelectorAll(".check-historico:checked");
