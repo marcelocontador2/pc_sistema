@@ -3950,7 +3950,10 @@ def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3"):
     from fastapi.responses import Response
     import time, os
     
-    url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?periodo_atual={periodo_atual}&_t={int(time.time())}"
+    if historico_id:
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
+    else:
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?periodo_atual={periodo_atual}&_t={int(time.time())}"
     
     with sync_playwright() as p:
         browser = p.chromium.launch()

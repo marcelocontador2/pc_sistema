@@ -1,0 +1,29 @@
+Vá no arquivo pc_frontend\relatorio_comparativo_receitas.html e altere o fetch para buscar do histórico.
+Use este código como base:
+
+
+        // INJEÇÃO DE DADOS DO HISTÓRICO
+        const urlParams = new URLSearchParams(window.location.search);
+        const historicoId = urlParams.get('historico_id');
+        
+        let urlFetch = '';
+        if (historicoId) {
+            urlFetch = `/historico_comparativo_receitas/${historicoId}`;
+        } else {
+            const periodo = urlParams.get('periodo_atual');
+            urlFetch = `/api/comparativo_receitas_v2/${periodo}`;
+        }
+        
+        fetch(urlFetch + '?_t=' + Date.now())
+            .then(res => res.json())
+            .then(data => {
+                // Se for do histórico, os dados vêm dentro de 'data.dados', senão é 'data' direto
+                const dadosReais = data.dados ? data.dados : data;
+                // AQUI ELE CHAMA A FUNÇÃO QUE JÁ EXISTE NA SUA PÁGINA PARA RENDERIZAR
+                if (typeof renderizarRelatorio === 'function') {
+                    renderizarRelatorio(dadosReais);
+                } else {
+                    console.log("Aviso: função de renderizar não encontrada. Dados:", dadosReais);
+                }
+            });
+    

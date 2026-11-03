@@ -199,6 +199,7 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
             <option value="DMPL">DMPL</option>
             <option value="CENTRO_CUSTOS">Centro de Custos</option>
             <option value="COMPARATIVO_RECEITAS">Comparativo de Receitas</option>
+            <option value="COMPARATIVO_DESPESAS">Comparativo de Despesas</option>
           </select>
         </div>
         <div style="margin-bottom: 20px;">
@@ -771,7 +772,28 @@ document.addEventListener("DOMContentLoaded", function() {
     }, 2000); // Espera um pouco mais para garantir que o menu anterior já foi criado
 });
 </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    setTimeout(function() {
+        const submenuAnalises = document.getElementById('submenu-analises');
+        if (submenuAnalises) {
+            // Verifica se o link já existe pelo href
+            if (!submenuAnalises.querySelector('a[href="/analise_comparativo_despesas"]')) {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = '/analise_comparativo_despesas';
+                a.textContent = 'Comparativo de Despesas';
+                a.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;';
+                li.appendChild(a);
+                submenuAnalises.appendChild(li);
+            }
+        }
+    }, 3000);
+});
+</script>
 </body>
+
 </html>
 
 
