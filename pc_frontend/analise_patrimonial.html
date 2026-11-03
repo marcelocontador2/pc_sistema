@@ -4,20 +4,7 @@
     <meta charset="UTF-8">
     <title>Análise Patrimonial</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js">
-        function gerarPDFHistorico() {
-            const sel = document.querySelector('input[name="historico"]:checked');
-            if (!sel) {
-                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
-                return;
-            }
-            const url = `/gerar_pdf_analise_patrimonial?historico_id=${sel.value}`;
-            const a = document.createElement('a');
-            a.href = url;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+        
     
     </script>
     <style>
@@ -279,5 +266,57 @@
         }
         document.addEventListener("DOMContentLoaded", carregarHistorico);
     </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Procura qualquer botão na tela que tenha o texto "Gerar PDF"
+            const botoes = Array.from(document.querySelectorAll('button, a'));
+            const btnPdf = botoes.find(b => b.innerText.includes('Gerar PDF'));
+            
+            if (btnPdf) {
+                // Garante o visual azul (caso o backup estivesse sem estilo)
+                btnPdf.style.background = '#3182ce';
+                btnPdf.style.color = 'white';
+                btnPdf.style.padding = '8px 16px';
+                btnPdf.style.border = 'none';
+                btnPdf.style.borderRadius = '4px';
+                btnPdf.style.fontWeight = 'bold';
+                btnPdf.style.cursor = 'pointer';
+                
+                // Remove o clique antigo quebrado
+                btnPdf.removeAttribute('onclick');
+                
+                // Adiciona a regra de negócio correta
+                btnPdf.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const sel = document.querySelector('input[type="checkbox"]:checked') || 
+                                document.querySelector('input[type="radio"]:checked');
+                    
+                    if (!sel) {
+                        alert("Atenção: Selecione um item do Histórico Salvo (marque a caixinha) antes de gerar o PDF.");
+                        return;
+                    }
+                    
+                    let id = sel.value;
+                    if (!id || id === "on") {
+                        id = sel.id.replace('check-', '').replace('hist-', '');
+                        if (!id) id = sel.getAttribute('data-id');
+                    }
+                    
+                    const url = `/gerar_pdf_analise_patrimonial/${id}`;
+                    console.log("[DEBUG] Abrindo PDF Patrimonial via JS:", url);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+            }
+        });
+    </script>
+
 </body>
 </html>

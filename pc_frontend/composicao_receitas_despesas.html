@@ -58,20 +58,7 @@ function exibirSelecionado() {
             });
         }
 
-        function gerarPDFHistorico() {
-            const sel = document.querySelector('input[name="historico"]:checked');
-            if (!sel) {
-                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
-                return;
-            }
-            const url = `/gerar_pdf_composicao_receitas_despesas?historico_id=${sel.value}`;
-            const a = document.createElement('a');
-            a.href = url;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+        
     
     </script>
 <style>
@@ -307,4 +294,56 @@ function exibirSelecionado() {
             });
         }
 </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Procura o botão de Gerar PDF
+            const botoes = Array.from(document.querySelectorAll('button, a, div'));
+            const btnPdf = botoes.find(b => b.innerText.trim().toUpperCase() === 'GERAR PDF');
+            
+            if (btnPdf) {
+                // Garante o visual azul
+                btnPdf.style.background = '#3182ce';
+                btnPdf.style.color = 'white';
+                btnPdf.style.padding = '8px 16px';
+                btnPdf.style.border = 'none';
+                btnPdf.style.borderRadius = '4px';
+                btnPdf.style.fontWeight = 'bold';
+                btnPdf.style.cursor = 'pointer';
+                
+                // Remove clique antigo quebrado
+                btnPdf.removeAttribute('onclick');
+                
+                // Adiciona a nova regra
+                btnPdf.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const sel = document.querySelector('input[type="checkbox"]:checked') || 
+                                document.querySelector('input[type="radio"]:checked');
+                    
+                    if (!sel) {
+                        alert("Atenção: Selecione um item do Histórico Salvo (marque a caixinha) antes de gerar o PDF.");
+                        return;
+                    }
+                    
+                    let id = sel.value;
+                    if (!id || id === "on") {
+                        id = sel.id.replace('check-', '').replace('hist-', '');
+                        if (!id) id = sel.getAttribute('data-id');
+                    }
+                    
+                    const url = `/gerar_pdf_composicao_receitas_despesas/${id}`;
+                    console.log("[DEBUG] Abrindo PDF Composição:", url);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+            }
+        });
+    </script>
+
 </body></html>

@@ -182,5 +182,58 @@
         }
         document.addEventListener("DOMContentLoaded", carregarHistorico);
     </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const botoes = Array.from(document.querySelectorAll('button, a, div'));
+            // Procura o botão que tenha "PDF" no texto
+            const btnPdf = botoes.find(b => b.innerText.toUpperCase().includes('PDF'));
+            
+            if (btnPdf) {
+                // Garante o visual azul padrão
+                btnPdf.style.background = '#3182ce';
+                btnPdf.style.color = 'white';
+                btnPdf.style.padding = '8px 16px';
+                btnPdf.style.border = 'none';
+                btnPdf.style.borderRadius = '4px';
+                btnPdf.style.fontWeight = 'bold';
+                btnPdf.style.cursor = 'pointer';
+                
+                btnPdf.removeAttribute('onclick');
+                
+                btnPdf.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const sel = document.querySelector('input[type="checkbox"]:checked') || 
+                                document.querySelector('input[type="radio"]:checked');
+                    
+                    if (!sel) {
+                        alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
+                        return;
+                    }
+                    
+                    let id = sel.value;
+                    if (!id || id === "on") {
+                        id = sel.id.replace('check-', '').replace('hist-', '');
+                        if (!id) id = sel.getAttribute('data-id');
+                    }
+                    
+                    const url = `/gerar_pdf_liquidez/${id}`;
+                    console.log("[DEBUG] Abrindo PDF Liquidez:", url);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+                console.log("[DEBUG] Botão PDF de Liquidez configurado!");
+            } else {
+                console.log("[DEBUG] ERRO: Botão PDF não encontrado na tela.");
+            }
+        });
+    </script>
+
 </body>
 </html>

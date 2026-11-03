@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import Request, FastAPI, Request
 from historico_integridade import router as historico_router
 from fastapi import FastAPI
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
@@ -1064,76 +1064,7 @@ async def excluir_panorama(id: int):
     conn.commit()
     conn.close()
     return {"mensagem": "Excluido"}
-@app.get("/gerar_pdf_panorama/{id}")
-async def gerar_pdf_panorama(id: int):
-    try:
-        from fastapi.responses import Response
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        import httpx, sqlite3, json, os
-        # 1. Pega o perÃ­odo do histÃ³rico salvo
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_panorama WHERE id = ?", (id,))
-        row = cursor.fetchone()
-        conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-        periodo, data_geracao, json_str = row
-        # 2. Consome a API do Painel para pegar os valores EXATOS do momento
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"http://127.0.0.1:8001/api/panorama/{periodo}")
-            if response.status_code != 200:
-                raise Exception(f"Erro ao buscar dados do painel: {response.status_code}")
-            dados = response.json()
-        # 3. Busca o valor do Caixa diretamente do BP para garantir que nÃ£o venha zerado
-        # Usa a funÃ§Ã£o _calc_liquidez que jÃ¡ sabe buscar o caixa no BP
-        dados_bp = _calc_liquidez(periodo)
-        caixa_bp = dados_bp.get("valores", {}).get("caixa", 0) if dados_bp else 0
-        # 4. Gera o PDF
-        pdf = FPDF(orientation='L', unit='mm', format='A4')
-        pdf.add_page()
-        pdf.set_font("helvetica", "B", 10)
-        pdf.set_text_color(150, 150, 150)
-        pdf.cell(0, 10, "P A N O R A M A", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", "B", 22)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 15, f"Resultados Gerais - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(10)
-        def fmt_mi(v): return f"R$ {v/1000000:,.1f} mi".replace(",", "X").replace(".", ",").replace("X", ".")
-        def card(x, y, w, h, valor, label):
-            pdf.set_fill_color(233, 242, 250)
-            pdf.rect(x, y, w, h, style='F')
-            pdf.set_xy(x + 5, y + 5)
-            pdf.set_font("helvetica", "B", 20)
-            pdf.set_text_color(0, 51, 102)
-            pdf.cell(w - 10, 10, valor, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_xy(x + 5, y + 18)
-            pdf.set_font("helvetica", "", 10)
-            pdf.set_text_color(80, 80, 80)
-            pdf.cell(w - 10, 5, label, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        # Linha 1 (Topo)
-        card(15, 50, 85, 35, fmt_mi(caixa_bp), "Caixa e Equivalente (BP)")
-        card(105, 50, 85, 35, fmt_mi(dados.get("ativo_total", 0)), "Ativo Total")
-        card(195, 50, 85, 35, fmt_mi(dados.get("passivo_total", 0)), "Passivo Total")
-        card(15, 95, 85, 35, fmt_mi(dados.get("patrimonio_liquido", 0)), "PatrimÃ´nio LÃ­quido")
-        card(105, 95, 85, 35, fmt_mi(dados.get("receita_realizada", 0) or dados.get("receitas_realizadas", 0)), "Receitas Realizadas (BO)")
-        card(195, 95, 85, 35, fmt_mi(dados.get("despesa_empenhada", 0) or dados.get("despesas_empenhadas", 0)), "Despesas Empenhadas (BO)")
-        card(15, 140, 85, 35, fmt_mi(dados.get("superavit_orcamentario", 0)), "SuperÃ¡vit/DÃ©ficit OrÃ§amentÃ¡rio")
-        card(105, 140, 85, 35, fmt_mi(dados.get("superavit_patrimonial", 0)), "SuperÃ¡vit/DÃ©ficit Patrimonial")
-        card(195, 140, 85, 35, fmt_mi(dados.get("superavit_financeiro", 0)), "SuperÃ¡vit/DÃ©ficit Financeiro")
-        pdf.set_y(185)
-        pdf.set_font("helvetica", "I", 10)
-        pdf.set_text_color(100, 100, 100)
-        pdf.multi_cell(0, 5, "Todos os demonstrativos estÃ£o equilibrados e consistentes entre si. EquaÃ§Ã£o patrimonial: Ativo = Passivo + PL.", align="L")
-        pdf.set_y(-20)
-        pdf.set_font("helvetica", "", 8)
-        pdf.cell(0, 10, "Cofen - Analise das DemonstraÃ§Ãµes ContÃ¡beis", align="L")
-        pdf.cell(0, 10, "03", align="R")
-        pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Resumo_{periodo.replace('-', '_')}.pdf"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/conferencia/{periodo}")
 async def api_conferencia_calcular(periodo: str):
     try:
@@ -1571,6 +1502,32 @@ async def excluir_bf(id: int):
     cur.execute("DELETE FROM historico_analise_financeira_bf WHERE id=?", (id,))
     conn.commit(); conn.close()
     return {"mensagem": "Excluido"}
+
+@app.get("/gerar_pdf_analise_patrimonial/{historico_id}")
+def gerar_pdf_analise_patrimonial(historico_id: int):
+    from playwright.sync_api import sync_playwright
+    from fastapi.responses import Response
+    import time
+    
+    # Abre a tela do relatório passando o ID do histórico
+    url = f"http://127.0.0.1:9994/relatorio_analise_patrimonial?historico_id={historico_id}&_t={int(time.time())}"
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        context = browser.new_context(bypass_csp=True)
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle")
+        page.wait_for_timeout(2000)
+        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+        browser.close()
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=patrimonial_{historico_id}.pdf"}
+    )
+
+
 @app.get("/gerar_pdf_analise_financeira_bf/{id}")
 async def gerar_pdf_analise_financeira_bf(id: int):
     try:
@@ -3002,7 +2959,7 @@ def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", e
             context = browser.new_context(bypass_csp=True)
             page = context.new_page()
             page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-            url = f"http://127.0.0.1:9999/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
+            url = f"http://127.0.0.1:9994/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
             pdf_bytes = page.pdf(format="A4", print_background=True)
@@ -3041,7 +2998,7 @@ def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMES
             context = browser.new_context(bypass_csp=True)
             page = context.new_page()
             page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-            url = f"http://127.0.0.1:9999/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
+            url = f"http://127.0.0.1:9994/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
             pdf_bytes = page.pdf(format="A4", print_background=True)
@@ -4278,3 +4235,108 @@ def rota_excluir_comparativo_despesas(id: int):
     conn.close()
     return {"erro": False}
 # ============================================================
+
+@app.get("/gerar_pdf_composicao_receitas_despesas/{historico_id}")
+def gerar_pdf_composicao_receitas_despesas(historico_id: int):
+    from playwright.sync_api import sync_playwright
+    from fastapi.responses import Response
+    import time
+    
+    # Abre a tela do relatório passando o ID do histórico
+    url = f"http://127.0.0.1:9994/relatorio_composicao_receitas_despesas?historico_id={historico_id}&_t={int(time.time())}"
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        context = browser.new_context(bypass_csp=True)
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle")
+        page.wait_for_timeout(2000)
+        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+        browser.close()
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=composicao_{historico_id}.pdf"}
+    )
+
+@app.get("/gerar_pdf_panorama/{historico_id}")
+def gerar_pdf_panorama(historico_id: int):
+    from playwright.sync_api import sync_playwright
+    from fastapi.responses import Response
+    import time
+    
+    # Abre a tela do panorama passando o ID do histórico
+    url = f"http://127.0.0.1:9994/relatorio_panorama?historico_id={historico_id}&_t={int(time.time())}"
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        context = browser.new_context(bypass_csp=True)
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle")
+        page.wait_for_timeout(3000) # Espera extra para gráficos renderizarem
+        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+        browser.close()
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=panorama_{historico_id}.pdf"}
+    )
+
+@app.get("/relatorio_panorama")
+def serve_relatorio_panorama():
+    from fastapi.responses import FileResponse
+    import os
+    caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "relatorio_panorama.html")
+    return FileResponse(caminho)
+
+@app.get("/gerar_pdf_centro_custos/{historico_id}")
+def gerar_pdf_centro_custos(historico_id: int):
+    from playwright.sync_api import sync_playwright
+    from fastapi.responses import Response
+    import time
+    
+    # Abre o relatório v2 passando o ID do histórico
+    url = f"http://127.0.0.1:9994/relatorio_centro_custos?historico_id={historico_id}&_t={int(time.time())}"
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        context = browser.new_context(bypass_csp=True)
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle")
+        page.wait_for_timeout(2000)
+        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+        browser.close()
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=centro_custos_{historico_id}.pdf"}
+    )
+
+@app.post("/salvar_conclusao_centro_custos/{historico_id}")
+async def salvar_conclusao_centro_custos(historico_id: int, request: Request):
+    import sqlite3, json, os
+    try:
+        data = await request.json()
+        texto = data.get("texto", "")
+        
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT dados_json FROM historico_centro_custos WHERE id = ?", (historico_id,))
+        row = cur.fetchone()
+        
+        if row:
+            dados = json.loads(row[0])
+            dados["conclusao_personalizada"] = texto
+            cur.execute("UPDATE historico_centro_custos SET dados_json = ? WHERE id = ?", (json.dumps(dados), historico_id))
+            conn.commit()
+            conn.close()
+            return {"erro": False, "mensagem": "Conclusão salva com sucesso!"}
+        
+        conn.close()
+        return {"erro": True, "mensagem": "Histórico não encontrado."}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}

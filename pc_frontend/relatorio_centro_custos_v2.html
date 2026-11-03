@@ -2,6 +2,9 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+
+    
+    
     <meta charset="UTF-8">
     <title>Relatório - Análise por Centro de Custos</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -46,6 +49,62 @@
         .badge.positive { background: #f8d7da; color: #721c24; }
         .badge.negative { background: #d4edda; color: #155724; }
     </style>
+
+    <style>
+        @media print {
+            button, .btn, .no-print { display: none !important; }
+            /* Remove aquele texto invisível que estava causando caracteres estranhos na tabela */
+            .material-icons, .fas, .far { display: none !important; }
+        }
+    </style>
+
+
+    <style>
+        @media print {
+            /* Força o grid de cards do Sumário a ficar em 2 colunas (2x2) */
+            .cards-grid, .grid-kpis, .cards-container {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 20px !important;
+            }
+
+            /* Cada card ocupa uma célula, com altura uniforme */
+            .card, .kpi-card {
+                box-sizing: border-box !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                padding: 20px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+            }
+
+            /* Títulos e valores não quebram de forma estranha */
+            .card-title, .kpi-title {
+                font-size: 12px !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.5px !important;
+            }
+            .card-value, .kpi-value, [id^="kpi-"] {
+                font-size: 22px !important;
+                white-space: nowrap !important;
+            }
+
+            /* Nome do Maior Centro de Custo pode quebrar em até 3 linhas */
+            #kpi-maior-centro {
+                font-size: 14px !important;
+                line-height: 1.3 !important;
+                white-space: normal !important;
+            }
+
+            /* Esconde botões e elementos que não são do relatório */
+            button, .btn, .no-print, .fab, .material-icons { display: none !important; }
+
+            /* Evita que o texto invisível apareça antes das páginas */
+            body::before, body::after { display: none !important; content: none !important; }
+        }
+    </style>
+
 </head>
 <body>
 
@@ -64,7 +123,7 @@
     <!-- SUMÁRIO EXECUTIVO -->
     <div class="page">
         <div class="section-subtitle">VISÃO GERAL</div>
-        <h2 class="section-title">Sumário Executivo</h2>
+        <div style="page-break-before: always;"></div><h2 class="section-title">Sumário Executivo</h2>
         <div class="cards-grid">
             <div class="card">
                 <div class="card-title">Total Executado (Atual)</div>
@@ -92,7 +151,7 @@
     <!-- TABELA DETALHADA -->
     <div class="page">
         <div class="section-subtitle">DADOS</div>
-        <h2 class="section-title">Tabela Detalhada — Despesas por Centro de Custo</h2>
+        <div style="page-break-before: always;"></div><h2 class="section-title">Tabela Detalhada — Despesas por Centro de Custo</h2>
         <table>
             <thead>
                 <tr>
@@ -124,7 +183,7 @@
                     varEl.innerText = 'Sem dados para comparação';
                     varEl.style.color = '#dc3545';
                 } else {
-                    varEl.innerText = (d.variacao_pct >= 0 ? '▲ ' : '▼ ') + fmtPct(Math.abs(d.variacao_pct)) + ' vs. Período Anterior';
+                    varEl.innerText = (d.variacao_pct >= 0 ? ' ' : ' ') + fmtPct(Math.abs(d.variacao_pct)) + ' vs. Período Anterior';
                     varEl.style.color = d.variacao_pct >= 0 ? '#dc3545' : '#28a745';
                 }
 
@@ -220,7 +279,151 @@
 </script>
     
     <div style="padding: 20px 40px; text-align: right;">
-        <button onclick="salvarRelatorio()" style="padding: 12px 24px; background: #0a1c3a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold;">💾 Salvar Relatório</button>
+        <button onclick="salvarRelatorio()" style="padding: 12px 24px; background: #0a1c3a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold;"> Salvar Relatório</button>
     </div>
+
+    <script id="interceptar_historico">
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const historicoId = urlParams.get('historico_id');
+            
+            if (historicoId) {
+                const originalFetch = window.fetch;
+                window.fetch = function(url, options) {
+                    if (url.includes('/api/relatorio_v2/')) {
+                        return originalFetch(`/historico_centro_custos/${historicoId}`, options)
+                            .then(res => res.json())
+                            .then(data => {
+                                const dados = data.dados ? data.dados : data;
+                                const centros = dados.centros || [];
+                                const centrosAnt = dados.centros_anterior || [];
+
+                                const totalAtual = centros.reduce((acc, c) => acc + c.valor, 0);
+                                const totalAnterior = centrosAnt.reduce((acc, c) => acc + c.valor, 0);
+
+                                const variacao = totalAtual - totalAnterior;
+                                const variacao_pct = totalAnterior > 0 ? (variacao / totalAnterior) * 100 : 0;
+
+                                let maiorCentro = { nome: "Nenhum", valor: 0 };
+                                if (centros.length > 0) {
+                                    maiorCentro = centros.reduce((max, c) => c.valor > max.valor ? c : max, centros[0]);
+                                }
+
+                                // Retorna o JSON no formato exato que o HTML original espera
+                                const respostaFinal = {
+                                    atual: {
+                                        total: totalAtual,
+                                        media_mensal: totalAtual / 9, // Considerando 9 meses no gráfico
+                                        maior_centro: maiorCentro
+                                    },
+                                    anterior: {
+                                        total: totalAnterior,
+                                        media_mensal: totalAnterior / 9
+                                    },
+                                    variacao_pct: variacao_pct,
+                                    centros: centros,
+                                    centros_anterior: centrosAnt
+                                };
+
+                                return new Response(JSON.stringify(respostaFinal), { 
+                                    headers: { 'Content-Type': 'application/json' } 
+                                });
+                            });
+                    }
+                    return originalFetch(url, options);
+                };
+            }
+        })();
+    </script>
+
+
+    <script id="fix_relatorio_pdf">
+        (function() {
+            // A. Remove textos que sejam lixo (caracteres estranhos)
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while(node = walker.nextNode()) {
+                if (node.nodeValue && /[-ÿ]{5,}/.test(node.nodeValue)) {
+                    node.nodeValue = ''; // Limpa o texto corrompido
+                }
+            }
+
+            // B. Injeta o CSS de impressão forçado
+            const style = document.createElement('style');
+            style.innerHTML = `
+                @media print {
+                    /* Esconde botões, ícones quebrados e menus */
+                    button, .btn, .no-print, i, .fa, .fas, .far, .material-icons, [class*="icon"] {
+                        display: none !important;
+                    }
+                    
+                    /* Força a grade 2x2 nos cards do sumário */
+                    .cards-grid, .grid-kpis, .cards-container, .d-flex, .row {
+                        display: grid !important;
+                        grid-template-columns: 1fr 1fr !important;
+                        gap: 20px !important;
+                        page-break-inside: avoid !important;
+                    }
+
+                    /* Garante que os cards não vazem */
+                    .card, .kpi-card {
+                        width: 100% !important;
+                        box-sizing: border-box !important;
+                        padding: 15px !important;
+                        page-break-inside: avoid !important;
+                    }
+
+                    /* Corrige o tamanho da fonte dos valores */
+                    .card-value, .kpi-value {
+                        font-size: 18px !important;
+                        white-space: nowrap !important;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+
+            // C. Injeta o espião para puxar os dados do histórico (se houver)
+            const urlParams = new URLSearchParams(window.location.search);
+            const historicoId = urlParams.get('historico_id');
+            
+            if (historicoId) {
+                const originalFetch = window.fetch;
+                window.fetch = function(url, options) {
+                    if (url.includes('/api/relatorio_v2/')) {
+                        return originalFetch(`/historico_centro_custos/${historicoId}`, options)
+                            .then(res => res.json())
+                            .then(data => {
+                                const dados = data.dados ? data.dados : data;
+                                const centros = dados.centros || [];
+                                const centrosAnt = dados.centros_anterior || [];
+
+                                const totalAtual = centros.reduce((acc, c) => acc + c.valor, 0);
+                                const totalAnterior = centrosAnt.reduce((acc, c) => acc + c.valor, 0);
+                                const variacao_pct = totalAnterior > 0 ? ((totalAtual - totalAnterior) / totalAnterior) * 100 : 0;
+                                
+                                let maiorCentro = { nome: "Nenhum", valor: 0 };
+                                if (centros.length > 0) {
+                                    maiorCentro = centros.reduce((max, c) => c.valor > max.valor ? c : max, centros[0]);
+                                }
+
+                                const respostaFinal = {
+                                    atual: { total: totalAtual, media_mensal: totalAtual / 9, maior_centro: maiorCentro },
+                                    anterior: { total: totalAnterior, media_mensal: totalAnterior / 9 },
+                                    variacao_pct: variacao_pct,
+                                    centros: centros,
+                                    centros_anterior: centrosAnt
+                                };
+
+                                return new Response(JSON.stringify(respostaFinal), { 
+                                    headers: { 'Content-Type': 'application/json' } 
+                                });
+                            });
+                    }
+                    return originalFetch(url, options);
+                };
+            }
+        })();
+    </script>
+
 </body>
 </html>

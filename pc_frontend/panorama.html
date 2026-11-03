@@ -29,6 +29,18 @@
         .card-indicador .label { font-size: 13px; color: #003366; margin-top: 5px; }
         .footer { border-top: 1px solid #ddd; padding-top: 15px; font-size: 12px; color: #777; display: flex; justify-content: space-between; font-style: italic; }
         #lista-historico { list-style: none; padding: 0; }
+    
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            color: white;
+        }
     </style>
     <style id="estilo-voltar-laranja">
         .btn-voltar-laranja {
@@ -44,22 +56,112 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
             cursor: pointer !important;
         }
+    
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            color: white;
+        }
     </style>
+
+    <style>
+        @media print {
+            /* Esconde os botões de ação, filtros e a barra lateral de histórico */
+            .actions, 
+            .filters, 
+            .historico-box,
+            .btn-voltar,
+            .btn-exibir,
+            .btn-excluir,
+            .btn-pdf,
+            .btn-salvar,
+            #lista-historico,
+            button {
+                display: none !important;
+            }
+
+            /* Ajusta o layout principal para ocupar a folha inteira A4 */
+            body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .container, .main-content, .layout {
+                display: block !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+
+            /* Garante que os cards fiquem alinhados em grade */
+            .cards-grid, .dashboard-cards, .row {
+                display: grid !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 20px !important;
+                margin-top: 20px !important;
+            }
+
+            /* Dá um visual limpo para os cards no papel */
+            .card {
+                background: #f8fafc !important;
+                border: 1px solid #e2e8f0 !important;
+                border-radius: 8px !important;
+                padding: 20px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Adiciona um título elegante no topo do PDF */
+            .container::before {
+                content: "Relatório de Panorama - Resultados Gerais";
+                display: block;
+                font-size: 24px;
+                font-weight: bold;
+                color: #1a202c;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #3182ce;
+            }
+        }
+    
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            color: white;
+        }
+    </style>
+    
 </head>
 <body>
     <div class="top-bar">
-        <a href="/" class="btn-voltar-laranja btn btn-voltar">&#8592; Voltar</a>
-        <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
-        <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
-        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
-        <button class="btn btn-salvar" id="btn-confirmar" onclick="salvarPanorama()" style="display:none;">Confirmar e Salvar</button>
+        <a href="/" class="btn" style="background:#ed8936; text-decoration:none; display:inline-block; padding:8px 15px; border-radius:6px; font-weight:bold; color:#fff; font-size:14px;">← Voltar</a>
+        <button class="btn" style="background:#38a169;" onclick="if(typeof exibirSelecionado === 'function') exibirSelecionado()">Exibir Selecionado</button>
+        <button class="btn" style="background:#e53e3e;" onclick="if(typeof excluirSelecionado === 'function') excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-pdf" onclick="gerarPDFPanorama()">Gerar PDF</button>
+        <button class="btn" style="background:#38a169;" onclick="if(typeof salvarPanorama === 'function') salvarPanorama()">Confirmar e Salvar</button>
     </div>
     <div class="filtros-bar">
         <div class="form-group"><label>Ano:</label><select id="ano"><option value="2026">2026</option><option value="2025">2025</option></select></div>
         <div class="form-group"><label>Tipo:</label><select id="tipo_periodo" onchange="ajustarPeriodo()"><option value="MES">Mensal</option><option value="TRIMESTRE" selected>Trimestral</option><option value="ANO">Exercício</option></select></div>
         <div class="form-group" id="group-mes" style="display:none;"><label>Mês:</label><select id="mes"><option value="01">01 - Janeiro</option><option value="02">02 - Fevereiro</option><option value="03">03 - Março</option><option value="04">04 - Abril</option><option value="05">05 - Maio</option><option value="06">06 - Junho</option><option value="07">07 - Julho</option><option value="08">08 - Agosto</option><option value="09">09 - Setembro</option><option value="10">10 - Outubro</option><option value="11">11 - Novembro</option><option value="12">12 - Dezembro</option></select></div>
         <div class="form-group" id="group-trimestre"><label>Trimestre:</label><select id="trimestre"><option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3" selected>3º Trimestre</option><option value="4">4º Trimestre</option></select></div>
-        <button class="btn btn-pdf" onclick="carregarPanorama()">Verificar</button>
+        <button class="btn btn-pdf" >Verificar</button>
     </div>
     <div class="flex-layout">
         <div class="sidebar">
@@ -203,10 +305,19 @@
             selecionados.forEach(check => { promessas.push(fetch("/excluir_panorama/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false)); });
             Promise.all(promessas).then(resultados => { if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); } });
         }
+        let isGeneratingPDF = false;
         function gerarPDF() {
+            if (isGeneratingPDF) return; // Evita dupla execução
+            isGeneratingPDF = true;
+            setTimeout(() => isGeneratingPDF = false, 2000); // Destrava após 2 segundos
+
             const check = document.querySelector(".check-historico:checked");
-            if (!check) { alert("Marque um relatório no histórico!"); return; }
-            window.open('/api/panorama/gerar_pdf_panorama_v2/' + check.value, '_blank');
+            if (!check) { 
+                return; 
+            }
+            
+            const url = `/gerar_pdf_panorama/${check.value}`;
+            window.open(url, '_blank');
         }
         document.addEventListener("DOMContentLoaded", () => { ajustarPeriodo(); carregarPanorama(); carregarHistorico(); });
     </script>
@@ -256,5 +367,65 @@
     })();
     // === FIM INTERCEPTOR ===
 </script>
+
+    
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const historicoId = urlParams.get('historico_id');
+            
+            if (historicoId) {
+                console.log("[DEBUG] Lendo Panorama do Histórico ID:", historicoId);
+                try {
+                    const res = await fetch(`/historico_panorama/${historicoId}`);
+                    const data = await res.json();
+                    
+                    if (data.ok && data.dados) {
+                        // Chama a função que já existe na tela para desenhar os dados
+                        if (typeof aplicarValores === 'function') {
+                            aplicarValores(data.dados);
+                            
+                            // Atualiza o título do período na tela (opcional, mas deixa o PDF bonito)
+                            const titulo = document.getElementById("periodo-titulo");
+                            if(titulo && data.periodo) {
+                                titulo.innerText = "Histórico: " + data.periodo;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erro ao carregar dados do histórico:", e);
+                }
+            }
+        });
+    </script>
+
+
+    
+
+
+    
+
+
+    
+
+
+    
+
+
+    
+
+
+    <script>
+        function gerarPDFPanorama() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) {
+                return;
+            }
+            window.open(`/gerar_pdf_panorama/${check.value}`, '_blank');
+        }
+    </script>
+
 </body>
 </html>
