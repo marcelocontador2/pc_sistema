@@ -198,6 +198,7 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
             <option value="DVP">DVP</option>
             <option value="DMPL">DMPL</option>
             <option value="CENTRO_CUSTOS">Centro de Custos</option>
+            <option value="COMPARATIVO_RECEITAS">Comparativo de Receitas</option>
           </select>
         </div>
         <div style="margin-bottom: 20px;">
@@ -751,6 +752,26 @@ document.addEventListener("DOMContentLoaded", function() {
     }, 1500); // Espera um pouco mais que o script anterior (1000ms) para garantir a ordem
 });
 </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    setTimeout(function() {
+        const submenuAnalises = document.getElementById('submenu-analises');
+        if (submenuAnalises) {
+            if (!submenuAnalises.textContent.includes('Comparativo de Receitas')) {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = '/analise_comparativo_receitas';
+                a.textContent = 'Comparativo de Receitas';
+                a.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;';
+                li.appendChild(a);
+                submenuAnalises.appendChild(li);
+            }
+        }
+    }, 2000); // Espera um pouco mais para garantir que o menu anterior já foi criado
+});
+</script>
 </body>
 </html>
+
 

@@ -1,0 +1,174 @@
+﻿html = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Comparativo de Receitas</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #2d3748; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .header { border-bottom: 2px solid #0a1c3a; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { color: #0a1c3a; margin: 0; font-size: 22px; }
+        
+        .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 14px; text-decoration: none; display: inline-block; }
+        .btn-voltar { background-color: #ff8c00; color: white; }
+        .btn-exibir { background-color: #28a745; color: white; }
+        .btn-excluir { background-color: #dc3545; color: white; }
+        .btn-pdf { background-color: #0d6efd; color: white; }
+        .btn-salvar { background-color: #28a745; color: white; }
+        
+        .filtros { display: flex; gap: 15px; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .filtros label { font-weight: 600; font-size: 14px; }
+        .filtros select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        .btn-verificar { background-color: #0d6efd; color: white; padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        
+        .historico-panel { background: #f9f9f9; border: 1px solid #e2e8f0; border-radius: 5px; padding: 15px; margin-bottom: 20px; }
+        .historico-panel h3 { margin-top: 0; color: #0a1c3a; font-size: 16px; }
+        .historico-item { display: block; padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .historico-item:hover { background: #eef4f9; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #eef4f9; color: #0a1c3a; font-weight: 600; }
+        tr:hover { background-color: #f9f9f9; }
+        .total-row td { font-weight: bold; background-color: #e6f0fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Comparativo de Receitas</h1>
+            <p>Apuração consolidada 12 meses</p>
+        </div>
+
+        <div class="toolbar">
+            <a href="/" class="btn btn-voltar">← Voltar</a>
+            <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+            <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+            <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+            <button class="btn btn-salvar" onclick="salvar()">Confirmar e Salvar</button>
+        </div>
+
+        <div class="filtros">
+            <label>Ano:</label>
+            <select id="filtro-ano"><option value="2026">2026</option><option value="2025">2025</option></select>
+            <label>Tipo:</label>
+            <select id="filtro-tipo"><option value="TRIMESTRE">Trimestral</option><option value="MES">Mensal</option></select>
+            <label>Trimestre:</label>
+            <select id="filtro-trimestre"><option value="1">1º</option><option value="2">2º</option><option value="3" selected>3º</option><option value="4">4º</option></select>
+            <button class="btn-verificar" onclick="verificar()">Verificar</button>
+        </div>
+
+        <div class="historico-panel">
+            <h3>Histórico Salvo</h3>
+            <div id="historico-lista">Carregando...</div>
+        </div>
+
+        <div id="tabela-container">
+            <div style="text-align: center; padding: 20px; color: #888;">Clique em "Verificar" para carregar os dados.</div>
+        </div>
+    </div>
+
+    <script>
+        let dadosAtuais = null;
+        function fmt(v) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+        document.addEventListener('DOMContentLoaded', function() { carregarHistorico(); });
+
+        async function carregarHistorico() {
+            try {
+                const r = await fetch('/historico_comparativo_receitas?_t=' + Date.now(), { cache: 'no-store' });
+                const data = await r.json();
+                const lista = document.getElementById('historico-lista');
+                if (!data || data.length === 0) { lista.innerHTML = '<div style="padding: 10px; color: #888;">Nenhum histórico.</div>'; return; }
+                let html = '';
+                data.forEach(item => {
+                    html += '<label class="historico-item"><input type="checkbox" class="check-historico" value="' + item.id + '"> <strong>' + item.periodo + '</strong> <span style="font-size: 11px; color: #888;">' + item.data_geracao + '</span></label>';
+                });
+                lista.innerHTML = html;
+            } catch (e) { console.error(e); }
+        }
+
+        async function verificar() {
+            const ano = document.getElementById('filtro-ano').value;
+            const tipo = document.getElementById('filtro-tipo').value;
+            const trimestre = document.getElementById('filtro-trimestre').value;
+            const periodo = `${ano}-${tipo}-${trimestre}`;
+            try {
+                document.getElementById('tabela-container').innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Verificando...</div>';
+                const r = await fetch(`/api/comparativo_receitas/${periodo}?_t=${Date.now()}`, { cache: 'no-store' });
+                const d = await r.json();
+                if (d.erro) { document.getElementById('tabela-container').innerHTML = '<div style="color: red; text-align: center; padding: 20px;">' + d.mensagem + '</div>'; return; }
+                dadosAtuais = d;
+                renderizarTabela(d);
+            } catch (e) { console.error(e); }
+        }
+
+        function renderizarTabela(d) {
+            let html = '<table><thead><tr><th>Centro de Receita</th><th>Valor (R$)</th><th>% do Total</th></tr></thead><tbody>';
+            let total = 0;
+            d.receitas.forEach(c => { total += c.valor; });
+            d.receitas.forEach(c => {
+                const pct = total > 0 ? (c.valor / total) * 100 : 0;
+                html += `<tr><td>${c.nome}</td><td>${fmt(c.valor)}</td><td>${fmt(pct)}%</td></tr>`;
+            });
+            html += `<tr class="total-row"><td>TOTAL</td><td>${fmt(total)}</td><td>100%</td></tr></tbody></table>`;
+            document.getElementById('tabela-container').innerHTML = html;
+        }
+
+        async function salvar() {
+            if (!dadosAtuais) { alert('Clique em "Verificar" antes de salvar.'); return; }
+            const ano = document.getElementById('filtro-ano').value;
+            const tipo = document.getElementById('filtro-tipo').value;
+            const trimestre = document.getElementById('filtro-trimestre').value;
+            const periodo = `${ano}-${tipo}-${trimestre}`;
+            try {
+                const r = await fetch('/salvar_comparativo_receitas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ periodo: periodo, dados: dadosAtuais })
+                });
+                const res = await r.json();
+                if (res.ok) { alert('Salvo com sucesso!'); carregarHistorico(); }
+                else { alert('Erro ao salvar.'); }
+            } catch (e) { console.error(e); }
+        }
+
+        async function exibirSelecionado() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert('Selecione um item no histórico.'); return; }
+            const r = await fetch('/historico_comparativo_receitas/' + check.value);
+            const d = await r.json();
+            if (d.dados) { dadosAtuais = d.dados; renderizarTabela(d.dados); }
+        }
+
+        async function excluirSelecionado() {
+            const checks = document.querySelectorAll('.check-historico:checked');
+            if (checks.length === 0) { alert('Selecione pelo menos um item.'); return; }
+            if (!confirm('Excluir ' + checks.length + ' relatório(s)?')) return;
+            const ids = Array.from(checks).map(c => parseInt(c.value));
+            try {
+                const r = await fetch('/excluir_multiplos_comparativo_receitas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: ids })
+                });
+                const res = await r.json();
+                if (res.ok) { alert('Excluídos ' + res.excluidos + ' relatório(s).'); carregarHistorico(); }
+                else { alert('Erro ao excluir.'); }
+            } catch (e) { console.error(e); }
+        }
+
+        function gerarPDF() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert('Selecione um item no histórico para gerar o PDF.'); return; }
+            window.open('/relatorio_comparativo_receitas?periodo_atual=' + encodeURIComponent(check.parentElement.querySelector('strong').innerText), '_blank');
+        }
+    </script>
+</body>
+</html>
+"""
+with open('../pc_frontend/analise_comparativo_receitas.html', 'w', encoding='utf-8') as f:
+    f.write(html)
+print("[OK] Tela analise_comparativo_receitas.html criada!")
