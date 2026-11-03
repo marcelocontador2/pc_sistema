@@ -282,21 +282,14 @@
                 }
             });        }
 
-        function gerarPDFHistorico() {
-            const sel = document.querySelector('input[name="historico"]:checked');
-            if (!sel) {
-                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
-                return;
-            }
-            const url = `/gerar_pdf_analise_financeira_bf?historico_id=${sel.value}`;
-            const a = document.createElement('a');
-            a.href = url;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+        
     
+    
+        
+
+    
+        
+
     </script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
@@ -328,7 +321,7 @@ tr:nth-child(even){background:#f8fbff}
 <a href="/" class="btn" style="background:#ff7f00">&#8592; Voltar</a>
 <button class="btn" style="background:#28a745" onclick="exibirSelecionado()">Exibir</button>
 <button class="btn" style="background:#dc3545" onclick="excluirSelecionado()">Excluir</button>
-<button class="btn" style="background:#0056b3" onclick="gerarPDFHistorico()">Gerar PDF</button>
+<button id="btn-pdf-unico" style="background:#3182ce; color:white; padding:8px 16px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Gerar PDF</button>
 </div>
 <div class="hdr-sub">Análise Financeira</div>
 <div class="hdr-tit">Balanço Financeiro Comparativo</div>
@@ -863,4 +856,50 @@ function exibirSelecionado() {
             });
         }
 </script>
+
+    
+
+
+    
+
+
+    
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const btnPdf = document.getElementById('btn-pdf-unico');
+            
+            if (btnPdf) {
+                btnPdf.addEventListener('click', function() {
+                    const sel = document.querySelector('input[type="checkbox"]:checked') || 
+                                document.querySelector('input[type="radio"]:checked');
+                    
+                    if (!sel) {
+                        alert("Atenção: Selecione um item do Histórico Salvo (marque a caixinha) antes de gerar o PDF.");
+                        return;
+                    }
+                    
+                    let id = sel.value;
+                    if (!id || id === "on") {
+                        id = sel.id.replace('check-', '').replace('hist-', '');
+                        if (!id) id = sel.getAttribute('data-id');
+                    }
+                    
+                    // ROTA CORRETA: O ID vai no path da URL, não como query string
+                    const url = `/gerar_pdf_analise_financeira_bf/${id}`;
+                    console.log("[DEBUG] Abrindo PDF com ID no path:", url);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+                console.log("[DEBUG] Botão PDF configurado para a rota correta!");
+            }
+        });
+    </script>
+
 </body></html>

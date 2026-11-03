@@ -1,6 +1,33 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+
+        <script id="ler_url_integridade">
+            document.addEventListener('DOMContentLoaded', function() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const checkId = urlParams.get('check');
+                
+                if (checkId) {
+                    console.log("Lendo integridade do ID:", checkId);
+                    fetch(`/historico_integridade?_t=${Date.now()}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            const item = data.find(x => x.id == checkId);
+                            if (item) {
+                                // Tenta chamar a função de renderização da tela
+                                if (typeof carregarDados === 'function') {
+                                    carregarDados(item);
+                                } else if (typeof renderizar === 'function') {
+                                    renderizar(item);
+                                } else {
+                                    console.log("Dados do histórico carregados, mas função de render não encontrada.");
+                                }
+                            }
+                        });
+                }
+            });
+        </script>
+        
     <meta charset="UTF-8">
     <title>Integridade entre Demonstrações</title>
     <style>
