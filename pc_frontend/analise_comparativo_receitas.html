@@ -268,38 +268,34 @@
         }
 
 
-        function gerarPDF() {
-            const sel = document.querySelector('input[name="historico"]:checked');
-            let periodo = "";
-            
-            // Tenta pegar o período do Histórico selecionado
-            if (sel) {
-                const span = sel.nextElementSibling;
-                if (span) {
-                    const texto = span.innerText;
-                    const partes = texto.split('|');
-                    if (partes.length > 0) {
-                        periodo = partes[0].replace('Período:', '').trim();
-                    }
-                }
-            }
-            
-            // Se não achou no histórico, pega dos filtros do topo
-            if (!periodo) {
-                const ano = document.getElementById('ano').value;
-                const tipo = document.getElementById('tipo').value;
-                const valor = document.getElementById('valor').value;
-                periodo = `${ano}-${tipo}-${valor}`;
-            }
-            
-            // Chama a rota
-            window.open(`/gerar_pdf_comparativo_receitas?historico_id=${sel.value}`, '_blank');
-        }
+        
         
         document.addEventListener('DOMContentLoaded', () => {
             carregarHistorico();
             carregarDados();
         });
+    
+        
+    
+    
+        function gerarPDF() {
+            const sel = document.querySelector('input[name="historico"]:checked');
+            if (!sel) {
+                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
+                return;
+            }
+            
+            const url = `/gerar_pdf_comparativo_receitas?historico_id=${sel.value}`;
+            
+            // Cria um link temporário para abrir em nova aba
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    
     </script>
 </body>
 </html>

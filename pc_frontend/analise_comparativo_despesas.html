@@ -78,7 +78,7 @@
             <button class="btn btn-voltar" onclick="window.location.href='/'">← Voltar</button>
             <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
             <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
-            <button class="btn btn-pdf" onclick="window.print()">Gerar PDF</button>
+            <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
             <button class="btn btn-salvar" onclick="salvarAtual()">Confirmar e Salvar</button>
         </div>
 
@@ -284,10 +284,38 @@
         }
 
         // Inicialização
+
+        
+        
         document.addEventListener('DOMContentLoaded', () => {
             carregarHistorico();
             carregarDados(); // Já carrega os dados visuais ao abrir a tela
         });
+    
+        
+
+    
+        
+    
+    
+        function gerarPDF() {
+            const sel = document.querySelector('input[name="historico"]:checked');
+            if (!sel) {
+                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
+                return;
+            }
+            
+            const url = `/gerar_pdf_comparativo_despesas?historico_id=${sel.value}`;
+            
+            // Cria um link temporário para abrir em nova aba
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    
     </script>
 </body>
 </html>

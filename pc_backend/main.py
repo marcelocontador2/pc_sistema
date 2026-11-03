@@ -4165,6 +4165,32 @@ def serve_analise_comparativo_despesas():
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
     return HTMLResponse(content="<h1>Tela não encontrada</h1>", status_code=404)
 
+
+@app.get("/gerar_pdf_conferencia/{check_id}")
+def gerar_pdf_conferencia(check_id: str):
+    from playwright.sync_api import sync_playwright
+    from fastapi.responses import Response
+    import time
+    
+    # Abre a tela de conferência com o ID passado
+    url = f"http://127.0.0.1:9994/conferencia_nova?check={check_id}&_t={int(time.time())}"
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        context = browser.new_context(bypass_csp=True)
+        page = context.new_page()
+        page.goto(url, wait_until="networkidle")
+        page.wait_for_timeout(2000)
+        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+        browser.close()
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=conferencia_{check_id}.pdf"}
+    )
+
+
 @app.get("/gerar_pdf_comparativo_despesas")
 def gerar_pdf_comparativo_despesas(periodo_atual: str = "2026-TRIMESTRE-3"):
     from playwright.sync_api import sync_playwright

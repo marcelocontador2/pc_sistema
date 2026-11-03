@@ -3,7 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <title>Análise Patrimonial</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js">
+        function gerarPDFHistorico() {
+            const sel = document.querySelector('input[name="historico"]:checked');
+            if (!sel) {
+                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
+                return;
+            }
+            const url = `/gerar_pdf_analise_patrimonial?historico_id=${sel.value}`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    
+    </script>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; color: #333; margin: 0; padding: 20px; }
         .top-bar { margin-bottom: 20px; display: flex; gap: 10px; }
@@ -34,7 +50,7 @@
         <button class="btn btn-voltar" onclick="window.location.href='/'">← Voltar</button>
         <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
-        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn btn-pdf" onclick="gerarPDFHistorico()">Gerar PDF</button>
     </div>
     <div style="margin-bottom: 20px;">
         <div style="color: #a0aec0; font-size: 12px; text-transform: uppercase;">Análise Patrimonial</div>
