@@ -8,24 +8,32 @@
         .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 24px; margin-bottom: 5px; color: #1a202c; }
         .subtitle { color: #718096; margin-bottom: 20px; font-size: 14px; }
-        .actions { display: flex; gap: 10px; margin-bottom: 20px; }
+        .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; color: #fff; font-weight: bold; font-size: 14px; }
         .btn-voltar { background: #ed8936; }
-        .btn-verificar { background: #3182ce; }
+        .btn-exibir { background: #38a169; }
+        .btn-excluir { background: #e53e3e; }
         .btn-pdf { background: #3182ce; }
+        .btn-salvar { background: #38a169; }
+        .btn-verificar { background: #3182ce; }
         .filters { display: flex; gap: 10px; align-items: center; background: #f7fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
         .filters label { font-size: 14px; font-weight: 600; }
         .filters select { padding: 6px; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .historico-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; margin-bottom: 20px; }
+        .historico-box h3 { font-size: 14px; color: #4a5568; margin-bottom: 10px; text-transform: uppercase; }
+        .historico-box ul { list-style: none; padding: 0; margin: 0; }
+        .historico-box li { padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 14px; display: flex; align-items: center; gap: 10px; }
         .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .card { background: #f8fafc; border-left: 4px solid #3182ce; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .card-title { font-size: 12px; font-weight: bold; color: #4a5568; text-transform: uppercase; margin-bottom: 5px; }
         .card-value { font-size: 22px; font-weight: bold; color: #1a202c; }
         .card-sub { font-size: 12px; color: #718096; margin-top: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        th { background: #edf2f7; font-weight: bold; color: #2d3748; font-size: 13px; text-transform: uppercase; }
+        table.data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        table.data-table th, table.data-table td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        table.data-table th { background: #edf2f7; font-weight: bold; color: #2d3748; font-size: 13px; text-transform: uppercase; }
         .text-right { text-align: right; }
         .total-row td { font-weight: bold; background: #f7fafc; }
+        .loading { color: #718096; font-size: 14px; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
@@ -35,7 +43,15 @@
 
         <div class="actions">
             <button class="btn btn-voltar" onclick="window.location.href='/'">← Voltar</button>
+            <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+            <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
             <button class="btn btn-pdf" onclick="window.print()">Gerar PDF</button>
+            <button class="btn btn-salvar" onclick="salvarAtual()">Confirmar e Salvar</button>
+        </div>
+
+        <div class="historico-box">
+            <h3>Histórico Salvo</h3>
+            <div id="historico-lista" class="loading">Carregando histórico...</div>
         </div>
 
         <div class="filters">
@@ -70,6 +86,8 @@
     </div>
 
     <script>
+        let dadosAtuais = null;
+
         function fmt(v) {
             if (v === undefined || v === null || isNaN(v)) return '0,00';
             return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -99,7 +117,7 @@
             const grupos = gruposAt.filter(g => (g.empenhado || 0) > 0 || (g.orcado || 0) > 0);
             const totalAtual = grupos.reduce((acc, g) => acc + (g.empenhado || 0), 0);
             
-            let html = '<table><thead><tr><th>Grupo de Despesa</th><th class="text-right">Período Atual (R$)</th><th class="text-right">Período Anterior (R$)</th><th class="text-right">Variação (R$)</th><th class="text-right">Variação (%)</th></tr></thead><tbody>';
+            let html = '<table class="data-table"><thead><tr><th>Grupo de Despesa</th><th class="text-right">Período Atual (R$)</th><th class="text-right">Período Anterior (R$)</th><th class="text-right">Variação (R$)</th><th class="text-right">Variação (%)</th></tr></thead><tbody>';
             
             grupos.forEach(g => {
                 const anGrupo = gruposAn.find(x => x.nome === g.nome);
@@ -143,6 +161,8 @@
                 const res = await fetch(`/api/comparativo_despesas_v2/${periodo}?_t=${Date.now()}`);
                 const data = await res.json();
                 if (data.erro) { alert("Aviso: " + data.mensagem); return; }
+                
+                dadosAtuais = data;
                 atualizarCards(data);
                 renderizarTabela(data);
             } catch (e) {
@@ -150,6 +170,78 @@
                 alert("Falha ao carregar os dados.");
             }
         }
+
+        async function salvarAtual() {
+            if (!dadosAtuais) { alert("Clique em Verificar antes de salvar."); return; }
+            const periodo = dadosAtuais.periodo_atual;
+            try {
+                const res = await fetch(`/api/comparativo_despesas_v2/${periodo}/salvar`, { method: 'POST' });
+                const data = await res.json();
+                if (data.erro) { alert(data.mensagem); return; }
+                alert("Salvo com sucesso!");
+                carregarHistorico();
+            } catch (e) {
+                alert("Erro ao salvar.");
+            }
+        }
+
+        async function carregarHistorico() {
+            try {
+                const res = await fetch(`/historico_comparativo_despesas?_t=${Date.now()}`);
+                const data = await res.json();
+                const div = document.getElementById('historico-lista');
+                if (data.length === 0) {
+                    div.innerHTML = '<p style="color:#718096;font-size:13px;">Nenhum histórico.</p>';
+                    return;
+                }
+                let html = '<ul>';
+                data.forEach(item => {
+                    html += `<li>
+                        <input type="radio" name="historico" value="${item.id}">
+                        <span><b>Período:</b> ${item.periodo} | <b>Gerado em:</b> ${item.data_geracao}</span>
+                    </li>`;
+                });
+                html += '</ul>';
+                div.innerHTML = html;
+            } catch (e) {
+                document.getElementById('historico-lista').innerHTML = 'Erro ao carregar.';
+            }
+        }
+
+        async function exibirSelecionado() {
+            const sel = document.querySelector('input[name="historico"]:checked');
+            if (!sel) { alert("Selecione um histórico na lista."); return; }
+            
+            try {
+                const res = await fetch(`/historico_comparativo_despesas/${sel.value}`);
+                const data = await res.json();
+                if (data.ok) {
+                    dadosAtuais = data.dados;
+                    atualizarCards(data.dados);
+                    renderizarTabela(data.dados);
+                } else {
+                    alert("Erro ao carregar o histórico.");
+                }
+            } catch (e) {
+                alert("Erro de conexão.");
+            }
+        }
+
+        async function excluirSelecionado() {
+            const sel = document.querySelector('input[name="historico"]:checked');
+            if (!sel) { alert("Selecione um histórico na lista."); return; }
+            if (!confirm("Tem certeza que deseja excluir este histórico?")) return;
+            
+            try {
+                await fetch(`/historico_comparativo_despesas/${sel.value}`, { method: 'DELETE' });
+                carregarHistorico();
+            } catch (e) {
+                alert("Erro ao excluir.");
+            }
+        }
+
+        // Carrega o histórico ao abrir a página
+        document.addEventListener('DOMContentLoaded', carregarHistorico);
     </script>
 </body>
 </html>

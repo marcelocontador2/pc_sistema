@@ -4177,3 +4177,39 @@ def serve_relatorio_comparativo_despesas():
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
     return HTMLResponse(content="<h1>Relatório não encontrado</h1>", status_code=404)
+
+
+# ========== ROTAS DE HISTÓRICO DESPESAS (FORÇADAS) ==========
+@app.post("/api/comparativo_despesas_v2/{periodo_atual}/salvar")
+def rota_salvar_comparativo_despesas(periodo_atual: str):
+    import sqlite3, os, json
+    from datetime import datetime
+    
+    dados = api_comparativo_despesas_v2(periodo_atual)
+    if dados.get("erro"): return {"erro": True, "mensagem": dados.get("mensagem")}
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_despesas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
+        
+    data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
+    dados_json = json.dumps(dados)
+    
+    cur.execute("INSERT INTO historico_comparativo_despesas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo_atual, data_geracao, dados_json))
+    conn.commit()
+    conn.close()
+    return {"erro": False, "mensagem": "Salvo com sucesso!"}
+
+@app.delete("/historico_comparativo_despesas/{id}")
+def rota_excluir_comparativo_despesas(id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM historico_comparativo_despesas WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"erro": False}
+# ============================================================
