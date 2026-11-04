@@ -1,4 +1,4 @@
-from fastapi import Request, FastAPI, Request
+from fastapi import Request, Request, FastAPI, Request
 from historico_integridade import router as historico_router
 from fastapi import FastAPI
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
@@ -1235,24 +1235,46 @@ async def api_integridade_matriz_calcular(periodo: str):
     except Exception as e:
         return {"erro": "falha", "mensagem": str(e)}
 @app.post("/salvar_integridade_matriz/{periodo}")
-async def salvar_integridade_matriz(periodo: str):
-    try:
-        from matriz_integridade import gerar_matriz
-        dados = await gerar_matriz(periodo)
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+async def salvar_integridade_matriz(periodo: str, request: Request):
+    import sqlite3
+    import json
+    from datetime import datetime
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cursor.execute("INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", 
-                       (periodo, data_agora, json.dumps(dados)))
-        conn.commit()
-        conn.close()
-        return {"mensagem": "Matriz salva!", "dados": dados}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    try:
+        body = await request.json()
+        justificativas = body.get("justificativas", {})
+        matriz = body.get("matriz", [])
+    except Exception:
+        justificativas = {}
+        matriz = []
+
+    if not matriz:
+        return {"ok": False, "mensagem": "Matriz vazia. Clique em 'Verificar Matriz' antes de salvar."}
+
+    # Monta o JSON final com a matriz e as justificativas
+    dados_matriz = {
+        "matriz": matriz,
+        "justificativas": justificativas
+    }
+
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+
+    data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute(
+        "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+        (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
+    )
+    
+    conn.commit()
+    conn.close()
+
+    return {"ok": True, "mensagem": "Matriz e justificativas salvas com sucesso!"}
 @app.get("/historico_integridade_matriz")
 async def listar_integridade_matriz():
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -1331,50 +1353,77 @@ async def gerar_pdf_conferencia(id: int):
 # PDF da Integridade (Tabela historico_integridade_matriz)
 @app.get("/gerar_pdf_integridade_matriz/{id}")
 async def gerar_pdf_integridade_matriz(id: int):
+    import sqlite3, json, os
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+    from fastapi.responses import Response
+
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return Response(content="Historico nao encontrado.", status_code=404, media_type="text/plain")
+
+    periodo, data_geracao, res_json = row
     try:
-        from fastapi.responses import Response
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-        cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE id=?", (id,))
-        row = cur.fetchone(); conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-        periodo, data_geracao, json_str = row
-        d = json.loads(json_str)
-        matriz = d.get("matriz", [])
-        # A3 PAISAGEM (420x297) para caber as 9 colunas com folga
-        pdf = FPDF(orientation="L", unit="mm", format="A3")
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
-        pdf.set_font("helvetica", "B", 18); pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 12, f"Matriz de Integridade - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.set_font("helvetica", "I", 11); pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 6, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.ln(6)
-        # Larguras proporcionais para A3 (util ~400mm)
-        # NOMENCLATURA 100, 7 colunas de 38 = 266, CONF 34 = 400 total
-        colunas = ["NOMENCLATURA", "BALANCETE", "BP", "BF", "BO", "DFC", "DVP", "DMPL", "CONF."]
-        larguras = [100, 38, 38, 38, 38, 38, 38, 38, 34]
-        pdf.set_font("helvetica", "B", 9)
-        pdf.set_fill_color(0, 86, 179); pdf.set_text_color(255, 255, 255)
-        for i, col in enumerate(colunas):
-            pdf.cell(larguras[i], 9, col, border=1, align="C", fill=True)
+        dados = json.loads(res_json)
+    except Exception:
+        dados = {}
+
+    matriz = dados.get("matriz", [])
+    justificativas = dados.get("justificativas", {})
+
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, "COFEN/BR - Matriz de Integridade", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 5, f"Periodo: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.ln(5)
+
+    # Cabecalhos da tabela
+    colunas = ["NOMENCLATURA", "BALANCETE", "BP", "BF", "BO", "DFC", "DVP", "DMPL", "CONFERENCIA"]
+    larguras = [60, 25, 25, 25, 25, 25, 25, 25, 25]
+
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_fill_color(0, 86, 179)
+    pdf.set_text_color(255, 255, 255)
+    for i, col in enumerate(colunas):
+        pdf.cell(larguras[i], 8, col, border=1, align="C", fill=True)
+    pdf.ln()
+
+    # Linhas da tabela
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 7)
+    for r in matriz:
+        pdf.cell(larguras[0], 6, str(r.get("item", ""))[:40], border=1, align="L")
+        pdf.cell(larguras[1], 6, str(r.get("balancete", "")), border=1, align="R")
+        pdf.cell(larguras[2], 6, str(r.get("bp", "")), border=1, align="R")
+        pdf.cell(larguras[3], 6, str(r.get("bf", "")), border=1, align="R")
+        pdf.cell(larguras[4], 6, str(r.get("bo", "")), border=1, align="R")
+        pdf.cell(larguras[5], 6, str(r.get("dfc", "")), border=1, align="R")
+        pdf.cell(larguras[6], 6, str(r.get("dvp", "")), border=1, align="R")
+        pdf.cell(larguras[7], 6, str(r.get("dmpl", "")), border=1, align="R")
+        pdf.cell(larguras[8], 6, str(r.get("conf", "")), border=1, align="C")
         pdf.ln()
-        pdf.set_font("helvetica", "", 8); pdf.set_text_color(0, 0, 0)
-        for linha in matriz:
-            pdf.cell(larguras[0], 7, str(linha.get('item', '')), border=1, align="L")
-            for key, index in zip(["balancete", "bp", "bf", "bo", "dfc", "dvp", "dmpl"], range(1, 8)):
-                pdf.cell(larguras[index], 7, str(linha.get(key, '-')), border=1, align="R")
-            conf = str(linha.get('conf', ''))
-            pdf.set_text_color(0, 128, 0) if conf == "OK" else pdf.set_text_color(255, 0, 0)
-            pdf.cell(larguras[8], 7, conf, border=1, align="C")
-            pdf.set_text_color(0, 0, 0)
-            pdf.ln()
-        pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=Integridade_{periodo}.pdf"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+    # Notas explicativas (apenas se houver)
+    if justificativas:
+        pdf.ln(10)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 8, "Notas Explicativas / Justificativas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 9)
+        for item, texto in justificativas.items():
+            if texto.strip():
+                pdf.multi_cell(0, 6, f"- {item}: {texto}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.ln(2)
+
+    pdf_bytes = bytes(pdf.output())
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Integridade_{periodo}.pdf"})
 @app.get("/api/analise_orcamentaria_bo/{periodo}")
 async def api_analise_orcamentaria_bo(periodo: str):
     try:
