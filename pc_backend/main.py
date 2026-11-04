@@ -28,7 +28,7 @@ def _corrigir_encoding(txt):
     if not txt: return ""
     try:
         # Tenta decodificar como latin-1 e re-codificar como utf-8
-        # Isso converte Ã§ -> ç, Ã£ -> ã, etc.
+        # Isso converte ç -> ç, ã -> ã, etc.
         s = txt.encode("latin-1", "ignore").decode("utf-8", "ignore")
         return s
     except:
@@ -100,11 +100,11 @@ async def post_configuracoes(config: dict):
     conn.close()
     return {"status": "ok", "configuracoes": config}
 # Router novo do Panorama (31/10/2026)
-# Servir arquivos estÃ¡ticos da pasta pc_frontend
+# Servir arquivos estáticos da pasta pc_frontend
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend")
 if os.path.exists(frontend_path):
     app.mount("/pc_frontend", StaticFiles(directory=frontend_path), name="pc_frontend")
-    print(f"âœ… Arquivos estÃ¡ticos montados em: {frontend_path}")
+    print(f"✅ Arquivos estáticos montados em: {frontend_path}")
 from fastapi.responses import HTMLResponse
 @app.get("/", response_class=HTMLResponse)
 def serve_frontend():
@@ -211,10 +211,27 @@ def _ler_csv(filepath, tipo=""):
         dados.append(clean_row)
     return dados
 # =======================================================
-# CONFIGURAÃ‡ÃƒO DO BANCO DE DADOS SQLITE
+# CONFIGURAÇÃO DO BANCO DE DADOS SQLITE
 # =======================================================
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+
+
+# === ROTA: Excluir relatorio CSV da pasta uploads_raw ===
+@app.delete("/api/excluir_relatorio/{nome_arquivo}")
+async def excluir_relatorio_csv(nome_arquivo: str):
+    # Seguranca: impede path traversal
+    if '..' in nome_arquivo or '/' in nome_arquivo or '\\' in nome_arquivo:
+        raise HTTPException(status_code=400, detail="Nome de arquivo invalido.")
+    caminho = os.path.join(UPLOAD_DIR, nome_arquivo)
+    if not os.path.exists(caminho):
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado: " + nome_arquivo)
+    try:
+        os.remove(caminho)
+        return {"ok": True, "mensagem": "Arquivo excluido: " + nome_arquivo}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Erro ao excluir: " + str(e))
+
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -248,7 +265,7 @@ def init_db():
 # Inicializa o banco na partida
 init_db()
 # =======================================================
-# ROTA DE UPLOAD (IMPORTAÃ‡ÃƒO)
+# ROTA DE UPLOAD (IMPORTAÇÃO)
 # =======================================================
 from fastapi import File, UploadFile, Form
 @app.get("/periodos_importados/{tipo_relatorio}")
@@ -293,15 +310,15 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             tipo_p = partes[1]
             valor_p = partes[2]
             if tipo_p == "MES":
-                meses = ["", "Janeiro", "Fevereiro", "MarÃ§o", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+                meses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
                 periodo_formatado = f"{meses[int(valor_p)]}/{ano}"
             elif tipo_p == "TRIMESTRE":
-                periodo_formatado = f"{valor_p}Âº Tri/{ano}"
+                periodo_formatado = f"{valor_p}º Tri/{ano}"
             else:
-                periodo_formatado = f"ExercÃ­cio {ano}"
+                periodo_formatado = f"Exercício {ano}"
         csv_path = _get_csv_por_tipo(tipo, periodo)
         if not csv_path:
-            raise HTTPException(status_code=404, detail=f"Arquivo CSV para {tipo} no perÃ­odo {periodo_formatado} nÃ£o encontrado.")
+            raise HTTPException(status_code=404, detail=f"Arquivo CSV para {tipo} no período {periodo_formatado} não encontrado.")
         # Leitura robusta: tenta utf-8-sig, depois latin-1 (que aceita qualquer byte)
         content = ""
         for enc in ["latin-1", "utf-8-sig"]:
@@ -312,9 +329,9 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             except:
                 continue
         
-        # Corrige caracteres corrompidos (ex: Ã§ -> ç, Ã£ -> ã)
+        # Corrige caracteres corrompidos (ex: ç -> ç, ã -> ã)
         content = content.replace("Ã§", "ç").replace("Ã£", "ã").replace("Ã¡", "á")
-        content = content.replace("Ã©", "é").replace("Ã­", "í").replace("Ã³", "ó")
+        content = content.replace("Ã©", "é").replace("Ã", "í").replace("Ã³", "ó")
         content = content.replace("Ãº", "ú").replace("Ã¢", "â").replace("Ãª", "ê")
         content = content.replace("Ã´", "ô").replace("Ãª", "ê").replace("Ã§", "ç")
         content = content.replace("Ãƒ", "Ã").replace("Ã‰", "É").replace("Ã“", "Ó")
@@ -353,11 +370,11 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             titulo_pdf = "Balancete Contábil"
         elif tipo == "BALANCO_PATRIMONIAL":
             col_w   = [85, 30, 85, 30, 0, 0]
-            headers = ["ESPECIFICACAO (ATIVO)", "ExercÃ­cio Atual", "ESPECIFICACAO (PASSIVO)", "ExercÃ­cio Atual", "", ""]
+            headers = ["ESPECIFICACAO (ATIVO)", "Exercício Atual", "ESPECIFICACAO (PASSIVO)", "Exercício Atual", "", ""]
             titulo_pdf = "Balanço Patrimonial"
         elif tipo == "BALANCO_FINANCEIRO":
             col_w   = [68, 28, 28, 68, 28, 28] 
-            headers = ["ESPECIFICACAO (INGRESSOS)", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "ESPECIFICACAO (DISPENDIOS)", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
+            headers = ["ESPECIFICACAO (INGRESSOS)", "Exercício Atual", "Exercício Anterior", "ESPECIFICACAO (DISPENDIOS)", "Exercício Atual", "Exercício Anterior"]
             titulo_pdf = "Balanço Financeiro"
         elif tipo == "BALANCO_ORCAMENTARIO":
             col_w   = [70, 32, 32, 34, 34, 34, 41]
@@ -370,19 +387,19 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 "RESERVAS DE CAPITAL", "AJUSTES DE AVALIACAO", "RESERVAS DE LUCROS", 
                 "DEMAIS RESERVAS", "RESULTADOS ACUMULADOS", "TOTAL"
             ]
-            titulo_pdf = "DemonstraÃ§Ã£o das MutaÃ§Ãµes do PatrimÃ´nio LÃ­quido"
+            titulo_pdf = "Demonstração das Mutações do Patrimônio Líquido"
         elif tipo == "DFC":
             col_w   = [160, 0, 0, 60, 57]
-            headers = ["ESPECIFICACAO", "", "", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
+            headers = ["ESPECIFICACAO", "", "", "Exercício Atual", "Exercício Anterior"]
             titulo_pdf = "Demonstração do Fluxo de Caixa"
         elif tipo == "DVP":
             # Layout DVP: Desc Ativa | Atual | Anterior | Desc Passiva | Atual | Anterior
             col_w   = [70, 25, 25, 70, 25, 25]
-            headers = ["VARIACOES AUMENTATIVAS", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "VARIACOES DIMINUTIVAS", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
+            headers = ["VARIACOES AUMENTATIVAS", "Exercício Atual", "Exercício Anterior", "VARIACOES DIMINUTIVAS", "Exercício Atual", "Exercício Anterior"]
             titulo_pdf = "Demonstração das Variações Patrimoniais"
         else:
             col_w   = [72, 30, 28, 72, 40, 35]
-            headers = ["ESPECIFICACAO", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "ESPECIFICACAO", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
+            headers = ["ESPECIFICACAO", "Exercício Atual", "Exercício Anterior", "ESPECIFICACAO", "Exercício Atual", "Exercício Anterior"]
             titulo_pdf = "Balanço Comparativo"
         def draw_header(is_first_page=False):
             if is_first_page:
@@ -466,19 +483,19 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                     pdf.cell(col_w[j], 5, _limpar_ascii(txt), align="R", border=0)
             pdf.set_xy(x, y + actual_h)
         # =======================================================
-        # LÃ“GICA ESPECÃFICA PARA O DVP
+        # LÔGICA ESPECÍFICA PARA O DVP
         # =======================================================
         if tipo == "DVP":
             linhas = content.splitlines()
             start_idx = 0
             for i, linha in enumerate(linhas):
-                if "VARIAÃ‡ÃƒO PATRIMONIAL AUMENTATIVA" in linha.upper():
+                if "VARIAÇÃO PATRIMONIAL AUMENTATIVA" in linha.upper():
                     start_idx = i
                     break
             for idx, linha in enumerate(linhas[start_idx:]):
                 if not linha.strip(): continue
-                if "COFEN/BR" in linha or "PERÃODO" in linha.upper() or "BRASÃLIA" in linha.upper() or "CONTADOR" in linha.upper() or "CRC-DF" in linha.upper(): continue
-                if "QUALITATIVAS" in linha.upper(): break # Para no bloco qualitativo para nÃ£o bagunÃ§ar a tabela principal
+                if "COFEN/BR" in linha or "PERÍODO" in linha.upper() or "BRASÍLIA" in linha.upper() or "CONTADOR" in linha.upper() or "CRC-DF" in linha.upper(): continue
+                if "QUALITATIVAS" in linha.upper(): break # Para no bloco qualitativo para não bagunçar a tabela principal
                 colunas = linha.split(';')
                 while len(colunas) < 7:
                     colunas.append('')
@@ -494,7 +511,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 pdf.set_font("Helvetica", "B" if is_header or is_total else "", 7)
                 draw_row(row_final, is_header, is_total, idx)
         elif tipo == "BALANCO_PATRIMONIAL":
-            # (MantÃ©m a lÃ³gica que jÃ¡ havÃ­amos ajustado para o BP)
+            # (Mantém a lógica que já havíamos ajustado para o BP)
             linhas = content.splitlines()
             start_idx = 0
             for i, linha in enumerate(linhas):
@@ -503,7 +520,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                     break
             for idx, linha in enumerate(linhas[start_idx:]):
                 if not linha.strip(): continue
-                if "COFEN/BR" in linha or "PERÃODO" in linha.upper(): continue
+                if "COFEN/BR" in linha or "PERÍODO" in linha.upper(): continue
                 colunas = linha.split(';')
                 while len(colunas) < 4:
                     colunas.append('')
@@ -525,17 +542,21 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                         elif len(matches) == 1: return "", matches[-1]
                 return "", ""
             ini_1, ini_2 = buscar_valores("Saldos iniciais")
-            res_1, res_2 = buscar_valores("Resultado do perÃ­odo")
+            res_1, res_2 = buscar_valores("Resultado do per")
+            if not res_1 and not res_2:
+                res_1, res_2 = buscar_valores("Resultado do periodo")
+            if not res_1 and not res_2:
+                res_1, res_2 = buscar_valores("Resultado do exerc")
             fim_1, fim_2 = buscar_valores("Saldos finais")
             linhas_dmpl = [
                 ("Saldos iniciais", ["", "", "", "", "", "", ini_1, ini_2], True),
-                ("Ajustes de exercÃ­cios anteriores", ["", "", "", "", "", "", "", "0"], False),
+                ("Ajustes de exercícios anteriores", ["", "", "", "", "", "", "", "0"], False),
                 ("Aumento de capital", ["", "", "", "", "", "", "", "0"], False),
-                ("Resultado do exercÃ­cio", ["", "", "", "", "", "", "0", "0"], False),
-                ("Resultado do perÃ­odo", ["", "", "", "", "", "", res_1, res_2], False),
-                ("Ajustes de avaliaÃ§Ã£o patrimonial", ["", "", "", "", "", "", "0", "0"], False),
-                ("ConstituiÃ§Ã£o / ReversÃ£o de reservas", ["", "", "", "", "", "", "0", "0"], False),
-                ("Demais variaÃ§Ãµes", ["", "", "", "", "", "", "0", "0"], False),
+                ("Resultado do exercício", ["", "", "", "", "", "", "0", "0"], False),
+                ("Resultado do período", ["", "", "", "", "", "", res_1, res_2], False),
+                ("Ajustes de avaliação patrimonial", ["", "", "", "", "", "", "0", "0"], False),
+                ("Constituição / Reversão de reservas", ["", "", "", "", "", "", "0", "0"], False),
+                ("Demais variações", ["", "", "", "", "", "", "0", "0"], False),
                 ("Saldos finais", ["", "", "", "", "", "", fim_1, fim_2], True)
             ]
             for idx, (desc, valores, is_total) in enumerate(linhas_dmpl):
@@ -548,11 +569,11 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             for i, row in enumerate(dados_csv):
                 joined = " ".join(row).upper()
                 if tipo in ["DFC"]:
-                    if "EXERCÃCIO ATUAL" in joined and "EXERCÃCIO ANTERIOR" in joined:
+                    if "EXERCÍCIO ATUAL" in joined and "EXERCÍCIO ANTERIOR" in joined:
                         start_idx = i + 1
                         break
                 elif tipo == "BALANCO_FINANCEIRO":
-                    if "ESPECIFICACAO" in joined and "EXERCÃCIO ATUAL" in joined:
+                    if "ESPECIFICACAO" in joined and "EXERCÍCIO ATUAL" in joined:
                         start_idx = i + 1
                         break
                 elif "CONTA" in joined and "SALDO" in joined:
@@ -560,10 +581,10 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                     break
             def eh_lixo(row):
                 texto_linha = " ".join(row).upper()
-                if "COFEN/BR" in texto_linha and ("PERÃODO" in texto_linha or "PERIODO" in texto_linha): return True
+                if "COFEN/BR" in texto_linha and ("PERÍODO" in texto_linha or "PERIODO" in texto_linha): return True
                 if row[0].strip().upper() == "COFEN/BR": return True
-                if "CONSELHO FEDERAL" in texto_linha or "CNPJ" in texto_linha or "DEMONSTRAÃ‡ÃƒO" in texto_linha or "BALANÃ‡O" in texto_linha: return True
-                if "MARCELO" in texto_linha or "CONTADOR" in texto_linha or "CRC-DF" in texto_linha or "PÃGINA" in texto_linha or "BRASÃLIA-DF" in texto_linha: return True
+                if "CONSELHO FEDERAL" in texto_linha or "CNPJ" in texto_linha or "DEMONSTRAÇÃO" in texto_linha or "BALANÇO" in texto_linha: return True
+                if "MARCELO" in texto_linha or "CONTADOR" in texto_linha or "CRC-DF" in texto_linha or "PÁGINA" in texto_linha or "BRASÍLIA-DF" in texto_linha: return True
                 return False
             for idx, row in enumerate(dados_csv[start_idx:]):
                 if not any(str(c).strip() for c in row): continue
@@ -571,14 +592,23 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 row_text = " ".join(row).upper()
                 is_header = False
                 is_total = False
-                if "TOTAIS" in row_text or "TOTAL:" in row_text or "TOTAL DAS" in row_text or "FLUXO DE CAIXA LÃQUIDO" in row_text or "GERAÃ‡ÃƒO LIQUIDA" in row_text:
+                if "TOTAIS" in row_text or "TOTAL:" in row_text or "TOTAL DAS" in row_text or "FLUXO DE CAIXA LÍQUIDO" in row_text or "GERAÇÃO LIQUIDA" in row_text:
                     is_total = True
-                elif any(k in row_text for k in ["ATIVO", "PASSIVO", "PATRIMÃ”NIO", "COMPENSAÃ‡Ã•ES", "QUADRO", "FLUXO DE CAIXA DAS ATIVIDADES"]):
+                elif any(k in row_text for k in ["ATIVO", "PASSIVO", "PATRIMÔNIO", "COMPENSAÇÕES", "QUADRO", "FLUXO DE CAIXA DAS ATIVIDADES"]):
                     is_header = True
                 if is_header: pdf.set_font(fonte_padrao, "B", 7.5)
                 elif is_total: pdf.set_font(fonte_padrao, "B", 7)
                 else:          pdf.set_font(fonte_padrao, "", 7)
                 draw_row(row, is_header, is_total, idx)
+                # Adiciona o nome do arquivo no rodapé de todas as páginas
+        nome_arquivo_csv = os.path.basename(csv_path)
+        for page_num in range(1, pdf.page_no() + 1):
+            pdf.page = page_num
+            pdf.set_y(-15)  # Posição do rodapé
+            pdf.set_font("Helvetica", "I", 7)
+            pdf.set_text_color(100, 100, 100)
+            pdf.cell(0, 5, f"Arquivo: {nome_arquivo_csv}", align="C")
+        
         out = pdf.output()
         pdf_bytes = bytes(out)
     except Exception as e:
@@ -595,7 +625,7 @@ async def download_excel(tipo: str, ano: int = Query(2026), periodo: str = Query
     try:
         csv_path = _get_csv_por_tipo(tipo)
         if not csv_path:
-            raise HTTPException(status_code=404, detail="CSV nÃƒÂ£o encontrado.")
+            raise HTTPException(status_code=404, detail="CSV não encontrado.")
         dados_csv = _ler_csv_generico(csv_path)
         while dados_csv and not any(str(c).strip() for c in dados_csv[-1]):
             dados_csv.pop()
@@ -616,11 +646,11 @@ async def download_excel(tipo: str, ano: int = Query(2026), periodo: str = Query
         ws['A1'].fill = PatternFill(start_color="0072BA", end_color="0072BA", fill_type="solid")
         ws['A1'].alignment = Alignment(vertical="center")
         ws.merge_cells('A2:F2')
-        ws['A2'] = f"CNPJ: 47.217.146/0001-57   |   PerÃƒÂ­odo: {periodo}/{ano}"
+        ws['A2'] = f"CNPJ: 47.217.146/0001-57   |   Período: {periodo}/{ano}"
         ws['A2'].font = Font(size=10, color="FFFFFF")
         ws['A2'].fill = PatternFill(start_color="0072BA", end_color="0072BA", fill_type="solid")
         ws['A2'].alignment = Alignment(vertical="center")
-        # CabeÃƒÂ§alho
+        # Cabeçalho
         header_row = dados_csv[header_idx]
         for col_idx, h in enumerate(header_row, start=1):
             cell = ws.cell(row=5, column=col_idx, value=h)
@@ -633,7 +663,7 @@ async def download_excel(tipo: str, ano: int = Query(2026), periodo: str = Query
             if not any(str(c).strip() for c in row):
                 continue
             row_str = " ".join(row).upper()
-            is_header = any(k in row[0].upper() for k in ["ATIVO", "PASSIVO", "PATRIMÃƒâ€NIO", "RECEITAS", "DESPESAS", "INGRESSOS"])
+            is_header = any(k in row[0].upper() for k in ["ATIVO", "PASSIVO", "PATRIMÔNIO", "RECEITAS", "DESPESAS", "INGRESSOS"])
             is_total = "TOTAL" in row_str
             for col_idx, val in enumerate(row, start=1):
                 cell = ws.cell(row=row_idx, column=col_idx, value=val)
@@ -672,7 +702,7 @@ async def download_pptx(tipo: str, ano: int = Query(2026), periodo: str = Query(
         prs.slide_height = Inches(7.5)
         csv_path = _get_csv_por_tipo(tipo)
         if not csv_path:
-            raise HTTPException(status_code=404, detail="CSV nÃƒÂ£o encontrado.")
+            raise HTTPException(status_code=404, detail="CSV não encontrado.")
         dados_csv = _ler_csv_generico(csv_path)
         while dados_csv and not any(str(c).strip() for c in dados_csv[-1]):
             dados_csv.pop()
@@ -711,7 +741,7 @@ async def download_pptx(tipo: str, ano: int = Query(2026), periodo: str = Query(
                     for pr in cell.text_frame.paragraphs:
                         for r in pr.runs:
                             r.font.size = Inches(0.07)
-                            if any(k in text.upper() for k in ["ATIVO", "PASSIVO", "TOTAL", "ESPECIFICAÃƒâ€¡ÃƒÆ’O", "RECEITAS"]):
+                            if any(k in text.upper() for k in ["ATIVO", "PASSIVO", "TOTAL", "ESPECIFICAÇÃO", "RECEITAS"]):
                                 r.font.bold = True
                             if j > 0:
                                 pr.alignment = PP_ALIGN.RIGHT
@@ -873,7 +903,7 @@ async def listar_historico():
         return historico
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-# Rota que abre um histÃ³rico especifico pelo ID
+# Rota que abre um histórico especifico pelo ID
 @app.get("/historico_integridade/{id}")
 async def buscar_historico(id: int):
     try:
@@ -985,7 +1015,7 @@ def _calc_panorama(periodo):
             break
     superavit_financeiro = 0.0
     for p in l_bp:
-        if "SUPERÃVIT FINANCEIRO" in p[0].upper() and len(p) > 2:
+        if "SUPERÁVIT FINANCEIRO" in p[0].upper() and len(p) > 2:
             superavit_financeiro = abs(_limpar_valor(p[2]))
             break
     receita_total = 0.0
@@ -1028,7 +1058,7 @@ async def api_panorama(periodo: str):
             "BALANCO_FINANCEIRO": "Balanço Financeiro",
             "DFC": "Demonstração do Fluxo de Caixa",
             "DVP": "Demonstração das Variações Patrimoniais",
-            "DMPL": "DemonstraÃ§Ã£o das MutaÃ§Ãµes do PL",
+            "DMPL": "Demonstração das Mutações do PL",
         }
         faltando = []
         for tipo, nome in demonstrativos.items():
@@ -1056,17 +1086,17 @@ async def api_panorama(periodo: str):
             return 0.0
         # === BP ===
         passivo_total = buscar(l_bp, ["TOTAL DO PASSIVO"], 3)
-        pl = buscar(l_bp, ["TOTAL DO PATRIMÃ”NIO LÃQUIDO", "TOTAL DO PATRIMONIO LIQUIDO"], 3)
+        pl = buscar(l_bp, ["TOTAL DO PATRIMÔNIO LÍQUIDO", "TOTAL DO PATRIMONIO LIQUIDO"], 3)
         ativo_total = passivo_total + pl  # Ativo = Passivo + PL
         caixa_bp = buscar(l_bp, ["CAIXA E EQUIVALENTES", "CAIXA E EQUIVALENTE"], 1)
-        superavit_financeiro = buscar(l_bp, ["SUPERÃVIT FINANCEIRO", "SUPERAVIT FINANCEIRO"], 2)
+        superavit_financeiro = buscar(l_bp, ["SUPERÁVIT FINANCEIRO", "SUPERAVIT FINANCEIRO"], 2)
         # === BO ===
         receita_realizada = buscar(l_bo, ["SUB-TOTAL DAS RECEITAS"], 6)
         despesa_empenhada = buscar(l_bo, ["SUB-TOTAL DAS DESPESAS"], 4)
         superavit_orcamentario = receita_realizada - despesa_empenhada
         # === DVP ===
-        total_vpa = buscar(l_dvp, ["Total das VariaÃ§Ãµes Ativas"], 2)
-        total_vpd = buscar(l_dvp, ["Total das VariaÃ§Ãµes Passivas"], 6)
+        total_vpa = buscar(l_dvp, ["Total das Variações Ativas"], 2)
+        total_vpd = buscar(l_dvp, ["Total das Variações Passivas"], 6)
         superavit_patrimonial = total_vpa - total_vpd
         conn.close()
         return {
@@ -1356,7 +1386,7 @@ async def api_analise_orcamentaria_bo(periodo: str):
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho or not os.path.exists(caminho):
-            return {"erro": True, "mensagem": f"BO do perÃ­odo {periodo} nÃ£o foi importado."}
+            return {"erro": True, "mensagem": f"BO do período {periodo} não foi importado."}
         linhas = _ler_linhas(caminho)
         def buscar(termo, col, apos=0):
             for i, p in enumerate(linhas):
@@ -1445,15 +1475,15 @@ async def api_composicao_rd(periodo: str):
         receitas = {
             "Receitas Correntes": buscar("RECEITAS CORRENTE"),
             "Receitas Patrimoniais": buscar("RECEITAS PATRIMONIAIS"),
-            "Transferencias Correntes": buscar("TRANSFERÃŠNCIAS CORRENTES"),
+            "Transferencias Correntes": buscar("TRANSFERÊNCIAS CORRENTES"),
             "Outras Receitas Correntes": buscar("OUTRAS RECEITAS CORRENTES"),
             "Receitas de Capital": buscar("RECEITAS DE CAPITAL"),
         }
         despesas = {
             "Pessoal e Encargos": buscar("PESSOAL E ENCARGOS SOCIAIS", 4),
             "Outras Despesas Correntes": buscar("OUTRAS DESPESAS CORRENTES", 4),
-            "Investimentos": buscar("INVESTIMENTOS - APLICAÃ‡Ã•ES DIRETAS", 4),
-            "Inversoes Financeiras": buscar("INVERSÃ•ES FINANCEIRAS  APLICAÃ‡Ã•ES DIRETAS", 4),
+            "Investimentos": buscar("INVESTIMENTOS - APLICAÇÕES DIRETAS", 4),
+            "Inversoes Financeiras": buscar("INVERSÕES FINANCEIRAS  APLICAÇÕES DIRETAS", 4),
         }
         return {"erro": False, "receitas": receitas, "despesas": despesas}
     except Exception as e:
@@ -1519,8 +1549,8 @@ async def api_analise_financeira_bf(periodo: str):
             if p and len(p) > idx: return abs(_limpar_valor(p[idx]))
             return 0.0
         l10 = buscar("RECEITA REALIZADA")
-        l28 = buscar("Recebimentos ExtraorÃ§amentÃ¡rios")
-        l33 = buscar("Saldo em espÃ©cie do ExercÃ­cio Anterior")
+        l28 = buscar("Recebimentos Extraorçamentários")
+        l33 = buscar("Saldo em espécie do Exercício Anterior")
         l36 = buscar("Total:")
         dados = {
             "receita_realizada": {"atual": val(l10,1), "anterior": val(l10,2)},
@@ -1851,28 +1881,28 @@ async def api_analise_patrimonial(periodo: str):
                 if len(row) < 8: continue
                 col_a = row[0].strip().upper()
                 col_d = row[4].strip().upper()
-                if col_a == "VARIAÃ‡ÃƒO PATRIMONIAL AUMENTATIVA":
+                if col_a == "VARIAÇÃO PATRIMONIAL AUMENTATIVA":
                     dados["variacoes_ativas"]["atual"] = limpar(row[2])
                     dados["variacoes_ativas"]["anterior"] = limpar(row[3])
-                elif col_a == "TRANSFERÃŠNCIAS E DELEGAÃ‡Ã•ES RECEBIDAS":
+                elif col_a == "TRANSFERÊNCIAS E DELEGAÇÕES RECEBIDAS":
                     dados["transf_recebidas"]["atual"] = limpar(row[2])
                     dados["transf_recebidas"]["anterior"] = limpar(row[3])
-                elif col_a == "REVERSÃƒO DE PROVISÃ•ES E AJUSTES DE PERDAS":
+                elif col_a == "REVERSÃO DE PROVISÕES E AJUSTES DE PERDAS":
                     dados["reversao_provisoes"]["atual"] = limpar(row[2])
                     dados["reversao_provisoes"]["anterior"] = limpar(row[3])
-                if col_d == "VARIAÃ‡ÃƒO PATRIMONIAL DIMINUTIVA":
+                if col_d == "VARIAÇÃO PATRIMONIAL DIMINUTIVA":
                     dados["variacoes_diminutivas"]["atual"] = limpar(row[6])
                     dados["variacoes_diminutivas"]["anterior"] = limpar(row[7])
                 elif col_d == "PESSOAL E ENCARGOS":
                     dados["pessoal_encargos"]["atual"] = limpar(row[6])
                     dados["pessoal_encargos"]["anterior"] = limpar(row[7])
-                elif col_d == "SERVIÃ‡OS TERCEIROS - PJ":
+                elif col_d == "SERVIÇOS TERCEIROS - PJ":
                     dados["servicos_terceiros"]["atual"] = limpar(row[6])
                     dados["servicos_terceiros"]["anterior"] = limpar(row[7])
-                elif col_d == "TRANSFERÃŠNCIAS E DELEGAÃ‡Ã•ES CONCEDIDAS":
+                elif col_d == "TRANSFERÊNCIAS E DELEGAÇÕES CONCEDIDAS":
                     dados["transf_concedidas"]["atual"] = limpar(row[6])
                     dados["transf_concedidas"]["anterior"] = limpar(row[7])
-        # Calcula SuperÃ¡vit e Margem
+        # Calcula Superávit e Margem
         dados["superavit_patrimonial"]["atual"] = dados["variacoes_ativas"]["atual"] - dados["variacoes_diminutivas"]["atual"]
         dados["superavit_patrimonial"]["anterior"] = dados["variacoes_ativas"]["anterior"] - dados["variacoes_diminutivas"]["anterior"]
         if dados["variacoes_ativas"]["atual"] > 0:
@@ -1979,7 +2009,7 @@ async def gerar_pdf_analise_orcamentaria(id: int):
         # Estrutura esperada: { atual: {...}, anterior: {...} }
         a = d.get("atual", {})
         b = d.get("anterior", {})
-        # --- 1. GERA O GRÃFICO (Atual primeiro) ---
+        # --- 1. GERA O GRÁFICO (Atual primeiro) ---
         labels = ["Receita Realizada", "Despesa Empenhada", "Superavit"]
         ant = [b.get("receita_realizada", 0), b.get("despesa_empenhada", 0), b.get("superavit", 0)]
         atu = [a.get("receita_realizada", 0), a.get("despesa_empenhada", 0), a.get("superavit", 0)]
@@ -2264,7 +2294,7 @@ async def gerar_pdf_composicao_receitas_despesas(id: int):
         # Estrutura esperada: { atual: { receitas: {...}, despesas: {...} }, anterior: { receitas: {...}, despesas: {...} } }
         a = d.get("atual", {})
         b = d.get("anterior", {})
-        # 2. Prepara os dados para o grÃ¡fico (Receitas)
+        # 2. Prepara os dados para o gráfico (Receitas)
         labels = list(a.get("receitas", {}).keys())
         data_a = [a.get("receitas", {}).get(k, 0) for k in labels]
         data_b = [b.get("receitas", {}).get(k, 0) for k in labels]
@@ -2350,7 +2380,7 @@ async def gerar_pdf_composicao_receitas_despesas(id: int):
             else: pdf.set_text_color(220, 53, 69)
             pdf.cell(30, 6, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.set_text_color(0, 0, 0)
-        # 4. Adiciona o grÃ¡fico no final
+        # 4. Adiciona o gráfico no final
         pdf.ln(8)
         pdf.image(img_path, x=40, y=pdf.get_y(), w=160)
         pdf_bytes = bytes(pdf.output())
@@ -2494,7 +2524,7 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
                     val = 0.0
                 if val > maior_pessoal:
                     maior_pessoal = val
-            # Outras Despesas VariÃ¡veis - pega o maior valor
+            # Outras Despesas Variáveis - pega o maior valor
             if "OUTRAS DESPESAS VARI" in nome.upper() and ("PESSOAL" in nome.upper() or "RGPS" in nome.upper()):
                 if len(linha) >= 8:
                     val = _limpar_valor(linha[5])
@@ -2504,7 +2534,7 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
                     val = 0.0
                 if val > maior_outras:
                     maior_outras = val
-            # TerceirizaÃ§Ã£o - pega o maior valor
+            # Terceirização - pega o maior valor
             if "OUTRAS DESPESAS DE PESSOAL DECORRENTES" in nome:
                 if len(linha) >= 8:
                     val = _limpar_valor(linha[5])
@@ -2514,8 +2544,8 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
                     val = 0.0
                 if val > maior_terc:
                     maior_terc = val
-            # SentenÃ§as Judiciais Trabalhistas - pega o maior valor
-            if "SENTENÃ‡AS JUDICIAIS" in nome and "TRABALHISTAS" in nome:
+            # Sentenças Judiciais Trabalhistas - pega o maior valor
+            if "SENTENÇAS JUDICIAIS" in nome and "TRABALHISTAS" in nome:
                 if len(linha) >= 8:
                     val = _limpar_valor(linha[5])
                 elif len(linha) >= 7:
@@ -2628,7 +2658,7 @@ async def api_relatorios_importados():
             nome = os.path.basename(arq)
             partes = nome.replace(".csv", "").split("_")
             tipo = partes[0] if partes else "Desconhecido"
-            periodo = "NÃ£o identificado"
+            periodo = "Não identificado"
             for i, p in enumerate(partes):
                 if len(p) == 4 and p.isdigit():
                     if i + 2 < len(partes):
@@ -2647,8 +2677,8 @@ async def serve_base_legal():
 async def salvar_base_legal(periodo_atual: str, periodo_anterior: str = "2025-TRIMESTRE-3"):
     try:
         import sqlite3, json, datetime, os
-        # Simulamos o salvamento dos dados do Base Legal (que sÃ£o fixos, mas dependem do perÃ­odo)
-        # O PDF serÃ¡ gerado posteriormente com base no ID salvo
+        # Simulamos o salvamento dos dados do Base Legal (que são fixos, mas dependem do período)
+        # O PDF será gerado posteriormente com base no ID salvo
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -2700,8 +2730,8 @@ def _calc_liquidez(periodo):
             realizavel = abs(_limpar_valor(_p[1]))
             break
     passivo_circulante = buscar("PASSIVO CIRCULANTE", 3) or buscar("ATIVO CIRCULANTE", 3)
-    passivo_nao_circulante = buscar("PASSIVO NAO-CIRCULANTE", 3) or buscar("PASSIVO NÃƒO CIRCULANTE", 3)
-    # VariÃ¡veis exatas do BP
+    passivo_nao_circulante = buscar("PASSIVO NAO-CIRCULANTE", 3) or buscar("PASSIVO NÃO CIRCULANTE", 3)
+    # Variáveis exatas do BP
     ativo_permanente = 0.0
     for _p in l_bp:
         if len(_p) > 1:
@@ -2709,14 +2739,14 @@ def _calc_liquidez(periodo):
             if "IMOBILIZADO" in _t0 or "INTANGIVEL" in _t0 or "INTANGÍVEL" in _t0:
                 ativo_permanente += abs(_limpar_valor(_p[1])) or (buscar("IMOBILIZADO", 1) + buscar("INTANGIVEL", 1))
     patrimonio_liquido = buscar("TOTAL DO PATRIM", 3)
-    # --- CÃLCULO DA LIQUIDEZ ---
+    # --- CÁLCULO DA LIQUIDEZ ---
     liq_imediata = (caixa / passivo_circulante) if passivo_circulante > 0 else 0
     liq_corrente = (ativo_circulante / passivo_circulante) if passivo_circulante > 0 else 0
     liq_seca = ((ativo_circulante - estoques) / passivo_circulante) if passivo_circulante > 0 else 0
     denom_geral = passivo_circulante + passivo_nao_circulante
     liq_geral = ((ativo_circulante + realizavel) / denom_geral) if denom_geral > 0 else 0
-    # --- CÃLCULO DA ESTRUTURA (BUSCA EXATA NO BP) ---
-    # Busca os totais exatos que jÃ¡ existem no BP
+    # --- CÁLCULO DA ESTRUTURA (BUSCA EXATA NO BP) ---
+    # Busca os totais exatos que já existem no BP
     ativo_total = 0.0
     for _p in l_bp:
         if len(_p) > 1 and str(_p[0]).upper().strip() == "TOTAL":
@@ -2826,7 +2856,7 @@ async def gerar_pdf_liquidez(id: int):
         if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
         periodo, data_geracao, json_str = row
         dados = json.loads(json_str)
-        # Garante que os dados de estrutura existam (mesmo em histÃ³ricos antigos)
+        # Garante que os dados de estrutura existam (mesmo em históricos antigos)
         if "estrutura" not in dados:
             novos_dados = _calc_liquidez(periodo)
             if novos_dados:
@@ -2841,11 +2871,11 @@ async def gerar_pdf_liquidez(id: int):
         pdf.cell(0, 10, "Indices de Liquidez", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         pdf.set_font("helvetica", "", 12)
         pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 8, f"PerÃ­odo: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.cell(0, 8, f"Período: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         pdf.ln(10)
         def fmt(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         def desenhar_card(titulo, valor, formula):
-            # Se o Y atual + 45mm (tamanho do card + margem) passar do limite da pÃ¡gina (A4 = 297mm - 20mm de margem)
+            # Se o Y atual + 45mm (tamanho do card + margem) passar do limite da página (A4 = 297mm - 20mm de margem)
             if pdf.get_y() + 45 > 277:
                 pdf.add_page()
                 pdf.set_font("helvetica", "B", 12)
@@ -2872,7 +2902,7 @@ async def gerar_pdf_liquidez(id: int):
         desenhar_card("Liquidez Imediata", res["liquidez_imediata"], f"(Caixa) / (Passivo Circulante) | ({fmt(val['caixa'])}) / ({fmt(val['passivo_circulante'])})")
         desenhar_card("Liquidez Corrente", res["liquidez_corrente"], f"(Ativo Circulante) / (Passivo Circulante) | ({fmt(val['ativo_circulante'])}) / ({fmt(val['passivo_circulante'])})")
         desenhar_card("Liquidez Seca", res["liquidez_seca"], f"((Ativo Circulante - Estoques)) / (Passivo Circulante) | (({fmt(val['ativo_circulante'])} - {fmt(val['estoques'])})) / ({fmt(val['passivo_circulante'])})")
-        desenhar_card("Liquidez Geral", res["liquidez_geral"], f"(Ativo Circulante + RealizÃ¡vel a Longo Prazo) / (Passivo Circulante + Passivo NÃ£o Circulante) | ({fmt(val['ativo_circulante'])} + {fmt(val['realizavel'])}) / ({fmt(val['passivo_circulante'])} + {fmt(val['passivo_nao_circulante'])})")
+        desenhar_card("Liquidez Geral", res["liquidez_geral"], f"(Ativo Circulante + Realizável a Longo Prazo) / (Passivo Circulante + Passivo Não Circulante) | ({fmt(val['ativo_circulante'])} + {fmt(val['realizavel'])}) / ({fmt(val['passivo_circulante'])} + {fmt(val['passivo_nao_circulante'])})")
         # --- CALCULO ESTRUTURA (MESMA LOGICA DO FRONTEND) ---
         v_ativa_circ = val.get('ativo_circulante', 0)
         v_realizavel = val.get('realizavel', 0)
@@ -2885,7 +2915,7 @@ async def gerar_pdf_liquidez(id: int):
         endividamento = (passivo_total / ativo_total * 100) if ativo_total > 0 else 0
         part_capital = (passivo_total / v_pl * 100) if v_pl > 0 else 0
         imobilizacao = (v_ativo_perm / v_pl * 100) if v_pl > 0 else 0
-        # FormataÃ§Ã£o dos valores (para moeda)
+        # Formatação dos valores (para moeda)
         f_ativo_total = fmt(ativo_total)
         f_passivo_total = fmt(passivo_total)
         f_pl = fmt(v_pl)
@@ -2893,7 +2923,7 @@ async def gerar_pdf_liquidez(id: int):
         # Desenha os 3 novos cards no PDF
         desenhar_card("Endividamento Geral", f"{endividamento:.2f}%", f"Passivo Total / Ativo Total | ({f_passivo_total}) / ({f_ativo_total})")
         desenhar_card("Part. de Capital de Terceiros", f"{part_capital:.2f}%", f"Passivo / PL | ({f_passivo_total}) / ({f_pl})")
-        desenhar_card("ImobilizaÃ§Ã£o do PL", f"{imobilizacao:.2f}%", f"Ativo Perm. / PL | ({f_ativo_perm}) / ({f_pl})")
+        desenhar_card("Imobilização do PL", f"{imobilizacao:.2f}%", f"Ativo Perm. / PL | ({f_ativo_perm}) / ({f_pl})")
         pdf_bytes = pdf.output()
         return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Indices_{periodo.replace('-', '_')}.pdf"})
     except Exception as e:
@@ -2901,7 +2931,7 @@ async def gerar_pdf_liquidez(id: int):
 @app.get("/painel_integridade_html/{periodo}")
 async def painel_integridade_html(periodo: str):
     try:
-        # Importa a funÃ§Ã£o do nosso mÃ³dulo de integridade
+        # Importa a função do nosso módulo de integridade
         from integridade import analise_integridade
         dados = await analise_integridade(periodo)
         analises = dados.get("analises", [])
@@ -2909,7 +2939,7 @@ async def painel_integridade_html(periodo: str):
         html += "<style>body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; } .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } table { width: 100%; border-collapse: collapse; margin-bottom: 15px; } td { padding: 8px 0; border-bottom: 1px solid #eee; } .status-ok { color: green; border-left: 5px solid green; } .status-erro { color: red; border-left: 5px solid red; }</style></head><body>"
         html += "<h2>Analises de Integridade - " + periodo + "</h2>"
         if not analises:
-            html += "<p>Nenhuma anÃ¡lise encontrada.</p>"
+            html += "<p>Nenhuma análise encontrada.</p>"
         for a in analises:
             classe = "status-ok" if a["status"] == "OK" else "status-erro"
             html += f"<div class='card {classe}'>"
@@ -2929,28 +2959,28 @@ async def painel_integridade_html(periodo: str):
 async def shutdown_playwright():
     try:
         from playwright.async_api import async_playwright
-        # O browser Ã© criado dentro da rota, entÃ£o nÃ£o temos uma referÃªncia global.
-        # Esta Ã© uma correÃ§Ã£o defensiva: o browser jÃ¡ Ã© fechado no finally da rota.
-        # Este handler sÃ³ garante que o driver do Playwright seja parado.
+        # O browser é criado dentro da rota, então não temos uma referência global.
+        # Esta é uma correção defensiva: o browser já é fechado no finally da rota.
+        # Este handler só garante que o driver do Playwright seja parado.
         pass
     except Exception:
         pass
-# ForÃ§ar o Event Loop correto no Windows (necessÃ¡rio para Playwright)
+# Forçar o Event Loop correto no Windows (necessário para Playwright)
 import sys
 if sys.platform == "win32":
     import asyncio
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 @app.get("/demonstracoes", response_class=HTMLResponse)
 def demonstracoes_em_breve():
-    return HTMLResponse(content="<html><body><h1>DemonstraÃ§Ãµes ContÃ¡beis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
+    return HTMLResponse(content="<html><body><h1>Demonstrações Contábeis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
 @app.get("/analises", response_class=HTMLResponse)
 def analises_em_breve():
-    return HTMLResponse(content="<html><body><h1>AnÃ¡lises ContÃ¡beis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
+    return HTMLResponse(content="<html><body><h1>Análises Contábeis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
 @app.post("/salvar_custo_pessoal/{periodo}")
 def salvar_custo_pessoal_rota(periodo: str):
     import sqlite3, json, os, datetime
     try:
-        # Chama a funÃ§Ã£o de cÃ¡lculo diretamente
+        # Chama a função de cálculo diretamente
         from main import api_custo_pessoal
         import asyncio
         dados = asyncio.run(api_custo_pessoal(periodo))
@@ -2968,7 +2998,7 @@ def salvar_custo_pessoal_rota(periodo: str):
                     (periodo, data_agora, json.dumps(dados)))
         conn.commit()
         conn.close()
-        return {"status": "sucesso", "mensagem": "RelatÃ³rio salvo!"}
+        return {"status": "sucesso", "mensagem": "Relatório salvo!"}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 # === ROUTER DO PANORAMA (registrado por ultimo para vencer a rota antiga) ===

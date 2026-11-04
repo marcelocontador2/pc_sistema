@@ -1,66 +1,51 @@
-﻿# ===== Python =====
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+﻿# === Ignorar scripts temporarios de debug/fix ===
+*.py
+!pc_backend/main.py
+!pc_backend/models.py
+!pc_backend/__init__.py
 
-# ===== Ambiente virtual =====
-pc_venv/
-.venv/
-venv/
-ENV/
-
-# ===== Backups e snapshots =====
-_backups_arquivo/
-backup_*/
-backup_2026*/
-backup_202610*/
-snapshot_*/
-_arquivo_20261031/
-*.bak
-*.bak2_*
+# === Ignorar backups ===
 *.bak_*
-
-# ===== Compactados grandes =====
-*.zip
-*.7z
-*.rar
-*.tar.gz
-*.bundle
-
-# ===== Dados gerados =====
-pc_storage/banco_dados.db
-pc_storage/banco_dados.db-journal
-pc_storage/banco_dados.db-wal
-pc_storage/banco_dados.db-shm
-pc_storage/temp_downloads/
-pc_storage/uploads_raw/*.csv
-pc_storage/output_documentos/*.pptx
-pc_storage/pdfs/*.pdf
-
-# ===== Logs =====
-*.log
-out_log.txt
-erro_log.txt
-
-# ===== PDFs gerados em pc_frontend/ =====
-pc_frontend/*.pdf
-
-# ===== IDE / Editor =====
-.vscode/
-.idea/
-*.swp
-*.swo
+*.bak
 *~
 
-# ===== OS =====
-Thumbs.db
-.DS_Store
-desktop.ini
+# === Ignorar cache do Python ===
+__pycache__/
+*.pyc
+*.pyo
 
-# Arvore fantasma (a ser arquivada)
-pc_sistema/
+# === Ignorar fontes duplicadas (mantém apenas as do sistema se houver) ===
+pc_backend/*.ttf
 
-# Duplicacao de storage em pc_backend (espelho)
-pc_backend/pc_storage/
+# === Ignorar scripts de debug na raiz ===
+/fix_*.py
+/diag_*.py
+/scan_*.py
+/audit*.py
+/test_*.py
+/ver_*.py
+/listar_*.py
+/reconstruir_*.py
+/reescrever_*.py
+/refazer_*.py
+/remover_*.py
+/restaurar_*.py
+/reverter_*.py
+/substituir_*.py
+/relatorio_hibrido_*.py
+/melhorar_*.py
+/paginar_*.py
+/filtrar_*.py
+/filtro_*.py
+/force_*.py
+/corrigir_*.py
+/criar_*.py
+/contas_*.py
+/despesas_*.py
+/valores_*.py
+/adicionar_*.py
+/ocultar_*.py
+/achar_*.py
+/desabilitar_*.py
+/auditar_*.py
+/fix_*.py
