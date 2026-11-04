@@ -149,8 +149,8 @@
                     <td style="text-align: left; font-weight: bold;">${row.item}</td>
                     <td>${row.balancete}</td><td>${row.bp}</td><td>${row.bf}</td><td>${row.bo}</td><td>${row.dfc}</td><td>${row.dvp}</td><td>${row.dmpl}</td>
                     <td class="${statusClass}">${
-            row.conf && row.conf.includes('(')
-                ? `<button class="btn-justificar" data-linha="${row.item}" onclick="abrirModalJust('${row.item}', this)" style="color:red; border:none; background:none; cursor:pointer; font-weight:bold; font-size:12px; padding:0;">${row.conf}</button>`
+            (row.conf && row.conf.includes('(')) || row.item.toUpperCase().includes('INCORPORAÇÃO DE ATIVOS')
+                ? `<button class="btn-justificar" data-linha="${row.item}" onclick="abrirModalJust('${row.item}', this)" style="color:${(row.conf && row.conf.includes('(')) ? 'red' : '#0056b3'}; border:none; background:none; cursor:pointer; font-weight:bold; font-size:12px; padding:0; ${(row.conf === 'OK') ? 'text-decoration:underline;' : ''}">${(row.conf === 'OK') ? 'Justificar' : row.conf}</button>`
                 : row.conf
         }</td>
                 </tr>`;
