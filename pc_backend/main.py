@@ -12,6 +12,40 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import os, shutil, io, glob, csv
 import psycopg2
+
+def _limpar_ascii(txt):
+    """Limpa caracteres de controle, mantendo acentos (para fontes Unicode)."""
+    if not txt: return ""
+    s = str(txt)
+    s = s.replace("\\t", " ").replace("\\n", " ").replace("\\r", " ")
+    s = s.replace("\\f", " ").replace("\\v", " ").replace("\\a", " ")
+    s = s.replace(chr(12), " ").replace(chr(11), " ").replace(chr(7), " ")
+    s = "".join(ch if (ord(ch) >= 32 and ord(ch) < 256) else " " for ch in s)
+    return s
+
+def _corrigir_encoding(txt):
+    """Corrige encoding duplo (UTF-8 lido como latin-1)."""
+    if not txt: return ""
+    try:
+        # Tenta decodificar como latin-1 e re-codificar como utf-8
+        # Isso converte Ã§ -> ç, Ã£ -> ã, etc.
+        s = txt.encode("latin-1", "ignore").decode("utf-8", "ignore")
+        return s
+    except:
+        return txt
+
+
+
+def _limpar_ascii(txt):
+    """Limpa apenas tabulações e caracteres de controle, mantendo acentos."""
+    if not txt: return ""
+    s = str(txt)
+    s = s.replace("\t", " ").replace("\n", " ").replace("\r", " ")
+    s = "".join(ch if ord(ch) >= 32 else " " for ch in s)
+    return s
+
+
+
 # import pandas as pd  # removido 31/10/2026 - nao usado
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
@@ -159,7 +193,7 @@ def _ler_csv(filepath, tipo=""):
     for enc in ["utf-8-sig", "utf-8", "latin-1"]:
         try:
             with open(filepath, "r", encoding=enc) as f:
-                content = f.read()
+                content = _corrigir_encoding(f.read())
             break
         except UnicodeDecodeError:
             continue
@@ -268,81 +302,115 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
         csv_path = _get_csv_por_tipo(tipo, periodo)
         if not csv_path:
             raise HTTPException(status_code=404, detail=f"Arquivo CSV para {tipo} no perÃ­odo {periodo_formatado} nÃ£o encontrado.")
+        # Leitura robusta: tenta utf-8-sig, depois latin-1 (que aceita qualquer byte)
         content = ""
-        for enc in ["utf-8-sig", "utf-8", "latin-1"]:
+        for enc in ["latin-1", "utf-8-sig"]:
             try:
                 with open(csv_path, "r", encoding=enc) as f:
-                    content = f.read()
+                    content = _corrigir_encoding(f.read())
                 break
-            except UnicodeDecodeError:
+            except:
                 continue
+        
+        # Corrige caracteres corrompidos (ex: Ã§ -> ç, Ã£ -> ã)
+        content = content.replace("Ã§", "ç").replace("Ã£", "ã").replace("Ã¡", "á")
+        content = content.replace("Ã©", "é").replace("Ã­", "í").replace("Ã³", "ó")
+        content = content.replace("Ãº", "ú").replace("Ã¢", "â").replace("Ãª", "ê")
+        content = content.replace("Ã´", "ô").replace("Ãª", "ê").replace("Ã§", "ç")
+        content = content.replace("Ãƒ", "Ã").replace("Ã‰", "É").replace("Ã“", "Ó")
         pdf = FPDF(orientation="L", unit="mm", format="A4")
+        fonte_padrao = "Helvetica"
+        # Registra fonte Arial (regular, bold e italic)
+        import os
+        font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "arial.ttf")
+        font_bold_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "arialbd.ttf")
+        font_italic_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ariali.ttf")
+        
+        if os.path.exists(font_path):
+            try:
+                pdf.add_font("ArialUnicode", "", font_path, uni=True)
+                if os.path.exists(font_bold_path):
+                    pdf.add_font("ArialUnicode", "B", font_bold_path, uni=True)
+                else:
+                    pdf.add_font("ArialUnicode", "B", font_path, uni=True)
+                if os.path.exists(font_italic_path):
+                    pdf.add_font("ArialUnicode", "I", font_italic_path, uni=True)
+                else:
+                    pdf.add_font("ArialUnicode", "I", font_path, uni=True)
+                fonte_padrao = "ArialUnicode"
+                print("[INFO] Fonte Arial registrada com sucesso (regular, bold, italic)")
+            except Exception as e:
+                print(f"[AVISO] Erro ao registrar Arial: {e}")
+                fonte_padrao = "Helvetica"
+        else:
+            fonte_padrao = "Helvetica"
+            print("[AVISO] Fonte Arial nao encontrada, usando Helvetica")
         pdf.set_auto_page_break(auto=False)
         # ---------- LAYOUTS ----------
         if tipo == "BALANCETE":
             col_w   = [125, 0, 38, 38, 38, 38]
-            headers = ["CONTA", "", "SALDO ANTERIOR", "DÃ‰BITOS", "CRÃ‰DITOS", "SALDO"]
-            titulo_pdf = "Balancete ContÃ¡bil"
+            headers = ["CONTA", "", "SALDO ANTERIOR", "DEBITOS", "CREDITOS", "SALDO"]
+            titulo_pdf = "Balancete Contábil"
         elif tipo == "BALANCO_PATRIMONIAL":
             col_w   = [85, 30, 85, 30, 0, 0]
-            headers = ["ESPECIFICAÃ‡ÃƒO (ATIVO)", "ExercÃ­cio Atual", "ESPECIFICAÃ‡ÃƒO (PASSIVO)", "ExercÃ­cio Atual", "", ""]
-            titulo_pdf = "BalanÃ§o Patrimonial"
+            headers = ["ESPECIFICACAO (ATIVO)", "ExercÃ­cio Atual", "ESPECIFICACAO (PASSIVO)", "ExercÃ­cio Atual", "", ""]
+            titulo_pdf = "Balanço Patrimonial"
         elif tipo == "BALANCO_FINANCEIRO":
             col_w   = [68, 28, 28, 68, 28, 28] 
-            headers = ["ESPECIFICAÃ‡ÃƒO (INGRESSOS)", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "ESPECIFICAÃ‡ÃƒO (DISPÃŠNDIOS)", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
-            titulo_pdf = "BalanÃ§o Financeiro"
+            headers = ["ESPECIFICACAO (INGRESSOS)", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "ESPECIFICACAO (DISPENDIOS)", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
+            titulo_pdf = "Balanço Financeiro"
         elif tipo == "BALANCO_ORCAMENTARIO":
             col_w   = [70, 32, 32, 34, 34, 34, 41]
-            headers = ["ESPECIFICAÃ‡ÃƒO", "PREVISÃƒO INICIAL", "PREVISÃƒO ATUALIZADA", "RECEITA REALIZADA", "SALDO", "DESPESAS", "SALDO FINAL"]
-            titulo_pdf = "BalanÃ§o OrÃ§amentÃ¡rio"
+            headers = ["ESPECIFICACAO", "PREVISAO INICIAL", "PREVISAO ATUALIZADA", "RECEITA REALIZADA", "SALDO", "DESPESAS", "SALDO FINAL"]
+            titulo_pdf = "Balanço Orçamentário"
         elif tipo == "DMPL":
             col_w   = [60, 24.5, 24.5, 24.5, 24.5, 24.5, 24.5, 34, 35] 
             headers = [
-                "ESPECIFICAÃ‡ÃƒO", "PATRIMÃ”NIO SOCIAL", "ADIANTAMENTO P/ AUMENTO", 
-                "RESERVAS DE CAPITAL", "AJUSTES DE AVALIAÃ‡ÃƒO", "RESERVAS DE LUCROS", 
+                "ESPECIFICACAO", "PATRIMONIO SOCIAL", "ADIANTAMENTO P/ AUMENTO", 
+                "RESERVAS DE CAPITAL", "AJUSTES DE AVALIACAO", "RESERVAS DE LUCROS", 
                 "DEMAIS RESERVAS", "RESULTADOS ACUMULADOS", "TOTAL"
             ]
             titulo_pdf = "DemonstraÃ§Ã£o das MutaÃ§Ãµes do PatrimÃ´nio LÃ­quido"
         elif tipo == "DFC":
             col_w   = [160, 0, 0, 60, 57]
-            headers = ["ESPECIFICAÃ‡ÃƒO", "", "", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
-            titulo_pdf = "DemonstraÃ§Ã£o do Fluxo de Caixa"
+            headers = ["ESPECIFICACAO", "", "", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
+            titulo_pdf = "Demonstração do Fluxo de Caixa"
         elif tipo == "DVP":
             # Layout DVP: Desc Ativa | Atual | Anterior | Desc Passiva | Atual | Anterior
             col_w   = [70, 25, 25, 70, 25, 25]
-            headers = ["VARIAÃ‡Ã•ES AUMENTATIVAS", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "VARIAÃ‡Ã•ES DIMINUTIVAS", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
-            titulo_pdf = "DemonstraÃ§Ã£o das VariaÃ§Ãµes Patrimoniais"
+            headers = ["VARIACOES AUMENTATIVAS", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "VARIACOES DIMINUTIVAS", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
+            titulo_pdf = "Demonstração das Variações Patrimoniais"
         else:
             col_w   = [72, 30, 28, 72, 40, 35]
-            headers = ["ESPECIFICAÃ‡ÃƒO", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "ESPECIFICAÃ‡ÃƒO", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
-            titulo_pdf = "BalanÃ§o Comparativo"
+            headers = ["ESPECIFICACAO", "ExercÃ­cio Atual", "ExercÃ­cio Anterior", "ESPECIFICACAO", "ExercÃ­cio Atual", "ExercÃ­cio Anterior"]
+            titulo_pdf = "Balanço Comparativo"
         def draw_header(is_first_page=False):
             if is_first_page:
                 pdf.set_fill_color(0, 114, 186)
                 pdf.rect(10, 10, 277, 20, 'F')
                 pdf.set_text_color(255, 255, 255)
-                pdf.set_font("Helvetica", "B", 14)
+                pdf.set_font(fonte_padrao, "B", 14)
                 pdf.set_xy(15, 12)
                 pdf.cell(0, 6, "COFEN/BR - Conselho Federal de Enfermagem", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                pdf.set_font("Helvetica", "", 9)
+                pdf.set_font(fonte_padrao, "", 9)
                 pdf.set_x(15)
                 pdf.cell(0, 5, "CNPJ: 47.217.146/0001-57", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_xy(200, 12)
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.cell(85, 6, f"PerÃ­odo: {periodo_formatado}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
-                pdf.set_font("Helvetica", "", 9)
+                pdf.set_font(fonte_padrao, "B", 10)
+                pdf.cell(85, 6, _limpar_ascii(f"Periodo: {periodo_formatado}"), new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+                pdf.set_font(fonte_padrao, "", 9)
                 pdf.set_x(200)
-                pdf.cell(85, 5, titulo_pdf, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
+                pdf.cell(85, 5, _limpar_ascii(titulo_pdf), new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
                 pdf.set_text_color(0, 0, 0)
                 pdf.ln(12)
             else:
-                pdf.set_font("Helvetica", "I", 8)
+                pdf.set_font(fonte_padrao, "I", 8)
                 pdf.set_text_color(100, 100, 100)
-                pdf.cell(0, 5, f"COFEN/BR - {titulo_pdf} - PerÃ­odo: {periodo_formatado} (ContinuaÃ§Ã£o)",
+                pdf.cell(0, 5, _limpar_ascii(f"COFEN/BR - {titulo_pdf} - Periodo: {periodo_formatado} (Continuacao)"),
                          new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
                 pdf.ln(2)
             pdf.set_fill_color(230, 240, 250)
-            pdf.set_font("Helvetica", "B", 6) 
+            pdf.set_font(fonte_padrao, "B", 6) 
             pdf.set_text_color(0, 0, 0)
             start_y = pdf.get_y()
             x_start = pdf.get_x()
@@ -350,7 +418,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 if col_w[j] > 0:
                     pdf.rect(pdf.get_x(), start_y, col_w[j], 10, style='DF')
                     pdf.set_xy(pdf.get_x(), start_y + 1)
-                    pdf.multi_cell(col_w[j], 4, h, border=0, align="C")
+                    pdf.multi_cell(col_w[j], 4, _limpar_ascii(h), border=0, align="C")
                     pdf.set_xy(x_start + sum(col_w[:j+1]), start_y)
             pdf.set_xy(x_start, start_y + 10)
         pdf.add_page()
@@ -359,7 +427,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             num_lines = 1
             for j in range(len(col_w)):
                 if col_w[j] > 0 and j < len(row):
-                    txt = str(row[j]).encode('latin-1', 'replace').decode('latin-1') or " "
+                    txt = _limpar_ascii(row[j]) or " "
                     lines = pdf.multi_cell(col_w[j], 5, txt, dry_run=True, output="LINES")
                     num_lines = max(num_lines, len(lines))
             actual_h = 5 * num_lines
@@ -380,7 +448,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             for j in range(len(col_w)):
                 if col_w[j] == 0 or j >= len(row):
                     continue
-                txt = str(row[j]).encode('latin-1', 'replace').decode('latin-1')
+                txt = _limpar_ascii(row[j])
                 if tipo in ["BALANCETE", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]:
                     align = "L" if j in [0, 3] else "R" if tipo == "DVP" else ("L" if j == 0 else "R")
                 elif tipo == "BALANCO_FINANCEIRO":
@@ -391,11 +459,11 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                     align = "L" if j in [0, 3] else "R"
                 if align == "L":
                     pdf.set_xy(x + sum(col_w[:j]) + 1, y + 0.5)
-                    pdf.multi_cell(col_w[j], 5, txt, border=0, align="L")
+                    pdf.multi_cell(col_w[j], 5, _limpar_ascii(txt), border=0, align="L")
                 else:
                     center_y = y + (actual_h - 5) / 2
                     pdf.set_xy(x + sum(col_w[:j]), center_y)
-                    pdf.cell(col_w[j], 5, txt, align="R", border=0)
+                    pdf.cell(col_w[j], 5, _limpar_ascii(txt), align="R", border=0)
             pdf.set_xy(x, y + actual_h)
         # =======================================================
         # LÃ“GICA ESPECÃFICA PARA O DVP
@@ -484,7 +552,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                         start_idx = i + 1
                         break
                 elif tipo == "BALANCO_FINANCEIRO":
-                    if "ESPECIFICAÃ‡ÃƒO" in joined and "EXERCÃCIO ATUAL" in joined:
+                    if "ESPECIFICACAO" in joined and "EXERCÃCIO ATUAL" in joined:
                         start_idx = i + 1
                         break
                 elif "CONTA" in joined and "SALDO" in joined:
@@ -507,9 +575,9 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                     is_total = True
                 elif any(k in row_text for k in ["ATIVO", "PASSIVO", "PATRIMÃ”NIO", "COMPENSAÃ‡Ã•ES", "QUADRO", "FLUXO DE CAIXA DAS ATIVIDADES"]):
                     is_header = True
-                if is_header: pdf.set_font("Helvetica", "B", 7.5)
-                elif is_total: pdf.set_font("Helvetica", "B", 7)
-                else:          pdf.set_font("Helvetica", "", 7)
+                if is_header: pdf.set_font(fonte_padrao, "B", 7.5)
+                elif is_total: pdf.set_font(fonte_padrao, "B", 7)
+                else:          pdf.set_font(fonte_padrao, "", 7)
                 draw_row(row, is_header, is_total, idx)
         out = pdf.output()
         pdf_bytes = bytes(out)
@@ -955,11 +1023,11 @@ async def api_panorama(periodo: str):
             return json.loads(row[0]) if row else []
         # === REGRA DE INTEGRIDADE: verifica se os 6 demonstrativos existem ===
         demonstrativos = {
-            "BALANCO_PATRIMONIAL": "BalanÃ§o Patrimonial",
-            "BALANCO_ORCAMENTARIO": "BalanÃ§o OrÃ§amentÃ¡rio",
-            "BALANCO_FINANCEIRO": "BalanÃ§o Financeiro",
-            "DFC": "DemonstraÃ§Ã£o do Fluxo de Caixa",
-            "DVP": "DemonstraÃ§Ã£o das VariaÃ§Ãµes Patrimoniais",
+            "BALANCO_PATRIMONIAL": "Balanço Patrimonial",
+            "BALANCO_ORCAMENTARIO": "Balanço Orçamentário",
+            "BALANCO_FINANCEIRO": "Balanço Financeiro",
+            "DFC": "Demonstração do Fluxo de Caixa",
+            "DVP": "Demonstração das Variações Patrimoniais",
             "DMPL": "DemonstraÃ§Ã£o das MutaÃ§Ãµes do PL",
         }
         faltando = []
@@ -1284,7 +1352,7 @@ async def api_analise_orcamentaria_bo(periodo: str):
         from matriz_integridade import _get_csv
         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho_check or not os.path.exists(caminho_check):
-            return {"erro": "faltando", "pecas": ["BalanÃ§o OrÃ§amentÃ¡rio"]}
+            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho or not os.path.exists(caminho):
@@ -1357,7 +1425,7 @@ async def api_composicao_rd(periodo: str):
         from matriz_integridade import _get_csv
         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho_check or not os.path.exists(caminho_check):
-            return {"erro": "faltando", "pecas": ["BalanÃ§o OrÃ§amentÃ¡rio"]}
+            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho or not os.path.exists(caminho):
@@ -1436,7 +1504,7 @@ async def api_analise_financeira_bf(periodo: str):
         from matriz_integridade import _get_csv
         caminho_check = _get_csv("BALANCO_FINANCEIRO", periodo)
         if not caminho_check or not os.path.exists(caminho_check):
-            return {"erro": "faltando", "pecas": ["BalanÃ§o Financeiro"]}
+            return {"erro": "faltando", "pecas": ["Balanço Financeiro"]}
         from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
         if not caminho or not os.path.exists(caminho):
@@ -1560,11 +1628,11 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         # Cabecalho azul escuro
         pdf.set_fill_color(0, 51, 102)
         pdf.rect(0, 0, 210, 35, "F")
-        pdf.set_font("Helvetica", "B", 22)
+        pdf.set_font(fonte_padrao, "B", 22)
         pdf.set_text_color(255, 255, 255)
         pdf.set_xy(15, 8)
         pdf.cell(180, 10, "Balanco Financeiro", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 13)
+        pdf.set_font(fonte_padrao, "", 13)
         pdf.set_xy(15, 20)
         pdf.cell(180, 8, f"Periodo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         # Linha amarela
@@ -1586,10 +1654,10 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_fill_color(232, 244, 248)
         pdf.rect(15, y_pos, card_w, card_h, "F")
         pdf.set_text_color(0, 51, 102)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(fonte_padrao, "B", 12)
         pdf.set_xy(18, y_pos + 4)
         pdf.cell(card_w - 6, 8, fmt(d["receitas"]["total"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 9)
+        pdf.set_font(fonte_padrao, "", 9)
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(18, y_pos + 15)
         pdf.cell(card_w - 6, 5, "Total de Receitas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -1597,10 +1665,10 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_fill_color(248, 232, 232)
         pdf.rect(77, y_pos, card_w, card_h, "F")
         pdf.set_text_color(220, 53, 69)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(fonte_padrao, "B", 12)
         pdf.set_xy(80, y_pos + 4)
         pdf.cell(card_w - 6, 8, fmt(d["despesas"]["total"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 9)
+        pdf.set_font(fonte_padrao, "", 9)
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(80, y_pos + 15)
         pdf.cell(card_w - 6, 5, "Total de Despesas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -1608,17 +1676,17 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_fill_color(238, 245, 232)
         pdf.rect(139, y_pos, card_w, card_h, "F")
         pdf.set_text_color(40, 167, 69)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(fonte_padrao, "B", 12)
         pdf.set_xy(142, y_pos + 4)
         pdf.cell(card_w - 6, 8, fmt(d["caixa"]["saldo_seguinte"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 9)
+        pdf.set_font(fonte_padrao, "", 9)
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(142, y_pos + 15)
         pdf.cell(card_w - 6, 5, "Saldo p/ Exerc. Seguinte", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         # --- TABELA DETALHADA ---
         y_pos += 40
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_font(fonte_padrao, "B", 10)
         pdf.set_fill_color(0, 51, 102)
         pdf.set_text_color(255, 255, 255)
         pdf.set_xy(15, y_pos)
@@ -1630,13 +1698,13 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_text_color(0, 0, 0)
         pdf.set_draw_color(0, 51, 102)
         pdf.set_line_width(0.2)
-        pdf.set_font("Helvetica", "", 9)
+        pdf.set_font(fonte_padrao, "", 9)
         def add_linha(nome, at, ant, bold=False, fill_color=None):
             nonlocal y_pos
             if bold:
-                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_font(fonte_padrao, "B", 9)
             else:
-                pdf.set_font("Helvetica", "", 9)
+                pdf.set_font(fonte_padrao, "", 9)
             if fill_color:
                 pdf.set_fill_color(*fill_color)
             pdf.set_xy(15, y_pos)
@@ -1647,7 +1715,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
             y_pos += 7
         # Grupo Receitas
         pdf.set_fill_color(232, 244, 248)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
         pdf.cell(170, 7, "RECEITAS", border=1, fill=True)
         pdf.ln()
@@ -1657,7 +1725,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         add_linha("TOTAL DE RECEITAS", d["receitas"]["total"]["atual"], d["receitas"]["total"]["anterior"], bold=True)
         # Grupo Despesas
         pdf.set_fill_color(248, 232, 232)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
         pdf.cell(170, 7, "DESPESAS", border=1, fill=True)
         pdf.ln()
@@ -1667,7 +1735,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         add_linha("TOTAL DE DESPESAS", d["despesas"]["total"]["atual"], d["despesas"]["total"]["anterior"], bold=True)
         # Grupo Extraorcamentario
         pdf.set_fill_color(240, 240, 240)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
         pdf.cell(170, 7, "EXTRAORCAMENTARIO", border=1, fill=True)
         pdf.ln()
@@ -1676,7 +1744,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         add_linha("Pagamentos Extraorcamentarios", d["extra"]["pagamentos"]["atual"], d["extra"]["pagamentos"]["anterior"])
         # Grupo Caixa
         pdf.set_fill_color(238, 245, 232)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
         pdf.cell(170, 7, "CAIXA E EQUIVALENTES", border=1, fill=True)
         pdf.ln()
@@ -1689,7 +1757,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_line_width(0.3)
         pdf.line(15, 285, 195, 285)
         pdf.set_text_color(120, 120, 120)
-        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_font(fonte_padrao, "I", 8)
         pdf.set_xy(15, 287)
         pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
         from datetime import datetime
@@ -2031,11 +2099,11 @@ async def gerar_pdf_analise_patrimonial(id: int):
         # Cabecalho azul escuro
         pdf.set_fill_color(0, 51, 102)
         pdf.rect(0, 0, 210, 35, "F")
-        pdf.set_font("Helvetica", "B", 22)
+        pdf.set_font(fonte_padrao, "B", 22)
         pdf.set_text_color(255, 255, 255)
         pdf.set_xy(15, 8)
         pdf.cell(180, 10, "DVP - Demonstração das Variações Patrimoniais", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 13)
+        pdf.set_font(fonte_padrao, "", 13)
         pdf.set_xy(15, 20)
         pdf.cell(180, 8, f"Período: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         # Linha amarela
@@ -2057,10 +2125,10 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_fill_color(232, 244, 248)
         pdf.rect(15, y_pos, card_w, card_h, "F")
         pdf.set_text_color(0, 51, 102)
-        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_font(fonte_padrao, "B", 14)
         pdf.set_xy(20, y_pos + 5)
         pdf.cell(card_w, 10, fmt_mi(d['total_vpa']['atual']), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 10)
+        pdf.set_font(fonte_padrao, "", 10)
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(20, y_pos + 20)
         pdf.cell(card_w, 5, "Total VPA (Variações Aumentativas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -2068,10 +2136,10 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_fill_color(248, 232, 232)
         pdf.rect(105, y_pos, card_w, card_h, "F")
         pdf.set_text_color(220, 53, 69)
-        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_font(fonte_padrao, "B", 14)
         pdf.set_xy(110, y_pos + 5)
         pdf.cell(card_w, 10, fmt_mi(d['total_vpd']['atual']), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 10)
+        pdf.set_font(fonte_padrao, "", 10)
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(110, y_pos + 20)
         pdf.cell(card_w, 5, "Total VPD (Variações Diminutivas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -2081,13 +2149,13 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.rect(15, y_pos, 180, 40, "F")
         cor_res = (0, 51, 102) if d['resultado']['atual'] >= 0 else (220, 53, 69)
         pdf.set_text_color(*cor_res)
-        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_font(fonte_padrao, "B", 12)
         pdf.set_xy(20, y_pos + 5)
         pdf.cell(180, 5, d['tipo_resultado']['atual'], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "B", 24)
+        pdf.set_font(fonte_padrao, "B", 24)
         pdf.set_xy(20, y_pos + 12)
         pdf.cell(180, 10, fmt_mi(d['resultado']['atual']), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 10)
+        pdf.set_font(fonte_padrao, "", 10)
         pdf.set_text_color(100, 100, 100)
         pdf.set_xy(20, y_pos + 28)
         pdf.cell(180, 5, "(Total VPA - Total VPD)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -2099,7 +2167,7 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_draw_color(0, 51, 102)
         pdf.set_line_width(0.2)
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_font(fonte_padrao, "B", 10)
         pdf.set_fill_color(0, 51, 102)
         pdf.set_text_color(255, 255, 255)
         pdf.set_xy(15, y_pos)
@@ -2109,13 +2177,13 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.ln()
         y_pos += 8
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Helvetica", "", 9)
+        pdf.set_font(fonte_padrao, "", 9)
         def add_linha(nome, at, ant, bold=False):
             nonlocal y_pos
             if bold:
-                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_font(fonte_padrao, "B", 9)
             else:
-                pdf.set_font("Helvetica", "", 9)
+                pdf.set_font(fonte_padrao, "", 9)
             pdf.set_xy(15, y_pos)
             pdf.cell(90, 7, nome, border=1)
             pdf.cell(40, 7, f"R$ {fmt_mi(at)}", border=1, align="R")
@@ -2124,7 +2192,7 @@ async def gerar_pdf_analise_patrimonial(id: int):
             y_pos += 7
         # Bloco VPA
         pdf.set_fill_color(232, 244, 248)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
         pdf.cell(170, 7, "VPA - VARIAÇÕES PATRIMONIAIS AUMENTATIVAS", border=1, fill=True)
         pdf.ln()
@@ -2136,7 +2204,7 @@ async def gerar_pdf_analise_patrimonial(id: int):
         add_linha("TOTAL VPA", d['total_vpa']['atual'], d['total_vpa']['anterior'], bold=True)
         # Bloco VPD
         pdf.set_fill_color(248, 232, 232)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
         pdf.cell(170, 7, "VPD - VARIAÇÕES PATRIMONIAIS DIMINUTIVAS", border=1, fill=True)
         pdf.ln()
@@ -2156,7 +2224,7 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_line_width(0.3)
         pdf.line(15, 285, 195, 285)
         pdf.set_text_color(120, 120, 120)
-        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_font(fonte_padrao, "I", 8)
         pdf.set_xy(15, 287)
         pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
         from datetime import datetime
@@ -2689,10 +2757,10 @@ async def api_calcular_liquidez(periodo: str):
     # === REGRA DE INTEGRIDADE ===
     from matriz_integridade import _get_csv
     if not _get_csv("BALANCO_PATRIMONIAL", periodo):
-        return {"erro": "faltando", "pecas": ["BalanÃ§o Patrimonial"]}
+        return {"erro": "faltando", "pecas": ["Balanço Patrimonial"]}
     dados = _calc_liquidez(periodo)
     if not dados:
-        return {"erro": "faltando", "pecas": ["BalanÃ§o Patrimonial"]}
+        return {"erro": "faltando", "pecas": ["Balanço Patrimonial"]}
     return dados
 @app.delete("/excluir_liquidez/{id}")
 async def excluir_liquidez(id: int):
@@ -2916,7 +2984,7 @@ app.include_router(bf_router)
 def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_completo.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        html_content = f.read()
+        html_content = _corrigir_encoding(f.read())
     pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
     # Substitui o texto descritivo
     html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
@@ -2927,7 +2995,7 @@ def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
 def serve_custo_pessoal_pdf_resumo(entidade: str = "COFEN"):
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_resumo.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        html_content = f.read()
+        html_content = _corrigir_encoding(f.read())
     pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
     # Substitui o texto descritivo
     html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
@@ -4436,3 +4504,84 @@ def serve_relatorio_despesas_v2():
         if os.path.exists(caminho):
             return FileResponse(caminho)
     return {"erro": True, "mensagem": "Relatorio nao encontrado"}
+
+@app.get("/download/pdf_csv/{tipo}")
+async def download_pdf_csv(tipo: str, ano: int = Query(2026), periodo: str = Query("")):
+    from fpdf import FPDF
+    from fastapi.responses import Response
+    import os
+    
+    # Mapeia o tipo para o nome do arquivo
+    mapa = {
+        "COMPARATIVO_DESPESAS": "COMPARATIVO_DESPESAS",
+        "COMPARATIVO_RECEITAS": "COMPARATIVO_RECEITAS",
+        "CENTRO_CUSTOS": "CENTRO_CUSTOS"
+    }
+    
+    prefixo = mapa.get(tipo.upper(), tipo.upper())
+    # Procura o arquivo mais recente com esse prefixo
+    pasta = r"C:\Users\Marcelo Medeiros\pc_sistema\pc_storage\uploads_raw"
+    arquivo = None
+    for f in sorted(os.listdir(pasta), reverse=True):
+        if f.startswith(prefixo) and f.endswith(".csv"):
+            arquivo = os.path.join(pasta, f)
+            break
+    
+    if not arquivo:
+        return {"erro": True, "mensagem": f"Arquivo CSV para {tipo} não encontrado."}
+    
+    # Lê o CSV
+    try:
+        with open(arquivo, "r", encoding="utf-8-sig") as f:
+            linhas = f.readlines()
+    except:
+        with open(arquivo, "r", encoding="latin-1") as f:
+            linhas = f.readlines()
+    
+    # Gera o PDF
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=10)
+    pdf.add_page()
+    
+    # Título
+    pdf.set_font("Helvetica", "B", 16)
+    titulo = tipo.replace("_", " ").title()
+    pdf.cell(0, 10, f"Relatório - {titulo}", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 8, f"Arquivo: {os.path.basename(arquivo)}", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.ln(5)
+    
+    # Cabeçalho da tabela
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_fill_color(0, 114, 186)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(80, 8, "Descrição", border=1, fill=True, align="C")
+    pdf.cell(30, 8, "Orçado", border=1, fill=True, align="C")
+    pdf.cell(30, 8, "Realizado", border=1, fill=True, align="C")
+    pdf.cell(30, 8, "%", border=1, fill=True, align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(0, 0, 0)
+    
+    # Dados (pula linhas de cabeçalho)
+    count = 0
+    for linha in linhas:
+        if ";" not in linha: continue
+        partes = linha.strip().split(";")
+        if len(partes) < 3: continue
+        nome = partes[0].strip().strip('"')[:50]
+        if not nome or "COFEN" in nome.upper() or "PERIODO" in nome.upper(): continue
+        orcado = partes[1].strip() if len(partes) > 1 else ""
+        realizado = partes[2].strip() if len(partes) > 2 else ""
+        pct = partes[3].strip() if len(partes) > 3 else ""
+        if not orcado or orcado == "Orçado": continue
+        
+        pdf.set_font("Helvetica", "", 7)
+        pdf.cell(80, 6, nome, border=1)
+        pdf.cell(30, 6, orcado, border=1, align="R")
+        pdf.cell(30, 6, realizado, border=1, align="R")
+        pdf.cell(30, 6, pct, border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+        count += 1
+        if count > 60: break
+    
+    out = pdf.output()
+    return Response(content=bytes(out), media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="relatorio_{tipo}_{ano}.pdf"'})

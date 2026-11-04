@@ -294,7 +294,7 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
                             <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.periodo}</td>
                             <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">
                                 <div style="display: flex; gap: 5px; justify-content: center;">
-                                    <button onclick="gerarPdfLista('${item.tipo}')" style="padding: 5px 10px; background: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">PDF</button>
+                                    <button onclick="gerarPdfLista('${item.nome}')" style="padding: 5px 10px; background: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">PDF</button>
                                     <button onclick="excluirRelatorio('${item.nome}')" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Excluir</button>
                                 </div>
                             </td>
@@ -302,7 +302,21 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
                     });
                     tbody.innerHTML = html;
                 }
-                function gerarPdfLista(tipo) { window.open('/download/pdf/' + tipo, '_blank'); }
+                function gerarPdfLista(nomeArquivo) {
+                    // Extrai o tipo do nome do arquivo
+                    let tipo = nomeArquivo.replace('.csv', '');
+                    tipo = tipo.replace(/_[0-9]{4}_[A-Z]+_[0-9]+$/, '');
+                    let tipoUpper = tipo.toUpperCase();
+                    
+                    // Tipos que usam a rota /download/pdf_csv/ (PDF direto do CSV)
+                    const tiposCsv = ['COMPARATIVO_DESPESAS', 'COMPARATIVO_RECEITAS', 'CENTRO_CUSTOS'];
+                    
+                    if (tiposCsv.includes(tipoUpper)) {
+                        window.open('/download/pdf_csv/' + tipo, '_blank');
+                    } else {
+                        window.open('/download/pdf/' + tipo, '_blank');
+                    }
+                }
                 function excluirRelatorio(nomeArquivo) {
                     if (!confirm("Excluir " + nomeArquivo + "?")) return;
                     fetch('/api/excluir_relatorio/' + nomeArquivo, { method: 'DELETE' })
