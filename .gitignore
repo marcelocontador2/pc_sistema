@@ -49,3 +49,9 @@ pc_backend/*.ttf
 /desabilitar_*.py
 /auditar_*.py
 /fix_*.py
+# === Ignorar dados locais ===
+_arquivo_20261031/
+_backups_arquivo/
+pc_backend/pc_storage/
+pc_storage/banco_dados.db
+pc_storage/uploads_raw/*.csv
