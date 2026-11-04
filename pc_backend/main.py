@@ -4987,3 +4987,70 @@ async def download_pdf_csv(tipo: str, ano: int = Query(2026), periodo: str = Que
     out = pdf.output()
     return Response(content=bytes(out), media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="relatorio_{tipo}_{ano}.pdf"'})
+
+
+# ============================================================
+# ROTAS DE CONFIGURACOES (CADASTRO DA ENTIDADE)
+# ============================================================
+
+@app.get('/api/configuracoes/entidade')
+async def obter_entidade():
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pc_storage', 'banco_dados.db')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS configuracoes_entidade (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
+        email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT,
+        contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT)''')
+    conn.commit()
+    cursor.execute('SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1')
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return {'razao_social': '', 'nome_fantasia': '', 'cnpj': '', 'endereco': '', 'email': '', 'telefone': '', 'contador_nome': '', 'contador_crc': '', 'contador_uf': '', 'contador_cpf': '', 'contador_email': ''}
+    return {'razao_social': row[1] or '', 'nome_fantasia': row[2] or '', 'cnpj': row[3] or '', 'endereco': row[4] or '', 'email': row[5] or '', 'telefone': row[6] or '', 'contador_nome': row[7] or '', 'contador_crc': row[8] or '', 'contador_uf': row[9] or '', 'contador_cpf': row[10] or '', 'contador_email': row[11] or ''}
+
+@app.post('/api/configuracoes/entidade')
+async def salvar_entidade(request: Request):
+    import sqlite3
+    from datetime import datetime
+    try:
+        body = await request.json()
+    except Exception:
+        return {'ok': False, 'mensagem': 'Dados invalidos.'}
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pc_storage', 'banco_dados.db')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS configuracoes_entidade (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
+        email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT,
+        contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT)''')
+    data_agora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cursor.execute('DELETE FROM configuracoes_entidade')
+    cursor.execute('''INSERT INTO configuracoes_entidade
+        (razao_social, nome_fantasia, cnpj, endereco, email, telefone, contador_nome, contador_crc, contador_uf, contador_cpf, contador_email, data_atualizacao)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+        body.get('razao_social', ''),
+        body.get('nome_fantasia', ''),
+        body.get('cnpj', ''),
+        body.get('endereco', ''),
+        body.get('email', ''),
+        body.get('telefone', ''),
+        body.get('contador_nome', ''),
+        body.get('contador_crc', ''),
+        body.get('contador_uf', ''),
+        body.get('contador_cpf', ''),
+        body.get('contador_email', ''),
+        data_agora))
+    conn.commit()
+    conn.close()
+    return {'ok': True, 'mensagem': 'Configuracoes salvas com sucesso!'}
+
+@app.get('/configuracoes')
+async def serve_configuracoes():
+    from fastapi.responses import FileResponse
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pc_frontend', 'configuracoes.html')
+    return FileResponse(caminho, headers={'Cache-Control': 'no-store, no-cache, must-revalidate'})
