@@ -3934,7 +3934,7 @@ def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3", hist
 @app.get("/api/comparativo_despesas_v2/{periodo_atual}")
 def api_comparativo_despesas_v2(periodo_atual: str):
     import os, unicodedata
-    upload_dir = r"C:\Users\Marcelo Medeiros\pc_sistema\pc_storage\uploads_raw"
+    upload_dir = r"C:\\Users\\Marcelo Medeiros\\pc_sistema\\pc_storage\\uploads_raw"
     
     partes = periodo_atual.split("-")
     if len(partes) == 3:
@@ -3980,18 +3980,39 @@ def api_comparativo_despesas_v2(periodo_atual: str):
                 
             dados = {
                 "orcado_total": 0.0, "empenhado_total": 0.0, "liquidado_total": 0.0,
-                "percentual_total": 0.0, "grupos": []
+                "percentual_total": 0.0, "grupos": [], "detalhes": []
             }
             
-            grupos_alvo = [
-                "PESSOAL E ENCARGOS SOCIAIS",
-                "JUROS E ENCARGOS DA DIVIDA",
-                "OUTRAS DESPESAS CORRENTES",
-                "INVESTIMENTOS",
-                "INVERSOES FINANCEIRAS",
-                "AMORTIZACAO DA DIVIDA"
+            # Lista fixa de cabeçalhos que NÃO são contas analíticas
+            cabecalhos = [
+                "CREDITO DISPONIVEL", "CREDITO DISPONIVEL - DESPESA CORRENTE",
+                "CREDITO DISPONIVEL - DESPESA CAPITAL",
+                "PESSOAL E ENCARGOS SOCIAIS", "JUROS E ENCARGOS DA DIVIDA",
+                "OUTRAS DESPESAS CORRENTES", "INVESTIMENTOS",
+                "INVERSOES FINANCEIRAS", "AMORTIZACAO DA DIVIDA",
+                "APLICACOES DIRETAS", "APLICACOES INDIRETAS",
+                "OUTROS SERVICOS DE TERCEIROS - PESSOA JURIDICA",
+                "DEMAIS SERVICOS - PESSOAS JURIDICAS",
+                "APOSENTADORIAS DO RPPS", "PROVENTOS - PESSOAL CIVIL",
+                "VENCIMENTOS E VANTAGENS FIXAS - PESSOAL CIVIL",
+                "OUTRAS DESPESAS VARIAVEIS - PESSOAL CIVIL - RGPS",
+                "RESSARCIMENTO DE DESPESAS DE PESSOAL REQUISITADO",
+                "JUROS SOBRE A DIVIDA POR CONTRATO",
+                "JUROS DE SOBRE FORNECIMENTO DE BENS",
+                "JUROS DE SERVICOS DE TERCEIROS - PESSOA JURIDICA",
+                "JUROS DE SERVICOS DE TERCEIROS - PESSOA FISICA",
+                "OUTROS JUROS E ENCARGOS DE MORA",
+                "DESPESAS DE EXERCICIOS ANTERIORES (JUROS E ENCARGOS DAS DIVIDAS)",
+                "OUTRAS DESPESAS DE PESSOAL DECORRENTES DE CONTRATOS DE TERCEIROS",
+                "OUTRAS DESPESAS CORRENTES - APLICACOES DIRETAS",
+                "INVESTIMENTOS - APLICACOES DIRETAS",
+                "INVERSOES FINANCEIRAS - APLICACOES DIRETAS",
+                "AMORTIZACAO DA DIVIDA - APLICACOES DIRETAS",
+                "TOTAL", "TOTAL GERAL"
             ]
-            grupos_alvo_norm = [normalizar(g) for g in grupos_alvo]
+            cabecalhos_norm = [normalizar(cg) for cg in cabecalhos]
+            
+            detalhes_temp = []
             
             for linha in linhas:
                 if ";" not in linha: continue
@@ -4001,12 +4022,24 @@ def api_comparativo_despesas_v2(periodo_atual: str):
                 nome_original = partes_linha[0].strip().strip('"')
                 nome_norm = normalizar(nome_original)
                 
+                if not nome_original or len(nome_original) < 3: continue
+                
+                # Total Global
                 if nome_norm == "CREDITO DISPONIVEL":
                     dados["orcado_total"] = parse_valor(partes_linha[1])
                     dados["empenhado_total"] = parse_valor(partes_linha[2])
                     dados["liquidado_total"] = parse_valor(partes_linha[2])
                     dados["percentual_total"] = parse_pct(partes_linha[3])
                     
+                # Grupos contábeis
+                grupos_alvo_norm = [
+                    "PESSOAL E ENCARGOS SOCIAIS",
+                    "JUROS E ENCARGOS DA DIVIDA",
+                    "OUTRAS DESPESAS CORRENTES",
+                    "INVESTIMENTOS",
+                    "INVERSOES FINANCEIRAS",
+                    "AMORTIZACAO DA DIVIDA"
+                ]
                 if nome_norm in grupos_alvo_norm:
                     if not any(g["nome"] == nome_original for g in dados["grupos"]):
                         dados["grupos"].append({
@@ -4016,25 +4049,23 @@ def api_comparativo_despesas_v2(periodo_atual: str):
                             "liquidado": parse_valor(partes_linha[2]),
                             "percentual": parse_pct(partes_linha[3])
                         })
-            
-            # === REGRA MATEMÁTICA DE FECHAMENTO ===
-            soma_grupos_orcado = sum(g["orcado"] for g in dados["grupos"])
-            soma_grupos_empenhado = sum(g["empenhado"] for g in dados["grupos"])
-            
-            # Se a soma for menor que o total (com tolerância para arredondamento), adiciona a diferença
-            if dados["orcado_total"] > soma_grupos_orcado + 1.0:
-                diff_orcado = dados["orcado_total"] - soma_grupos_orcado
-                diff_empenhado = dados["empenhado_total"] - soma_grupos_empenhado
-                diff_pct = (diff_empenhado / diff_orcado * 100) if diff_orcado > 0 else 0
                 
-                dados["grupos"].append({
-                    "nome": "OUTRAS DESPESAS (DIVERSAS)",
-                    "orcado": diff_orcado,
-                    "empenhado": diff_empenhado,
-                    "liquidado": diff_empenhado,
-                    "percentual": diff_pct
-                })
-                
+                # Detalhes: exclui cabeçalhos e pega o resto com valor > 0
+                valor_emp = parse_valor(partes_linha[2])
+                if valor_emp > 0 and nome_norm not in cabecalhos_norm:
+                    # Exclui também linhas com "TOTAL" no nome (são somatórios)
+                    if "TOTAL" not in nome_norm and "SUBTOTAL" not in nome_norm:
+                        detalhes_temp.append({
+                            "nome": nome_original,
+                            "orcado": parse_valor(partes_linha[1]),
+                            "empenhado": valor_emp,
+                            "percentual": parse_pct(partes_linha[3])
+                        })
+            
+            # Ordena por empenhado desc e pega top 10
+            detalhes_temp.sort(key=lambda x: x["empenhado"], reverse=True)
+            dados["detalhes"] = detalhes_temp[:10]
+            
             return dados
         except Exception as e:
             print(f"[ERRO] Falha ao ler CSV: {e}")
@@ -4053,11 +4084,9 @@ def api_comparativo_despesas_v2(periodo_atual: str):
         "atual": atual,
         "anterior": anterior or {
             "orcado_total": 0.0, "empenhado_total": 0.0, "liquidado_total": 0.0,
-            "percentual_total": 0.0, "grupos": []
+            "percentual_total": 0.0, "grupos": [], "detalhes": []
         }
     }
-
-
 @app.get("/historico_comparativo_despesas")
 def get_historico_comparativo_despesas():
     import sqlite3, os
@@ -4172,9 +4201,9 @@ def gerar_pdf_comparativo_despesas(periodo_atual: str = "2026-TRIMESTRE-3", hist
     from fastapi.responses import Response
     import time, os
     if historico_id:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas?historico_id={historico_id}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas?periodo_atual={periodo_atual}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?periodo_atual={periodo_atual}&_t={int(time.time())}"
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(bypass_csp=True)
@@ -4395,3 +4424,15 @@ def excluir_historico_receitas(id: int):
     conn.close()
     return {"erro": False}
 
+
+@app.get("/relatorio_comparativo_despesas_v2")
+def serve_relatorio_despesas_v2():
+    from fastapi.responses import FileResponse
+    import os
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Procura o _v2 primeiro, senão o sem _v2
+    for nome in ["relatorio_comparativo_despesas_v2.html", "relatorio_comparativo_despesas.html"]:
+        caminho = os.path.join(base, "pc_frontend", nome)
+        if os.path.exists(caminho):
+            return FileResponse(caminho)
+    return {"erro": True, "mensagem": "Relatorio nao encontrado"}
