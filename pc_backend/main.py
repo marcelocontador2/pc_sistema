@@ -1685,7 +1685,10 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         from fastapi.responses import Response
         from app.routers.balanco_financeiro import processar_bf
         import sqlite3, os
-        # Buscar o periodo no historico
+        from datetime import datetime
+
+        fonte_padrao = "Helvetica"  # Definicao da fonte
+
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -1693,20 +1696,22 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         row = cursor.fetchone()
         conn.close()
         periodo = row[0] if row else "2026-TRIMESTRE-3"
-        # Calcular os dados
-        # Extrair apenas o periodo atual (ignorar a comparacao "vs ...")
+
         periodo_atual = periodo.split(" vs ")[0].strip() if " vs " in periodo else periodo
         p_limpo = periodo_atual.replace("-", "_")
         caminho_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", f"BALANCO_FINANCEIRO_{p_limpo}.csv")
+        
         if not os.path.exists(caminho_csv):
             raise Exception(f"Arquivo do Balanco Financeiro nao encontrado para {periodo}")
+
         resultado = processar_bf(caminho_csv)
         d = resultado["dados"]
-        # === MONTAR O PDF ===
+
         pdf = FPDF()
         pdf.add_page()
         pdf.set_auto_page_break(auto=False)
-        # Cabecalho azul escuro
+
+        # Cabecalho
         pdf.set_fill_color(0, 51, 102)
         pdf.rect(0, 0, 210, 35, "F")
         pdf.set_font(fonte_padrao, "B", 22)
@@ -1716,22 +1721,23 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_font(fonte_padrao, "", 13)
         pdf.set_xy(15, 20)
         pdf.cell(180, 8, f"Periodo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        # Linha amarela
+
         pdf.set_draw_color(0, 51, 102)
         pdf.set_line_width(1.5)
         pdf.line(0, 35, 210, 35)
-        # Funcao de formatacao
+
         def fmt(v):
             try:
                 s = f"R$ {v:,.2f}"
                 return s.replace(",", "X").replace(".", ",").replace("X", ".")
             except Exception:
                 return str(v)
+
         # --- CARDS DE TOTAIS ---
         y_pos = 50
         card_w = 55
         card_h = 25
-        # Card 1: Total Receitas
+
         pdf.set_fill_color(232, 244, 248)
         pdf.rect(15, y_pos, card_w, card_h, "F")
         pdf.set_text_color(0, 51, 102)
@@ -1742,7 +1748,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(18, y_pos + 15)
         pdf.cell(card_w - 6, 5, "Total de Receitas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        # Card 2: Total Despesas
+
         pdf.set_fill_color(248, 232, 232)
         pdf.rect(77, y_pos, card_w, card_h, "F")
         pdf.set_text_color(220, 53, 69)
@@ -1753,7 +1759,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(80, y_pos + 15)
         pdf.cell(card_w - 6, 5, "Total de Despesas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        # Card 3: Saldo Seguinte
+
         pdf.set_fill_color(238, 245, 232)
         pdf.rect(139, y_pos, card_w, card_h, "F")
         pdf.set_text_color(40, 167, 69)
@@ -1764,6 +1770,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(142, y_pos + 15)
         pdf.cell(card_w - 6, 5, "Saldo p/ Exerc. Seguinte", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
         # --- TABELA DETALHADA ---
         y_pos += 40
         pdf.set_text_color(0, 0, 0)
@@ -1776,11 +1783,13 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.cell(40, 8, "Periodo Anterior", border=1, fill=True, align="R")
         pdf.ln()
         y_pos += 8
+
         pdf.set_text_color(0, 0, 0)
         pdf.set_draw_color(0, 51, 102)
         pdf.set_line_width(0.2)
         pdf.set_font(fonte_padrao, "", 9)
-        def add_linha(nome, at, ant, bold=False, fill_color=None):
+
+        def add_linha(nome, at, ant, bold=False, fill_color=None, text_color=(0,0,0)):
             nonlocal y_pos
             if bold:
                 pdf.set_font(fonte_padrao, "B", 9)
@@ -1788,62 +1797,130 @@ async def gerar_pdf_analise_financeira_bf(id: int):
                 pdf.set_font(fonte_padrao, "", 9)
             if fill_color:
                 pdf.set_fill_color(*fill_color)
+            pdf.set_text_color(*text_color)
+            
             pdf.set_xy(15, y_pos)
-            pdf.cell(90, 7, nome, border=1, fill=bool(fill_color))
-            pdf.cell(40, 7, f"R$ {fmt(at)}", border=1, align="R", fill=bool(fill_color))
-            pdf.cell(40, 7, f"R$ {fmt(ant)}", border=1, align="R", fill=bool(fill_color))
+            pdf.cell(90, 6, nome, border=1, fill=bool(fill_color))
+            pdf.cell(40, 6, fmt(at), border=1, align="R", fill=bool(fill_color))
+            pdf.cell(40, 6, fmt(ant), border=1, align="R", fill=bool(fill_color))
             pdf.ln()
-            y_pos += 7
+            y_pos += 6
+
         # Grupo Receitas
         pdf.set_fill_color(232, 244, 248)
+        pdf.set_text_color(0, 0, 0)
         pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
-        pdf.cell(170, 7, "RECEITAS", border=1, fill=True)
+        pdf.cell(170, 6, "RECEITAS", border=1, fill=True)
         pdf.ln()
-        y_pos += 7
+        y_pos += 6
         add_linha("Receitas Correntes", d["receitas"]["corrente"]["atual"], d["receitas"]["corrente"]["anterior"])
         add_linha("Receitas de Capital", d["receitas"]["capital"]["atual"], d["receitas"]["capital"]["anterior"])
         add_linha("TOTAL DE RECEITAS", d["receitas"]["total"]["atual"], d["receitas"]["total"]["anterior"], bold=True)
+
         # Grupo Despesas
         pdf.set_fill_color(248, 232, 232)
         pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
-        pdf.cell(170, 7, "DESPESAS", border=1, fill=True)
+        pdf.cell(170, 6, "DESPESAS", border=1, fill=True)
         pdf.ln()
-        y_pos += 7
+        y_pos += 6
         add_linha("Despesas Correntes", d["despesas"]["corrente"]["atual"], d["despesas"]["corrente"]["anterior"])
         add_linha("Despesas de Capital", d["despesas"]["capital"]["atual"], d["despesas"]["capital"]["anterior"])
         add_linha("TOTAL DE DESPESAS", d["despesas"]["total"]["atual"], d["despesas"]["total"]["anterior"], bold=True)
+
         # Grupo Extraorcamentario
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
-        pdf.cell(170, 7, "EXTRAORCAMENTARIO", border=1, fill=True)
+        pdf.cell(170, 6, "EXTRAORCAMENTARIO", border=1, fill=True)
         pdf.ln()
-        y_pos += 7
+        y_pos += 6
         add_linha("Recebimentos Extraorcamentarios", d["extra"]["recebimentos"]["atual"], d["extra"]["recebimentos"]["anterior"])
         add_linha("Pagamentos Extraorcamentarios", d["extra"]["pagamentos"]["atual"], d["extra"]["pagamentos"]["anterior"])
+
         # Grupo Caixa
         pdf.set_fill_color(238, 245, 232)
         pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
-        pdf.cell(170, 7, "CAIXA E EQUIVALENTES", border=1, fill=True)
+        pdf.cell(170, 6, "CAIXA E EQUIVALENTES", border=1, fill=True)
         pdf.ln()
-        y_pos += 7
+        y_pos += 6
         add_linha("Saldo em Especie do Exercicio Anterior", d["caixa"]["saldo_anterior"]["atual"], d["caixa"]["saldo_anterior"]["anterior"])
         add_linha("Geracao Liquida de Caixa", d["caixa"]["geracao_liquida"]["atual"], d["caixa"]["geracao_liquida"]["anterior"], bold=True)
         add_linha("Saldo em Especie para o Exercicio Seguinte", d["caixa"]["saldo_seguinte"]["atual"], d["caixa"]["saldo_seguinte"]["anterior"], bold=True)
-        # Rodape
+
+        # ==========================================
+        # NOVOS TOTAIS (INGRESSOS E DISPENDIOS)
+        # ==========================================
+        y_pos += 5
+        
+        # Calculos de Ingressos
+        totRecAt = d["receitas"]["total"]["atual"]
+        totRecAnt = d["receitas"]["total"]["anterior"]
+        totExtAt = d["extra"]["recebimentos"]["atual"]
+        totExtAnt = d["extra"]["recebimentos"]["anterior"]
+        saldoAntAt = d["caixa"]["saldo_anterior"]["atual"]
+        saldoAntAnt = d["caixa"]["saldo_anterior"]["anterior"]
+
+        totalIngAt = totRecAt + totExtAt + saldoAntAt
+        totalIngAnt = totRecAnt + totExtAnt + saldoAntAnt
+
+        # Tabela de Ingressos
+        pdf.set_fill_color(0, 86, 179)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(fonte_padrao, "B", 10)
+        pdf.set_xy(15, y_pos)
+        pdf.cell(170, 6, "TOTAL GERAL DE INGRESSOS", border=1, fill=True)
+        pdf.ln()
+        y_pos += 6
+        
+        add_linha("Receitas Orcamentarias (Corrente + Capital)", totRecAt, totRecAnt)
+        add_linha("Recebimentos Extraorcamentarios", totExtAt, totExtAnt)
+        add_linha("Saldo em Especie do Exercicio Anterior", saldoAntAt, saldoAntAnt)
+        add_linha("TOTAL DE INGRESSOS", totalIngAt, totalIngAnt, bold=True, fill_color=(233, 236, 239), text_color=(0, 86, 179))
+
+        # Calculos de Dispêndios
+        y_pos += 5
+        totDespAt = d["despesas"]["total"]["atual"]
+        totDespAnt = d["despesas"]["total"]["anterior"]
+        pagExtAt = d["extra"]["pagamentos"]["atual"]
+        pagExtAnt = d["extra"]["pagamentos"]["anterior"]
+        saldoSegAt = d["caixa"]["saldo_seguinte"]["atual"]
+        saldoSegAnt = d["caixa"]["saldo_seguinte"]["anterior"]
+
+        totalDispAt = totDespAt + pagExtAt + saldoSegAt
+        totalDispAnt = totDespAnt + pagExtAnt + saldoSegAnt
+
+        # Tabela de Dispêndios
+        pdf.set_fill_color(220, 53, 69)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font(fonte_padrao, "B", 10)
+        pdf.set_xy(15, y_pos)
+        pdf.cell(170, 6, "TOTAL GERAL DE DISPENDIOS", border=1, fill=True)
+        pdf.ln()
+        y_pos += 6
+
+        add_linha("Despesas Orcamentarias (Corrente + Capital)", totDespAt, totDespAnt)
+        add_linha("Pagamentos Extraorcamentarios", pagExtAt, pagExtAnt)
+        add_linha("Saldo em Especie para o Exercicio Seguinte", saldoSegAt, saldoSegAnt)
+        add_linha("TOTAL DE DISPENDIOS", totalDispAt, totalDispAnt, bold=True, fill_color=(233, 236, 239), text_color=(220, 53, 69))
+
+        # Rodape - Posiciona dinamicamente, abaixo da ultima linha (se houver espaco)
+        y_rodape = max(y_pos + 5, 270)
+        if y_rodape > 280:
+            y_rodape = 280
+        
         pdf.set_draw_color(200, 200, 200)
         pdf.set_line_width(0.3)
-        pdf.line(15, 285, 195, 285)
+        pdf.line(15, y_rodape, 195, y_rodape)
         pdf.set_text_color(120, 120, 120)
         pdf.set_font(fonte_padrao, "I", 8)
-        pdf.set_xy(15, 287)
+        pdf.set_xy(15, y_rodape + 2)
         pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
-        from datetime import datetime
-        pdf.set_xy(135, 287)
+        pdf.set_xy(135, y_rodape + 2)
         pdf.cell(60, 5, f"Gerado em: {datetime.now():%d/%m/%Y %H:%M}", align="R")
+
         pdf_bytes = bytes(pdf.output())
         return Response(
             content=pdf_bytes,
@@ -1856,6 +1933,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
+
 @app.get("/analise_financeira_bf")
 async def serve_analise_financeira_bf():
     from fastapi.responses import FileResponse
@@ -2513,14 +2591,14 @@ async def gerar_pdf_analise_patrimonial(id: int):
             pdf.cell(40, 7, f"R$ {fmt_mi(at)}", border=1, align="R")
             pdf.cell(40, 7, f"R$ {fmt_mi(ant)}", border=1, align="R")
             pdf.ln()
-            y_pos += 7
+            y_pos += 6
         # Bloco VPA
         pdf.set_fill_color(232, 244, 248)
         pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
         pdf.cell(170, 7, "VPA - VARIAÇÕES PATRIMONIAIS AUMENTATIVAS", border=1, fill=True)
         pdf.ln()
-        y_pos += 7
+        y_pos += 6
         add_linha("VPA Financeiras", d['vpa_financeiras']['atual'], d['vpa_financeiras']['anterior'])
         add_linha("Transferências Recebidas", d['transf_recebidas']['atual'], d['transf_recebidas']['anterior'])
         add_linha("Outras VPA", d['outras_vpa']['atual'], d['outras_vpa']['anterior'])
@@ -2532,7 +2610,7 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_xy(15, y_pos)
         pdf.cell(170, 7, "VPD - VARIAÇÕES PATRIMONIAIS DIMINUTIVAS", border=1, fill=True)
         pdf.ln()
-        y_pos += 7
+        y_pos += 6
         add_linha("VPD Financeiras", d['vpd_financeiras']['atual'], d['vpd_financeiras']['anterior'])
         add_linha("Pessoal e Encargos", d['pessoal_encargos']['atual'], d['pessoal_encargos']['anterior'])
         add_linha("Uso de Material de Consumo", d['uso_material_consumo']['atual'], d['uso_material_consumo']['anterior'])
