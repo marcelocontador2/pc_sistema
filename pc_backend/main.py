@@ -941,12 +941,23 @@ def _calc_panorama(periodo):
     l_dvp = buscar_no_banco("DVP")
     conn.close()
     def buscar(linhas, termo, coluna):
+        # Procura o termo na coluna 0 (Ativo) ou 3 (Passivo)
+        # e pega o valor da coluna seguinte (1 para Ativo, 4 para Passivo)
+        termo_upper = termo.upper() if isinstance(termo, str) else termo[0].upper()
         for p in linhas:
-            if len(p) > coluna and termo.upper() in p[0].upper():
-                return abs(_limpar_valor(p[coluna]))
+            for col_espec in [0, 3]:
+                if len(p) > col_espec and termo_upper in str(p[col_espec]).upper():
+                    col_valor = col_espec + 1
+                    if len(p) > col_valor:
+                        try:
+                            v = abs(_limpar_valor(p[col_valor]))
+                            if v > 0:
+                                return v
+                        except:
+                            pass
         return 0.0
     ativo_total = buscar(l_bp, "TOTAL", 1)
-    passivo_total = buscar(l_bp, "TOTAL", 3)
+    passivo_total = buscar(l_bp, ["TOTAL"], 3)
     pl = 0.0
     for p in l_bp:
         if len(p) > 3 and "604.368.244,61" in p[3]:
@@ -1012,20 +1023,29 @@ async def api_panorama(periodo: str):
         l_dvp = buscar_no_banco("DVP")
         def buscar(linhas, termos, coluna):
             for p in linhas:
-                for celula in p:
-                    for termo in termos:
-                        if termo.upper() in str(celula).upper():
-                            if len(p) > coluna:
+                for termo in termos:
+                    termo_upper = termo.upper()
+                    # Procura o termo na coluna 0 (Ativo) ou 3 (Passivo)
+                    for col_espec in [0, 3]:
+                        if len(p) > col_espec and termo_upper in str(p[col_espec]).upper():
+                            # Pega o valor da coluna seguinte (1 para Ativo, 4 para Passivo)
+                            col_valor = col_espec + 1
+                            if len(p) > col_valor:
                                 try:
-                                    v = abs(_limpar_valor(p[coluna]))
+                                    v = abs(_limpar_valor(p[col_valor]))
                                     if v > 0:
                                         return v
                                 except:
                                     pass
             return 0.0
         # === BP ===
-        passivo_total = buscar(l_bp, ["TOTAL DO PASSIVO"], 3)
-        pl = buscar(l_bp, ["TOTAL DO PATRIMÔNIO LÍQUIDO", "TOTAL DO PATRIMONIO LIQUIDO"], 3)
+        # NOVO CSV: Passivo esta na coluna 3 (especificacao) e o valor na coluna 4
+        # Patrimonio Liquido esta na coluna 3 (especificacao) e o valor na coluna 4
+        # Usa a Definição 7 (que procura na coluna 0/3 e pega o valor da coluna seguinte)
+        passivo_total = buscar("TOTAL DO PASSIVO", 4)  # Definicao 7
+        pl = buscar("TOTAL DO PATRIMÔNIO LÍQUIDO", 4)  # Definicao 7
+        if pl == 0.0:
+            pl = buscar("RESULTADOS ACUMULADOS", 4)
         ativo_total = passivo_total + pl  # Ativo = Passivo + PL
         caixa_bp = buscar(l_bp, ["CAIXA E EQUIVALENTES", "CAIXA E EQUIVALENTE"], 1)
         superavit_financeiro = buscar(l_bp, ["SUPERÁVIT FINANCEIRO", "SUPERAVIT FINANCEIRO"], 2)
@@ -3155,264 +3175,21 @@ def _calc_liquidez(periodo):
     if not caminho_bp: return None
     l_bp = _ler_linhas(caminho_bp)
     def buscar(termo, coluna):
-        for p in l_bp:
-            if len(p) > coluna:
-                for celula in p:
-                    if termo.upper() in str(celula).upper():
-                        return abs(_limpar_valor(p[coluna]))
-        return 0.0
-    # --- BUSCA DOS VALORES EXATOS DO BP ---
-    ativo_circulante = buscar("ATIVO CIRCULANTE", 1)
-    caixa = buscar("CAIXA E EQUIVALENTES", 1)
-    estoques = buscar("ESTOQUES", 1) or buscar("ESTOQUES", 3)
-# Realizavel a Longo Prazo (RLP)
-    realizavel = 0.0
-    for _p in l_bp:
-        if len(_p) > 1 and "REALIZ" in str(_p[0]).upper():
-            realizavel = abs(_limpar_valor(_p[1]))
-            break
-    passivo_circulante = buscar("PASSIVO CIRCULANTE", 3) or buscar("ATIVO CIRCULANTE", 3)
-    passivo_nao_circulante = buscar("PASSIVO NAO-CIRCULANTE", 3) or buscar("PASSIVO NÃO CIRCULANTE", 3)
-    # Variáveis exatas do BP
-    ativo_permanente = 0.0
-    for _p in l_bp:
-        if len(_p) > 1:
-            _t0 = str(_p[0]).upper()
-            if "IMOBILIZADO" in _t0 or "INTANGIVEL" in _t0 or "INTANGÍVEL" in _t0:
-                ativo_permanente += abs(_limpar_valor(_p[1])) or (buscar("IMOBILIZADO", 1) + buscar("INTANGIVEL", 1))
-    patrimonio_liquido = buscar("TOTAL DO PATRIM", 3)
-    # --- CÁLCULO DA LIQUIDEZ ---
-    liq_imediata = (caixa / passivo_circulante) if passivo_circulante > 0 else 0
-    liq_corrente = (ativo_circulante / passivo_circulante) if passivo_circulante > 0 else 0
-    liq_seca = ((ativo_circulante - estoques) / passivo_circulante) if passivo_circulante > 0 else 0
-    denom_geral = passivo_circulante + passivo_nao_circulante
-    liq_geral = ((ativo_circulante + realizavel) / denom_geral) if denom_geral > 0 else 0
-    # --- CÁLCULO DA ESTRUTURA (BUSCA EXATA NO BP) ---
-    # Busca os totais exatos que já existem no BP
-    ativo_total = 0.0
-    for _p in l_bp:
-        if len(_p) > 1 and str(_p[0]).upper().strip() == "TOTAL":
-            _v = abs(_limpar_valor(_p[1]))
-            if _v > ativo_total:
-                ativo_total = _v
-    passivo_total = buscar("TOTAL DO PASSIVO", 3) or (passivo_circulante + passivo_nao_circulante)
-    endividamento_geral = round((passivo_total / ativo_total) * 100, 2) if ativo_total > 0 else 0
-    part_capital_terceiros = round((passivo_total / patrimonio_liquido) * 100, 2) if patrimonio_liquido > 0 else 0
-    imobilizacao_pl = round((ativo_permanente / patrimonio_liquido) * 100, 2) if patrimonio_liquido > 0 else 0
-    return {
-        "liquidez": {
-            "liquidez_imediata": round(liq_imediata, 2),
-            "liquidez_corrente": round(liq_corrente, 2),
-            "liquidez_seca": round(liq_seca, 2),
-            "liquidez_geral": round(liq_geral, 2)
-        },
-        "estrutura": {
-            "endividamento_geral": endividamento_geral,
-            "part_capital_terceiros": part_capital_terceiros,
-            "imobilizacao_pl": imobilizacao_pl
-        },
-        "valores": {
-            "ativo_circulante": ativo_circulante,
-            "passivo_circulante": passivo_circulante,
-            "caixa": caixa,
-            "estoques": estoques,
-            "realizavel": realizavel,
-            "passivo_nao_circulante": passivo_nao_circulante,
-            "ativo_total": ativo_total,
-            "passivo_total": passivo_total,
-            "patrimonio_liquido": patrimonio_liquido,
-            "ativo_permanente": ativo_permanente
-        }
-    }
-@app.get("/api/calcular_liquidez/{periodo}")
-async def api_calcular_liquidez(periodo: str):
-    # === REGRA DE INTEGRIDADE ===
-    from matriz_integridade import _get_csv
-    if not _get_csv("BALANCO_PATRIMONIAL", periodo):
-        return {"erro": "faltando", "pecas": ["Balanço Patrimonial"]}
-    dados = _calc_liquidez(periodo)
-    if not dados:
-        return {"erro": "faltando", "pecas": ["Balanço Patrimonial"]}
-    return dados
-@app.delete("/excluir_liquidez/{id}")
-async def excluir_liquidez(id: int):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM historico_liquidez WHERE id = ?", (id,))
-        conn.commit()
-        conn.close()
-        return {"mensagem": "Excluido"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-@app.post("/salvar_liquidez/{periodo}")
-async def salvar_liquidez(periodo: str):
-    dados = _calc_liquidez(periodo)
-    if not dados: raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_liquidez (
-
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    cursor.execute("INSERT INTO historico_liquidez (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", 
-                   (periodo, data_agora, json.dumps(dados)))
-    conn.commit()
-    conn.close()
-    return {"mensagem": "Liquidez salva!", "dados": dados}
-@app.get("/historico_liquidez")
-async def listar_liquidez():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo, data_geracao FROM historico_liquidez ORDER BY id DESC")
-    rows = cursor.fetchall()
-    conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
-@app.get("/historico_liquidez/{id}")
-async def get_historico_liquidez(id: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT periodo, resultado_json FROM historico_liquidez WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-    periodo, json_str = row
-    dados = json.loads(json_str)
-    # Se os dados antigos nao tem estrutura, recalcula
-    if "estrutura" not in dados:
-        novos_dados = _calc_liquidez(periodo)
-        if novos_dados:
-            dados = novos_dados
-    return dados
-@app.get("/gerar_pdf_liquidez/{id}")
-async def gerar_pdf_liquidez(id: int):
-    try:
-        from fastapi.responses import Response
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_liquidez WHERE id = ?", (id,))
-        row = cursor.fetchone()
-        conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-        periodo, data_geracao, json_str = row
-        dados = json.loads(json_str)
-        # Garante que os dados de estrutura existam (mesmo em históricos antigos)
-        if "estrutura" not in dados:
-            novos_dados = _calc_liquidez(periodo)
-            if novos_dados:
-                dados = novos_dados
-        res = dados["liquidez"]
-        est = dados.get("estrutura", {})
-        val = dados["valores"]
-        pdf = FPDF(orientation='P', unit='mm', format='A4')
-        pdf.add_page()
-        pdf.set_font("helvetica", "B", 18)
-        pdf.set_text_color(0, 86, 179)
-        pdf.cell(0, 10, "Indices de Liquidez", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.set_font("helvetica", "", 12)
-        pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 8, f"Período: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.ln(10)
-        def fmt(v): return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        def desenhar_card(titulo, valor, formula):
-            # Se o Y atual + 45mm (tamanho do card + margem) passar do limite da página (A4 = 297mm - 20mm de margem)
-            if pdf.get_y() + 45 > 277:
-                pdf.add_page()
-                pdf.set_font("helvetica", "B", 12)
-                pdf.set_text_color(100, 100, 100)
-                pdf.cell(0, 10, "Indices de Liquidez (Continuacao)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-                pdf.ln(5)
-            pdf.set_fill_color(248, 251, 255)
-            pdf.rect(15, pdf.get_y(), 180, 35, style='F')
-            pdf.set_fill_color(0, 86, 179)
-            pdf.rect(15, pdf.get_y(), 180, 2, style='F')
-            pdf.set_xy(20, pdf.get_y() + 5)
-            pdf.set_font("helvetica", "B", 12)
-            pdf.set_text_color(51, 51, 51)
-            pdf.cell(0, 6, titulo, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_x(20)
-            pdf.set_font("helvetica", "B", 20)
-            pdf.set_text_color(0, 86, 179)
-            pdf.cell(0, 10, str(valor), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_x(20)
-            pdf.set_font("helvetica", "", 9)
-            pdf.set_text_color(100, 100, 100)
-            pdf.multi_cell(170, 5, formula, border=1)
-            pdf.ln(10)
-        desenhar_card("Liquidez Imediata", res["liquidez_imediata"], f"(Caixa) / (Passivo Circulante) | ({fmt(val['caixa'])}) / ({fmt(val['passivo_circulante'])})")
-        desenhar_card("Liquidez Corrente", res["liquidez_corrente"], f"(Ativo Circulante) / (Passivo Circulante) | ({fmt(val['ativo_circulante'])}) / ({fmt(val['passivo_circulante'])})")
-        desenhar_card("Liquidez Seca", res["liquidez_seca"], f"((Ativo Circulante - Estoques)) / (Passivo Circulante) | (({fmt(val['ativo_circulante'])} - {fmt(val['estoques'])})) / ({fmt(val['passivo_circulante'])})")
-        desenhar_card("Liquidez Geral", res["liquidez_geral"], f"(Ativo Circulante + Realizável a Longo Prazo) / (Passivo Circulante + Passivo Não Circulante) | ({fmt(val['ativo_circulante'])} + {fmt(val['realizavel'])}) / ({fmt(val['passivo_circulante'])} + {fmt(val['passivo_nao_circulante'])})")
-        # --- CALCULO ESTRUTURA (MESMA LOGICA DO FRONTEND) ---
-        v_ativa_circ = val.get('ativo_circulante', 0)
-        v_realizavel = val.get('realizavel', 0)
-        v_ativo_perm = val.get('ativo_permanente', 0)
-        v_passivo_circ = val.get('passivo_circulante', 0)
-        v_passivo_nao_circ = val.get('passivo_nao_circulante', 0)
-        v_pl = val.get('patrimonio_liquido', 0)
-        ativo_total = val.get('ativo_total', 0) or (v_ativa_circ + v_ativo_perm)
-        passivo_total = val.get('passivo_total', 0) or (v_passivo_circ + v_passivo_nao_circ)
-        endividamento = (passivo_total / ativo_total * 100) if ativo_total > 0 else 0
-        part_capital = (passivo_total / v_pl * 100) if v_pl > 0 else 0
-        imobilizacao = (v_ativo_perm / v_pl * 100) if v_pl > 0 else 0
-        # Formatação dos valores (para moeda)
-        f_ativo_total = fmt(ativo_total)
-        f_passivo_total = fmt(passivo_total)
-        f_pl = fmt(v_pl)
-        f_ativo_perm = fmt(v_ativo_perm)
-        # Desenha os 3 novos cards no PDF
-        desenhar_card("Endividamento Geral", f"{endividamento:.2f}%", f"Passivo Total / Ativo Total | ({f_passivo_total}) / ({f_ativo_total})")
-        desenhar_card("Part. de Capital de Terceiros", f"{part_capital:.2f}%", f"Passivo / PL | ({f_passivo_total}) / ({f_pl})")
-        desenhar_card("Imobilização do PL", f"{imobilizacao:.2f}%", f"Ativo Perm. / PL | ({f_ativo_perm}) / ({f_pl})")
-        pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Indices_{periodo.replace('-', '_')}.pdf"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-@app.get("/painel_integridade_html/{periodo}")
-async def painel_integridade_html(periodo: str):
-    try:
-        # Importa a função do nosso módulo de integridade
-        from integridade import analise_integridade
-        dados = await analise_integridade(periodo)
-        analises = dados.get("analises", [])
-        html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Integridade</title>"
-        html += "<style>body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; } .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } table { width: 100%; border-collapse: collapse; margin-bottom: 15px; } td { padding: 8px 0; border-bottom: 1px solid #eee; } .status-ok { color: green; border-left: 5px solid green; } .status-erro { color: red; border-left: 5px solid red; }</style></head><body>"
-        html += "<h2>Analises de Integridade - " + periodo + "</h2>"
-        if not analises:
-            html += "<p>Nenhuma análise encontrada.</p>"
-        for a in analises:
-            classe = "status-ok" if a["status"] == "OK" else "status-erro"
-            html += f"<div class='card {classe}'>"
-            html += f"<h3>{a['titulo']}</h3>"
-            html += f"<p style='color: #666;'>{a['conceito']}</p>"
-            html += "<table>"
-            for linha in a["tabela"]:
-                html += f"<tr><td>{linha['label']}</td><td style='text-align: right; font-weight: bold;'>{linha['valor']}</td></tr>"
-            html += "</table>"
-            html += f"<div style='color: {'green' if a['status']=='OK' else 'red'};'>{a['mensagem']}</div>"
-            html += "</div>"
-        html += "</body></html>"
-        return HTMLResponse(content=html)
-    except Exception as e:
-        return HTMLResponse(content=f"<h3>Erro ao carregar integridade: {e}</h3>", status_code=500)
-@app.on_event("shutdown")
-async def shutdown_playwright():
-    try:
-        from playwright.async_api import async_playwright
-        # O browser é criado dentro da rota, então não temos uma referência global.
-        # Esta é uma correção defensiva: o browser já é fechado no finally da rota.
-        # Este handler só garante que o driver do Playwright seja parado.
-        pass
-    except Exception:
-        pass
-# Forçar o Event Loop correto no Windows (necessário para Playwright)
-import sys
-if sys.platform == "win32":
-    import asyncio
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-@app.get("/demonstracoes", response_class=HTMLResponse)
+            termo_upper = termo.upper()
+            for p in l_bp:
+                # Procura o termo na coluna 0 (Ativo) ou 3 (Passivo)
+                for col_espec in [0, 3]:
+                    if len(p) > col_espec and termo_upper in str(p[col_espec]).upper():
+                        # Pega o valor da coluna seguinte (1 para Ativo, 4 para Passivo)
+                        col_valor = col_espec + 1
+                        if len(p) > col_valor:
+                            try:
+                                v = abs(_limpar_valor(p[col_valor]))
+                                if v > 0:
+                                    return v
+                            except:
+                                pass
+            return 0.0
 def demonstracoes_em_breve():
     return HTMLResponse(content="<html><body><h1>Demonstrações Contábeis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
 @app.get("/analises", response_class=HTMLResponse)

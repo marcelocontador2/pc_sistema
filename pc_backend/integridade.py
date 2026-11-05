@@ -35,10 +35,14 @@ async def analise_integridade(periodo: str):
         linhas = _ler_linhas(path_bp)
         ativo, passivo = 0.0, 0.0
         for p in linhas:
-            if len(p) >= 4:
+            if len(p) >= 5:
                 if p[0].strip().upper() == "TOTAL":
                     ativo = _limpar_valor(p[1])
-                    passivo = _limpar_valor(p[3])
+                    # O valor do Passivo + PL esta na coluna 4 (p[4])
+                    passivo = _limpar_valor(p[4])
+                    # Se o passivo for 0, tenta a coluna 3 (fallback)
+                    if passivo == 0.0 and len(p) > 3:
+                        passivo = _limpar_valor(p[3])
                     break
         diff = ativo - passivo
         status = "OK" if abs(diff) < 0.05 else "ERRO"
