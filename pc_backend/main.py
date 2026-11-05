@@ -761,108 +761,44 @@ async def upload_arquivo(
     periodo_tipo: str = Form(None),
     periodo_valor: str = Form(None)
 ):
-    import os, shutil, csv, io, json, sqlite3
+    import os
     from datetime import datetime
     
-    # Variáveis iniciais
-    dados_processados = []
-    mensagem = "Arquivo enviado com sucesso."
-    centros = []
-    
-    # Define o nome padronizado
+    # Define o nome padrao
     nome_arquivo = file.filename
-    if tipo_relatorio and ("COMPARATIVO_RECEITAS" in tipo_relatorio.upper() or "COMPARATIVO DE RECEITAS" in tipo_relatorio.upper()):
-        periodo_str = f"{ano}_{periodo_tipo}_{periodo_valor}" if ano and periodo_tipo and periodo_valor else "2026_TRIMESTRE_3"
-        nome_arquivo = f"COMPARATIVO_RECEITAS_{periodo_str}.csv"
-    if tipo_relatorio and ("COMPARATIVO_DESPESAS" in tipo_relatorio.upper() or "COMPARATIVO DE DESPESAS" in tipo_relatorio.upper()):
-        periodo_str = f"{ano}_{periodo_tipo}_{periodo_valor}" if ano and periodo_tipo and periodo_valor else "2026_TRIMESTRE_3"
-        nome_arquivo = f"COMPARATIVO_DESPESAS_{periodo_str}.csv"
-    if tipo_relatorio and tipo_relatorio.upper() == "CENTRO_CUSTOS":
-        periodo_str = f"{ano}_{periodo_tipo}_{periodo_valor}" if ano and periodo_tipo and periodo_valor else "2026_TRIMESTRE_3"
-        nome_arquivo = f"CENTRO_CUSTOS_{periodo_str}.csv"
+    periodo_str = f"{ano}_{periodo_tipo}_{periodo_valor}" if ano and periodo_tipo and periodo_valor else "2026_TRIMESTRE_3"
     
-    # Salva o arquivo
+    if tipo_relatorio:
+        tipo = tipo_relatorio.upper()
+        if "BALANCO_PATRIMONIAL" in tipo or "BP" == tipo:
+            nome_arquivo = f"BALANCO_PATRIMONIAL_{periodo_str}.csv"
+        elif "BALANCETE" in tipo:
+            nome_arquivo = f"BALANCETE_{periodo_str}.csv"
+        elif "BALANCO_ORCAMENTARIO" in tipo:
+            nome_arquivo = f"BALANCO_ORCAMENTARIO_{periodo_str}.csv"
+        elif "BALANCO_FINANCEIRO" in tipo:
+            nome_arquivo = f"BALANCO_FINANCEIRO_{periodo_str}.csv"
+        elif "DFC" in tipo:
+            nome_arquivo = f"DFC_{periodo_str}.csv"
+        elif "DVP" in tipo:
+            nome_arquivo = f"DVP_{periodo_str}.csv"
+        elif "DMPL" in tipo:
+            nome_arquivo = f"DMPL_{periodo_str}.csv"
+        elif "CENTRO_CUSTOS" in tipo:
+            nome_arquivo = f"CENTRO_CUSTOS_{periodo_str}.csv"
+        elif "COMPARATIVO_RECEITAS" in tipo:
+            nome_arquivo = f"COMPARATIVO_RECEITAS_{periodo_str}.csv"
+        elif "COMPARATIVO_DESPESAS" in tipo:
+            nome_arquivo = f"COMPARATIVO_DESPESAS_{periodo_str}.csv"
+    
+    # Salva o arquivo (le com await, escreve com open)
     caminho = os.path.join(UPLOAD_DIR, nome_arquivo)
-    with open(caminho, "wb") as b:
-        shutil.copyfileobj(file.file, b)
+    conteudo = await file.read()
+    with open(caminho, "wb") as f:
+        f.write(conteudo)
     
-    # Processa Centro de Custos
-    if tipo_relatorio and tipo_relatorio.upper() == "CENTRO_CUSTOS":
-        try:
-            # Tenta ler como UTF-8, se falhar, tenta como ANSI (latin-1)
-            try:
-                with open(caminho, "r", encoding="utf-8-sig") as f:
-                    linhas = f.readlines()
-            except UnicodeDecodeError:
-                with open(caminho, "r", encoding="latin-1") as f:
-                    linhas = f.readlines()
-            
-            # Encontra a linha de cabeçalho (que começa com "Centro de Custo x Conta")
-            inicio_dados = 0
-            for i, linha in enumerate(linhas):
-                if "Centro de Custo x Conta" in linha:
-                    inicio_dados = i + 1
-                    break
-            
-            # Pula a linha do "COFEN/BR" se existir
-            if inicio_dados < len(linhas) and "COFEN/BR" in linhas[inicio_dados]:
-                inicio_dados += 1
-                
-            # Processa as linhas de dados
-            for linha in linhas[inicio_dados:]:
-                if ";" in linha:
-                    partes = linha.strip().split(";")
-                else:
-                    partes = linha.strip().split(",")
-                
-                if len(partes) < 2:
-                    continue
-                
-                nome = partes[0].strip().strip('"')
-                if not nome or "TOTAL" in nome.upper() or nome.startswith("Página"):
-                    continue
-                
-                # Pega o último valor numérico válido da linha
-                valor = 0.0
-                for parte in reversed(partes):
-                    parte_limpa = parte.strip().strip('"').replace(".", "").replace(",", ".")
-                    try:
-                        valor = float(parte_limpa)
-                        if valor > 0:
-                            break
-                    except:
-                        continue
-                
-                centros.append({"nome": nome, "valor": valor})
-            
-            if centros:
-                # Salva no banco de dados
-                db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-                conn = sqlite3.connect(db_path)
-                cur = conn.cursor()
-                cur.execute("""CREATE TABLE IF NOT EXISTS historico_centro_custos (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
-                periodo = f"{ano}-{periodo_tipo}-{periodo_valor}" if ano and periodo_tipo and periodo_valor else "2026-TRIMESTRE-3"
-                data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                cur.execute("INSERT INTO historico_centro_custos (periodo, data_geracao, dados_json) VALUES (?, ?, ?)",
-                           (periodo, data_geracao, json.dumps({"centros": centros})))
-                conn.commit()
-                conn.close()
-                dados_processados = centros
-                mensagem = f"Centro de Custos importado com sucesso! ({len(centros)} centros) - Arquivo: {nome_arquivo}"
-            else:
-                mensagem = "CSV processado, mas nenhum centro encontrado. Verifique o formato."
-        except Exception as e:
-            mensagem = f"Erro ao processar CSV: {str(e)}"
-    
-    return {
-        "status": "sucesso",
-        "mensagem": mensagem,
-        "arquivo": nome_arquivo,
-        "tipo_relatorio": tipo_relatorio,
-        "dados_processados": dados_processados
-    }
-import json
+    return {"ok": True, "mensagem": f"Arquivo {nome_arquivo} importado com sucesso!"}
+
 @app.on_event("startup")
 async def criar_tabela_integridade():
     conn = sqlite3.connect(DB_PATH)
@@ -5518,4 +5454,260 @@ async def serve_relatorio_consolidado():
     from fastapi.responses import FileResponse
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_consolidado.html")
     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
+
+# ============================================================
+# API DA ANALISE BP (Balanco Patrimonial)
+# ============================================================
+
+
+
+
+
+
+
+
+
+@app.get("/api/analise_bp/{periodo}")
+async def api_analise_bp(periodo: str):
+    import csv, os, glob, unicodedata
+    from fastapi import HTTPException
+    
+    p_limpo = periodo.replace("-", "_")
+    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    
+    ano_atual = p_limpo.split("_")[0]
+    candidatos = glob.glob(os.path.join(pasta, f"BALANCO_PATRIMONIAL_{ano_atual}*.csv"))
+    if not candidatos:
+        return {"erro": "faltando", "pecas": ["Balanco Patrimonial"]}
+    caminho = candidatos[0]
+    
+    def limpar(v):
+        if not v: return 0.0
+        v = str(v).replace("R$", "").replace("C", "").strip()
+        if v in ["-", "0,00", ""]: return 0.0
+        if "," in v and "." in v: v = v.replace(".", "").replace(",", ".")
+        elif "," in v: v = v.replace(",", ".")
+        try: return float(v)
+        except: return 0.0
+    
+    def remover_acentos(s):
+        return unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('ASCII').upper().strip()
+    
+    try:
+        linhas = []
+        with open(caminho, "r", encoding="latin-1", errors="ignore") as f:
+            for row in csv.reader(f, delimiter=";"):
+                linhas.append(row)
+        
+        # Ativo: Col0 (esp), Col1 (atual), Col2 (anterior)
+        # Passivo: Col3 (esp), Col4 (atual), Col5 (anterior)
+        
+        def buscar_ativo(termo):
+            termo_norm = remover_acentos(termo)
+            for p in linhas:
+                if len(p) > 2 and termo_norm in remover_acentos(str(p[0])):
+                    return limpar(p[1]), limpar(p[2])
+            return 0.0, 0.0
+        
+        def buscar_passivo(termo):
+            termo_norm = remover_acentos(termo)
+            for p in linhas:
+                if len(p) > 5 and termo_norm in remover_acentos(str(p[3])):
+                    return limpar(p[4]), limpar(p[5])
+            return 0.0, 0.0
+        
+        # Busca os valores (atual, anterior)
+        ativo_circ_at, ativo_circ_ant = buscar_ativo("ATIVO CIRCULANTE")
+        caixa_at, caixa_ant = buscar_ativo("CAIXA E EQUIVALENTES")
+        creditos_at, creditos_ant = buscar_ativo("CRÉDITOS A CURTO PRAZO")
+        ativo_nao_circ_at, ativo_nao_circ_ant = buscar_ativo("ATIVO NÃO CIRCULANTE")
+        ativo_realizavel_at, ativo_realizavel_ant = buscar_ativo("ATIVO REALIZÁVEL A LONGO PRAZO")
+        imobilizado_at, imobilizado_ant = buscar_ativo("IMOBILIZADO")
+        
+        passivo_circ_at, passivo_circ_ant = buscar_passivo("PASSIVO CIRCULANTE")
+        passivo_nao_circ_at, passivo_nao_circ_ant = buscar_passivo("PASSIVO NAO-CIRCULANTE")
+        pl_at, pl_ant = buscar_passivo("RESULTADOS ACUMULADOS")
+        
+        # Total do Ativo
+        total_ativo_at = ativo_circ_at + ativo_nao_circ_at
+        total_ativo_ant = ativo_circ_ant + ativo_nao_circ_ant
+        
+        # PASSIVO TOTAL = Passivo Circulante + Passivo Nao Circulante
+        passivo_total_at = passivo_circ_at + passivo_nao_circ_at
+        passivo_total_ant = passivo_circ_ant + passivo_nao_circ_ant
+        
+        # TOTAL DO PASSIVO = Passivo Total + Patrimonio Liquido
+        total_passivo_at = passivo_total_at + pl_at
+        total_passivo_ant = passivo_total_ant + pl_ant
+        
+        dados = {
+            "ativo_circulante": {"atual": ativo_circ_at, "anterior": ativo_circ_ant},
+            "caixa": {"atual": caixa_at, "anterior": caixa_ant},
+            "creditos": {"atual": creditos_at, "anterior": creditos_ant},
+            "ativo_nao_circulante": {"atual": ativo_nao_circ_at, "anterior": ativo_nao_circ_ant},
+            "ativo_realizavel": {"atual": ativo_realizavel_at, "anterior": ativo_realizavel_ant},
+            "imobilizado": {"atual": imobilizado_at, "anterior": imobilizado_ant},
+            "total_ativo": {"atual": total_ativo_at, "anterior": total_ativo_ant},
+            "passivo_circulante": {"atual": passivo_circ_at, "anterior": passivo_circ_ant},
+            "passivo_nao_circulante": {"atual": passivo_nao_circ_at, "anterior": passivo_nao_circ_ant},
+            "passivo_total": {"atual": passivo_total_at, "anterior": passivo_total_ant},
+            "patrimonio_liquido": {"atual": pl_at, "anterior": pl_ant},
+            "total_passivo": {"atual": total_passivo_at, "anterior": total_passivo_ant},
+        }
+        
+        return {"erro": False, "dados": dados}
+    
+    except Exception as e:
+        print(f"[BP] ERRO: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analise_bp")
+async def serve_analise_bp():
+    from fastapi.responses import FileResponse
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_bp.html")
+    return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
+@app.post("/salvar_analise_bp/{periodo}")
+async def salvar_analise_bp(periodo: str):
+    import sqlite3, json, os
+    from datetime import datetime
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_analise_bp (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    
+    # Chama a API para pegar os dados atuais
+    try:
+        dados = await api_analise_bp(periodo)
+    except Exception as e:
+        return {"ok": False, "mensagem": f"Erro ao calcular BP: {e}"}
+    
+    data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("INSERT INTO historico_analise_bp (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+                   (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "mensagem": "Analise BP salva com sucesso!"}
+
+@app.get("/historico_analise_bp")
+async def get_hist_bp():
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_analise_bp (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_bp ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.get("/historico_analise_bp/{id}")
+async def get_bp_id(id: int):
+    import sqlite3, json, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_bp WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return {"erro": "nao encontrado"}
+    return {"periodo": row[0], "data_geracao": row[1], "dados": json.loads(row[2])}
+
+@app.delete("/excluir_analise_bp/{id}")
+async def excluir_bp(id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM historico_analise_bp WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.get("/gerar_pdf_analise_bp/{id}")
+async def gerar_pdf_analise_bp(id: int):
+    import sqlite3, json, os
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+    from fastapi.responses import Response
+    from datetime import datetime
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_bp WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return Response(content="Historico nao encontrado.", status_code=404)
+    
+    periodo, data_geracao, res_json = row
+    try:
+        dados = json.loads(res_json)
+    except Exception:
+        dados = {}
+    
+    d = dados.get("dados", {})
+    
+    def fmt(v):
+        if v is None: return "0,00"
+        s = f"{v:,.2f}"
+        # Formato: 1,234,567.89 -> 1.234.567,89
+        return s.replace(",", "X").replace(".", ",").replace("X", ".")
+    
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.add_page()
+    
+    pdf.set_fill_color(0, 51, 102)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 15, "COFEN/BR - ANALISE DO BALANCO PATRIMONIAL", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
+    
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.ln(5)
+    pdf.cell(0, 6, f"Periodo: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.ln(10)
+    
+    # Tabela
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(0, 86, 179)
+    pdf.set_text_color(255, 255, 255)
+    col_w = [70, 40, 40, 30]
+    headers = ["Conta", "Periodo Atual (R$)", "Periodo Anterior (R$)", "Var. (%)"]
+    for i, h in enumerate(headers):
+        pdf.cell(col_w[i], 8, h, border=1, align="C", fill=True)
+    pdf.ln()
+    
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 8)
+    
+    def linha(label, va, vb):
+        pdf.cell(col_w[0], 7, label, border=1, align="L")
+        pdf.cell(col_w[1], 7, fmt(va), border=1, align="R")
+        pdf.cell(col_w[2], 7, fmt(vb), border=1, align="R")
+        pct = "-" if not vb else f"{(((va - vb) / abs(vb)) * 100):,.2f}%".replace(".", ",")
+        pdf.cell(col_w[3], 7, pct, border=1, align="R")
+        pdf.ln()
+    
+    linha("Ativo Circulante", d.get("ativo_circulante", {}).get("atual", 0), d.get("ativo_circulante", {}).get("anterior", 0))
+    linha("Caixa e Equivalentes", d.get("caixa", {}).get("atual", 0), d.get("caixa", {}).get("anterior", 0))
+    linha("Creditos a Curto Prazo", d.get("creditos", {}).get("atual", 0), d.get("creditos", {}).get("anterior", 0))
+    linha("Ativo Nao Circulante", d.get("ativo_nao_circulante", {}).get("atual", 0), d.get("ativo_nao_circulante", {}).get("anterior", 0))
+    linha("Ativo Realizavel a Longo Prazo", d.get("ativo_realizavel", {}).get("atual", 0), d.get("ativo_realizavel", {}).get("anterior", 0))
+    linha("Imobilizado", d.get("imobilizado", {}).get("atual", 0), d.get("imobilizado", {}).get("anterior", 0))
+    linha("TOTAL DO ATIVO", d.get("total_ativo", {}).get("atual", 0), d.get("total_ativo", {}).get("anterior", 0))
+    linha("Passivo Circulante", d.get("passivo_circulante", {}).get("atual", 0), d.get("passivo_circulante", {}).get("anterior", 0))
+    linha("Passivo Nao Circulante", d.get("passivo_nao_circulante", {}).get("atual", 0), d.get("passivo_nao_circulante", {}).get("anterior", 0))
+    linha("Passivo Total", d.get("passivo_total", {}).get("atual", 0), d.get("passivo_total", {}).get("anterior", 0))
+    linha("Patrimonio Liquido", d.get("patrimonio_liquido", {}).get("atual", 0), d.get("patrimonio_liquido", {}).get("anterior", 0))
+    linha("TOTAL DO PASSIVO", d.get("total_passivo", {}).get("atual", 0), d.get("total_passivo", {}).get("anterior", 0))
+    
+    pdf_bytes = bytes(pdf.output())
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Analise_BP_{periodo}.pdf"})
 
