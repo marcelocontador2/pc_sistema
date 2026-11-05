@@ -996,12 +996,13 @@ async def api_panorama(periodo: str):
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
+        
         def buscar_no_banco(tipo):
             nome = f"{tipo}_{periodo.replace('-', '_')}.csv"
             cursor.execute("SELECT dados_json FROM arquivos_importados WHERE nome_arquivo = ?", (nome,))
             row = cursor.fetchone()
             return json.loads(row[0]) if row else []
-        # === REGRA DE INTEGRIDADE: verifica se os 6 demonstrativos existem ===
+            
         demonstrativos = {
             "BALANCO_PATRIMONIAL": "Balanço Patrimonial",
             "BALANCO_ORCAMENTARIO": "Balanço Orçamentário",
@@ -1012,23 +1013,22 @@ async def api_panorama(periodo: str):
         }
         faltando = []
         for tipo, nome in demonstrativos.items():
-            dados = buscar_no_banco(tipo)
-            if not dados:
+            if not buscar_no_banco(tipo):
                 faltando.append(nome)
         if faltando:
             conn.close()
             return {"erro": "faltando", "pecas": faltando}
+            
         l_bp = buscar_no_banco("BALANCO_PATRIMONIAL")
         l_bo = buscar_no_banco("BALANCO_ORCAMENTARIO")
         l_dvp = buscar_no_banco("DVP")
-        def buscar(linhas, termos, coluna):
+        
+        def buscar(linhas, termos):
             for p in linhas:
                 for termo in termos:
                     termo_upper = termo.upper()
-                    # Procura o termo na coluna 0 (Ativo) ou 3 (Passivo)
                     for col_espec in [0, 3]:
                         if len(p) > col_espec and termo_upper in str(p[col_espec]).upper():
-                            # Pega o valor da coluna seguinte (1 para Ativo, 4 para Passivo)
                             col_valor = col_espec + 1
                             if len(p) > col_valor:
                                 try:
@@ -1038,26 +1038,50 @@ async def api_panorama(periodo: str):
                                 except:
                                     pass
             return 0.0
-        # === BP ===
-        # NOVO CSV: Passivo esta na coluna 3 (especificacao) e o valor na coluna 4
-        # Patrimonio Liquido esta na coluna 3 (especificacao) e o valor na coluna 4
-        # Usa a Definição 7 (que procura na coluna 0/3 e pega o valor da coluna seguinte)
-        passivo_total = buscar("TOTAL DO PASSIVO", 4)  # Definicao 7
-        pl = buscar("TOTAL DO PATRIMÔNIO LÍQUIDO", 4)  # Definicao 7
+            
+        def buscar_exato(linhas, termo_exato):
+            for p in linhas:
+                for col_espec in [0, 3]:
+                    if len(p) > col_espec and str(p[col_espec]).strip().upper() == termo_exato.upper():
+                        col_valor = col_espec + 1
+                        if len(p) > col_valor:
+                            try:
+                                v = abs(_limpar_valor(p[col_valor]))
+                                if v > 0:
+                                    return v
+                            except:
+                                pass
+            return 0.0
+
+        passivo_total = buscar_exato(l_bp, "TOTAL DO PASSIVO")
+        if passivo_total == 0.0:
+            passivo_total = buscar(l_bp, ["TOTAL DO PASSIVO", "PASSIVO TOTAL"])
+            
+        pl = buscar_exato(l_bp, "TOTAL DO PATRIMÔNIO LÍQUIDO")
         if pl == 0.0:
-            pl = buscar("RESULTADOS ACUMULADOS", 4)
-        ativo_total = passivo_total + pl  # Ativo = Passivo + PL
-        caixa_bp = buscar(l_bp, ["CAIXA E EQUIVALENTES", "CAIXA E EQUIVALENTE"], 1)
-        superavit_financeiro = buscar(l_bp, ["SUPERÁVIT FINANCEIRO", "SUPERAVIT FINANCEIRO"], 2)
-        # === BO ===
-        receita_realizada = buscar(l_bo, ["SUB-TOTAL DAS RECEITAS"], 6)
-        despesa_empenhada = buscar(l_bo, ["SUB-TOTAL DAS DESPESAS"], 4)
+            pl = buscar_exato(l_bp, "TOTAL DO PATRIMONIO LIQUIDO")
+        if pl == 0.0:
+            pl = buscar(l_bp, ["TOTAL DO PATRIMÔNIO LÍQUIDO", "TOTAL DO PATRIMONIO LIQUIDO"])
+            
+        ativo_total = buscar_exato(l_bp, "TOTAL")
+        if ativo_total == 0.0:
+            ativo_total = buscar(l_bp, ["TOTAL DO ATIVO", "ATIVO TOTAL"])
+        if ativo_total == 0.0:
+            ativo_total = passivo_total + pl
+            
+        caixa_bp = buscar(l_bp, ["CAIXA E EQUIVALENTES", "CAIXA E EQUIVALENTE"])
+        superavit_financeiro = buscar(l_bp, ["SUPERÁVIT FINANCEIRO", "SUPERAVIT FINANCEIRO"])
+        
+        receita_realizada = buscar(l_bo, ["TOTAL DAS RECEITAS", "RECEITAS REALIZADAS", "RECEITA REALIZADA", "TOTAL DA RECEITA", "RECEITAS"])
+        despesa_empenhada = buscar(l_bo, ["TOTAL DAS DESPESAS", "DESPESAS EMPENHADAS", "DESPESA EMPENHADA", "TOTAL DA DESPESA", "DESPESAS"])
         superavit_orcamentario = receita_realizada - despesa_empenhada
-        # === DVP ===
-        total_vpa = buscar(l_dvp, ["Total das Variações Ativas"], 2)
-        total_vpd = buscar(l_dvp, ["Total das Variações Passivas"], 6)
+        
+        total_vpa = buscar(l_dvp, ["Total das Variações Ativas", "TOTAL DAS VARIACOES ATIVAS", "VARIAÇÕES ATIVAS"])
+        total_vpd = buscar(l_dvp, ["Total das Variações Passivas", "TOTAL DAS VARIACOES PASSIVAS", "VARIAÇÕES PASSIVAS"])
         superavit_patrimonial = total_vpa - total_vpd
+        
         conn.close()
+        
         return {
             "ativo_total": ativo_total,
             "passivo_total": passivo_total,
@@ -1072,24 +1096,25 @@ async def api_panorama(periodo: str):
     except Exception as e:
         return {"erro": "falha", "mensagem": str(e)}
 @app.post("/salvar_panorama/{periodo}")
-async def salvar_panorama(periodo: str):
+async def salvar_panorama(periodo: str, request: Request):
+    import sqlite3, json, os, datetime
     try:
-        import sqlite3, json, datetime, os
-        dados = _calc_panorama(periodo)
+        dados_recebidos = await request.json() # Pega o JSON exato enviado pelo navegador
+        
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("""CREATE TABLE IF NOT EXISTS historico_panorama (
-
             id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cursor.execute("INSERT INTO historico_panorama (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)", 
-                       (periodo, data_agora, json.dumps(dados)))
+        cursor.execute("INSERT INTO historico_panorama (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+                       (periodo, data_agora, json.dumps(dados_recebidos, ensure_ascii=False)))
         conn.commit()
         conn.close()
-        return {"mensagem": "Panorama salvo!", "dados": dados}
+        return {"ok": True, "mensagem": "Salvo com sucesso"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"erro": True, "mensagem": str(e)}
+
 @app.get("/historico_panorama")
 async def listar_panorama():
     import sqlite3, os
@@ -1101,16 +1126,23 @@ async def listar_panorama():
     conn.close()
     return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
 @app.get("/historico_panorama/{id}")
-async def buscar_panorama(id: int):
+async def get_historico_panorama_id(id: int):
     import sqlite3, json, os
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT resultado_json FROM historico_panorama WHERE id = ?", (id,))
+    cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_panorama WHERE id = ?", (id,))
     row = cursor.fetchone()
     conn.close()
-    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-    return json.loads(row[0])
+    
+    if not row:
+        return {"erro": "Historico nao encontrado"}
+        
+    return {
+        "periodo": row[0],
+        "data_geracao": row[1],
+        "dados": json.loads(row[2])
+    }
 @app.delete("/excluir_panorama/{id}")
 async def excluir_panorama(id: int):
     import sqlite3, os
