@@ -799,6 +799,62 @@ document.addEventListener("DOMContentLoaded", function() {
     }, 3000);
 });
 </script>
+
+<!-- ORDENACAO SUBMENU ANALISES -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Espera o menu ser montado (3 segundos para garantir)
+    setTimeout(function() {
+        var submenu = document.getElementById('submenu-analises');
+        if (!submenu) {
+            console.log("[ORDENACAO] Submenu nao encontrado.");
+            return;
+        }
+        
+        var ordem = [
+            'Conferência das Demonstrações',
+            'Integridade entre Demonstrações',
+            'Análise BP',
+            'Análise Orçamentária (BO)',
+            'Análise Financeira (BF)',
+            'Análise DFC',
+            'Análise Patrimonial (DVP)',
+            'Índices de Liquidez',
+            'Composição Receitas/Despesas',
+            'Resultados Gerais',
+            'Comparativo de Receitas',
+            'Comparativo de Despesas',
+            'Análise por Centro de Custos',
+            'Custo de Pessoal'
+        ];
+        
+        var itens = Array.from(submenu.querySelectorAll('li'));
+        var mapa = {};
+        itens.forEach(function(li) {
+            var texto = li.textContent.trim();
+            mapa[texto] = li;
+        });
+        
+        // Limpa e reorganiza
+        submenu.innerHTML = '';
+        ordem.forEach(function(texto) {
+            if (mapa[texto]) {
+                submenu.appendChild(mapa[texto]);
+            }
+        });
+        // Adiciona os que nao estao na ordem (se houver)
+        itens.forEach(function(li) {
+            var texto = li.textContent.trim();
+            if (ordem.indexOf(texto) === -1) {
+                submenu.appendChild(li);
+            }
+        });
+        
+        console.log("[ORDENACAO] Submenu reorganizado.");
+    }, 3000);
+});
+</script>
+<!-- FIM ORDENACAO -->
 </body>
 
 </html>
