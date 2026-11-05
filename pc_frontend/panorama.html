@@ -151,17 +151,17 @@
 <body>
     <div class="top-bar">
         <a href="/" class="btn" style="background:#ed8936; text-decoration:none; display:inline-block; padding:8px 15px; border-radius:6px; font-weight:bold; color:#fff; font-size:14px;">← Voltar</a>
-        <button class="btn" style="background:#38a169;" onclick="if(typeof exibirSelecionado === 'function') exibirSelecionado()">Exibir Selecionado</button>
-        <button class="btn" style="background:#e53e3e;" onclick="if(typeof excluirSelecionado === 'function') excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn" style="background:#38a169;" onclick="exibirSelecionado()">Exibir Selecionado</button>
+        <button class="btn" style="background:#e53e3e;" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDFPanorama()">Gerar PDF</button>
-        <button class="btn" style="background:#38a169;" onclick="if(typeof salvarPanorama === 'function') salvarPanorama()">Confirmar e Salvar</button>
+        <button class="btn" style="background:#38a169;" onclick="salvarPanorama()">Confirmar e Salvar</button>
     </div>
     <div class="filtros-bar">
         <div class="form-group"><label>Ano:</label><select id="ano"><option value="2026">2026</option><option value="2025">2025</option></select></div>
         <div class="form-group"><label>Tipo:</label><select id="tipo_periodo" onchange="ajustarPeriodo()"><option value="MES">Mensal</option><option value="TRIMESTRE" selected>Trimestral</option><option value="ANO">Exercício</option></select></div>
         <div class="form-group" id="group-mes" style="display:none;"><label>Mês:</label><select id="mes"><option value="01">01 - Janeiro</option><option value="02">02 - Fevereiro</option><option value="03">03 - Março</option><option value="04">04 - Abril</option><option value="05">05 - Maio</option><option value="06">06 - Junho</option><option value="07">07 - Julho</option><option value="08">08 - Agosto</option><option value="09">09 - Setembro</option><option value="10">10 - Outubro</option><option value="11">11 - Novembro</option><option value="12">12 - Dezembro</option></select></div>
         <div class="form-group" id="group-trimestre"><label>Trimestre:</label><select id="trimestre"><option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3" selected>3º Trimestre</option><option value="4">4º Trimestre</option></select></div>
-        <button class="btn btn-pdf" >Verificar</button>
+        <button class="btn btn-pdf" onclick="gerarPDFPanorama()">Verificar</button>
     </div>
     <div class="flex-layout">
         <div class="sidebar">
@@ -191,93 +191,114 @@
         </div>
     </div>
     <script>
-        function formatarMilhoes(valor) {
-            if (valor === null || valor === undefined) return "R$ 0,0 mi";
-            return "R$ " + (valor / 1000000).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " mi";
-        }
-        function ajustarPeriodo() {
-            const tipo = document.getElementById('tipo_periodo').value;
-            document.getElementById('group-mes').style.display = (tipo === 'MES') ? 'flex' : 'none';
-            document.getElementById('group-trimestre').style.display = (tipo === 'TRIMESTRE') ? 'flex' : 'none';
-        }
-        function aplicarValores(data) {
-            const valOrc = data.superavit_orcamentario;
-            const labelOrc = document.getElementById("label-superavit-orc");
-            const valElement = document.getElementById("val-superavit-orc");
-            valElement.innerText = formatarMilhoes(valOrc);
-            if (valOrc < 0) { labelOrc.innerText = "Déficit Orçamentário"; labelOrc.style.color = "#003366"; valElement.style.color = "#003366"; }
-            else { labelOrc.innerText = "Superávit Orçamentário"; labelOrc.style.color = "#555"; valElement.style.color = "#003366"; }
-            const valPat = data.superavit_patrimonial;
-            const labelPat = document.getElementById("label-superavit-pat");
-            const valElemPat = document.getElementById("val-superavit-pat");
-            if (valElemPat) valElemPat.innerText = formatarMilhoes(valPat);
-            if (labelPat) {
-                if (valPat < 0) { labelPat.innerText = "Déficit Patrimonial"; labelPat.style.color = "#dc3545"; }
-                else { labelPat.innerText = "Superávit Patrimonial (DVP)"; labelPat.style.color = "#555"; }
-            }
-            document.getElementById("val-superavit-fin").innerText = formatarMilhoes(data.superavit_financeiro);
-            document.getElementById("val-pl").innerText = formatarMilhoes(data.patrimonio_liquido);
-            document.getElementById("val-ativo").innerText = formatarMilhoes(data.ativo_total);
-            document.getElementById("val-passivo").innerText = formatarMilhoes(data.passivo_total);
-            document.getElementById("val-receita").innerText = formatarMilhoes(data.receita_realizada);
-            document.getElementById("val-despesa").innerText = formatarMilhoes(data.despesa_empenhada);
-            document.getElementById("val-caixa").innerText = formatarMilhoes(data.caixa_bp);
-            const btnSalvar = document.getElementById("btn-confirmar");
-            if (btnSalvar) btnSalvar.style.display = "inline-block";
-        }
-        async function carregarPanorama() {
-            const ano = document.getElementById('ano').value;
-            const tipo = document.getElementById('tipo_periodo').value;
-            let valor = (tipo === 'MES') ? document.getElementById('mes').value : (tipo === 'TRIMESTRE') ? document.getElementById('trimestre').value : "1";
-            const periodo = ano + '-' + tipo + '-' + valor;
-            document.getElementById("periodo-titulo").innerText = (tipo === 'TRIMESTRE') ? valor + "º Trimestre de " + ano : (tipo === 'MES') ? "Mês " + valor + " de " + ano : "Exercício de " + ano;
-            try {
-                const response = await fetch(`/api/panorama/${periodo}`);
-                const data = await response.json();
-                // === Trata erro de integridade (faltando pecas) ===
-                if (data.erro === "faltando") {
-                    const div = document.getElementById("integridade-cards");
-                    let html = '<div style="background:#fff3cd; border-left:5px solid #ffc107; padding:20px; border-radius:8px; margin-top:20px;">';
-                    html += '<h3 style="color:#856404; margin:0 0 10px 0;">⚠️ Peças Pendentes</h3>';
-                    html += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados para o período <strong>' + periodo + '</strong>:</p>';
-                    html += '<ul style="color:#856404;">';
-                    data.pecas.forEach(p => { html += '<li>' + p + '</li>'; });
-                    html += '</ul>';
-                    html += '<p style="color:#856404; margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p>';
-                    html += '</div>';
-                    div.innerHTML = html;
-                    document.getElementById("btn-confirmar").style.display = "none";
-                    return;
-                }
-                // === Trata erro de falha generica ===
-                if (data.erro) {
-                    alert("Erro: " + (data.mensagem || "Falha ao calcular panorama."));
-                    return;
-                }
-                if (data.detail) { alert("Erro: " + data.detail); return; }
-                // === Sucesso: aplica os valores ===
-                aplicarValores(data);
-                document.getElementById("btn-confirmar").setAttribute("data-periodo", periodo);
-            } catch (e) { 
-                console.error("Erro", e); 
-                // Alerta removido (a tarja amarela já é exibida pelo interceptor)
-            }
-        }
-        async function salvarPanorama() {
+// Funções do Panorama
+async function carregarPanorama() {
+    const ano = document.getElementById('ano').value;
+    const tipo = document.getElementById('tipo_periodo').value;
+    let valor = (tipo === 'MES') ? document.getElementById('mes').value : (tipo === 'TRIMESTRE') ? document.getElementById('trimestre').value : "1";
+    const periodo = ano + '-' + tipo + '-' + valor;
+    document.getElementById("periodo-titulo").innerText = (tipo === 'TRIMESTRE') ? valor + "º Trimestre de " + ano : (tipo === 'MES') ? "Mês " + valor + " de " + ano : "Exercício de " + ano;
+    
+    try {
+        const response = await fetch(`/api/panorama/${periodo}`);
+        const data = await response.json();
+        
+        if (data.erro === "faltando") {
+            const div = document.getElementById("integridade-cards");
+            let html = '<div style="background:#fff3cd; border-left:5px solid #ffc107; padding:20px; border-radius:8px; margin-top:20px;">';
+            html += '<h3 style="color:#856404; margin:0 0 10px 0;">⚠️ Peças Pendentes</h3>';
+            html += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados para o período <strong>' + periodo + '</strong>:</p>';
+            html += '<ul style="color:#856404;">';
+            data.pecas.forEach(p => { html += '<li>' + p + '</li>'; });
+            html += '</ul>';
+            html += '<p style="color:#856404; margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p>';
+            html += '</div>';
+            div.innerHTML = html;
             const btn = document.getElementById("btn-confirmar");
-            const periodo = btn.getAttribute("data-periodo");
-            btn.innerText = "Salvando..."; btn.disabled = true;
-            try {
-                await fetch("/salvar_panorama/" + periodo, { method: "POST" });
-                alert("Resultados salvos com sucesso!");
-                carregarHistorico(); btn.style.display = "none";
-            } catch (e) { alert("Erro ao salvar."); }
-            finally { btn.innerText = "Confirmar e Salvar"; btn.disabled = false; }
+            if(btn) btn.style.display = "none";
+            return;
         }
-        function carregarHistorico() {
-            fetch('/historico_panorama').then(r => r.json()).then(data => {
-                let html = '';
-                if(data.length === 0) html = '<li>Nenhum histórico.</li>';
+        
+        if (data.erro) {
+            alert("Erro: " + (data.mensagem || "Falha ao calcular panorama."));
+            return;
+        }
+        
+        aplicarValores(data);
+        const btn = document.getElementById("btn-confirmar");
+        if(btn) btn.setAttribute("data-periodo", periodo);
+        
+    } catch (e) { 
+        console.error("Erro na requisição", e); 
+    }
+}
+
+function aplicarValores(data) {
+    const format = (val) => {
+        if (val === undefined || val === null) return 'R$ 0,0 mi';
+        let num = Math.abs(val) / 1000000;
+        let prefix = val < 0 ? '-R$ ' : 'R$ ';
+        return prefix + num.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' mi';
+    };
+
+    const map = {
+        'caixa e equivalente': data.caixa_bp,
+        'ativo total': data.ativo_total,
+        'passivo total': data.passivo_total,
+        'patrimônio líquido': data.patrimonio_liquido,
+        'patrimonio liquido': data.patrimonio_liquido,
+        'receitas realizadas': data.receita_realizada,
+        'despesas empenhadas': data.despesa_empenhada,
+        'superávit orçamentário': data.superavit_orcamentario,
+        'déficit orçamentário': data.superavit_orcamentario,
+        'superávit patrimonial': data.superavit_patrimonial,
+        'superávit financeiro': data.superavit_financeiro
+    };
+
+    // Procura por qualquer elemento que tenha classe de card ou seja uma div com R$
+    document.querySelectorAll('.card, .kpi-card, .card-panorama, div').forEach(card => {
+        let textoCard = card.innerText.toLowerCase();
+        for (let key in map) {
+            if (textoCard.includes(key) && card.children.length <= 1) { 
+                // Encontrou o card certo
+                let elementos = card.querySelectorAll('*');
+                for (let el of elementos) {
+                    if (el.children.length === 0 && el.innerText.includes('R$')) {
+                        el.innerText = format(map[key]);
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    });
+}
+
+async function salvarPanorama() {
+    const btn = document.getElementById("btn-confirmar");
+    const periodo = btn.getAttribute("data-periodo");
+    if (!periodo) { alert("Verifique o panorama antes de salvar."); return; }
+    
+    btn.innerText = "Salvando..."; btn.disabled = true;
+    try {
+        await fetch("/salvar_panorama/" + periodo, { method: "POST" });
+        alert("Resultados salvos com sucesso!");
+        carregarHistorico(); btn.style.display = "none";
+    } catch (e) { 
+        alert("Erro ao salvar."); 
+    } finally { 
+        btn.innerText = "Confirmar e Salvar"; btn.disabled = false; 
+    }
+}
+
+function carregarHistorico() {
+    fetch('/historico_panorama')
+        .then(r => r.json())
+        .then(data => {
+            let html = '';
+            if (!data || data.length === 0) {
+                html = '<li>Nenhum histórico.</li>';
+            } else {
                 data.forEach(item => {
                     html += `<li style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
@@ -285,42 +306,47 @@
                             <div><div style="font-weight: bold; color: #0056b3;">${item.periodo}</div><div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div></div>
                         </div></li>`;
                 });
-                document.getElementById('lista-historico').innerHTML = html;
-            });
-        }
-        function exibirSelecionado() {
-            const check = document.querySelector(".check-historico:checked");
-            if (!check) { alert("Selecione um item no histórico."); return; }
-            const periodo = check.parentElement.querySelector('strong').innerText;
-            fetch(`/api/panorama/${periodo}?_t=${Date.now()}`, { cache: 'no-store' })
-                .then(r => r.json())
-                .then(data => { aplicarValores(data); })
-                .catch(e => { console.error(e); alert('Erro ao carregar dados.'); });
-        }
-        function excluirSelecionado() {
-            const selecionados = document.querySelectorAll(".check-historico:checked");
-            if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
-            if (!confirm(`Excluir ${selecionados.length} itens?`)) return;
-            let promessas = [];
-            selecionados.forEach(check => { promessas.push(fetch("/excluir_panorama/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false)); });
-            Promise.all(promessas).then(resultados => { if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); } });
-        }
-        let isGeneratingPDF = false;
-        function gerarPDF() {
-            if (isGeneratingPDF) return; // Evita dupla execução
-            isGeneratingPDF = true;
-            setTimeout(() => isGeneratingPDF = false, 2000); // Destrava após 2 segundos
-
-            const check = document.querySelector(".check-historico:checked");
-            if (!check) { 
-                return; 
             }
-            
-            const url = `/gerar_pdf_panorama/${check.value}`;
-            window.open(url, '_blank');
-        }
-        document.addEventListener("DOMContentLoaded", () => { ajustarPeriodo(); carregarPanorama(); carregarHistorico(); });
-    </script>
+            document.getElementById('lista-historico').innerHTML = html;
+        })
+        .catch(e => {
+            document.getElementById('lista-historico').innerHTML = '<li>Erro ao carregar.</li>';
+        });
+}
+
+function exibirSelecionado() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    // Aqui assumimos que a rota retorna o JSON salvo para ser exibido
+    window.open(`/panorama?id=${check.value}`, '_blank');
+}
+
+function excluirSelecionado() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    if (!confirm("Excluir este item?")) return;
+    fetch(`/excluir_panorama/${check.value}`, { method: 'DELETE' })
+        .then(() => carregarHistorico());
+}
+
+function gerarPDFPanorama() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico para gerar o PDF."); return; }
+    window.open(`/gerar_pdf_panorama/${check.value}`, '_blank');
+}
+
+// Exporta para o escopo global para os botoes HTML acharem
+window.carregarPanorama = carregarPanorama;
+window.salvarPanorama = salvarPanorama;
+window.exibirSelecionado = exibirSelecionado;
+window.excluirSelecionado = excluirSelecionado;
+window.gerarPDFPanorama = gerarPDFPanorama;
+window.carregarHistorico = carregarHistorico;
+
+document.addEventListener("DOMContentLoaded", () => {
+    carregarHistorico();
+});
+</script>
 <script>
     // === INTERCEPTOR TARJA (PADRÃO LIQUIDEZ) ===
     (function() {
@@ -425,6 +451,13 @@
             }
             window.open(`/gerar_pdf_panorama/${check.value}`, '_blank');
         }
+    
+    // --- Fix para os botoes funcionarem no HTML ---
+    window.salvarPanorama = salvarPanorama;
+    window.exibirSelecionado = exibirSelecionado;
+    window.excluirSelecionado = excluirSelecionado;
+    window.gerarPDFPanorama = gerarPDFPanorama;
+    // ----------------------------------------------
     </script>
 
 </body>
