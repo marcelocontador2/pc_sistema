@@ -3170,26 +3170,125 @@ async def serve_liquidez():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "liquidez.html")
     return FileResponse(caminho)
 def _calc_liquidez(periodo):
+    """Calcula indices de liquidez e estrutura a partir do Balanco Patrimonial."""
     from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
     caminho_bp = _get_csv("BALANCO_PATRIMONIAL", periodo)
-    if not caminho_bp: return None
+    if not caminho_bp:
+        return None
     l_bp = _ler_linhas(caminho_bp)
-    def buscar(termo, coluna):
-            termo_upper = termo.upper()
+
+    def _norm(s):
+        import unicodedata
+        s = unicodedata.normalize("NFKD", str(s))
+        return "".join(c for c in s if not unicodedata.combining(c)).upper().strip()
+
+    def buscar(*termos):
+        """Retorna o primeiro valor > 0 encontrado para qualquer um dos termos (col 0=Ativo, 3=Passivo)."""
+        for termo in termos:
+            termo_norm = _norm(termo)
             for p in l_bp:
-                # Procura o termo na coluna 0 (Ativo) ou 3 (Passivo)
-                for col_espec in [0, 3]:
-                    if len(p) > col_espec and termo_upper in str(p[col_espec]).upper():
-                        # Pega o valor da coluna seguinte (1 para Ativo, 4 para Passivo)
+                for col_espec in (0, 3):
+                    if len(p) > col_espec and termo_norm in _norm(p[col_espec]):
                         col_valor = col_espec + 1
                         if len(p) > col_valor:
                             try:
                                 v = abs(_limpar_valor(p[col_valor]))
                                 if v > 0:
                                     return v
-                            except:
+                            except Exception:
                                 pass
-            return 0.0
+        return 0.0
+
+    caixa = buscar("CAIXA E EQUIVALENTES", "DISPONIBILIDADES", "CAIXA")
+    ativo_circulante = buscar("ATIVO CIRCULANTE")
+    estoques = buscar("ESTOQUES")
+    realizavel_lp = buscar("ATIVO REALIZAVEL A LONGO PRAZO", "REALIZAVEL A LONGO PRAZO", "REALIZAVEL LONGO PRAZO")
+    ativo_nao_circulante = buscar("ATIVO NAO CIRCULANTE", "ATIVO NAO-CIRCULANTE")
+    imobilizado = buscar("IMOBILIZADO", "IMOBILIZADO LIQUIDO")
+    passivo_circulante = buscar("PASSIVO CIRCULANTE")
+    passivo_nao_circulante = buscar("PASSIVO NAO CIRCULANTE", "PASSIVO NAO-CIRCULANTE")
+    passivo_total = buscar("TOTAL DO PASSIVO", "PASSIVO TOTAL", "TOTAL PASSIVO")
+    ativo_total = buscar("ATIVO TOTAL", "TOTAL DO ATIVO", "TOTAL ATIVO")
+    patrimonio_liquido = buscar("TOTAL DO PATRIMONIO LIQUIDO", "PATRIMONIO LIQUIDO", "PATRIMONIO SOCIAL")
+
+    # ===== Fallbacks robustos =====
+    # CUIDADO: no BP brasileiro, ARLP e Imobilizado JA ESTAO dentro do ANC.
+    # Por isso NAO somar ARLP ao ANC novamente.
+
+    # 1) Se nao achou ANC mas achou Imobilizado, usa Imobilizado como piso
+    if not ativo_nao_circulante and imobilizado:
+        ativo_nao_circulante = imobilizado
+
+    # 2) Se nao achou passivo_total, calcula pela soma dos componentes
+    if not passivo_total and passivo_circulante and passivo_nao_circulante:
+        passivo_total = passivo_circulante + passivo_nao_circulante
+
+    # 3) Ativo total: AC + ANC (ARLP ja esta dentro de ANC)
+    if not ativo_total:
+        if ativo_circulante and ativo_nao_circulante:
+            ativo_total = ativo_circulante + ativo_nao_circulante
+        elif ativo_circulante:
+            ativo_total = ativo_circulante + (realizavel_lp or 0.0) + (imobilizado or 0.0)
+
+    # 4) Se ainda nao tem ativo_total mas tem passivo + PL, usa a equacao contabil
+    if not ativo_total and passivo_total and patrimonio_liquido:
+        ativo_total = passivo_total + patrimonio_liquido
+
+    # 5) Se nao achou PL mas tem ativo e passivo totais
+    if not patrimonio_liquido and ativo_total and passivo_total:
+        patrimonio_liquido = ativo_total - passivo_total
+
+    # 6) VALIDACAO FINAL: se ativo_total nao bate com (passivo_total + PL), forca a equacao contabil
+    if ativo_total and passivo_total and patrimonio_liquido:
+        soma_esperada = passivo_total + patrimonio_liquido
+        if abs(ativo_total - soma_esperada) > 1.0:  # tolerancia de R$ 1
+            ativo_total = soma_esperada
+
+    def div(a, b):
+        return (a / b) if b else 0.0
+
+    def pct(a, b):
+        return ((a / b) * 100) if b else 0.0
+
+    def fmt(v):
+        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    liq_imediata = div(caixa, passivo_circulante)
+    liq_corrente = div(ativo_circulante, passivo_circulante)
+    liq_seca = div(ativo_circulante - estoques, passivo_circulante)
+    liq_geral = div(ativo_circulante + realizavel_lp, passivo_circulante + passivo_nao_circulante)
+    endividamento = pct(passivo_total, ativo_total)
+    part_cap_terceiros = pct(passivo_total, patrimonio_liquido)
+    imob_pl = pct(imobilizado, patrimonio_liquido)
+
+    return {
+        "liquidez": {
+            "liquidez_imediata": fmt(liq_imediata),
+            "liquidez_corrente": fmt(liq_corrente),
+            "liquidez_seca": fmt(liq_seca),
+            "liquidez_geral": fmt(liq_geral),
+        },
+        "estrutura": {
+            "endividamento_geral": fmt(endividamento),
+            "part_capital_terceiros": fmt(part_cap_terceiros),
+            "imobilizacao_pl": fmt(imob_pl),
+        },
+        "valores": {
+            "caixa": caixa,
+            "ativo_circulante": ativo_circulante,
+            "estoques": estoques,
+            "realizavel_lp": realizavel_lp,
+            "ativo_nao_circulante": ativo_nao_circulante,
+            "imobilizado": imobilizado,
+            "passivo_circulante": passivo_circulante,
+            "passivo_nao_circulante": passivo_nao_circulante,
+            "passivo_total": passivo_total,
+            "ativo_total": ativo_total,
+            "patrimonio_liquido": patrimonio_liquido,
+        },
+    }
+
+
 def demonstracoes_em_breve():
     return HTMLResponse(content="<html><body><h1>Demonstrações Contábeis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
 @app.get("/analises", response_class=HTMLResponse)
@@ -5488,3 +5587,185 @@ async def gerar_pdf_analise_bp(id: int):
     pdf_bytes = bytes(pdf.output())
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Analise_BP_{periodo}.pdf"})
 
+
+
+# =========================================================
+# ROTAS DE LIQUIDEZ (adicionadas automaticamente)
+# =========================================================
+
+@app.get("/api/calcular_liquidez/{periodo}")
+async def api_calcular_liquidez(periodo: str):
+    dados = _calc_liquidez(periodo)
+    if not dados:
+        return {"erro": True, "mensagem": "Balanco Patrimonial nao encontrado para este periodo."}
+    return dados
+
+
+@app.post("/salvar_liquidez/{periodo}")
+async def salvar_liquidez_rota(periodo: str):
+    try:
+        dados = _calc_liquidez(periodo)
+        if not dados:
+            return {"erro": True, "mensagem": "Sem dados para salvar."}
+        import sqlite3 as _sq, json as _js, datetime as _dt
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = _sq.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS historico_liquidez (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+        data_agora = _dt.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cur.execute("INSERT INTO historico_liquidez (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+                    (periodo, data_agora, _js.dumps(dados, ensure_ascii=False)))
+        conn.commit()
+        conn.close()
+        return {"ok": True, "mensagem": "Liquidez salva com sucesso!"}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+
+
+@app.get("/historico_liquidez")
+async def listar_historico_liquidez():
+    import sqlite3 as _sq
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = _sq.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS historico_liquidez (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    cur.execute("SELECT id, periodo, data_geracao FROM historico_liquidez ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+
+@app.get("/historico_liquidez/{id}")
+async def get_liquidez_id(id: int):
+    import sqlite3 as _sq, json as _js
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = _sq.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_liquidez WHERE id = ?", (id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return {"erro": True, "mensagem": "Nao encontrado"}
+    dados = _js.loads(row[2])
+    dados["_periodo_hist"] = row[0]
+    dados["_data_hist"] = row[1]
+    return dados
+
+
+@app.delete("/excluir_liquidez/{id}")
+async def excluir_liquidez(id: int):
+    import sqlite3 as _sq
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = _sq.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM historico_liquidez WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.get("/gerar_pdf_liquidez/{id}")
+def gerar_pdf_liquidez(id: int):
+    import sqlite3 as _sq, json as _js
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+    from fastapi.responses import Response
+
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = _sq.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_liquidez WHERE id = ?", (id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return Response(content="Historico nao encontrado.", status_code=404, media_type="text/plain")
+
+    periodo, data_geracao, res_json = row
+    dados = _js.loads(res_json)
+    liq = dados.get("liquidez", {})
+    est = dados.get("estrutura", {})
+    val = dados.get("valores", {})
+
+    def fmt_moeda(v):
+        try:
+            return f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except Exception:
+            return str(v)
+
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.add_page()
+    pdf.set_fill_color(0, 51, 102)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 15)
+    pdf.cell(0, 15, "INDICES DE LIQUIDEZ E ESTRUTURA", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.ln(4)
+    pdf.cell(0, 6, f"Periodo: {periodo.replace('-', ' ')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 6, f"Data de Geracao: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.ln(6)
+
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_fill_color(0, 86, 179)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 8, "1. INDICES DE LIQUIDEZ", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 10)
+    for label, chave in [
+        ("Liquidez Imediata", "liquidez_imediata"),
+        ("Liquidez Corrente", "liquidez_corrente"),
+        ("Liquidez Seca", "liquidez_seca"),
+        ("Liquidez Geral", "liquidez_geral"),
+    ]:
+        pdf.cell(110, 7, label, border=1)
+        pdf.cell(0, 7, str(liq.get(chave, "0,00")), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_fill_color(0, 86, 179)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 8, "2. ESTRUTURA PATRIMONIAL", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 10)
+    for label, chave in [
+        ("Endividamento Geral (%)", "endividamento_geral"),
+        ("Part. Capital de Terceiros (%)", "part_capital_terceiros"),
+        ("Imobilizacao do PL (%)", "imobilizacao_pl"),
+    ]:
+        pdf.cell(110, 7, label, border=1)
+        pdf.cell(0, 7, str(est.get(chave, "0,00")) + "%", border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_fill_color(0, 86, 179)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 8, "3. VALORES BASE", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 10)
+    for label, chave in [
+        ("Caixa e Equivalentes", "caixa"),
+        ("Ativo Circulante", "ativo_circulante"),
+        ("Estoques", "estoques"),
+        ("Realizavel a Longo Prazo", "realizavel_lp"),
+        ("Imobilizado", "imobilizado"),
+        ("Passivo Circulante", "passivo_circulante"),
+        ("Passivo Nao Circulante", "passivo_nao_circulante"),
+        ("Passivo Total", "passivo_total"),
+        ("Ativo Total", "ativo_total"),
+        ("Patrimonio Liquido", "patrimonio_liquido"),
+    ]:
+        pdf.cell(110, 7, label, border=1)
+        pdf.cell(0, 7, fmt_moeda(val.get(chave, 0)), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    pdf_bytes = bytes(pdf.output())
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=liquidez_{id}.pdf"},
+    )
+# =========================================================
+# FIM DAS ROTAS DE LIQUIDEZ
+# =========================================================
