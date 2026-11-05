@@ -144,13 +144,16 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
         <li><a id="submenu-dvp" onclick="mostrarTela('demonstracoes','DVP')">DVP</a></li>
         <li><a id="submenu-dmpl" onclick="mostrarTela('demonstracoes','DMPL')">DMPL</a></li>
         <li><a href="/conferencia" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Conferência das Demonstrações</a></li>
+        <li>
+        <a href="/analise_orcamentaria" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Orçamentária (BO)</a>
+        <a href="/analise_financeira_bf" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Financeira (BF)</a>
+        <a href="/analise_dfc" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise DFC</a>
+        <a href="/analise_patrimonial" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Patrimonial (DVP)</a>
+    </li>
+
         <li><a href="/integridade" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
-    <li><a href="/analise_orcamentaria" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Análise Orçamentária</a>
-        <a href="/analise_financeira_bf" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Análise Financeira-BF</a>
-        <a href="/analise_dfc" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Análise DFC</a>
-            <a href="/analise_patrimonial" style="text-decoration:none; color:inherit;" class="menu-item">Análise Patrimonial</a></li>
-<li><a href="/analise_orcamentaria" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Análise Orçamentária</a>
-            <a href="/analise_patrimonial" style="text-decoration:none; color:inherit;" class="menu-item">Análise Patrimonial</a></li>
+    <li></li>
+<li></li>
     <li><a href="/composicao_receitas_despesas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Composição Receitas/Despesas</a></li>
 <li><a href="/liquidez" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Índices de Liquidez</a></li>
     <li><a href="/panorama" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Resultados Gerais</a></li>
@@ -689,9 +692,10 @@ document.addEventListener("DOMContentLoaded", function() {
     const linksParaMover = [
         'Conferência das Demonstrações',
         'Integridade entre Demonstrações',
-        'Análise Orçamentária',
-        'Análise Financeira-BF',
-        'Análise Patrimonial',
+        'Análise Orçamentária (BO)',
+        'Análise Financeira (BF)',
+        'Análise DFC',
+        'Análise Patrimonial (DVP)',
         'Composição Receitas/Despesas',
         'Índices de Liquidez',
         'Resultados Gerais'

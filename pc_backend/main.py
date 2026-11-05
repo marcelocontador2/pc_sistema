@@ -1,7 +1,8 @@
+from fastapi.staticfiles import StaticFiles
 from app.routers import dfc
 from fastapi import Request, Request, FastAPI, Request
 from historico_integridade import router as historico_router
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
 from fastapi.staticfiles import StaticFiles
 from historico_integridade import router as historico_router
@@ -2176,6 +2177,139 @@ async def gerar_pdf_analise_dfc(id: int):
 
     pdf_bytes = bytes(pdf.output())
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Analise_DFC_{periodo}.pdf"})
+
+# ============================================================
+# API DA ANALISE DFC (le o CSV e retorna os dados)
+# ============================================================
+
+@app.get("/api/analise_dfc/{periodo}")
+async def api_analise_dfc(periodo: str):
+    import csv, os
+    from fastapi import HTTPException
+    
+    p_limpo = periodo.replace("-", "_")
+    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+    caminho = os.path.join(pasta, f"DFC_{p_limpo}.csv")
+    
+    if not os.path.exists(caminho):
+        return {"erro": "faltando", "pecas": ["DFC"]}
+    
+    def limpar(v):
+        if not v:
+            return 0.0
+        v = str(v).replace("R$", "").strip()
+        if v in ["-", "0,00", ""]:
+            return 0.0
+        if "," in v and "." in v:
+            v = v.replace(".", "").replace(",", ".")
+        elif "," in v:
+            v = v.replace(",", ".")
+        try:
+            return float(v)
+        except Exception:
+            return 0.0
+    
+    try:
+        linhas = []
+        with open(caminho, "r", encoding="latin-1", errors="ignore") as f:
+            leitor = csv.reader(f, delimiter=";")
+            for row in leitor:
+                linhas.append(row)
+        
+        def buscar(termo):
+            termo = termo.upper().strip()
+            for p in linhas:
+                if len(p) > 0 and termo in str(p[0]).upper():
+                    return p
+                if len(p) > 3 and termo in str(p[3]).upper():
+                    return p
+            return None
+        
+        def val(p, idx):
+            if p and len(p) > idx:
+                return limpar(p[idx])
+            return 0.0
+        
+        # Blocos
+        def achar_idx(termo, inicio=0):
+            termo = termo.upper().strip()
+            for i in range(inicio, len(linhas)):
+                p = linhas[i]
+                if len(p) > 0 and termo in str(p[0]).upper():
+                    return i
+                if len(p) > 3 and termo in str(p[3]).upper():
+                    return i
+            return -1
+        
+        idx_oper = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DAS OPERA")
+        idx_invest = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DE INVESTIMENTO")
+        idx_financ = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DE FINANCIAMENTO")
+        idx_apuracao = achar_idx("APURA")
+        
+        if idx_oper == -1 or idx_invest == -1 or idx_financ == -1 or idx_apuracao == -1:
+            return {"erro": "estrutura", "mensagem": "Nao foi possivel localizar os blocos da DFC no CSV."}
+        
+        def buscar_bloco(bloco, termo):
+            termo = termo.upper().strip()
+            for p in bloco:
+                if len(p) > 0 and termo in str(p[0]).upper():
+                    return p
+                if len(p) > 3 and termo in str(p[3]).upper():
+                    return p
+            return None
+        
+        # Operacional
+        linhas_oper = linhas[idx_oper:idx_invest]
+        l_ing_oper = buscar_bloco(linhas_oper, "INGRESSOS")
+        l_desemb_oper = buscar_bloco(linhas_oper, "DESEMBOLSOS")
+        l_liq_oper = buscar_bloco(linhas_oper, "FLUXO DE CAIXA L")
+        
+        # Investimento
+        linhas_invest = linhas[idx_invest:idx_financ]
+        l_ing_invest = buscar_bloco(linhas_invest, "INGRESSOS")
+        l_desemb_invest = buscar_bloco(linhas_invest, "DESEMBOLSOS")
+        l_liq_invest = buscar_bloco(linhas_invest, "FLUXO DE CAIXA L")
+        
+        # Financiamento
+        linhas_financ = linhas[idx_financ:idx_apuracao]
+        l_ing_financ = buscar_bloco(linhas_financ, "INGRESSOS")
+        l_desemb_financ = buscar_bloco(linhas_financ, "DESEMBOLSOS")
+        l_liq_financ = buscar_bloco(linhas_financ, "FLUXO DE CAIXA L")
+        
+        # Apuracao
+        linhas_apuracao = linhas[idx_apuracao:]
+        l_geracao = buscar_bloco(linhas_apuracao, "GERA")
+        l_caixa_inicial = buscar_bloco(linhas_apuracao, "CAIXA E EQUIVALENTES DE CAIXA INICIAL")
+        l_caixa_final = buscar_bloco(linhas_apuracao, "CAIXA E EQUIVALENTES DE CAIXA FINAL")
+        
+        dados = {
+            "operacional": {
+                "ingressos": {"atual": val(l_ing_oper, 3), "anterior": val(l_ing_oper, 4)},
+                "desembolsos": {"atual": val(l_desemb_oper, 3), "anterior": val(l_desemb_oper, 4)},
+                "liquido": {"atual": val(l_liq_oper, 3), "anterior": val(l_liq_oper, 4)},
+            },
+            "investimento": {
+                "ingressos": {"atual": val(l_ing_invest, 3), "anterior": val(l_ing_invest, 4)},
+                "desembolsos": {"atual": val(l_desemb_invest, 3), "anterior": val(l_desemb_invest, 4)},
+                "liquido": {"atual": val(l_liq_invest, 3), "anterior": val(l_liq_invest, 4)},
+            },
+            "financiamento": {
+                "ingressos": {"atual": val(l_ing_financ, 3), "anterior": val(l_ing_financ, 4)},
+                "desembolsos": {"atual": val(l_desemb_financ, 3), "anterior": val(l_desemb_financ, 4)},
+                "liquido": {"atual": val(l_liq_financ, 3), "anterior": val(l_liq_financ, 4)},
+            },
+            "caixa": {
+                "geracao": {"atual": val(l_geracao, 3), "anterior": val(l_geracao, 4)},
+                "inicial": {"atual": val(l_caixa_inicial, 3), "anterior": val(l_caixa_inicial, 4)},
+                "final": {"atual": val(l_caixa_final, 3), "anterior": val(l_caixa_final, 4)},
+            }
+        }
+        return {"erro": False, "dados": dados}
+    
+    except Exception as e:
+        print(f"[DFC] ERRO: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/analise_dfc")
 async def serve_analise_dfc():
     from fastapi.responses import FileResponse
@@ -4995,22 +5129,49 @@ async def download_pdf_csv(tipo: str, ano: int = Query(2026), periodo: str = Que
 
 @app.get('/api/configuracoes/entidade')
 async def obter_entidade():
-    import sqlite3
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pc_storage', 'banco_dados.db')
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row # Permite acessar colunas pelo nome
     cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS configuracoes_entidade (
+    
+    # Cria a tabela se nao existir
+    cursor.execute("""CREATE TABLE IF NOT EXISTS configuracoes_entidade (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
         email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT,
-        contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT)''')
+        contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT, logo_path TEXT
+    )""")
     conn.commit()
-    cursor.execute('SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1')
+    
+    cursor.execute("SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
     row = cursor.fetchone()
     conn.close()
+    
     if not row:
-        return {'razao_social': '', 'nome_fantasia': '', 'cnpj': '', 'endereco': '', 'email': '', 'telefone': '', 'contador_nome': '', 'contador_crc': '', 'contador_uf': '', 'contador_cpf': '', 'contador_email': ''}
-    return {'razao_social': row[1] or '', 'nome_fantasia': row[2] or '', 'cnpj': row[3] or '', 'endereco': row[4] or '', 'email': row[5] or '', 'telefone': row[6] or '', 'contador_nome': row[7] or '', 'contador_crc': row[8] or '', 'contador_uf': row[9] or '', 'contador_cpf': row[10] or '', 'contador_email': row[11] or ''}
+        return {"razao_social": "", "nome_fantasia": "", "cnpj": "", "endereco": "", "email": "", "telefone": "", "contador_nome": "", "contador_crc": "", "contador_uf": "", "contador_cpf": "", "contador_email": "", "logo_path": ""}
+    
+    # Acessa pelo nome da coluna (evita erro de indice desalinhado)
+    def get_col(nome):
+        try:
+            return row[nome] or ""
+        except Exception:
+            return ""
+            
+    return {
+        "razao_social": get_col("razao_social"),
+        "nome_fantasia": get_col("nome_fantasia"),
+        "cnpj": get_col("cnpj"),
+        "endereco": get_col("endereco"),
+        "email": get_col("email"),
+        "telefone": get_col("telefone"),
+        "contador_nome": get_col("contador_nome"),
+        "contador_crc": get_col("contador_crc"),
+        "contador_uf": get_col("contador_uf"),
+        "contador_cpf": get_col("contador_cpf"),
+        "contador_email": get_col("contador_email"),
+        "logo_path": get_col("logo_path")
+    }
 
 @app.post('/api/configuracoes/entidade')
 async def salvar_entidade(request: Request):
@@ -5031,8 +5192,8 @@ async def salvar_entidade(request: Request):
     data_agora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     cursor.execute('DELETE FROM configuracoes_entidade')
     cursor.execute('''INSERT INTO configuracoes_entidade
-        (razao_social, nome_fantasia, cnpj, endereco, email, telefone, contador_nome, contador_crc, contador_uf, contador_cpf, contador_email, data_atualizacao)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+        (razao_social, nome_fantasia, cnpj, endereco, email, telefone, contador_nome, contador_crc, contador_uf, contador_cpf, contador_email, data_atualizacao, logo_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
         body.get('razao_social', ''),
         body.get('nome_fantasia', ''),
         body.get('cnpj', ''),
@@ -5044,7 +5205,8 @@ async def salvar_entidade(request: Request):
         body.get('contador_uf', ''),
         body.get('contador_cpf', ''),
         body.get('contador_email', ''),
-        data_agora))
+        data_agora,
+        body.get('logo_path', '')))
     conn.commit()
     conn.close()
     return {'ok': True, 'mensagem': 'Configuracoes salvas com sucesso!'}
@@ -5054,3 +5216,306 @@ async def serve_configuracoes():
     from fastapi.responses import FileResponse
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pc_frontend', 'configuracoes.html')
     return FileResponse(caminho, headers={'Cache-Control': 'no-store, no-cache, must-revalidate'})
+
+
+
+
+@app.get("/api/configuracoes/migrar_logo")
+async def migrar_logo():
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("ALTER TABLE configuracoes_entidade ADD COLUMN logo_path TEXT DEFAULT ''")
+        conn.commit()
+        msg = "Coluna logo_path adicionada."
+    except Exception as e:
+        msg = f"Ja existe ou erro: {str(e)[:50]}"
+    conn.close()
+    return {"ok": True, "mensagem": msg}
+
+
+@app.post("/api/configuracoes/logo")
+async def upload_logo(file: UploadFile = File(...)):
+    import os, uuid, sqlite3
+    from fastapi import HTTPException
+    
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
+    if ext not in ["png", "jpg", "jpeg"]:
+        raise HTTPException(status_code=400, detail="Formato invalido. Use PNG ou JPG.")
+    
+    pasta_logos = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_logos")
+    os.makedirs(pasta_logos, exist_ok=True)
+    
+    nome_arquivo = f"logo_{uuid.uuid4().hex[:8]}.{ext}"
+    caminho = os.path.join(pasta_logos, nome_arquivo)
+    
+    with open(caminho, "wb") as f:
+        f.write(await file.read())
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS configuracoes_entidade (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
+        email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT,
+        contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT, logo_path TEXT
+    )""")
+    conn.commit()
+    
+    try:
+        cursor.execute("ALTER TABLE configuracoes_entidade ADD COLUMN logo_path TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass
+    
+    cursor.execute("SELECT COUNT(*) FROM configuracoes_entidade")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO configuracoes_entidade (razao_social, logo_path) VALUES ('', ?)", (nome_arquivo,))
+    else:
+        cursor.execute("UPDATE configuracoes_entidade SET logo_path = ?", (nome_arquivo,))
+    conn.commit()
+    conn.close()
+    
+    return {"ok": True, "mensagem": "Logo enviada com sucesso!", "logo_path": nome_arquivo}
+
+@app.get("/api/configuracoes/migrar_logo")
+async def migrar_logo():
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("ALTER TABLE configuracoes_entidade ADD COLUMN logo_path TEXT DEFAULT ''")
+        conn.commit()
+        msg = "Coluna logo_path adicionada."
+    except Exception as e:
+        msg = "Coluna ja existe ou erro: " + str(e)[:50]
+    conn.close()
+    return {"ok": True, "mensagem": msg}
+
+
+app.mount("/static_logos", StaticFiles(directory=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_logos")), name="static_logos")
+
+
+# ============================================================
+# ROTAS DO RELATORIO CONSOLIDADO
+# ============================================================
+
+@app.get("/api/relatorio_consolidado/{periodo}")
+async def api_relatorio_consolidado(periodo: str):
+    import sqlite3, os, json
+    # Aqui buscamos os dados de todos os modulos (BP, DFC, DVP, DMPL, BF, Integridade)
+    # Para simplificar, vamos apenas retornar o status de cada um
+    # (Na proxima etapa, cruzamos os dados reais)
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    modulos = {}
+    # Verifica quais modulos tem historico salvo para esse periodo
+    for tabela in ["historico_analise_financeira_bf", "historico_analise_dfc", "historico_integridade_matriz"]:
+        try:
+            cursor.execute(f"SELECT COUNT(*) FROM {tabela} WHERE periodo LIKE ?", (f"%{periodo}%",))
+            modulos[tabela] = cursor.fetchone()[0]
+        except Exception:
+            modulos[tabela] = 0
+    
+    conn.close()
+    
+    return {
+        "periodo": periodo,
+        "modulos": modulos,
+        "status": "ok" if sum(modulos.values()) > 0 else "faltando"
+    }
+
+@app.post("/salvar_relatorio_consolidado/{periodo}")
+async def salvar_relatorio_consolidado(periodo: str):
+    import sqlite3, json
+    from datetime import datetime
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_relatorio_consolidado (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    
+    # Pega os dados de todos os modulos
+    # Por enquanto, salvamos um JSON simples (na proxima etapa sera completo)
+    dados = {"periodo": periodo, "gerado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    data_agora = dados["gerado_em"]
+    
+    cursor.execute("INSERT INTO historico_relatorio_consolidado (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+                   (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "mensagem": "Relatorio consolidado salvo com sucesso!"}
+
+@app.get("/historico_relatorio_consolidado")
+async def get_hist_consolidado():
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_relatorio_consolidado (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    cursor.execute("SELECT id, periodo, data_geracao FROM historico_relatorio_consolidado ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+@app.delete("/excluir_relatorio_consolidado/{id}")
+async def excluir_relatorio_consolidado(id: int):
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM historico_relatorio_consolidado WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.get("/gerar_pdf_relatorio_consolidado/{id}")
+async def gerar_pdf_relatorio_consolidado(id: int):
+    import sqlite3, json, os
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+    from fastapi.responses import Response
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT periodo, data_geracao FROM historico_relatorio_consolidado WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    
+    # Pega dados da entidade
+    cursor.execute("""CREATE TABLE IF NOT EXISTS configuracoes_entidade (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
+        email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT, contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT, logo_path TEXT)""")
+    cursor.execute("SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
+    ent = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return Response(content="Historico nao encontrado.", status_code=404)
+    
+    periodo, data_geracao = row
+    
+    # Dados da entidade
+    razao = ent[1] if ent and len(ent) > 1 else "COFEN/BR"
+    cnpj = ent[3] if ent and len(ent) > 3 else ""
+    contador_nome = ent[7] if ent and len(ent) > 7 else ""
+    contador_crc = ent[8] if ent and len(ent) > 8 else ""
+    contador_uf = ent[9] if ent and len(ent) > 9 else ""
+    contador_cpf = ent[10] if ent and len(ent) > 10 else ""
+    logo_path = ent[13] if ent and len(ent) > 13 else ""
+    
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # CAPA
+    # Logo (se existir)
+    caminho_logo = ""
+    if logo_path:
+        if os.path.isabs(logo_path):
+            caminho_logo = logo_path
+        else:
+            caminho_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_logos", logo_path)
+        if not os.path.exists(caminho_logo):
+            caminho_logo = ""
+    
+    if caminho_logo:
+        try:
+            # Centraliza a logo no topo
+            pdf.image(caminho_logo, x=70, y=20, w=70)
+            y_inicio = 100
+        except Exception:
+            y_inicio = 50
+    else:
+        y_inicio = 50
+    
+    # Titulo
+    pdf.set_y(y_inicio)
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "RELATORIO CONSOLIDADO", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "DE ANALISE CONTABIL", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    
+    pdf.ln(10)
+    pdf.set_font("Helvetica", "", 12)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 8, f"Periodo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 8, f"Data de Emissao: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    
+    pdf.ln(30)
+    
+    # Dados da entidade na capa
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 8, "DADOS DA ENTIDADE", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 6, f"Razao Social: {razao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 6, f"CNPJ: {cnpj}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    
+    pdf.ln(20)
+    
+    # Dados do contador na capa
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 8, "RESPONSAVEL TECNICO", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 6, f"Contador: {contador_nome}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 6, f"CRC: {contador_crc} / UF: {contador_uf}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 6, f"CPF: {contador_cpf}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    
+    # ========== PAGINA 2: SUMARIO ==========
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "SUMARIO", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.ln(10)
+    
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(0, 0, 0)
+    capitulos = [
+        "1. Apresentacao e Escopo",
+        "2. Visao Geral Orcamentaria e Financeira",
+        "3. Analise do Balanco Patrimonial",
+        "4. Demonstracao das Variacoes Patrimoniais",
+        "5. Demonstracao dos Fluxos de Caixa",
+        "6. Demonstracao das Mutacoes do PL",
+        "7. Analise de Despesas e Custeio",
+        "8. Matriz de Integridade e Controles",
+        "9. Parecer Conclusivo",
+        "10. Anexos e Assinaturas"
+    ]
+    for cap in capitulos:
+        pdf.cell(0, 8, cap, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    # ========== PAGINA FINAL: ASSINATURA ==========
+    pdf.add_page()
+    pdf.set_y(100)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, "_____________________________________________", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 8, "Contador Responsavel", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 8, contador_nome, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 8, f"CRC: {contador_crc} / UF: {contador_uf}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 8, f"CPF: {contador_cpf}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    
+    pdf_bytes = bytes(pdf.output())
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Relatorio_Consolidado_{periodo}.pdf"})
+
+@app.get("/relatorio_consolidado")
+async def serve_relatorio_consolidado():
+    from fastapi.responses import FileResponse
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_consolidado.html")
+    return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
