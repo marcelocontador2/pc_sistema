@@ -301,34 +301,188 @@ H += tit(4, 'Análise do Balanço Financeiro');
 H += '<div class="desc">Movimentação financeira consolidada.</div>';
 const bf = unwrap(D.analise_financeira_bf);
 if (bf) {
-    const blocos = [
-        ['Receitas', bf.receitas],
-        ['Despesas', bf.despesas],
-        ['Extraorçamentário', bf.extra],
-        ['Caixa', bf.caixa]
-    ];
-    blocos.forEach(([titulo, obj]) => {
+    // --- INÍCIO DA TABELA ÚNICA ---
+    H += '<table style="width:100%; border-collapse:collapse; table-layout:fixed; font-size:8.5px;">';
+    H += '<thead><tr style="background:#003366; color:#fff;">';
+    H += '<th style="width:60%; padding:5px; text-align:left;">ITEM</th>';
+    H += '<th style="width:15%; padding:5px; text-align:right;">ATUAL</th>';
+    H += '<th style="width:15%; padding:5px; text-align:right;">ANTERIOR</th>';
+    H += '<th style="width:10%; padding:5px; text-align:right;">VAR. (%)</th>';
+    H += '</tr></thead><tbody>';
+
+    const addSecao = (texto, bg) => {
+        H += `<tr style="background:${bg}; color:#fff;"><td colspan="4" style="padding:4px 5px; text-align:left; font-size:8px; text-transform:uppercase;">${texto}</td></tr>`;
+    };
+    const addLinha = (item, at, an, variacao, classe) => {
+        const bg = classe === 'zebra' ? '#f8f9fa' : (classe === 'total' ? '#e9ecef' : '#fff');
+        const fw = classe === 'total' ? 'bold' : 'normal';
+        H += `<tr style="background:${bg}; font-weight:${fw};">`;
+        H += `<td style="padding:4px 5px; border:1px solid #ddd;">${item}</td>`;
+        H += `<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">${at}</td>`;
+        H += `<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">${an}</td>`;
+        H += `<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">${variacao}</td>`;
+        H += '</tr>';
+    };
+
+    const renderBloco = (titulo, obj) => {
         if (!obj) return;
-        H += sub(titulo);
-        const rows = [];
-        Object.keys(obj).forEach(k => {
+        addSecao(titulo, '#003366');
+        const keys = Object.keys(obj).filter(k => k !== 'detalhes');
+        let count = 0;
+        let sumAt = 0, sumAn = 0;
+
+        keys.forEach(k => {
             const v = obj[k];
-            if (k === 'detalhes') {
-                Object.keys(v).forEach(kk => {
-                    const at = v[kk].atual || 0;
-                    const an = v[kk].anterior || 0;
-                    const varStr = varPct(at, an);
-                    rows.push(['  ' + kk.replace(/_/g,' ').toUpperCase(), moeda(at), moeda(an), varStr]);
-                });
-            } else if (v && typeof v === 'object' && 'atual' in v) {
+            if (v && typeof v === 'object' && 'atual' in v) {
                 const at = v.atual || 0;
                 const an = v.anterior || 0;
-                const varStr = varPct(at, an);
-                rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(at), moeda(an), varStr]);
+                sumAt += at; sumAn += an;
+                addLinha(k.replace(/_/g,' ').toUpperCase(), moeda(at).replace('R$ ',''), moeda(an).replace('R$ ',''), varPct(at, an), count%2===0 ? 'zebra' : '');
+                count++;
             }
         });
-        H += tab(['Item','Atual','Anterior','Var. (%)'], rows);
-    });
+        addLinha('TOTAL', moeda(sumAt).replace('R$ ',''), moeda(sumAn).replace('R$ ',''), varPct(sumAt, sumAn), 'total');
+    };
+
+    renderBloco('Receitas', bf.receitas);
+    renderBloco('Despesas', bf.despesas);
+    renderBloco('Extraorçamentário', bf.extra);
+    renderBloco('Caixa', bf.caixa);
+
+    // --- TOTAIS GERAIS ---
+    const getV = (obj, key, tipo) => (obj && obj[key] && obj[key][tipo]) ? Number(obj[key][tipo]) : 0;
+
+    const recOrcAt = getV(bf.receitas, 'corrente', 'atual') + getV(bf.receitas, 'capital', 'atual');
+    const recOrcAn = getV(bf.receitas, 'corrente', 'anterior') + getV(bf.receitas, 'capital', 'anterior');
+    const recExtAt = getV(bf.extra, 'recebimentos', 'atual');
+    const recExtAn = getV(bf.extra, 'recebimentos', 'anterior');
+    const saldoAntAt = getV(bf.caixa, 'saldo_anterior', 'atual');
+    const saldoAntAn = getV(bf.caixa, 'saldo_anterior', 'anterior');
+    const totIngAt = recOrcAt + recExtAt + saldoAntAt;
+    const totIngAn = recOrcAn + recExtAn + saldoAntAn;
+
+    const despOrcAt = getV(bf.despesas, 'corrente', 'atual') + getV(bf.despesas, 'capital', 'atual');
+    const despOrcAn = getV(bf.despesas, 'corrente', 'anterior') + getV(bf.despesas, 'capital', 'anterior');
+    const despExtAt = getV(bf.extra, 'pagamentos', 'atual');
+    const despExtAn = getV(bf.extra, 'pagamentos', 'anterior');
+    const saldoSegAt = getV(bf.caixa, 'saldo_seguinte', 'atual');
+    const saldoSegAn = getV(bf.caixa, 'saldo_seguinte', 'anterior');
+    const totDispAt = despOrcAt + despExtAt + saldoSegAt;
+    const totDispAn = despOrcAn + despExtAn + saldoSegAn;
+
+    addSecao('TOTAL GERAL DE INGRESSOS', '#003366');
+    addLinha('Receitas Orçamentárias (Corrente + Capital)', moeda(recOrcAt).replace('R$ ',''), moeda(recOrcAn).replace('R$ ',''), '-', 'zebra');
+    addLinha('Recebimentos Extraorçamentários', moeda(recExtAt).replace('R$ ',''), moeda(recExtAn).replace('R$ ',''), '-', '');
+    addLinha('Saldo em Espécie do Exercício Anterior', moeda(saldoAntAt).replace('R$ ',''), moeda(saldoAntAn).replace('R$ ',''), '-', 'zebra');
+    addLinha('<b>TOTAL DE INGRESSOS</b>', '<b>' + moeda(totIngAt).replace('R$ ','') + '</b>', '<b>' + moeda(totIngAn).replace('R$ ','') + '</b>', '-', 'total');
+
+    addSecao('TOTAL GERAL DE DISPÊNDIOS', '#dc3545');
+    addLinha('Despesas Orçamentárias (Corrente + Capital)', moeda(despOrcAt).replace('R$ ',''), moeda(despOrcAn).replace('R$ ',''), '-', 'zebra');
+    addLinha('Pagamentos Extraorçamentários', moeda(despExtAt).replace('R$ ',''), moeda(despExtAn).replace('R$ ',''), '-', '');
+    addLinha('Saldo em Espécie para o Exercício Seguinte', moeda(saldoSegAt).replace('R$ ',''), moeda(saldoSegAn).replace('R$ ',''), '-', 'zebra');
+    addLinha('<b>TOTAL DE DISPÊNDIOS</b>', '<b>' + moeda(totDispAt).replace('R$ ','') + '</b>', '<b>' + moeda(totDispAn).replace('R$ ','') + '</b>', '-', 'total');
+
+    H += '</tbody></table>';
+
+    // =======================================================
+    // --- GRÁFICO SVG DINÂMICO ---
+    // =======================================================
+    let sumRecAt = 0, sumRecAn = 0, sumDespAt = 0, sumDespAn = 0;
+    if (bf.receitas) {
+        Object.keys(bf.receitas).forEach(k => {
+            const v = bf.receitas[k];
+            if (v && typeof v === 'object' && 'atual' in v && k !== 'detalhes') {
+                sumRecAt += v.atual || 0; sumRecAn += v.anterior || 0;
+            }
+        });
+    }
+    if (bf.despesas) {
+        Object.keys(bf.despesas).forEach(k => {
+            const v = bf.despesas[k];
+            if (v && typeof v === 'object' && 'atual' in v && k !== 'detalhes') {
+                sumDespAt += v.atual || 0; sumDespAn += v.anterior || 0;
+            }
+        });
+    }
+    
+    const saldoAntAtVal = getV(bf.caixa, 'saldo_anterior', 'atual');
+    const saldoAntAnVal = getV(bf.caixa, 'saldo_anterior', 'anterior');
+    const saldoSegAtVal = getV(bf.caixa, 'saldo_seguinte', 'atual');
+    const saldoSegAnVal = getV(bf.caixa, 'saldo_seguinte', 'anterior');
+
+    const maxVal = Math.max(sumRecAt, sumRecAn, sumDespAt, sumDespAn, saldoAntAtVal, saldoAntAnVal, saldoSegAtVal, saldoSegAnVal) || 1;
+    const scale = 200 / maxVal; // Altura máxima de 200px
+
+    let svg = '<svg viewBox="0 0 800 380" width="100%" height="380" style="font-family: Arial, sans-serif;">';
+    
+    // Eixos e linhas de grade
+    for (let i = 0; i <= 5; i++) {
+        let y = 250 - (i * 40);
+        let val = (maxVal / 5) * i;
+        svg += `<line x1="60" y1="${y}" x2="760" y2="${y}" stroke="#e0e0e0" stroke-width="1" />`;
+        svg += `<text x="55" y="${y + 4}" font-size="10" fill="#666" text-anchor="end">${Math.round(val).toLocaleString('pt-BR')}</text>`;
+    }
+    
+    // Barras
+    const barWidth = 25;
+    const gap = 10;
+    
+    // Posições X centrais para cada grupo
+    const posX = { rec: 150, desp: 350, saldoAnt: 530, saldoSeg: 700 };
+    
+    const drawBar = (val, x, cor) => {
+        let h = Math.max(1, val * scale);
+        let yStart = 250 - h;
+        return `<rect x="${x}" y="${yStart}" width="${barWidth}" height="${h}" fill="${cor}" rx="2" />`;
+    };
+
+    svg += drawBar(sumRecAt, posX.rec - (barWidth+gap/2), '#003366');
+    svg += drawBar(sumRecAn, posX.rec + (gap/2), '#5B9BD5');
+    svg += drawBar(sumDespAt, posX.desp - (barWidth+gap/2), '#C00000');
+    svg += drawBar(sumDespAn, posX.desp + (gap/2), '#F08080');
+    svg += drawBar(saldoAntAtVal, posX.saldoAnt - (barWidth+gap/2), '#4472C4');
+    svg += drawBar(saldoAntAnVal, posX.saldoAnt + (gap/2), '#9DC3E6');
+    svg += drawBar(saldoSegAtVal, posX.saldoSeg - (barWidth+gap/2), '#00B050');
+    svg += drawBar(saldoSegAnVal, posX.saldoSeg + (gap/2), '#90EE90');
+
+    // Labels do eixo X
+    svg += `<text x="${posX.rec}" y="275" font-size="11" fill="#333" text-anchor="middle">Receitas</text>`;
+    svg += `<text x="${posX.desp}" y="275" font-size="11" fill="#333" text-anchor="middle">Despesas</text>`;
+    svg += `<text x="${posX.saldoAnt}" y="275" font-size="11" fill="#333" text-anchor="middle">Saldo Ant.</text>`;
+    svg += `<text x="${posX.saldoSeg}" y="275" font-size="11" fill="#333" text-anchor="middle">Saldo Seg.</text>`;
+
+    // --- LEGENDA MELHORADA (CENTRALIZADA E COM ESPAÇAMENTO) ---
+    // Configurações
+    const legY1 = 300; // Primeira linha de legenda
+    const legY2 = 325; // Segunda linha de legenda
+    const legItemWidth = 150; // Largura estimada para cada item (retangulo + texto)
+    const legInicioX = 100; // Posição X inicial para centralizar os 4 itens
+
+    const addLegenda = (texto, cor, x, y) => {
+        return `<rect x="${x}" y="${y}" width="12" height="12" fill="${cor}" rx="2" />` +
+               `<text x="${x+18}" y="${y+10}" font-size="10" fill="#333">${texto}</text>`;
+    };
+
+    // Linha 1 (Atual)
+    svg += addLegenda('Receitas (Atual)', '#003366', legInicioX, legY1);
+    svg += addLegenda('Despesas (Atual)', '#C00000', legInicioX + legItemWidth, legY1);
+    svg += addLegenda('Saldo Ant. (Atual)', '#4472C4', legInicioX + legItemWidth*2, legY1);
+    svg += addLegenda('Saldo Seg. (Atual)', '#00B050', legInicioX + legItemWidth*3, legY1);
+    
+    // Linha 2 (Anterior)
+    svg += addLegenda('Receitas (Anterior)', '#5B9BD5', legInicioX, legY2);
+    svg += addLegenda('Despesas (Anterior)', '#F08080', legInicioX + legItemWidth, legY2);
+    svg += addLegenda('Saldo Ant. (Anterior)', '#9DC3E6', legInicioX + legItemWidth*2, legY2);
+    svg += addLegenda('Saldo Seg. (Anterior)', '#90EE90', legInicioX + legItemWidth*3, legY2);
+
+    svg += '</svg>';
+
+    H += '<div style="margin-top: 30px; page-break-inside: avoid;">';
+    H += '<div style="background: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">';
+    H += '<h3 style="text-align: center; color: #003366; font-size: 13px; margin-top: 0; margin-bottom: 15px;">Comparativo de Receitas, Despesas e Saldos</h3>';
+    H += svg;
+    H += '</div></div>';
+
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 5. ANÁLISE DFC =====
@@ -582,6 +736,19 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
