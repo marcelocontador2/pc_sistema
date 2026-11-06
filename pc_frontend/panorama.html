@@ -249,15 +249,32 @@
         }
 
         async function excluirSelecionado() {
-            const check = document.querySelector('.check-historico:checked');
-            if (!check) { alert("Selecione um item no histórico."); return; }
-            if (!confirm("Excluir este item do histórico?")) return;
+            const checks = document.querySelectorAll('.check-historico:checked');
+            if (checks.length === 0) { alert("Selecione pelo menos um item no histórico."); return; }
+            if (!confirm(`Excluir ${checks.length} item(ns) do histórico?`)) return;
+            
+            const ids = Array.from(checks).map(c => parseInt(c.value));
+            console.log("IDs para excluir:", ids);
             
             try {
-                await fetch(`/excluir_panorama/${check.value}`, { method: 'DELETE' });
-                carregarHistorico();
+                const res = await fetch("/excluir_panorama_multiplos", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids: ids })
+                });
+                
+                console.log("Status da resposta:", res.status);
+                const data = await res.json();
+                console.log("Resposta do servidor:", data);
+                
+                if (data.ok) {
+                    carregarHistorico();
+                } else {
+                    alert("Erro ao excluir: " + (data.mensagem || "Falha no servidor"));
+                }
             } catch(e) {
-                alert("Erro ao excluir.");
+                console.error("Erro de conexão:", e);
+                alert("Erro de conexão ao excluir. Verifique o Console (F12).");
             }
         }
 

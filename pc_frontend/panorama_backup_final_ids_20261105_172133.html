@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Resultados Gerais</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; padding: 20px; margin: 0; color: #333; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn { border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #fff; text-decoration: none; font-size: 14px; }
+        .btn-voltar { background: #fff; border: 1px solid #ccc; color: #333; }
+        .btn-pdf { background: #0056b3; }
+        .btn-exibir { background: #28a745; }
+        .btn-excluir { background: #dc3545; }
+        .btn-salvar { background: #28a745; }
+        .filtros-bar { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .form-group { display: flex; align-items: center; gap: 5px; }
+        label { font-weight: bold; color: #444; font-size: 14px; }
+        select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        .flex-layout { display: flex; gap: 20px; }
+        .sidebar { width: 300px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; height: fit-content; }
+        .main-content { flex: 1; }
+        .card-panorama { background: #fff; padding: 40px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .header-panorama { margin-bottom: 30px; }
+        .subtitulo { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #6c757d; font-weight: bold; }
+        h1 { font-size: 28px; color: #003366; margin: 5px 0 0 0; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .card-indicador { background: #e9f2fa; padding: 25px; border-radius: 8px; }
+        .card-indicador .valor { font-size: 26px; font-weight: bold; color: #003366; white-space: nowrap; }
+        .card-indicador .label { font-size: 13px; color: #003366; margin-top: 5px; }
+        .footer { border-top: 1px solid #ddd; padding-top: 15px; font-size: 12px; color: #777; display: flex; justify-content: space-between; font-style: italic; }
+        #lista-historico { list-style: none; padding: 0; }
+    
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            color: white;
+        }
+    </style>
+    <style id="estilo-voltar-laranja">
+        .btn-voltar-laranja {
+            background-color: #ff7f00 !important;
+            border-color: #ff7f00 !important;
+            border-radius: 50px !important;
+            color: white !important;
+            padding: 8px 20px !important;
+            font-weight: bold !important;
+            text-decoration: none !important;
+            display: inline-block !important;
+            border: none !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            cursor: pointer !important;
+        }
+    
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            color: white;
+        }
+    </style>
+
+    <style>
+        @media print {
+            /* Esconde os botões de ação, filtros e a barra lateral de histórico */
+            .actions, 
+            .filters, 
+            .historico-box,
+            .btn-voltar,
+            .btn-exibir,
+            .btn-excluir,
+            .btn-pdf,
+            .btn-salvar,
+            #lista-historico,
+            button {
+                display: none !important;
+            }
+
+            /* Ajusta o layout principal para ocupar a folha inteira A4 */
+            body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .container, .main-content, .layout {
+                display: block !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+
+            /* Garante que os cards fiquem alinhados em grade */
+            .cards-grid, .dashboard-cards, .row {
+                display: grid !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 20px !important;
+                margin-top: 20px !important;
+            }
+
+            /* Dá um visual limpo para os cards no papel */
+            .card {
+                background: #f8fafc !important;
+                border: 1px solid #e2e8f0 !important;
+                border-radius: 8px !important;
+                padding: 20px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Adiciona um título elegante no topo do PDF */
+            .container::before {
+                content: "Relatório de Panorama - Resultados Gerais";
+                display: block;
+                font-size: 24px;
+                font-weight: bold;
+                color: #1a202c;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #3182ce;
+            }
+        }
+    
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            color: white;
+        }
+    </style>
+    
+</head>
+<body>
+    
+    
+<div class="top-bar" style="display:flex; gap:10px; padding:10px; background: #f4f6f9; flex-wrap: wrap; align-items: center;">
+    <a href="/" class="btn" style="background:#ff7f00; color:white; padding:8px 16px; border-radius:6px; text-decoration:none; font-weight:bold;">← Voltar</a>
+    <button class="btn" onclick="exibirSelecionado()" style="background:#28a745; color:white; padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">Exibir Selecionado</button>
+    <button class="btn" onclick="excluirSelecionado()" style="background:#dc3545; color:white; padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">Excluir Selecionado</button>
+    <button class="btn" onclick="gerarPDFPanorama()" style="background:#0056b3; color:white; padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">Gerar PDF</button>
+    <button class="btn" id="btn-salvar" onclick="salvarPanorama()" style="background:#38a169; color:white; padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; display:none;">Confirmar e Salvar</button>
+</div>
+
+
+    <div class="filtros-bar">
+        <div class="form-group"><label>Ano:</label><select id="ano"><option value="2026">2026</option><option value="2025">2025</option></select></div>
+        <div class="form-group"><label>Tipo:</label><select id="tipo_periodo" onchange="ajustarPeriodo()"><option value="MES">Mensal</option><option value="TRIMESTRE" selected>Trimestral</option><option value="ANO">Exercício</option></select></div>
+        <div class="form-group" id="group-mes" style="display:none;"><label>Mês:</label><select id="mes"><option value="01">01 - Janeiro</option><option value="02">02 - Fevereiro</option><option value="03">03 - Março</option><option value="04">04 - Abril</option><option value="05">05 - Maio</option><option value="06">06 - Junho</option><option value="07">07 - Julho</option><option value="08">08 - Agosto</option><option value="09">09 - Setembro</option><option value="10">10 - Outubro</option><option value="11">11 - Novembro</option><option value="12">12 - Dezembro</option></select></div>
+        <div class="form-group" id="group-trimestre"><label>Trimestre:</label><select id="trimestre"><option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3" selected>3º Trimestre</option><option value="4">4º Trimestre</option></select></div>
+        <button class="btn" onclick="carregarPanorama()" style="background:#0056b3; color:white; padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">Verificar</button>
+    </div>
+    <div class="flex-layout">
+        <div class="sidebar">
+            <h3>Histórico Salvo</h3>
+            <ul id="lista-historico">Carregando...</ul>
+        </div>
+        <div class="main-content">
+            <div class="card-panorama">
+                <div class="header-panorama">
+                    <div class="subtitulo">Panorama</div>
+                    <h1>Resultados Gerais — <span id="periodo-titulo">3º Trimestre de 2026</span></h1>
+                </div>
+                <div class="grid">
+                    <div class="card-indicador"><div class="valor" id="val-caixa">R$ 0,0 mi</div><div class="label">Caixa e Equivalente de Caixa (BP)</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-ativo"><span id="val-caixa">R$ 0,0 mi</span></div><div class="label">Ativo Total</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-passivo"><span id="val-ativo">R$ 0,0 mi</span></div><div class="label">Passivo Total</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-pl"><span id="val-passivo">R$ 0,0 mi</span></div><div class="label">Patrimônio Líquido</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-receita"><span id="val-pl">R$ 0,0 mi</span></div><div class="label">Receitas Realizadas (BO)</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-despesa"><span id="val-receitas">R$ 0,0 mi</span></div><div class="label">Despesas Empenhadas (BO)</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-superavit-orc"><span id="val-despesas">R$ 0,0 mi</span></div><div class="label" id="label-superavit-orc">Superávit Orçamentário</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-superavit-pat"><span id="val-superavit-orc">R$ 0,0 mi</span></div><div class="label" id="label-superavit-pat">Superávit Patrimonial (DVP)</div></div>
+                    <div class="card-indicador"><div class="valor" id="val-superavit-fin"><span id="val-superavit-pat">R$ 0,0 mi</span></div><div class="label">Superávit Financeiro (BP)</div></div>
+                </div></div></div>
+                </div>
+                <div class="footer"><div>Cofen • Análise das Demonstrações Contábeis</div><div>03</div></div>
+            </div>
+        </div>
+    </div>
+    <script>
+// Funções do Panorama
+async function carregarPanorama() {
+    const ano = document.getElementById('ano').value;
+    const tipo = document.getElementById('tipo_periodo').value;
+    let valor = (tipo === 'MES') ? document.getElementById('mes').value : (tipo === 'TRIMESTRE') ? document.getElementById('trimestre').value : "1";
+    const periodo = ano + '-' + tipo + '-' + valor;
+    document.getElementById("periodo-titulo").innerText = (tipo === 'TRIMESTRE') ? valor + "º Trimestre de " + ano : (tipo === 'MES') ? "Mês " + valor + " de " + ano : "Exercício de " + ano;
+    
+    try {
+        const response = await fetch(`/api/panorama/${periodo}`);
+        const data = await response.json();
+        
+        if (data.erro === "faltando") {
+            const div = document.getElementById("integridade-cards");
+            let html = '<div style="background:#fff3cd; border-left:5px solid #ffc107; padding:20px; border-radius:8px; margin-top:20px;">';
+            html += '<h3 style="color:#856404; margin:0 0 10px 0;">⚠️ Peças Pendentes</h3>';
+            html += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados para o período <strong>' + periodo + '</strong>:</p>';
+            html += '<ul style="color:#856404;">';
+            data.pecas.forEach(p => { html += '<li>' + p + '</li>'; });
+            html += '</ul>';
+            html += '<p style="color:#856404; margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p>';
+            html += '</div>';
+            div.innerHTML = html;
+            const btn = document.getElementById("btn-confirmar");
+            if(btn) btn.style.display = "none";
+            return;
+        }
+        
+        if (data.erro) {
+            alert("Erro: " + (data.mensagem || "Falha ao calcular panorama."));
+            return;
+        }
+        
+        aplicarValores(data);
+        const btn = document.getElementById("btn-confirmar");
+        if(btn) btn.setAttribute("data-periodo", periodo);
+        
+    } catch (e) { 
+        console.error("Erro na requisição", e); 
+    }
+}
+
+function aplicarValores(data) {
+    const format = (val) => {
+        if (val === undefined || val === null) return '<span id="val-superavit-fin">R$ 0,0 mi</span>';
+        let num = Math.abs(val) / 1000000;
+        let prefix = val < 0 ? '-R$ ' : 'R$ ';
+        return prefix + num.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' mi';
+    };
+
+    const map = [
+        { keys: ['caixa e equivalente', 'caixa'], val: data.caixa_bp },
+        { keys: ['ativo total'], val: data.ativo_total },
+        { keys: ['passivo total'], val: data.passivo_total },
+        { keys: ['patrimônio líquido', 'patrimonio liquido'], val: data.patrimonio_liquido },
+        { keys: ['receitas realizadas', 'receita realizada'], val: data.receita_realizada },
+        { keys: ['despesas empenhadas', 'despesa empenhada'], val: data.despesa_empenhada },
+        { keys: ['superávit orçamentário', 'superavit orcamentario', 'déficit orçamentário', 'deficit orcamentario'], val: data.superavit_orcamentario },
+        { keys: ['superávit patrimonial', 'superavit patrimonial'], val: data.superavit_patrimonial },
+        { keys: ['superávit financeiro', 'superavit financeiro'], val: data.superavit_financeiro }
+    ];
+
+    // Passa por cada elemento que não tem filhos (textos soltos)
+    document.querySelectorAll('*').forEach(el => {
+        if (el.children.length > 0) return;
+        let txt = el.innerText ? el.innerText.toLowerCase().trim() : '';
+
+        for (let item of map) {
+            if (item.keys.some(k => txt.includes(k))) {
+                // Achou o titulo. Agora vai no elemento pai (o quadro do card)
+                let card = el.parentElement;
+                if (!card) continue;
+
+                let atualizado = false;
+                // Varre o card inteiro procurando qualquer coisa que pareça um valor em R$ ou 0,0
+                Array.from(card.querySelectorAll('*')).forEach(child => {
+                    if (atualizado || child === el || child.children.length > 0) return;
+                    let cTxt = child.innerText.trim();
+                    
+                    if (cTxt.includes('R$') || cTxt.includes('0,0') || cTxt.includes('0,00')) {
+                        child.innerText = format(item.val);
+                        atualizado = true;
+                    }
+                });
+
+                // Se não achou no quadro (talvez esteja do lado de fora), tenta o próximo irmão
+                if (!atualizado && el.nextElementSibling) {
+                    let next = el.nextElementSibling;
+                    if (next.innerText.includes('R$') || next.innerText.includes('0,0')) {
+                        next.innerText = format(item.val);
+                    }
+                }
+            }
+        }
+    });
+}
+
+async function salvarPanorama() {
+    const btn = document.getElementById("btn-confirmar");
+    const periodo = btn.getAttribute("data-periodo");
+    if (!periodo) { alert("Verifique o panorama antes de salvar."); return; }
+    
+    btn.innerText = "Salvando..."; btn.disabled = true;
+    try {
+        await fetch("/salvar_panorama/" + periodo, { method: "POST" });
+        alert("Resultados salvos com sucesso!");
+        carregarHistorico(); btn.style.display = "none";
+    } catch (e) { 
+        alert("Erro ao salvar."); 
+    } finally { 
+        btn.innerText = "Confirmar e Salvar"; btn.disabled = false; 
+    }
+}
+
+function carregarHistorico() {
+    fetch('/historico_panorama')
+        .then(r => r.json())
+        .then(data => {
+            let html = '';
+            if (!data || data.length === 0) {
+                html = '<li>Nenhum histórico.</li>';
+            } else {
+                data.forEach(item => {
+                    html += `<li style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" class="check-historico" value="${item.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                            <div><div style="font-weight: bold; color: #0056b3;">${item.periodo}</div><div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div></div>
+                        </div></li>`;
+                });
+            }
+            document.getElementById('lista-historico').innerHTML = html;
+        })
+        .catch(e => {
+            document.getElementById('lista-historico').innerHTML = '<li>Erro ao carregar.</li>';
+        });
+}
+
+function exibirSelecionado() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    // Aqui assumimos que a rota retorna o JSON salvo para ser exibido
+    window.open(`/panorama?id=${check.value}`, '_blank');
+}
+
+function excluirSelecionado() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    if (!confirm("Excluir este item?")) return;
+    fetch(`/excluir_panorama/${check.value}`, { method: 'DELETE' })
+        .then(() => carregarHistorico());
+}
+
+function gerarPDFPanorama() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico para gerar o PDF."); return; }
+    window.open(`/gerar_pdf_panorama/${check.value}`, '_blank');
+}
+
+// Exporta para o escopo global para os botoes HTML acharem
+window.carregarPanorama = carregarPanorama;
+window.salvarPanorama = salvarPanorama;
+window.exibirSelecionado = exibirSelecionado;
+window.excluirSelecionado = excluirSelecionado;
+window.gerarPDFPanorama = gerarPDFPanorama;
+window.carregarHistorico = carregarHistorico;
+
+document.addEventListener("DOMContentLoaded", () => {
+    carregarHistorico();
+});
+</script>
+<script>
+    // === INTERCEPTOR TARJA (PADRÃO LIQUIDEZ) ===
+    (function() {
+        var originalFetch = window.fetch;
+        window.fetch = function(input, init) {
+            return originalFetch(input, init).then(function(response) {
+                // Se for uma requisição para /api/panorama/
+                if (typeof input === 'string' && input.includes('/api/panorama/')) {
+                    var clone = response.clone();
+                    clone.json().then(function(data) {
+                        if (data && data.erro === 'faltando') {
+                            // Padrão Liquidez: procura uma div específica ou fallback
+                            var divErro = document.getElementById('integridade-cards') 
+                                       || document.querySelector('.main') 
+                                       || document.querySelector('main') 
+                                       || document.body;
+                            var periodo = input.split('/').pop();
+                            var html = '<div style="background:#fff3cd; border-left:5px solid #ffc107; padding:20px; border-radius:8px; margin-bottom:20px;">';
+                            html += '<h3 style="color:#856404; margin:0 0 10px 0;">⚠️ Demonstrativos Faltando</h3>';
+                            html += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados para o período <strong>' + periodo + '</strong>:</p>';
+                            html += '<ul style="color:#856404;">';
+                            data.pecas.forEach(function(p) { html += '<li>' + p + '</li>'; });
+                            html += '</ul>';
+                            html += '<p style="color:#856404; margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p>';
+                            html += '</div>';
+                            // Remove tarja antiga (se existir)
+                            var tarjaAntiga = divErro.querySelector('div[style*="fff3cd"]');
+                            if (tarjaAntiga) tarjaAntiga.remove();
+                            divErro.insertAdjacentHTML('afterbegin', html);
+                            // Esconde o botão de salvar
+                            var btnSalvar = document.getElementById('btn-salvar') || document.getElementById('btn-confirmar');
+                            if (btnSalvar) btnSalvar.style.display = 'none';
+                        } else {
+                            // Se não é erro, limpa a tarja (se existir)
+                            var divErro = document.querySelector('.main') || document.querySelector('main') || document.body;
+                            var tarjaAntiga = divErro.querySelector('div[style*="fff3cd"]');
+                            if (tarjaAntiga) tarjaAntiga.remove();
+                        }
+                    }).catch(function(e) { console.error('Erro no interceptor:', e); });
+                }
+                return response;
+            });
+        };
+    })();
+    // === FIM INTERCEPTOR ===
+</script>
+
+    
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const historicoId = urlParams.get('historico_id');
+            
+            if (historicoId) {
+                console.log("[DEBUG] Lendo Panorama do Histórico ID:", historicoId);
+                try {
+                    const res = await fetch(`/historico_panorama/${historicoId}`);
+                    const data = await res.json();
+                    
+                    if (data.ok && data.dados) {
+                        // Chama a função que já existe na tela para desenhar os dados
+                        if (typeof aplicarValores === 'function') {
+                            aplicarValores(data.dados);
+                            
+                            // Atualiza o título do período na tela (opcional, mas deixa o PDF bonito)
+                            const titulo = document.getElementById("periodo-titulo");
+                            if(titulo && data.periodo) {
+                                titulo.innerText = "Histórico: " + data.periodo;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erro ao carregar dados do histórico:", e);
+                }
+            }
+        });
+    </script>
+
+
+    
+
+
+    
+
+
+    
+
+
+    
+
+
+    
+
+
+    <script>
+// ===== JAVASCRIPT DEFINITIVO 3.0 - PANORAMA =====
+
+function aplicarValores(data) {
+    // Prepara os dados (pode vir da API ao vivo ou do Histórico salvo)
+    let d = data;
+    if (data.dados) d = data.dados; // Se for do histórico
+    if (typeof d === 'string') d = JSON.parse(d); 
+    if (d.dados) d = d.dados; // Se estiver duplamente embrulhado
+
+    const format = (val) => {
+        if (val === undefined || val === null || isNaN(val)) return 'R$ 0,0 mi';
+        let num = Math.abs(val) / 1000000;
+        let prefix = val < 0 ? '-R$ ' : 'R$ ';
+        return prefix + num.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' mi';
+    };
+
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = format(val);
+    };
+
+    setVal('val-caixa', d.caixa_bp || d.caixa);
+    setVal('val-ativo', d.ativo_total);
+    setVal('val-passivo', d.passivo_total);
+    setVal('val-pl', d.patrimonio_liquido || d.patrimonio);
+    setVal('val-receitas', d.receita_realizada || d.receitas_realizadas);
+    setVal('val-despesas', d.despesa_empenhada || d.despesas_empenhadas);
+    setVal('val-superavit-orc', d.superavit_orcamentario !== undefined ? d.superavit_orcamentario : d.superavit_orc);
+    setVal('val-superavit-pat', d.superavit_patrimonial);
+    setVal('val-superavit-fin', d.superavit_financeiro);
+}
+
+async function carregarPanorama() {
+    const ano = document.getElementById('ano').value;
+    const tipo = document.getElementById('tipo_periodo').value;
+    let valor = (tipo === 'MES') ? document.getElementById('mes').value : (tipo === 'TRIMESTRE') ? document.getElementById('trimestre').value : "1";
+    const periodo = ano + '-' + tipo + '-' + valor;
+    
+    const titulo = document.getElementById("periodo-titulo");
+    if (titulo) titulo.innerText = (tipo === 'TRIMESTRE') ? valor + "º Trimestre de " + ano : (tipo === 'MES') ? "Mês " + valor + " de " + ano : "Exercício de " + ano;
+    
+    try {
+        const response = await fetch(`/api/panorama/${periodo}`);
+        const data = await response.json();
+        
+        if (data.erro === "faltando") { alert("Faltam peças: " + data.pecas.join(', ')); return; }
+        if (data.erro || data.detail) { alert("Erro: " + (data.mensagem || data.detail)); return; }
+        
+        aplicarValores(data);
+        
+        const btnSalvar = document.getElementById("btn-salvar");
+        if(btnSalvar) {
+            btnSalvar.setAttribute("data-periodo", periodo);
+            btnSalvar.style.display = "inline-block";
+            btnSalvar.innerText = "Confirmar e Salvar";
+            btnSalvar.disabled = false;
+        }
+    } catch (e) { 
+        console.error("Erro", e); 
+        alert("Erro de conexão.");
+    }
+}
+
+async function salvarPanorama() {
+    const btn = document.getElementById("btn-salvar");
+    if (!btn) return;
+    const periodo = btn.getAttribute("data-periodo");
+    if (!periodo) { alert("Clique em 'Verificar' antes."); return; }
+    
+    btn.innerText = "Salvando..."; btn.disabled = true;
+    try {
+        const res = await fetch("/salvar_panorama/" + periodo, { method: "POST" });
+        if(res.ok) {
+            alert("Resultados salvos com sucesso!");
+            carregarHistorico();
+        } else {
+            alert("Erro no servidor (" + res.status + ").");
+        }
+    } catch (e) { 
+        alert("Erro de conexão."); 
+    } finally { 
+        btn.innerText = "Confirmar e Salvar"; btn.disabled = false; 
+    }
+}
+
+function carregarHistorico() {
+    fetch('/historico_panorama')
+        .then(r => r.json())
+        .then(data => {
+            let html = '';
+            if (!data || data.length === 0) {
+                html = '<li>Nenhum histórico.</li>';
+            } else {
+                data.forEach(item => {
+                    html += `<li style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" class="check-historico" value="${item.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                            <div><div style="font-weight: bold; color: #0056b3;">${item.periodo}</div><div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div></div>
+                        </div></li>`;
+                });
+            }
+            const list = document.getElementById('lista-historico');
+            if(list) list.innerHTML = html;
+        })
+        .catch(e => console.error("Erro no historico", e));
+}
+
+async function exibirSelecionado() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    
+    try {
+        const res = await fetch(`/historico_panorama/${check.value}`);
+        const data = await res.json();
+        if (data.erro) { alert("Erro ao carregar histórico."); return; }
+        
+        // Limpa a URL
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.pathname);
+        }
+        
+        aplicarValores(data); 
+        window.scrollTo(0, 0);
+    } catch(e) {
+        alert("Erro de conexão ao exibir histórico.");
+    }
+}
+
+async function excluirSelecionado() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    if (!confirm("Excluir este item do histórico?")) return;
+    
+    try {
+        await fetch(`/excluir_panorama/${check.value}`, { method: 'DELETE' });
+        carregarHistorico();
+    } catch(e) {
+        alert("Erro ao excluir.");
+    }
+}
+
+function gerarPDFPanorama() {
+    const check = document.querySelector('.check-historico:checked');
+    if (!check) { alert("Selecione um item no histórico para gerar o PDF."); return; }
+    window.open(`/gerar_pdf_panorama/${check.value}`, '_blank');
+}
+
+window.carregarPanorama = carregarPanorama;
+window.salvarPanorama = salvarPanorama;
+window.exibirSelecionado = exibirSelecionado;
+window.excluirSelecionado = excluirSelecionado;
+window.gerarPDFPanorama = gerarPDFPanorama;
+
+document.addEventListener("DOMContentLoaded", () => {
+    carregarHistorico();
+});
+</script>
+
+</body>
+</html>

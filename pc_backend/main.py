@@ -5801,3 +5801,33 @@ def gerar_pdf_liquidez(id: int):
 # =========================================================
 # FIM DAS ROTAS DE LIQUIDEZ
 # =========================================================
+
+
+@app.post("/excluir_panorama_multiplos")
+async def excluir_panorama_multiplos(request: Request):
+    import sqlite3, os
+    try:
+        dados = await request.json()
+        ids_brutos = dados.get("ids", [])
+        
+        if not ids_brutos:
+            return {"erro": True, "mensagem": "Nenhum ID enviado"}
+            
+        # Garante que todos são inteiros (para o SQLite)
+        ids = [int(i) for i in ids_brutos if str(i).strip().isdigit()]
+        
+        if not ids:
+            return {"erro": True, "mensagem": "IDs inválidos"}
+            
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        placeholders = ','.join('?' for _ in ids)
+        cursor.execute(f"DELETE FROM historico_panorama WHERE id IN ({placeholders})", ids)
+        excluidos = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        return {"ok": True, "mensagem": f"{excluidos} itens excluídos"}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}

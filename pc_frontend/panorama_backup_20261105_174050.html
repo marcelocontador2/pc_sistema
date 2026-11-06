@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panorama de Resultados</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { background: #f4f6f9; padding: 20px; color: #333; }
+        
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-voltar { background: #ff7f00; color: white; text-decoration: none; }
+        .btn-verde { background: #28a745; color: white; }
+        .btn-vermelho { background: #dc3545; color: white; }
+        .btn-azul { background: #0056b3; color: white; }
+        .btn:hover { opacity: 0.9; }
+        
+        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+        .filtros label { font-size: 12px; font-weight: bold; color: #555; }
+        .filtros select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .layout { display: flex; gap: 20px; }
+        
+        .sidebar { width: 250px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: fit-content; }
+        .sidebar h3 { margin-top: 0; font-size: 16px; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .sidebar ul { list-style: none; padding: 0; }
+        .sidebar li { margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .sidebar .check-historico { width: 16px; height: 16px; cursor: pointer; }
+        .sidebar .periodo { font-weight: bold; color: #0056b3; }
+        .sidebar .data { font-size: 12px; color: #888; }
+        
+        .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .main-content h2 { margin-top: 0; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-top: 20px; }
+        .card { background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #0056b3; }
+        .card .label { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .card .valor { font-size: 24px; font-weight: bold; color: #333; }
+        
+        .footer { margin-top: 40px; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 10px; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <a href="/" class="btn btn-voltar">← Voltar</a>
+        <button id="btn-exibir" class="btn btn-verde">Exibir Selecionado</button>
+        <button id="btn-excluir" class="btn btn-vermelho">Excluir Selecionado</button>
+        <button id="btn-pdf" class="btn btn-azul">Gerar PDF</button>
+        <button id="btn-salvar" class="btn btn-verde" style="display:none;">Confirmar e Salvar</button>
+    </div>
+
+    <div class="filtros">
+        <div>
+            <label>Ano:</label>
+            <select id="ano">
+                <option value="2026">2026</option>
+            </select>
+        </div>
+        <div>
+            <label>Tipo:</label>
+            <select id="tipo_periodo">
+                <option value="TRIMESTRE">Trimestral</option>
+            </select>
+        </div>
+        <div>
+            <label>Trimestre:</label>
+            <select id="trimestre">
+                <option value="1">1º Trimestre</option>
+                <option value="2">2º Trimestre</option>
+                <option value="3">3º Trimestre</option>
+                <option value="4">4º Trimestre</option>
+            </select>
+        </div>
+        <button id="btn-verificar" class="btn btn-azul">Verificar</button>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <h3>Histórico Salvo</h3>
+            <ul id="lista-historico">
+                <li>Carregando...</li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <p style="font-size: 12px; color: #888; font-weight: bold;">PANORAMA</p>
+            <h2 id="periodo-titulo">Resultados Gerais</h2>
+            
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="label">Caixa e Equivalente de Caixa (BP)</div>
+                    <div class="valor" id="val-caixa">R$ 0,0 mi</div>
+                </div>
+                <div class="card">
+                    <div class="label">Ativo Total</div>
+                    <div class="valor" id="val-ativo">R$ 0,0 mi</div>
+                </div>
+                <div class="card">
+                    <div class="label">Passivo Total</div>
+                    <div class="valor" id="val-passivo">R$ 0,0 mi</div>
+                </div>
+                <div class="card">
+                    <div class="label">Patrimônio Líquido</div>
+                    <div class="valor" id="val-pl">R$ 0,0 mi</div>
+                </div>
+                <div class="card">
+                    <div class="label">Receitas Realizadas (BO)</div>
+                    <div class="valor" id="val-receitas">R$ 0,0 mi</div>
+                </div>
+                <div class="card">
+                    <div class="label">Despesas Empenhadas (BO)</div>
+                    <div class="valor" id="val-despesas">R$ 0,0 mi</div>
+                </div>
+                <div class="card">
+                    <div class="label">Superávit Orçamentário</div>
+                    <div class="valor" id="val-superavit-orc">R$ 0,0 mi</div>
+                </div>
+                <div class="card">
+                    <div class="label">Superávit Patrimonial (DVP)</div>
+                    <div class="valor" id="val-superavit-pat">R$ 0,0 mi</div>
+                </div>
+                <div class="card">
+                    <div class="label">Superávit Financeiro (BP)</div>
+                    <div class="valor" id="val-superavit-fin">R$ 0,0 mi</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div>Cofen • Análise das Demonstrações Contábeis</div>
+        <div>SGPC - Sistema de Gestão de Prestação de Contas</div>
+    </div>
+
+    <script>
+        // ===== FUNÇÕES CORE =====
+        const fmt = (val) => {
+            if (val === undefined || val === null) return 'R$ 0,0 mi';
+            let num = parseFloat(val);
+            if (isNaN(num)) return 'R$ 0,0 mi';
+            
+            let absNum = Math.abs(num) / 1000000;
+            let sinal = num < 0 ? '-R$ ' : 'R$ ';
+            return sinal + absNum.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' mi';
+        };
+
+        function aplicarValores(data) {
+            // Desembrulha o JSON se ele vier dentro de "dados" ou for uma string
+            let d = data;
+            if (d && d.dados) d = d.dados;
+            if (typeof d === 'string') {
+                try { d = JSON.parse(d); } catch(e) {}
+            }
+            if (d && d.dados) d = d.dados;
+
+            console.log("Dados recebidos para os cards:", d);
+
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = fmt(val);
+            };
+
+            setVal('val-caixa', d.caixa_bp);
+            setVal('val-ativo', d.ativo_total);
+            setVal('val-passivo', d.passivo_total);
+            setVal('val-pl', d.patrimonio_liquido);
+            setVal('val-receitas', d.receita_realizada);
+            setVal('val-despesas', d.despesa_empenhada);
+            setVal('val-superavit-orc', d.superavit_orcamentario);
+            setVal('val-superavit-pat', d.superavit_patrimonial);
+            setVal('val-superavit-fin', d.superavit_financeiro);
+        }
+
+        async function carregarPanorama() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo_periodo').value;
+            const valor = document.getElementById('trimestre').value;
+            const periodo = `${ano}-${tipo}-${valor}`;
+            
+            document.getElementById('periodo-titulo').innerText = `Resultados Gerais — ${valor}º Trimestre de ${ano}`;
+            
+            try {
+                const response = await fetch(`/api/panorama/${periodo}`);
+                const data = await response.json();
+                
+                if (data.erro) { alert("Erro: " + (data.mensagem || "Faltam peças")); return; }
+                
+                aplicarValores(data);
+                
+                const btnSalvar = document.getElementById("btn-salvar");
+                btnSalvar.setAttribute("data-periodo", periodo);
+                btnSalvar.style.display = "inline-block";
+                btnSalvar.innerText = "Confirmar e Salvar";
+                btnSalvar.disabled = false;
+            } catch (e) { 
+                console.error(e); 
+                alert("Erro de conexão ao buscar panorama.");
+            }
+        }
+
+        async function salvarPanorama() {
+            const btn = document.getElementById("btn-salvar");
+            const periodo = btn.getAttribute("data-periodo");
+            if (!periodo) { alert("Verifique o panorama antes de salvar."); return; }
+            
+            const dadosTela = {
+                ativo_total:      document.getElementById('val-ativo').innerText,
+                passivo_total:    document.getElementById('val-passivo').innerText,
+                patrimonio_liquido: document.getElementById('val-pl').innerText,
+                caixa_bp:         document.getElementById('val-caixa').innerText,
+                receita_realizada: document.getElementById('val-receitas').innerText,
+                despesa_empenhada: document.getElementById('val-despesas').innerText,
+                superavit_orcamentario: document.getElementById('val-superavit-orc').innerText,
+                superavit_patrimonial:  document.getElementById('val-superavit-pat').innerText,
+                superavit_financeiro:   document.getElementById('val-superavit-fin').innerText
+            };
+            
+            btn.innerText = "Salvando..."; 
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch("/salvar_panorama/" + periodo, { 
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(dadosTela)
+                });
+                if(res.ok) {
+                    alert("Resultados salvos com sucesso!");
+                    carregarHistorico();
+                } else {
+                    alert("Erro no servidor ao salvar.");
+                }
+            } catch (e) { 
+                alert("Erro de conexão ao salvar."); 
+            } finally { 
+                btn.innerText = "Confirmar e Salvar"; 
+                btn.disabled = false; 
+            }
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_panorama')
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    if (!data || data.length === 0) {
+                        html = '<li>Nenhum histórico.</li>';
+                    } else {
+                        data.forEach(item => {
+                            html += `<li>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="checkbox" class="check-historico" value="${item.id}">
+                                    <div>
+                                        <div class="periodo">${item.periodo}</div>
+                                        <div class="data">Gerado em: ${item.data_geracao}</div>
+                                    </div>
+                                </div>
+                            </li>`;
+                        });
+                    }
+                    document.getElementById('lista-historico').innerHTML = html;
+                })
+                .catch(e => console.error("Erro no historico", e));
+        }
+
+        async function exibirSelecionado() {
+            let check = document.querySelector('.check-historico:checked');
+            if (!check) {
+                // Fallback caso o seletor falhe por algum motivo
+                const todos = document.querySelectorAll('input[type="checkbox"]');
+                for (let c of todos) {
+                    if (c.checked) { check = c; break; }
+                }
+            }
+            
+            if (!check) { 
+                alert("Selecione um item no histórico antes de clicar em Exibir."); 
+                return; 
+            }
+            
+            try {
+                const res = await fetch(`/historico_panorama/${check.value}`);
+                if (!res.ok) throw new Error("Erro HTTP " + res.status);
+                
+                const data = await res.json();
+                if (data.erro) { alert("Erro no servidor: " + data.erro); return; }
+                
+                console.log("Retorno do historico:", data);
+                aplicarValores(data); 
+                window.scrollTo(0, 0);
+            } catch(e) {
+                console.error("Falha no exibir:", e);
+                alert("Erro ao carregar o histórico. Verifique o Console (F12).");
+            }
+        }
+
+        async function excluirSelecionado() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert("Selecione um item no histórico."); return; }
+            if (!confirm("Excluir este item do histórico?")) return;
+            
+            try {
+                await fetch(`/excluir_panorama/${check.value}`, { method: 'DELETE' });
+                carregarHistorico();
+            } catch(e) {
+                alert("Erro ao excluir.");
+            }
+        }
+
+        function gerarPDFPanorama() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert("Selecione um item no histórico para gerar o PDF."); return; }
+            window.open(`/gerar_pdf_panorama/${check.value}`, '_blank');
+        }
+
+        // ===== LIGANDO OS BOTOES =====
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById('btn-verificar').addEventListener('click', carregarPanorama);
+            document.getElementById('btn-salvar').addEventListener('click', salvarPanorama);
+            document.getElementById('btn-exibir').addEventListener('click', exibirSelecionado);
+            document.getElementById('btn-excluir').addEventListener('click', excluirSelecionado);
+            document.getElementById('btn-pdf').addEventListener('click', gerarPDFPanorama);
+
+            carregarHistorico();
+        });
+</script>
+</body>
+</html>

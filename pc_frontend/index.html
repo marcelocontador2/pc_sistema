@@ -125,6 +125,18 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
             cursor: pointer !important;
         }
     </style>
+
+<style>
+    /* TRAVAR MENU ABERTO */
+    /* Força a lista de itens do menu a ficar sempre visível */
+    #submenu-analises, .submenu {
+        display: block !important;
+        visibility: visible !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+</style>
 </head>
 <body>
 <aside class="sidebar">
@@ -158,6 +170,10 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
     <li><a href="/composicao_receitas_despesas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Composição Receitas/Despesas</a></li>
 <li><a href="/liquidez" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Índices de Liquidez</a></li>
     <li><a href="/panorama" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Resultados Gerais</a></li>
+            <a href="/analise_comparativo_receitas" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Comparativo de Receitas</a>
+            <a href="/analise_comparativo_despesas" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Comparativo de Despesas</a>
+            <a href="/analise_centro_custos" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise por Centro de Custos</a>
+            <a href="/analise_custo_pessoal" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Custo de Pessoal</a>
     </ul>
     </li>
   </ul>
@@ -684,7 +700,11 @@ document.addEventListener("DOMContentLoaded", function() {
         'Composição Receitas/Despesas',
         'Índices de Liquidez',
         'Resultados Gerais',
-        'Análise BP'];
+        'Análise BP',
+        'Comparativo de Receitas',
+        'Comparativo de Despesas',
+        'Análise por Centro de Custos',
+        'Custo de Pessoal'];
     const todosLinks = Array.from(menuPrincipal.querySelectorAll('a'));
     todosLinks.forEach(link => {
         const texto = link.textContent.trim();
@@ -720,140 +740,16 @@ document.addEventListener("DOMContentLoaded", function() {
     }, 500);
 });
 </script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    setTimeout(function() {
-        // Encontra o submenu de Análises Contábeis
-        const submenuAnalises = document.getElementById('submenu-analises');
-        if (submenuAnalises) {
-            // Verifica se o item já existe para não duplicar
-            if (!submenuAnalises.textContent.includes('Custo de Pessoal')) {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.href = '/analise_custo_pessoal';
-                a.textContent = 'Custo de Pessoal';
-                a.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;';
-                li.appendChild(a);
-                submenuAnalises.appendChild(li);
-            }
-        }
-    }, 1000); // Espera o menu ser gerado
-});
-</script>
 
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    setTimeout(function() {
-        const submenuAnalises = document.getElementById('submenu-analises');
-        if (submenuAnalises) {
-            // Verifica se o item já existe para não duplicar
-            if (!submenuAnalises.textContent.includes('Análise por Centro de Custos')) {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.href = '/analise_centro_custos';
-                a.textContent = 'Análise por Centro de Custos';
-                a.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;';
-                li.appendChild(a);
-                submenuAnalises.appendChild(li);
-            }
-        }
-    }, 1500); // Espera um pouco mais que o script anterior (1000ms) para garantir a ordem
-});
-</script>
 
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    setTimeout(function() {
-        const submenuAnalises = document.getElementById('submenu-analises');
-        if (submenuAnalises) {
-            if (!submenuAnalises.textContent.includes('Comparativo de Receitas')) {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.href = '/analise_comparativo_receitas';
-                a.textContent = 'Comparativo de Receitas';
-                a.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;';
-                li.appendChild(a);
-                submenuAnalises.appendChild(li);
-            }
-        }
-    }, 2000); // Espera um pouco mais para garantir que o menu anterior já foi criado
-});
-</script>
 
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    setTimeout(function() {
-        const submenuAnalises = document.getElementById('submenu-analises');
-        if (submenuAnalises) {
-            // Verifica se o link já existe pelo href
-            if (!submenuAnalises.querySelector('a[href="/analise_comparativo_despesas"]')) {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.href = '/analise_comparativo_despesas';
-                a.textContent = 'Comparativo de Despesas';
-                a.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;';
-                li.appendChild(a);
-                submenuAnalises.appendChild(li);
-            }
-        }
-    }, 3000);
-});
-</script>
+
+
+
+
 
 <!-- ORDENACAO SUBMENU ANALISES -->
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    // Espera o menu ser montado (3 segundos para garantir)
-    setTimeout(function() {
-        var submenu = document.getElementById('submenu-analises');
-        if (!submenu) {
-            console.log("[ORDENACAO] Submenu nao encontrado.");
-            return;
-        }
-        
-        var ordem = [
-            'Conferência das Demonstrações',
-            'Integridade entre Demonstrações',
-            'Análise BP',
-            'Análise Orçamentária (BO)',
-            'Análise Financeira (BF)',
-            'Análise DFC',
-            'Análise Patrimonial (DVP)',
-            'Índices de Liquidez',
-            'Composição Receitas/Despesas',
-            'Resultados Gerais',
-            'Comparativo de Receitas',
-            'Comparativo de Despesas',
-            'Análise por Centro de Custos',
-            'Custo de Pessoal'
-        ];
-        
-        var itens = Array.from(submenu.querySelectorAll('li'));
-        var mapa = {};
-        itens.forEach(function(li) {
-            var texto = li.textContent.trim();
-            mapa[texto] = li;
-        });
-        
-        // Limpa e reorganiza
-        submenu.innerHTML = '';
-        ordem.forEach(function(texto) {
-            if (mapa[texto]) {
-                submenu.appendChild(mapa[texto]);
-            }
-        });
-        // Adiciona os que nao estao na ordem (se houver)
-        itens.forEach(function(li) {
-            var texto = li.textContent.trim();
-            if (ordem.indexOf(texto) === -1) {
-                submenu.appendChild(li);
-            }
-        });
-        
-        console.log("[ORDENACAO] Submenu reorganizado.");
-    }, 3000);
-});
-</script>
+
 <!-- FIM ORDENACAO -->
 </body>
 
