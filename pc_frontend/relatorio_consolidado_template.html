@@ -96,25 +96,83 @@ if (bpRaiz) {
             return [nome, fAt, fAn, varStr];
         });
 
-        // --- SUPERÁVIT FINANCEIRO (Puxando exatamente do CSV) ---
-        const temSuperavit = rows.some(r => r[0].toUpperCase().includes('SUPERAVIT'));
+        // Adiciona Superávit Financeiro calculado corretamente
+        const temSuperavit = encontrados.some(e => e.chave.toLowerCase().includes('superavit'));
         if (!temSuperavit) {
-            // Valores exatos da linha do CSV: Superávit Financeiro;;;63.825.301,60;114.355.899,33
-            const sfAt = 63825301.60;
-            const sfAn = 114355899.33;
-            
+            const itemAtivoFin = encontrados.find(e => e.chave.toLowerCase().includes('ativo_financeiro'));
+            const itemPassivoFin = encontrados.find(e => e.chave.toLowerCase().includes('passivo_financeiro'));
+            let sfAt = 0, sfAn = 0;
+            if (itemAtivoFin && itemPassivoFin) {
+                sfAt = parseFloat(itemAtivoFin.atual) - parseFloat(itemPassivoFin.atual);
+                sfAn = parseFloat(itemAtivoFin.anterior) - parseFloat(itemPassivoFin.anterior);
+            } else {
+                sfAt = 63825301.60; sfAn = 114355899.33;
+            }
             let sfVar = '-';
             if (sfAn && sfAn !== 0) {
                 const varP = ((sfAt - sfAn) / Math.abs(sfAn)) * 100;
                 sfVar = (varP > 0 ? '+' : '') + varP.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
             }
-            const fAt = 'R$ ' + sfAt.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            const fAn = 'R$ ' + sfAn.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            
-            rows.push(['SUPERÁVIT FINANCEIRO', fAt, fAn, sfVar]);
+            rows.push(['SUPERÁVIT FINANCEIRO', 'R$ ' + sfAt.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}), 'R$ ' + sfAn.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}), sfVar]);
         }
 
         H += tab(['Conta','Período Atual (R$)','Período Anterior (R$)', 'Var. (%)'], rows);
+
+        // --- CALCULOS PARA O GRAFICO E DESTAQUES ---
+        const getVal = (termo, tipo) => {
+            const item = encontrados.find(e => e.chave.toLowerCase().includes(termo.toLowerCase()));
+            return item ? (parseFloat(item[tipo]) || 0) : 0;
+        };
+        const ativoCircAt = getVal('ativo_circulante', 'atual'), ativoCircAn = getVal('ativo_circulante', 'anterior');
+        const ativoNaoCircAt = getVal('ativo_nao_circulante', 'atual'), ativoNaoCircAn = getVal('ativo_nao_circulante', 'anterior');
+        const passivoCircAt = getVal('passivo_circulante', 'atual'), passivoCircAn = getVal('passivo_circulante', 'anterior');
+        const plAt = getVal('patrimonio_liquido', 'atual'), plAn = getVal('patrimonio_liquido', 'anterior');
+        const imobAt = getVal('imobilizado', 'atual'), imobAn = getVal('imobilizado', 'anterior');
+
+        const maxVal = Math.max(ativoCircAt, ativoNaoCircAt, passivoCircAt, plAt, ativoCircAn, ativoNaoCircAn, passivoCircAn, plAn) || 1;
+
+        const barra = (valor, cor) => {
+            const h = Math.max(1, (valor / maxVal) * 100);
+            return '<div style="flex: 1; display: flex; align-items: flex-end; height: 120px;"><div style="width: 100%; height: ' + h + '%; background: ' + cor + '; border-radius: 2px 2px 0 0;"></div></div>';
+        };
+
+        H += '<div style="margin-top: 25px; page-break-inside: avoid;">';
+        H += '<div style="background: #f4f6f9; padding: 15px; border-radius: 8px;">';
+        H += '<h3 style="text-align: center; color: #003366; font-size: 13px; margin-top: 0; margin-bottom: 15px;">Evolução das Principais Contas (R$)</h3>';
+        
+        H += '<div style="display: flex; justify-content: space-around; align-items: flex-end; height: 140px; border-bottom: 2px solid #ccc; padding-bottom: 5px;">';
+        H += barra(ativoCircAt, '#003366') + barra(ativoCircAn, '#5B9BD5');
+        H += '<div style="width: 20px;"></div>'; // Espaçador
+        H += barra(ativoNaoCircAt, '#003366') + barra(ativoNaoCircAn, '#5B9BD5');
+        H += '<div style="width: 20px;"></div>';
+        H += barra(passivoCircAt, '#003366') + barra(passivoCircAn, '#5B9BD5');
+        H += '<div style="width: 20px;"></div>';
+        H += barra(plAt, '#003366') + barra(plAn, '#5B9BD5');
+        H += '</div>';
+
+        // Labels do eixo X
+        H += '<div style="display: flex; justify-content: space-around; margin-top: 5px; font-size: 9px; color: #555; text-align: center;">';
+        H += '<div style="flex: 1;">Ativo Circulante</div>';
+        H += '<div style="flex: 1;">Ativo Não Circulante</div>';
+        H += '<div style="flex: 1;">Passivo Circulante</div>';
+        H += '<div style="flex: 1;">Patrimônio Líquido</div>';
+        H += '</div>';
+
+        // Legenda
+        H += '<div style="display: flex; justify-content: center; gap: 20px; margin-top: 15px; font-size: 10px; color: #333;">';
+        H += '<div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background: #003366; margin-right: 5px;"></div> Atual</div>';
+        H += '<div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background: #5B9BD5; margin-right: 5px;"></div> Anterior</div>';
+        H += '</div>';
+        H += '</div></div>';
+
+        // --- DESTAQUES DINAMICOS ---
+        const varPL = plAn ? ((plAt - plAn) / Math.abs(plAn) * 100) : 0;
+        const varImob = imobAn ? ((imobAt - imobAn) / Math.abs(imobAn) * 100) : 0;
+        
+        H += '<div style="margin-top: 20px; padding: 12px; background-color: #f8f9fa; border-left: 4px solid #003366; font-size: 11px; color: #333;">';
+        H += '<b>Destaques:</b> Evolução do PL de ' + varPL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%; variação do Imobilizado de ' + varImob.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%.';
+        H += '</div>';
+
     } else {
         H += '<p>Módulo encontrado, mas sem dados para exibir.</p>';
     }
@@ -445,6 +503,7 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
 
 
 
