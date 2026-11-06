@@ -345,7 +345,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<script>
+// ESCONDER_BOTAO_WORD
+document.addEventListener('DOMContentLoaded', function() {
+    const botoes = Array.from(document.querySelectorAll('button, a, .btn'));
+    const btnWord = botoes.find(b => b.innerText.includes('Gerar Word'));
+    if (btnWord) {
+        btnWord.style.display = 'none'; // Esconde o botão
+    }
+});
+</script>
 </body>
+
 
 
 </html>

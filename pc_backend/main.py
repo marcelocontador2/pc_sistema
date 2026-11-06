@@ -5464,18 +5464,23 @@ async def gerar_pdf_analise_bp(id: int):
         
         pdf.ln()
     
-    linha("Ativo Circulante", d.get("ativo_circulante", {}).get("atual", 0), d.get("ativo_circulante", {}).get("anterior", 0))
-    linha("Caixa e Equivalentes", d.get("caixa", {}).get("atual", 0), d.get("caixa", {}).get("anterior", 0))
-    linha("Creditos a Curto Prazo", d.get("creditos", {}).get("atual", 0), d.get("creditos", {}).get("anterior", 0))
-    linha("Ativo Nao Circulante", d.get("ativo_nao_circulante", {}).get("atual", 0), d.get("ativo_nao_circulante", {}).get("anterior", 0))
-    linha("Ativo Realizavel a Longo Prazo", d.get("ativo_realizavel", {}).get("atual", 0), d.get("ativo_realizavel", {}).get("anterior", 0))
-    linha("Imobilizado", d.get("imobilizado", {}).get("atual", 0), d.get("imobilizado", {}).get("anterior", 0))
-    linha("TOTAL DO ATIVO", d.get("total_ativo", {}).get("atual", 0), d.get("total_ativo", {}).get("anterior", 0))
-    linha("Passivo Circulante", d.get("passivo_circulante", {}).get("atual", 0), d.get("passivo_circulante", {}).get("anterior", 0))
-    linha("Passivo Nao Circulante", d.get("passivo_nao_circulante", {}).get("atual", 0), d.get("passivo_nao_circulante", {}).get("anterior", 0))
-    linha("Passivo Total", d.get("passivo_total", {}).get("atual", 0), d.get("passivo_total", {}).get("anterior", 0))
-    linha("Patrimonio Liquido", d.get("patrimonio_liquido", {}).get("atual", 0), d.get("patrimonio_liquido", {}).get("anterior", 0))
-    linha("TOTAL DO PASSIVO", d.get("total_passivo", {}).get("atual", 0), d.get("total_passivo", {}).get("anterior", 0))
+    total_ativo_val = d.get('total_ativo', {}).get('atual', 0) or 0
+    
+    total_passivo_val = d.get('total_passivo', {}).get('atual', 0) or 0
+
+    
+    linha("Ativo Circulante", d.get("ativo_circulante", {}).get("atual", 0), d.get("ativo_circulante", {}).get("anterior", 0), total_ativo_val)
+    linha("Caixa e Equivalentes", d.get("caixa", {}).get("atual", 0), d.get("caixa", {}).get("anterior", 0), total_ativo_val)
+    linha("Creditos a Curto Prazo", d.get("creditos", {}).get("atual", 0), d.get("creditos", {}).get("anterior", 0), total_ativo_val)
+    linha("Ativo Nao Circulante", d.get("ativo_nao_circulante", {}).get("atual", 0), d.get("ativo_nao_circulante", {}).get("anterior", 0), total_ativo_val)
+    linha("Ativo Realizavel a Longo Prazo", d.get("ativo_realizavel", {}).get("atual", 0), d.get("ativo_realizavel", {}).get("anterior", 0), total_ativo_val)
+    linha("Imobilizado", d.get("imobilizado", {}).get("atual", 0), d.get("imobilizado", {}).get("anterior", 0), total_ativo_val)
+    linha("TOTAL DO ATIVO", total_ativo_val, d.get("total_ativo", {}).get("anterior", 0), total_ativo_val)
+    linha("Passivo Circulante", d.get("passivo_circulante", {}).get("atual", 0), d.get("passivo_circulante", {}).get("anterior", 0), total_passivo_val)
+    linha("Passivo Nao Circulante", d.get("passivo_nao_circulante", {}).get("atual", 0), d.get("passivo_nao_circulante", {}).get("anterior", 0), total_passivo_val)
+    linha("Passivo Total", d.get("passivo_total", {}).get("atual", 0), d.get("passivo_total", {}).get("anterior", 0), total_passivo_val)
+    linha("Patrimonio Liquido", d.get("patrimonio_liquido", {}).get("atual", 0), d.get("patrimonio_liquido", {}).get("anterior", 0), total_passivo_val)
+    linha("TOTAL DO PASSIVO", total_passivo_val, d.get("total_passivo", {}).get("anterior", 0), total_passivo_val)
     linha("Superávit Financeiro", 63825301.60, 114355899.33)
     
     pdf_bytes = bytes(pdf.output())
@@ -5880,41 +5885,11 @@ async def excluir_multiplos_relatorio_consolidado(request: Request):
 
 
 
-@app.get("/gerar_word_relatorio_consolidado/{id}")
-def gerar_word_relatorio_consolidado(id: int):
-    from fastapi.responses import Response
-    from pdf2docx import Converter
-    from main import gerar_pdf_relatorio_consolidado
-    import tempfile, os
-    
-    # 1. Gera o PDF (que já está perfeito)
-    pdf_response = gerar_pdf_relatorio_consolidado(id)
-    pdf_bytes = pdf_response.body
-    
-    # 2. Salva o PDF em um arquivo temporário
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
-        tmp_pdf.write(pdf_bytes)
-        tmp_pdf_path = tmp_pdf.name
-        
-    tmp_docx_path = tmp_pdf_path.replace(".pdf", ".docx")
-    
-    try:
-        # 3. Converte PDF para DOCX
-        cv = Converter(tmp_pdf_path)
-        cv.convert(tmp_docx_path, start=0, end=None)
-        cv.close()
-        
-        with open(tmp_docx_path, "rb") as f:
-            docx_bytes = f.read()
-            
-        return Response(
-            content=docx_bytes,
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": f"attachment; filename=relatorio_consolidado_{id}.docx"}
-        )
-    finally:
-        if os.path.exists(tmp_pdf_path): os.remove(tmp_pdf_path)
-        if os.path.exists(tmp_docx_path): os.remove(tmp_docx_path)
+
+
+
+
+
 
 @app.get("/gerar_pdf_relatorio_consolidado/{id}")
 def gerar_pdf_relatorio_consolidado(id: int):
