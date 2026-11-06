@@ -385,8 +385,22 @@ H += tit(12, 'Custo de Pessoal');
 H += '<div class="desc">Custo de pessoal x limite legal (Resolução Cofen 814/2026).</div>';
 const cp = unwrap(D.custo_pessoal);
 if (cp) {
-    // Desembrulha o objeto 'dados' que vem do backend
     const c = cp.dados || cp;
+    
+    // Lê a entidade dinamicamente do JSON (que foi ajustada no backend)
+    const entidadeAtual = (c.entidade || 'COFEN').toUpperCase();
+    const limitePctNum = (entidadeAtual === 'COREN') ? 60 : 50;
+    
+    const vRCL = Number(c.rcl_total) || 0;
+    const vCusto = Number(c.custo_total) || 0;
+    
+    // Recalcula os valores com a alíquota correta
+    const vLimite = vRCL * (limitePctNum / 100);
+    const vMargem = vLimite - vCusto;
+    const pctCusto = vRCL ? (vCusto / vRCL * 100) : 0;
+    const pctMargem = vRCL ? (vMargem / vRCL * 100) : 0;
+    const limitePctStr = limitePctNum.toFixed(2).replace('.', ',');
+    const valFmt = function(v) { return moeda(v).replace('R$ ', ''); };
 
     H += sub('Composição do Custo');
     H += tab(['Item','Atual','Anterior','Total'], [
@@ -399,64 +413,25 @@ if (cp) {
     
     H += sub('Limite e Margem');
     H += tab(['Item','Valor'], [
-        ['Limite Resolução Cofen 814/2026', moeda(c.limite_total)],
-        ['Margem Disponível', moeda(c.margem_disponivel_total)],
-        ['% Custo sobre RCL', pct(c.pct_custo_total)],
+        ['Limite Legal Aplicável', moeda(vLimite)],
+        ['Margem Disponível', moeda(vMargem)],
+        ['% Custo sobre RCL', pct(pctCusto)],
         ['Faixa de Controle', c.faixa_controle || '-']
     ]);
 
-    // --- NOVO QUADRO: Apuração consolidada 12 meses ---
     H += sub('Apuração consolidada 12 meses');
-    
-    // Puxa os valores consolidados de 12 meses direto do backend
-    const vRCL = Number(c.rcl_total) || 0;
-    const vCusto = Number(c.custo_total) || 0;
-    const vLimite = Number(c.limite_total) || (vRCL * 0.5);
-    const vMargem = Number(c.margem_disponivel_total) || (vLimite - vCusto);
-    
-    // Calcula os percentuais com base na RCL Total
-    const pctRcl = 100;
-    const pctCusto = vRCL ? (vCusto / vRCL * 100) : 0;
-    const pctMargem = vRCL ? (vMargem / vRCL * 100) : 0;
-    const pctLimite = vRCL ? (vLimite / vRCL * 100) : 0;
-    const pctSituacao = pctCusto;
-    
-    const valFmt = (v) => moeda(v).replace('R$ ', ''); // Remove o R$ da coluna de valores
-
     H += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; border-top: 2px solid #003366;">';
-    H += '<thead>';
-    H += '<tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">';
+    H += '<thead><tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">';
     H += '<th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Indicador</th>';
     H += '<th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Valor (R$)</th>';
     H += '<th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">% da RCL</th>';
-    H += '</tr>';
-    H += '</thead>';
+    H += '</tr></thead>';
     H += '<tbody>';
-    H += '<tr>';
-    H += '<td style="padding: 8px; border-bottom: 1px solid #eee;">Receita Corrente Líquida (RCL)</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vRCL) + '</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctRcl) + '</td>';
-    H += '</tr>';
-    H += '<tr>';
-    H += '<td style="padding: 8px; border-bottom: 1px solid #eee;">(-) Custo de Pessoal (Bruto)</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vCusto) + '</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctCusto) + '</td>';
-    H += '</tr>';
-    H += '<tr style="background: #f8f9fa;">';
-    H += '<td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">(=) Margem Disponível (Limite Resolução Cofen 814/2026 - Custo)</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + valFmt(vMargem) + '</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + pct(pctMargem) + '</td>';
-    H += '</tr>';
-    H += '<tr>';
-    H += '<td style="padding: 8px; border-bottom: 1px solid #eee;">Limite Resolução Cofen 814/2026 (50,00% da RCL)</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vLimite) + '</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctLimite) + '</td>';
-    H += '</tr>';
-    H += '<tr>';
-    H += '<td style="padding: 8px; border-bottom: 1px solid #eee;">Situação</td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;"></td>';
-    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; color: #28a745; font-weight: bold;">' + pct(pctSituacao) + '</td>';
-    H += '</tr>';
+    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">Receita Corrente Líquida (RCL)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vRCL) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(100) + '</td></tr>';
+    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">(-) Custo de Pessoal (Bruto)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vCusto) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctCusto) + '</td></tr>';
+    H += '<tr style="background: #f8f9fa;"><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">(=) Margem Disponível (Limite - Custo)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + valFmt(vMargem) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + pct(pctMargem) + '</td></tr>';
+    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">Limite Resolução Cofen 814/2026 (' + limitePctStr + '% da RCL)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vLimite) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(limitePctNum) + '</td></tr>';
+    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">Situação (' + entidadeAtual + ')</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;"></td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; color: #28a745; font-weight: bold;">' + pct(pctCusto) + '</td></tr>';
     H += '</tbody>';
     H += '</table>';
 } else { H += '<p>Módulo não encontrado.</p>'; }
@@ -470,6 +445,12 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
+
+
+
+
 
 
 

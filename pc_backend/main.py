@@ -5912,6 +5912,30 @@ def gerar_pdf_relatorio_consolidado(id: int):
     periodo, data_geracao, res_json = row
     dados = json.loads(res_json).get("dados", {})
 
+    # --- CORRECAO_ENTIDADE_DINAMICA ---
+    try:
+        if 'custo_pessoal' in dados and dados['custo_pessoal']:
+            _conn_cfg = sqlite3.connect(db_path)
+            _cur_cfg = _conn_cfg.cursor()
+            _cur_cfg.execute("SELECT valor FROM configuracoes WHERE chave = 'tipo_entidade'")
+            _row_cfg = _cur_cfg.fetchone()
+            _conn_cfg.close()
+            _entidade_real = (_row_cfg[0] if _row_cfg else 'COFEN').upper()
+            _cp = dados['custo_pessoal']
+            _cp_inner = _cp
+            if isinstance(_cp, dict) and 'dados' in _cp and isinstance(_cp['dados'], dict):
+                _cp_inner = _cp['dados']
+                if 'dados' in _cp_inner and isinstance(_cp_inner['dados'], dict):
+                    _cp_inner = _cp_inner['dados']
+            if isinstance(_cp_inner, dict):
+                _cp_inner['entidade'] = _entidade_real
+                print(f"[PDF CONSOLIDADO] Entidade ajustada dinamicamente: {_entidade_real}")
+    except Exception as _e:
+        print(f"[PDF CONSOLIDADO] Erro ao ajustar entidade: {_e}")
+    # --- FIM CORRECAO_ENTIDADE_DINAMICA ---
+
+
+
     template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_consolidado_template.html")
     with open(template_path, "r", encoding="utf-8") as f:
         template = f.read()
