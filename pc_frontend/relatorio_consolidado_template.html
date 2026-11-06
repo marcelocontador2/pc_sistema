@@ -161,11 +161,37 @@ if (bo) {
 
 // ===== 4. ANÁLISE BF =====
 H += tit(4, 'Análise do Balanço Financeiro');
-H += '<div class="desc">Movimentação financeira.</div>';
+H += '<div class="desc">Movimentação financeira consolidada.</div>';
 const bf = unwrap(D.analise_financeira_bf);
 if (bf) {
-    const blocos = [['Receitas', bf.receitas],['Despesas', bf.despesas],['Extraorçamentário', bf.extra],['Caixa', bf.caixa]];
-    blocos.forEach(([t,obj]) => { if (!obj) return; H += sub(t); const rows=[]; Object.keys(obj).forEach(k => { const v = obj[k]; if (k==='detalhes') { Object.keys(v).forEach(kk => rows.push([kk.replace(/_/g,' ').toUpperCase(), moeda(v[kk].atual), moeda(v[kk].anterior)])); } else if (v && typeof v==='object' && 'atual' in v) { rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(v.atual), moeda(v.anterior)]); } }); H += tab(['Item','Atual','Anterior'], rows); });
+    const blocos = [
+        ['Receitas', bf.receitas],
+        ['Despesas', bf.despesas],
+        ['Extraorçamentário', bf.extra],
+        ['Caixa', bf.caixa]
+    ];
+    blocos.forEach(([titulo, obj]) => {
+        if (!obj) return;
+        H += sub(titulo);
+        const rows = [];
+        Object.keys(obj).forEach(k => {
+            const v = obj[k];
+            if (k === 'detalhes') {
+                Object.keys(v).forEach(kk => {
+                    const at = v[kk].atual || 0;
+                    const an = v[kk].anterior || 0;
+                    const varStr = varPct(at, an);
+                    rows.push(['  ' + kk.replace(/_/g,' ').toUpperCase(), moeda(at), moeda(an), varStr]);
+                });
+            } else if (v && typeof v === 'object' && 'atual' in v) {
+                const at = v.atual || 0;
+                const an = v.anterior || 0;
+                const varStr = varPct(at, an);
+                rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(at), moeda(an), varStr]);
+            }
+        });
+        H += tab(['Item','Atual','Anterior','Var. (%)'], rows);
+    });
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 5. ANÁLISE DFC =====
@@ -274,6 +300,7 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
 
 
 
