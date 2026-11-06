@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Relatório Consolidado</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
@@ -20,12 +21,13 @@
         .filtros label { font-size: 12px; font-weight: bold; color: #555; }
         .filtros select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         
-        .layout { display: flex; gap: 20px; }
+        .layout { display: flex; gap: 20px; align-items: flex-start; }
         
         .sidebar { width: 280px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: fit-content; }
         .sidebar h3 { font-size: 16px; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
         .sidebar ul { list-style: none; padding: 0; }
         .sidebar li { margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; font-size: 13px; }
+        .sidebar .check-historico { width: 16px; height: 16px; cursor: pointer; }
         
         .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .main-content h2 { color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
@@ -38,19 +40,17 @@
         .modulo-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
         .modulo-ok { color: #28a745; font-weight: bold; }
         .modulo-faltando { color: #dc3545; font-weight: bold; }
-        
-        .footer { margin-top: 40px; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 10px; display: flex; justify-content: space-between; }
     </style>
 </head>
 <body>
 
     <div class="top-bar">
         <a href="/" class="btn btn-voltar">← Voltar</a>
-        <button id="btn-exibir" class="btn btn-verde" disabled>Exibir Selecionado</button>
-        <button id="btn-excluir" class="btn btn-vermelho" disabled>Excluir Selecionado</button>
-        <button id="btn-pdf" class="btn btn-azul" disabled>Gerar PDF</button>
-        <button id="btn-word" class="btn btn-azul" disabled>Gerar Word</button>
-        <button id="btn-salvar" class="btn btn-verde" disabled style="display:none;">Confirmar e Salvar</button>
+        <button id="btn-exibir" class="btn btn-verde">Exibir Selecionado</button>
+        <button id="btn-excluir" class="btn btn-vermelho">Excluir Selecionado</button>
+        <button id="btn-pdf" class="btn btn-azul">Gerar PDF</button>
+        <button id="btn-word" class="btn btn-azul">Gerar Word</button>
+        <button id="btn-salvar" class="btn btn-verde" style="display:none;">Confirmar e Salvar</button>
     </div>
 
     <div class="filtros">
@@ -63,7 +63,6 @@
             <select id="tipo_periodo">
                 <option value="TRIMESTRE">Trimestral</option>
                 <option value="MES">Mensal</option>
-                <option value="EXERCICIO">Exercício</option>
             </select>
         </div>
         <div>
@@ -97,22 +96,19 @@
         </div>
     </div>
 
-    <div class="footer">
-        <div>Cofen • Análise das Demonstrações Contábeis</div>
-        <div>SGPC - Sistema de Gestão de Prestação de Contas</div>
-    </div>
-
     <script>
         let dadosConsolidados = null;
 
-        async function verificarDados() {
+        function pegarPeriodo() {
             const ano = document.getElementById('ano').value;
             const tipo = document.getElementById('tipo_periodo').value;
-            const valor = document.getElementById('periodo_valor').value;
-            // Remove o º do valor (ex: "3º" vira "3")
-            const valor_limpo = valor.replace('º', '').trim();
-            const periodo = `${ano}-${tipo}-${valor_limpo}`;
+            let valor = document.getElementById('periodo_valor').value;
+            valor = valor.replace('º', '').trim(); // Remove o º
+            return `${ano}-${tipo}-${valor}`;
+        }
 
+        async function verificarDados() {
+            const periodo = pegarPeriodo();
             const statusArea = document.getElementById('status-area');
             const modulosArea = document.getElementById('modulos-area');
             
@@ -124,51 +120,42 @@
                 const data = await res.json();
 
                 if (data.total_faltando === 0) {
-                    // Tudo OK!
                     statusArea.innerHTML = `<div class="status-box status-ok">
                         <strong>✓ Todos os ${data.total_modulos} módulos encontrados!</strong>
                         <p>Período ${periodo} está pronto para ser consolidado.</p>
                     </div>`;
                     
-                    // Habilita botões
                     document.getElementById('btn-salvar').style.display = 'inline-block';
                     document.getElementById('btn-salvar').disabled = false;
                     document.getElementById('btn-salvar').setAttribute('data-periodo', periodo);
                     dadosConsolidados = data;
                 } else {
-                    // Faltam módulos
                     statusArea.innerHTML = `<div class="status-box status-pendente">
                         <strong>⚠ Faltam ${data.total_faltando} módulo(s) para consolidar.</strong>
-                        <p>Você precisa realizar os cálculos dos módulos abaixo antes de gerar o relatório consolidado:</p>
+                        <p>Realize os cálculos dos módulos pendentes antes de gerar o relatório.</p>
                     </div>`;
-                    
                     document.getElementById('btn-salvar').style.display = 'none';
                     dadosConsolidados = null;
                 }
 
-                // Mostra a lista de módulos
-                let html = '<h3 style="margin-top: 20px;">Status dos Módulos:</h3>';
+                let html = '<h3>Status dos Módulos:</h3>';
                 
-                // Encontrados
                 if (Object.keys(data.encontrados).length > 0) {
-                    html += '<h4 style="margin-top: 15px; color: #28a745;">✓ Encontrados:</h4>';
+                    html += '<h4 style="color: #28a745; margin-top: 15px;">✓ Encontrados:</h4>';
+                    let contador = 0;
                     for (const chave in data.encontrados) {
+                        contador++;
                         const m = data.encontrados[chave];
-                        html += `<div class="modulo-item">
-                            <span>${m.nome}</span>
-                            <span class="modulo-ok">✓ ${m.data_geracao}</span>
-                        </div>`;
+                        html += `<div class="modulo-item"><span>${contador}. ${m.nome}</span><span class="modulo-ok">✓ ${m.data_geracao}</span></div>`;
                     }
                 }
                 
-                // Faltando
                 if (data.faltando.length > 0) {
-                    html += '<h4 style="margin-top: 15px; color: #dc3545;">✗ Faltando:</h4>';
+                    html += '<h4 style="color: #dc3545; margin-top: 15px;">✗ Faltando:</h4>';
+                    let contFaltando = 0;
                     data.faltando.forEach(m => {
-                        html += `<div class="modulo-item">
-                            <span>${m.nome}</span>
-                            <span class="modulo-faltando">✗ Faltando</span>
-                        </div>`;
+                        contFaltando++;
+                        html += `<div class="modulo-item"><span>${contFaltando}. ${m.nome}</span><span class="modulo-faltando">✗ Faltando</span></div>`;
                     });
                 }
                 
@@ -183,7 +170,6 @@
         async function salvarConsolidado() {
             const btn = document.getElementById('btn-salvar');
             const periodo = btn.getAttribute('data-periodo');
-            
             if (!periodo) { alert("Clique em 'Verificar Dados' antes."); return; }
             
             btn.innerText = "Salvando...";
@@ -216,7 +202,15 @@
                         html = '<li>Nenhum histórico.</li>';
                     } else {
                         data.forEach(item => {
-                            html += `<li><b>Período:</b> ${item.periodo}<br><small>Gerado em: ${item.data_geracao}</small></li>`;
+                            html += `<li style="margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" class="check-historico" value="${item.id}">
+                                    <div>
+                                        <b>Período:</b> ${item.periodo}<br>
+                                        <small>Gerado em: ${item.data_geracao}</small>
+                                    </div>
+                                </label>
+                            </li>`;
                         });
                     }
                     document.getElementById('lista-historico').innerHTML = html;
@@ -224,9 +218,104 @@
                 .catch(e => console.error("Erro no histórico:", e));
         }
 
+        async function exibirSelecionado() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert("Selecione um item no histórico."); return; }
+            
+            try {
+                const res = await fetch(`/historico_relatorio_consolidado/${check.value}`);
+                const data = await res.json();
+                if (data.erro) { alert("Erro ao carregar histórico."); return; }
+                
+                const statusArea = document.getElementById('status-area');
+                const modulosArea = document.getElementById('modulos-area');
+                
+                const periodo = data.periodo || "N/A";
+                const dataGeracao = data.data_geracao || "N/A";
+                
+                statusArea.innerHTML = `<div class="status-box status-ok">
+                    <strong>✓ Histórico carregado!</strong>
+                    <p>Período ${periodo} (salvo em ${dataGeracao})</p>
+                </div>`;
+                
+                let html = '<h3>Módulos Consolidados:</h3>';
+                
+                // Função que varre o objeto inteiro procurando chaves que tenham .nome
+                let encontrados = 0;
+                function buscarModulos(obj) {
+                    if (!obj || typeof obj !== 'object') return;
+                    
+                    for (const chave in obj) {
+                        const item = obj[chave];
+                        if (item && typeof item === 'object') {
+                            if (item.nome && item.data_geracao) {
+                                encontrados++;
+                                html += `<div class="modulo-item"><span>${encontrados}. ${item.nome}</span><span class="modulo-ok">✓ ${item.data_geracao}</span></div>`;
+                            } else {
+                                // Se não tem nome, pode ser um objeto "pai" (como o "dados"), entra nele
+                                buscarModulos(item);
+                            }
+                        }
+                    }
+                }
+                
+                buscarModulos(data);
+                
+                if (encontrados === 0) {
+                    html += '<p style="color:#666;">Nenhum módulo listado no histórico.</p>';
+                }
+                
+                modulosArea.innerHTML = html;
+            } catch(e) {
+                console.error("Erro ao exibir:", e);
+                alert("Erro de conexão ao exibir histórico.");
+            }
+        }
+
+        async function excluirSelecionado() {
+            const checks = document.querySelectorAll('.check-historico:checked');
+            if (checks.length === 0) { alert("Selecione pelo menos um item no histórico."); return; }
+            if (!confirm(`Excluir ${checks.length} item(ns) do histórico?`)) return;
+            
+            const ids = Array.from(checks).map(c => parseInt(c.value));
+            
+            try {
+                const res = await fetch("/excluir_multiplos_relatorio_consolidado", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids: ids })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    carregarHistorico();
+                } else {
+                    alert("Erro ao excluir: " + (data.mensagem || "Falha no servidor"));
+                }
+            } catch(e) {
+                alert("Erro de conexão ao excluir.");
+            }
+        }
+
+        function gerarPDF() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert("Selecione um item no histórico para gerar o PDF."); return; }
+            window.open(`/gerar_pdf_relatorio_consolidado/${check.value}`, '_blank');
+        }
+
+        function gerarWord() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert("Selecione um item no histórico para gerar o Word."); return; }
+            window.open(`/gerar_word_relatorio_consolidado/${check.value}`, '_blank');
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
             document.getElementById('btn-verificar').addEventListener('click', verificarDados);
             document.getElementById('btn-salvar').addEventListener('click', salvarConsolidado);
+            document.getElementById('btn-exibir').addEventListener('click', exibirSelecionado);
+            document.getElementById('btn-excluir').addEventListener('click', excluirSelecionado);
+            document.getElementById('btn-pdf').addEventListener('click', gerarPDF);
+            document.getElementById('btn-word').addEventListener('click', gerarWord);
+            
             carregarHistorico();
         });
     </script>

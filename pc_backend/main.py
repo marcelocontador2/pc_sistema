@@ -5896,3 +5896,43 @@ async def salvar_relatorio_consolidado_novo(periodo: str):
     conn.close()
     
     return {"ok": True, "mensagem": "Relatório consolidado salvo com sucesso!", "dados": dados_consolidados}
+
+
+@app.get("/historico_relatorio_consolidado/{id}")
+async def get_historico_consolidado(id: int):
+    import sqlite3, json, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_relatorio_consolidado WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return {"erro": "Histórico não encontrado"}
+        
+    return {
+        "periodo": row[0],
+        "data_geracao": row[1],
+        "dados": json.loads(row[2])
+    }
+
+
+@app.post("/excluir_multiplos_relatorio_consolidado")
+async def excluir_multiplos_relatorio_consolidado(request: Request):
+    import sqlite3, os
+    try:
+        dados = await request.json()
+        ids = [int(i) for i in dados.get("ids", []) if str(i).isdigit()]
+        if not ids:
+            return {"erro": True, "mensagem": "Nenhum ID válido"}
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        placeholders = ','.join('?' for _ in ids)
+        cursor.execute(f"DELETE FROM historico_relatorio_consolidado WHERE id IN ({placeholders})", ids)
+        conn.commit()
+        conn.close()
+        return {"ok": True, "mensagem": f"{cursor.rowcount} itens excluídos"}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
