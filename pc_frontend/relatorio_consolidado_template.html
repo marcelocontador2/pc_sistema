@@ -662,10 +662,149 @@ H += tit(6, 'Análise das Variações Patrimoniais');
 H += '<div class="desc">Demonstração das Variações Patrimoniais.</div>';
 const dvp = unwrap(D.analise_patrimonial);
 if (dvp) {
-    const labels = { variacoes_ativas:'Variações Ativas', transf_recebidas:'Transf. Recebidas', reversao_provisoes:'Reversão de Provisões', variacoes_diminutivas:'Variações Diminutivas', pessoal_encargos:'Pessoal e Encargos', servicos_terceiros:'Serviços de Terceiros', transf_concedidas:'Transf. Concedidas', superavit_patrimonial:'Superávit Patrimonial', margem_patrimonial:'Margem Patrimonial (%)' };
+    const labels = {
+        variacoes_ativas:'Variações Ativas (VPA)', transf_recebidas:'Transferências Recebidas',
+        reversao_provisoes:'Reversão de Provisões', variacoes_diminutivas:'Variações Diminutivas (VPD)',
+        pessoal_encargos:'Pessoal e Encargos', servicos_terceiros:'Serviços de Terceiros',
+        transf_concedidas:'Transferências Concedidas', superavit_patrimonial:'Superávit Patrimonial',
+        margem_patrimonial:'Margem Patrimonial (%)'
+    };
     const rows = [];
-    Object.keys(labels).forEach(k => { if (dvp[k] && typeof dvp[k] === 'object') { const at = dvp[k].atual; const an = dvp[k].anterior; let fAt, fAn, vStr; if (k === 'margem_patrimonial') { fAt = pct(at); fAn = pct(an); vStr = '-'; } else { fAt = moeda(at); fAn = moeda(an); vStr = varPct(at, an); } rows.push([labels[k], fAt, fAn, vStr]); } });
+    Object.keys(labels).forEach(k => {
+        if (dvp[k] && typeof dvp[k] === 'object') {
+            const at = dvp[k].atual;
+            const an = dvp[k].anterior;
+            let fAt, fAn, vStr;
+            if (k === 'margem_patrimonial') {
+                fAt = pct(at); fAn = pct(an); vStr = '-';
+            } else {
+                fAt = moeda(at); fAn = moeda(an); vStr = varPct(at, an);
+            }
+            rows.push([labels[k], fAt, fAn, vStr]);
+        }
+    });
     H += tab(['Item','Atual','Anterior','Var. (%)'], rows);
+
+    // --- INÍCIO DOS GRÁFICOS (CSS NATIVO PARA ALINHAMENTO) ---
+    const getV = (k, tipo) => (dvp[k] && dvp[k][tipo]) ? Number(dvp[k][tipo]) : 0;
+    const vpaAt = getV('variacoes_ativas', 'atual');
+    const vpaAn = getV('variacoes_ativas', 'anterior');
+    const vpdAt = getV('variacoes_diminutivas', 'atual');
+    const vpdAn = getV('variacoes_diminutivas', 'anterior');
+    
+    const maxVal = Math.max(vpaAt, vpaAn, vpdAt, vpdAn) || 1;
+    const scale = 100 / maxVal; // Altura máxima 100px
+
+    // Função para renderizar uma barra
+    const renderBarra = (val, cor) => {
+        let h = Math.max(1, val * scale);
+        return `<div style="width: 40px; height: ${h}px; background: ${cor}; border-radius: 2px 2px 0 0; margin: 0 auto;"></div>`;
+    };
+
+    H += '<div style="display: flex; gap: 20px; margin-top: 30px; page-break-inside: avoid;">';
+    
+    // --- GRÁFICO 1 (BARRAS) ---
+    H += '<div style="flex: 1; background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">';
+    H += '<h3 style="text-align: center; color: #003366; font-size: 12px; margin-top: 0; margin-bottom: 20px;">VPA x VPD (R$)</h3>';
+    
+    H += '<table style="width: 100%; border-collapse: collapse; text-align: center;">';
+    H += '<tr>';
+    // Eixo Y e Barras
+    H += '<td style="width: 30px; vertical-align: bottom; padding-bottom: 10px;">';
+    H += `<div style="height: 100px; display: flex; flex-direction: column; justify-content: space-between; font-size: 8px; color: #666;">`;
+    H += `<span>${Math.round(maxVal).toLocaleString('pt-BR')}</span><span>${Math.round(maxVal/2).toLocaleString('pt-BR')}</span><span>0</span>`;
+    H += '</div>';
+    H += '</td>';
+    
+    H += '<td style="vertical-align: bottom; border-bottom: 1px solid #ccc; padding-bottom: 5px;">';
+    H += '<div style="display: flex; justify-content: space-around; align-items: flex-end; height: 100px;">';
+    // Barras VPA
+    H += `<div style="display: flex; gap: 10px; align-items: flex-end;">${renderBarra(vpaAt, '#003366')}${renderBarra(vpaAn, '#5B9BD5')}</div>`;
+    // Barras VPD
+    H += `<div style="display: flex; gap: 10px; align-items: flex-end;">${renderBarra(vpdAt, '#C00000')}${renderBarra(vpdAn, '#F08080')}</div>`;
+    H += '</div>';
+    H += '</td>';
+    H += '</tr>';
+    
+    // Eixo X Labels
+    H += '<tr>';
+    H += '<td></td>';
+    H += '<td style="padding-top: 5px;">';
+    H += '<div style="display: flex; justify-content: space-around;">';
+    H += '<div style="font-size: 9px; color: #333;">Variações<br>Ativas</div>';
+    H += '<div style="font-size: 9px; color: #333;">Variações<br>Diminutivas</div>';
+    H += '</div>';
+    H += '</td>';
+    H += '</tr>';
+    
+    // Legenda
+    H += '<tr>';
+    H += '<td></td>';
+    H += '<td style="padding-top: 15px;">';
+    H += '<div style="display: flex; justify-content: center; gap: 20px; font-size: 9px; color: #333;">';
+    H += '<div><span style="display: inline-block; width: 10px; height: 10px; background: #003366; margin-right: 3px;"></span>Atual</div>';
+    H += '<div><span style="display: inline-block; width: 10px; height: 10px; background: #5B9BD5; margin-right: 3px;"></span>Anterior</div>';
+    H += '</div>';
+    H += '</td>';
+    H += '</tr>';
+    H += '</table>';
+    H += '</div>';
+
+    // --- GRÁFICO 2 (PIZZA) ---
+    const pessoal = getV('pessoal_encargos', 'atual');
+    const servicos = getV('servicos_terceiros', 'atual');
+    const transf = getV('transf_concedidas', 'atual');
+    const outrasVPD = Math.max(0, vpdAt - pessoal - servicos - transf);
+    
+    const totalVPD = pessoal + servicos + transf + outrasVPD || 1;
+    const cores = ['#003366', '#5B9BD5', '#C00000', '#F08080'];
+    const legendas = ['Pessoal', 'Serviços', 'Transf.', 'Outras'];
+
+    let svg2 = '<svg viewBox="0 0 250 200" width="100%" height="200" style="font-family: Arial, sans-serif;">';
+    let startAngle = 0;
+    const cx = 90, cy = 90, r = 70;
+    const vals = [pessoal, servicos, transf, outrasVPD];
+
+    for (let i = 0; i < vals.length; i++) {
+        let val = vals[i];
+        if (val === 0) continue;
+        let angle = (val / totalVPD) * 360;
+        let endAngle = startAngle + angle;
+        let radStart = (startAngle - 90) * Math.PI / 180;
+        let radEnd = (endAngle - 90) * Math.PI / 180;
+        
+        let x1 = cx + r * Math.cos(radStart);
+        let y1 = cy + r * Math.sin(radStart);
+        let x2 = cx + r * Math.cos(radEnd);
+        let y2 = cy + r * Math.sin(radEnd);
+        let largeArc = angle > 180 ? 1 : 0;
+        
+        svg2 += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${cores[i % cores.length]}" />`;
+        
+        let midAngle = startAngle + angle / 2;
+        let radMid = (midAngle - 90) * Math.PI / 180;
+        let lx = cx + (r/2) * Math.cos(radMid);
+        let ly = cy + (r/2) * Math.sin(radMid);
+        if (angle > 15) {
+            svg2 += `<text x="${lx}" y="${ly+3}" font-size="9" fill="#fff" text-anchor="middle" font-weight="bold">${Math.round((val/totalVPD)*100)}%</text>`;
+        }
+        startAngle = endAngle;
+    }
+
+    // Legenda do Pizza
+    for (let i = 0; i < legendas.length; i++) {
+        svg2 += `<rect x="180" y="${50 + i*20}" width="10" height="10" fill="${cores[i % cores.length]}" />`;
+        svg2 += `<text x="195" y="${58 + i*20}" font-size="9" fill="#333">${legendas[i]}</text>`;
+    }
+    svg2 += '</svg>';
+
+    H += '<div style="flex: 1; background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">';
+    H += '<h3 style="text-align: center; color: #003366; font-size: 12px; margin-top: 0; margin-bottom: 10px;">Composição das VPD</h3>';
+    H += svg2;
+    H += '</div>';
+
+    H += '</div>';
+
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 7. COMPARATIVO DE RECEITAS =====
@@ -854,6 +993,8 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
 
 
 
