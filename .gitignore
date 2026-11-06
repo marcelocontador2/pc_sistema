@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 *.zip
 _backups_arquivo/backups/
+pc_storage/banco_dados.db
+_arquivo_20261031/
+*.zip
