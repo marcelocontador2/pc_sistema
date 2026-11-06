@@ -241,7 +241,7 @@
                 let html = '<ul>';
                 data.forEach(item => {
                     html += `<li>
-                        <input type="radio" name="historico" value="${item.id}">
+                        <input type="checkbox" class="check-historico" value="${item.id}">
                         <span><b>Período:</b> ${item.periodo} | <b>Gerado em:</b> ${item.data_geracao}</span>
                     </li>`;
                 });
@@ -270,34 +270,29 @@
             }
         }
 
-        async function excluirSelecionado() {
-            const sel = document.querySelector('input[name="historico"]:checked');
-            if (!sel) { alert("Selecione um histórico na lista."); return; }
-            if (!confirm("Tem certeza que deseja excluir este histórico?")) return;
+        function excluirSelecionado() {
+            const checks = document.querySelectorAll('.check-historico:checked');
+            if (checks.length === 0) { alert("Selecione pelo menos um item no histórico."); return; }
+            if (!confirm(`Excluir ${checks.length} item(ns) do histórico?`)) return;
             
-            try {
-                await fetch(`/historico_comparativo_despesas/${sel.value}`, { method: 'DELETE' });
-                carregarHistorico();
-            } catch (e) {
-                alert("Erro ao excluir.");
-            }
+            const ids = Array.from(checks).map(c => parseInt(c.value));
+            
+            fetch("/excluir_multiplos_comparativo_despesas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: ids })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    carregarHistorico();
+                } else {
+                    alert("Erro ao excluir: " + (data.mensagem || "Falha no servidor"));
+                }
+            })
+            .catch(e => alert("Erro de conexão ao excluir."));
         }
 
-        // Inicialização
-
-        
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            carregarHistorico();
-            carregarDados(); // Já carrega os dados visuais ao abrir a tela
-        });
-    
-        
-
-    
-        
-    
-    
         function gerarPDF() {
             const sel = document.querySelector('input[name="historico"]:checked');
             if (!sel) {
