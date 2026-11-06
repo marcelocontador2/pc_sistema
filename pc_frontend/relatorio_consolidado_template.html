@@ -196,12 +196,57 @@ if (bf) {
 
 // ===== 5. ANÁLISE DFC =====
 H += tit(5, 'Análise do Fluxo de Caixa');
-H += '<div class="desc">Demonstração do Fluxo de Caixa.</div>';
-const dfc = unwrap(D.analise_dfc);
+H += '<div class="desc">Demonstração do Fluxo de Caixa (método direto).</div>';
+
+// Desembrulha os dois níveis de 'dados'
+const dfcRaiz = D.analise_dfc || D.dfc;
+let dfc = null;
+if (dfcRaiz) {
+    if (dfcRaiz.dados && dfcRaiz.dados.dados) {
+        dfc = dfcRaiz.dados.dados;
+    } else if (dfcRaiz.dados) {
+        dfc = dfcRaiz.dados;
+    } else {
+        dfc = dfcRaiz;
+    }
+}
+
 if (dfc) {
-    const blocos = [['Fluxo Operacional', dfc.operacional],['Fluxo de Investimento', dfc.investimento],['Fluxo de Financiamento', dfc.financiamento],['Apuração de Caixa', dfc.caixa]];
-    blocos.forEach(([t,obj]) => { if (!obj) return; H += sub(t); const rows=[]; Object.keys(obj).forEach(k => { const v = obj[k]; if (v && typeof v==='object' && 'atual' in v) { rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(v.atual), moeda(v.anterior)]); } }); H += tab(['Item','Atual','Anterior'], rows); });
-} else { H += '<p>Módulo não encontrado.</p>'; }
+    const blocos = [
+        ['Fluxo Operacional', dfc.operacional],
+        ['Fluxo de Investimento', dfc.investimento],
+        ['Fluxo de Financiamento', dfc.financiamento],
+        ['Apuração de Caixa', dfc.caixa || dfc.apuracao_caixa || dfc.saldo_caixa]
+    ];
+    
+    let achouDados = false;
+    blocos.forEach(([titulo, obj]) => {
+        if (!obj || typeof obj !== 'object') return;
+        
+        const rows = [];
+        Object.keys(obj).forEach(k => {
+            const v = obj[k];
+            if (v && typeof v === 'object' && 'atual' in v) {
+                const at = v.atual || 0;
+                const an = v.anterior || 0;
+                const varStr = varPct(at, an);
+                rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(at), moeda(an), varStr]);
+                achouDados = true;
+            }
+        });
+        
+        if (rows.length > 0) {
+            H += sub(titulo);
+            H += tab(['Item','Atual','Anterior','Var. (%)'], rows);
+        }
+    });
+    
+    if (!achouDados) {
+        H += '<p>Módulo encontrado, mas as contas não estão no formato esperado.</p>';
+    }
+} else {
+    H += '<p>Módulo não encontrado.</p>';
+}
 
 // ===== 6. ANÁLISE DVP =====
 H += tit(6, 'Análise das Variações Patrimoniais');
@@ -300,6 +345,9 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
+
 
 
 
