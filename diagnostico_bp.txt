@@ -1,0 +1,16 @@
+=== 1. CÓDIGO ATUAL DA SEÇÃO 2 NO TEMPLATE ===
+// ===== 2. ANÁLISE BP =====
+H += tit(2, 'Análise do Balanço Patrimonial');
+H += '<div class="desc">Comparativo das contas do Balanço Patrimonial.</div>';
+const bp = unwrap(D.analise_bp);
+if (bp) {
+    const rows = [];
+    ['ativo_circulante','caixa','creditos','ativo_nao_circulante','ativo_realizavel','imobilizado','total_ativo','passivo_circulante','passivo_nao_circulante','passivo_total','patrimonio_liquido','total_passivo'].forEach(k => {
+        if (bp[k]) rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(bp[k].atual), moeda(bp[k].anterior)]);
+    });
+    H += tab(['Conta','Período Atual','Período Anterior'], rows);
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+
+=== 2. TENTATIVA DE LER O JSON DO BACKEND ===
+Erro ao ler o JSON embutido: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)

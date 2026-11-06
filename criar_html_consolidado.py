@@ -1,0 +1,160 @@
+﻿html = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatorio Consolidado</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-voltar { background: #f0ad4e; }
+        .btn-salvar { background: #28a745; }
+        .btn-pdf { background: #0056b3; }
+        .btn-word { background: #2b579a; }
+        .btn-excluir { background: #dc3545; }
+        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; }
+        .filtros label { font-size: 12px; font-weight: bold; color: #555; }
+        .filtros select, .filtros input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .layout { display: flex; gap: 20px; }
+        .sidebar { width: 250px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: fit-content; }
+        .sidebar h3 { margin-top: 0; font-size: 16px; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .hist-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 400px; }
+        .main-content h2 { color: #003366; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <button class="btn btn-voltar" onclick="window.location.href='/'">&larr; Voltar</button>
+        <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
+        <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn btn-word" onclick="gerarWord()">Gerar Word</button>
+    </div>
+
+    <div class="filtros">
+        <div>
+            <label>Ano:</label>
+            <input type="number" id="ano" value="2026" style="width: 80px;">
+        </div>
+        <div>
+            <label>Tipo:</label>
+            <select id="tipo">
+                <option value="TRIMESTRE" selected>Trimestral</option>
+                <option value="MES">Mensal</option>
+            </select>
+        </div>
+        <div>
+            <label>Periodo:</label>
+            <select id="val">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+            </select>
+        </div>
+        <button class="btn btn-pdf" onclick="verificar()">Verificar Dados</button>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <h3>Historico Salvo</h3>
+            <div id="historico-lista">Nenhum historico.</div>
+        </div>
+
+        <div class="main-content">
+            <h2>Relatorio Consolidado de Analise Contabil</h2>
+            <p>Clique em "Verificar Dados" para carregar a base do periodo selecionado.</p>
+            <p style="color: #888; font-size: 14px; margin-top: 30px;">
+                O relatorio incluira: Capa, Sumario, Analise de BP, DFC, DVP, DMPL, BF, Integridade, Parecer e Assinatura do Contador.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function mp(ano, tipo, val) {
+            return ano + '-' + tipo + '-' + val;
+        }
+
+        function verificar() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo').value;
+            const val = document.getElementById('val').value;
+            const periodo = mp(ano, tipo, val);
+
+            fetch('/api/relatorio_consolidado/' + periodo)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'faltando') {
+                        alert("Nenhum dado encontrado para o periodo " + periodo + ".");
+                        return;
+                    }
+                    alert("Dados carregados com sucesso! Clique em 'Confirmar e Salvar' para gravar o relatorio.");
+                    document.getElementById('btn-salvar').style.display = 'inline-block';
+                    document.getElementById('btn-salvar').setAttribute('data-periodo', periodo);
+                })
+                .catch(e => alert("Erro ao verificar dados."));
+        }
+
+        function salvar() {
+            const btn = document.getElementById('btn-salvar');
+            const periodo = btn.getAttribute('data-periodo');
+            btn.innerText = "Salvando...";
+            btn.disabled = true;
+            fetch('/salvar_relatorio_consolidado/' + periodo, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) { alert("Relatorio salvo com sucesso!"); carregarHistorico(); }
+                    else { alert("Erro: " + data.mensagem); }
+                })
+                .catch(e => alert("Erro ao salvar."))
+                .finally(() => { btn.innerText = "Confirmar e Salvar"; btn.disabled = false; });
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_relatorio_consolidado')
+                .then(r => r.json())
+                .then(data => {
+                    const lista = document.getElementById('historico-lista');
+                    if (!data || data.length === 0) { lista.innerHTML = 'Nenhum historico.'; return; }
+                    let html = '';
+                    data.forEach(item => {
+                        html += `<div class="hist-item">
+                            <input type="checkbox" value="${item.id}" class="check-hist">
+                            <div><strong>${item.periodo}</strong><br><span style="font-size:11px;color:#777;">${item.data_geracao}</span></div>
+                        </div>`;
+                    });
+                    lista.innerHTML = html;
+                });
+        }
+
+        function excluirSelecionado() {
+            const selecionados = document.querySelectorAll(".check-hist:checked");
+            if (selecionados.length === 0) { alert("Selecione um item no historico."); return; }
+            if (!confirm("Tem certeza que deseja excluir " + selecionados.length + " item(ns)?")) return;
+
+            const promessas = Array.from(selecionados).map(sel => 
+                fetch('/excluir_relatorio_consolidado/' + sel.value, { method: 'DELETE' }).then(r => r.json())
+            );
+            Promise.all(promessas).then(() => { alert("Excluido(s) com sucesso!"); carregarHistorico(); });
+        }
+
+        function gerarPDF() {
+            const sel = document.querySelector(".check-hist:checked");
+            if (!sel) { alert("Selecione um item no historico."); return; }
+            window.open('/gerar_pdf_relatorio_consolidado/' + sel.value, '_blank');
+        }
+
+        function gerarWord() {
+            alert("Geracao de Word sera implementada na proxima etapa. Por enquanto, use o PDF.");
+        }
+
+        document.addEventListener('DOMContentLoaded', carregarHistorico);
+    </script>
+</body>
+</html>"""
+
+with open("pc_frontend/relatorio_consolidado.html", "w", encoding="utf-8") as f:
+    f.write(html)
+print("[OK] relatorio_consolidado.html criado com sucesso.")

@@ -1,0 +1,239 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório Consolidado</title>
+<style>
+    @page { size: A4 portrait; margin: 15mm; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #333; line-height: 1.35; margin: 0; font-size: 10px; }
+    .capa { text-align: center; padding-top: 60mm; page-break-after: always; }
+    .capa .logo { max-height: 80px; margin-bottom: 20px; }
+    .capa .faixa { background: #003366; color: white; padding: 35px 0; margin: 15px -15mm 30px -15mm; }
+    .capa h1 { color: white; margin: 0; font-size: 30px; letter-spacing: 4px; }
+    .capa h2 { color: white; margin: 8px 0 0 0; font-size: 14px; font-weight: normal; }
+    .capa .entidade { font-size: 14px; color: #555; margin: 20px 0; }
+    .capa .info { background: #f4f6f9; border-left: 5px solid #0056b3; padding: 15px 40px; margin: 15px auto; max-width: 400px; text-align: left; }
+    .capa .info .label { font-size: 10px; color: #666; text-transform: uppercase; }
+    .capa .info .valor { font-size: 18px; font-weight: bold; color: #003366; margin-top: 5px; }
+    .capa .rodape { color: #999; font-size: 10px; margin-top: 50px; }
+    h2.secao-titulo { color: #003366; border-bottom: 3px solid #003366; padding-bottom: 6px; page-break-before: always; font-size: 18px; margin-bottom: 12px; }
+    h3.sub { color: #0056b3; font-size: 11px; margin: 12px 0 6px 0; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+    .desc { font-size: 9px; color: #666; margin-bottom: 8px; font-style: italic; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+    th { background: #003366; color: white; padding: 5px; text-align: left; font-size: 8px; text-transform: uppercase; border: 1px solid #003366; }
+    td { padding: 4px 5px; border: 1px solid #ddd; font-size: 8.5px; }
+    td.right { text-align: right; }
+    td.center { text-align: center; }
+    tr:nth-child(even) { background: #f8f9fa; }
+    tr.total { font-weight: bold; background: #e9ecef; }
+</style>
+</head>
+<body>
+<div class="capa">
+    <img src="logo" class="logo">
+    <div class="faixa"><h1>RELATÓRIO CONSOLIDADO</h1><h2>Análise Contábil</h2></div>
+    <div class="entidade">COFEN - Conselho Federal de Enfermagem</div>
+    <div class="info"><div class="label">Período de Análise</div><div class="valor">{periodo}</div></div>
+    <div class="rodape">Gerado em: {data_geracao}<br>SGPC - Sistema de Gestão de Prestação de Contas</div>
+</div>
+<div id="conteudo"></div>
+<script>
+const D = {dados_json};
+function moeda(v) { if (v === null || v === undefined || isNaN(v)) return 'R$ 0,00'; return 'R$ ' + parseFloat(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function pct(v) { if (v === null || v === undefined) return '0,00%'; return parseFloat(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%'; }
+function varPct(atual, anterior) { if (!anterior || anterior === 0) return '-'; let v = ((atual - anterior) / Math.abs(anterior)) * 100; return (v > 0 ? '+' : '') + v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%'; }
+function tit(n, t) { return '<h2 class="secao-titulo">' + n + '. ' + t + '</h2>'; }
+function sub(t) { return '<h3 class="sub">' + t + '</h3>'; }
+function tab(headers, rows) { if (!rows.length) return '<p style="color:#999">Sem dados.</p>'; let h = '<table><thead><tr>'; headers.forEach((x,i) => h += '<th' + (i>0?' style="text-align:right"':'') + '>' + x + '</th>'); h += '</tr></thead><tbody>'; rows.forEach(r => { h += '<tr>'; r.forEach((c,i) => h += '<td' + (i>0?' class="right"':'') + '>' + (c??'-') + '</td>'); h += '</tr>'; }); return h + '</tbody></table>'; }
+function unwrap(mod) { if (!mod) return null; if (mod.dados !== undefined) return mod.dados; return mod; }
+let H = '';
+
+// ===== 1. INTEGRIDADE =====
+H += tit(1, 'Integridade entre Demonstrações');
+H += '<div class="desc">Matriz de integridade com o cruzamento de todas as demonstrações.</div>';
+const integ = unwrap(D.integridade);
+if (integ && integ.matriz) {
+    function limpaRS(v) { if (v === null || v === undefined) return '-'; let s = String(v); s = s.replace(/R\$\s*/g, ''); return s.trim() || '-'; }
+    const rows = integ.matriz.map(m => [m.item || '-', limpaRS(m.balancete), limpaRS(m.bp), limpaRS(m.bf), limpaRS(m.bo), limpaRS(m.dfc), limpaRS(m.dvp), limpaRS(m.dmpl), m.conf || '-']);
+    H += tab(['Item','Balancete','BP','BF','BO','DFC','DVP','DMPL','Conf.'], rows);
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 2. ANÁLISE BP =====
+H += tit(2, 'Análise do Balanço Patrimonial');
+H += '<div class="desc">Comparativo das contas do Balanço Patrimonial (período atual x anterior).</div>';
+
+// Função que desembrulha recursivamente e busca qualquer item com 'atual' e 'anterior'
+function coletarBP(obj, prefixo, result) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+    Object.keys(obj).forEach(k => {
+        const v = obj[k];
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+            if ('atual' in v && 'anterior' in v) {
+                result.push({ chave: prefixo + k, atual: v.atual, anterior: v.anterior });
+            } else {
+                coletarBP(v, prefixo + k + '.', result);
+            }
+        }
+    });
+}
+
+const bpRaiz = D.analise_bp || D.balanco_patrimonial || D.bp;
+if (bpRaiz) {
+    const encontrados = [];
+    coletarBP(bpRaiz, '', encontrados);
+    
+    if (encontrados.length > 0) {
+        const rows = encontrados.map(e => {
+            const at = parseFloat(e.atual) || 0;
+            const an = parseFloat(e.anterior) || 0;
+            let varStr = '-';
+            if (an && an !== 0) {
+                const varP = ((at - an) / Math.abs(an)) * 100;
+                varStr = (varP > 0 ? '+' : '') + varP.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+            }
+            const fAt = 'R$ ' + at.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const fAn = 'R$ ' + an.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            // Limpa o prefixo da chave para mostrar apenas o nome da conta
+            let nome = e.chave.replace(/^dados\./, '').replace(/^dados\./, '').replace(/_/g, ' ').toUpperCase();
+            return [nome, fAt, fAn, varStr];
+        });
+        H += tab(['Conta','Período Atual (R$)','Período Anterior (R$)', 'Var. (%)'], rows);
+    } else {
+        H += '<div style="border: 2px solid red; padding: 10px; background: #fff; font-family: monospace; font-size: 10px;">';
+        H += '<b>DEBUG: Nenhuma conta encontrada. Estrutura recebida:</b><br>';
+        H += '<pre>' + JSON.stringify(bpRaiz, null, 2).substring(0, 3000) + '</pre>';
+        H += '</div>';
+    }
+} else {
+    H += '<p>Módulo não encontrado no JSON.</p>';
+}
+// ===== 3. ANÁLISE BO =====
+H += tit(3, 'Análise do Balanço Orçamentário');
+H += '<div class="desc">Comparativo de receitas e despesas.</div>';
+const bo = unwrap(D.analise_orcamentaria);
+if (bo) {
+    const campos = [['Receita Realizada','receita_realizada'],['Despesa Empenhada','despesa_empenhada'],['Superávit/Déficit','superavit'],['Restos a Pagar','restos_pagar'],['Receita Orçada','receita_orcada'],['Despesa Orçada','despesa_orcada'],['% Realização Receitas','pct_receita'],['% Realização Despesas','pct_despesa']];
+    const rows = [];
+    campos.forEach(([l,k]) => { rows.push([l, moeda(bo.atual ? bo.atual[k] : null), moeda(bo.anterior ? bo.anterior[k] : null)]); });
+    H += tab(['Indicador','Atual','Anterior'], rows);
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 4. ANÁLISE BF =====
+H += tit(4, 'Análise do Balanço Financeiro');
+H += '<div class="desc">Movimentação financeira.</div>';
+const bf = unwrap(D.analise_financeira_bf);
+if (bf) {
+    const blocos = [['Receitas', bf.receitas],['Despesas', bf.despesas],['Extraorçamentário', bf.extra],['Caixa', bf.caixa]];
+    blocos.forEach(([t,obj]) => { if (!obj) return; H += sub(t); const rows=[]; Object.keys(obj).forEach(k => { const v = obj[k]; if (k==='detalhes') { Object.keys(v).forEach(kk => rows.push([kk.replace(/_/g,' ').toUpperCase(), moeda(v[kk].atual), moeda(v[kk].anterior)])); } else if (v && typeof v==='object' && 'atual' in v) { rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(v.atual), moeda(v.anterior)]); } }); H += tab(['Item','Atual','Anterior'], rows); });
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 5. ANÁLISE DFC =====
+H += tit(5, 'Análise do Fluxo de Caixa');
+H += '<div class="desc">Demonstração do Fluxo de Caixa.</div>';
+const dfc = unwrap(D.analise_dfc);
+if (dfc) {
+    const blocos = [['Fluxo Operacional', dfc.operacional],['Fluxo de Investimento', dfc.investimento],['Fluxo de Financiamento', dfc.financiamento],['Apuração de Caixa', dfc.caixa]];
+    blocos.forEach(([t,obj]) => { if (!obj) return; H += sub(t); const rows=[]; Object.keys(obj).forEach(k => { const v = obj[k]; if (v && typeof v==='object' && 'atual' in v) { rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(v.atual), moeda(v.anterior)]); } }); H += tab(['Item','Atual','Anterior'], rows); });
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 6. ANÁLISE DVP =====
+H += tit(6, 'Análise das Variações Patrimoniais');
+H += '<div class="desc">Demonstração das Variações Patrimoniais.</div>';
+const dvp = unwrap(D.analise_patrimonial);
+if (dvp) {
+    const labels = { variacoes_ativas:'Variações Ativas', transf_recebidas:'Transf. Recebidas', reversao_provisoes:'Reversão de Provisões', variacoes_diminutivas:'Variações Diminutivas', pessoal_encargos:'Pessoal e Encargos', servicos_terceiros:'Serviços de Terceiros', transf_concedidas:'Transf. Concedidas', superavit_patrimonial:'Superávit Patrimonial', margem_patrimonial:'Margem Patrimonial (%)' };
+    const rows = [];
+    Object.keys(labels).forEach(k => { if (dvp[k] && typeof dvp[k] === 'object') { const at = dvp[k].atual; const an = dvp[k].anterior; let fAt, fAn, vStr; if (k === 'margem_patrimonial') { fAt = pct(at); fAn = pct(an); vStr = '-'; } else { fAt = moeda(at); fAn = moeda(an); vStr = varPct(at, an); } rows.push([labels[k], fAt, fAn, vStr]); } });
+    H += tab(['Item','Atual','Anterior','Var. (%)'], rows);
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 7. COMPARATIVO DE RECEITAS =====
+H += tit(7, 'Comparativo de Receitas');
+H += '<div class="desc">Comparativo consolidado de receitas.</div>';
+const crec = unwrap(D.comparativo_receitas);
+if (crec) {
+    const at = crec.atual || {};
+    H += sub('Resumo');
+    H += tab(['Indicador','Valor'], [['Receita Orçada', moeda(at.orcado_total)], ['Receita Realizada', moeda(at.realizado_total)], ['% Execução', pct(at.percentual_total)]]);
+    if (at.grupos && at.grupos.length) { H += sub('Composição por Grupo'); H += tab(['Grupo','Orçado','Realizado','%'], at.grupos.map(g => [g.nome, moeda(g.orcado), moeda(g.realizado), pct(g.percentual)])); }
+    if (at.cores && at.cores.length) {
+        const mapa = new Map();
+        at.cores.forEach(c => { const key = (c.nome || 'NÃO INFORMADO').toString().trim().toUpperCase(); if (!mapa.has(key)) mapa.set(key, { regional: key, orcado: 0, realizado: 0 }); const item = mapa.get(key); item.orcado += Number(c.orcado || 0); item.realizado += Number(c.realizado || 0); });
+        const rows = []; let totOrc = 0, totReal = 0;
+        [...mapa.values()].sort((a, b) => a.regional.localeCompare(b.regional)).forEach(item => { const perc = item.orcado ? (item.realizado / item.orcado * 100) : 0; rows.push([item.regional.charAt(0) + item.regional.slice(1).toLowerCase(), moeda(item.orcado), moeda(item.realizado), pct(perc)]); totOrc += item.orcado; totReal += item.realizado; });
+        rows.push(['TOTAL', moeda(totOrc), moeda(totReal), pct(totOrc ? (totReal/totOrc*100) : 0)]);
+        H += sub('Desdobramento por Regional'); H += tab(['Regional','Orçado','Realizado','%'], rows);
+    }
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 8. COMPARATIVO DE DESPESAS =====
+H += tit(8, 'Comparativo de Despesas');
+H += '<div class="desc">Comparativo consolidado de despesas.</div>';
+const cdesp = unwrap(D.comparativo_despesas);
+if (cdesp) {
+    const at = cdesp.atual || {};
+    H += sub('Resumo');
+    H += tab(['Indicador','Valor'], [['Despesa Orçada', moeda(at.orcado_total)], ['Despesa Empenhada', moeda(at.empenhado_total)], ['Despesa Liquidada', moeda(at.liquidado_total)], ['% Execução', pct(at.percentual_total)]]);
+    if (at.grupos && at.grupos.length) { H += sub('Composição por Grupo'); H += tab(['Grupo','Orçado','Empenhado','Liquidado','%'], at.grupos.map(g => [g.nome, moeda(g.orcado), moeda(g.empenhado), moeda(g.liquidado), pct(g.percentual)])); }
+    if (at.detalhes && at.detalhes.length) { H += sub('Detalhamento das Despesas'); H += tab(['Descrição','Orçado','Empenhado','%'], at.detalhes.map(x => [x.nome, moeda(x.orcado), moeda(x.empenhado), pct(x.percentual)])); }
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 9. LIQUIDEZ =====
+H += tit(9, 'Índices de Liquidez e Estrutura');
+H += '<div class="desc">Indicadores de liquidez e estrutura patrimonial.</div>';
+const liq = unwrap(D.liquidez);
+if (liq) {
+    H += sub('Liquidez'); const rowsLiq = [];
+    if (liq.liquidez) { [['Liquidez Imediata','liquidez_imediata'], ['Liquidez Corrente','liquidez_corrente'], ['Liquidez Seca','liquidez_seca'], ['Liquidez Geral','liquidez_geral']].forEach(([label, key]) => { if (liq.liquidez[key] !== undefined) rowsLiq.push([label, liq.liquidez[key]]); }); }
+    H += tab(['Indicador','Valor'], rowsLiq);
+    if (liq.estrutura) { H += sub('Estrutura Patrimonial'); const rowsEst = []; [['Endividamento Geral','endividamento_geral'], ['Part. Capital de Terceiros','part_capital_terceiros'], ['Imobilização do PL','imobilizacao_pl']].forEach(([label, key]) => { if (liq.estrutura[key] !== undefined) rowsEst.push([label, liq.estrutura[key] + '%']); }); H += tab(['Indicador','Valor'], rowsEst); }
+    if (liq.valores) { H += sub('Valores Base'); const labelsVal = { caixa:'Caixa', ativo_circulante:'Ativo Circulante', estoques:'Estoques', realizavel_lp:'Realizável LP', ativo_nao_circulante:'Ativo Não Circulante', imobilizado:'Imobilizado', passivo_circulante:'Passivo Circulante', passivo_nao_circulante:'Passivo Não Circulante', passivo_total:'Passivo Total', ativo_total:'Ativo Total', patrimonio_liquido:'Patrimônio Líquido' }; const rowsVal = []; Object.keys(labelsVal).forEach(k => { if (liq.valores[k] !== undefined) rowsVal.push([labelsVal[k], moeda(liq.valores[k])]); }); H += tab(['Item','Valor'], rowsVal); }
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 10. PANORAMA =====
+H += tit(10, 'Panorama de Resultados');
+H += '<div class="desc">Resumo executivo dos principais indicadores.</div>';
+const pan = unwrap(D.panorama);
+if (pan) {
+    const labels = { ativo_total:'Ativo Total', passivo_total:'Passivo Total', patrimonio_liquido:'Patrimônio Líquido', caixa_bp:'Caixa e Equivalentes', receita_realizada:'Receitas Realizadas', despesa_empenhada:'Despesas Empenhadas', superavit_orcamentario:'Resultado Orçamentário', superavit_patrimonial:'Superávit Patrimonial', superavit_financeiro:'Superávit Financeiro' };
+    const rows = []; Object.keys(labels).forEach(k => { if (pan[k] !== undefined) rows.push([labels[k], moeda(pan[k])]); }); H += tab(['Indicador','Valor'], rows);
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 11. CENTRO DE CUSTOS =====
+H += tit(11, 'Análise por Centro de Custos');
+H += '<div class="desc">Distribuição das despesas por centro de custo.</div>';
+const cc = unwrap(D.centro_custos);
+if (cc && cc.centros) {
+    const at = cc.centros || []; const an = cc.centros_anterior || []; const mapa = {};
+    at.forEach(x => { mapa[x.nome] = {at: x.valor, an: 0}; });
+    an.forEach(x => { if (mapa[x.nome]) mapa[x.nome].an = x.valor; else mapa[x.nome] = {at: 0, an: x.valor}; });
+    const rows = []; let totalAt = 0, totalAn = 0;
+    Object.keys(mapa).sort().forEach(nome => { const {at: va, an: vb} = mapa[nome]; totalAt += va; totalAn += vb; const variacao = vb ? ((va - vb) / Math.abs(vb)) * 100 : 0; rows.push([nome, moeda(va), moeda(vb), pct(variacao)]); });
+    rows.push(['TOTAL', moeda(totalAt), moeda(totalAn), pct(totalAn ? ((totalAt-totalAn)/Math.abs(totalAn))*100 : 0)]);
+    H += tab(['Centro de Custo','Atual','Anterior','Variação'], rows);
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 12. CUSTO DE PESSOAL =====
+H += tit(12, 'Custo de Pessoal');
+H += '<div class="desc">Custo de pessoal x limite legal.</div>';
+const cp = unwrap(D.custo_pessoal);
+if (cp) {
+    H += sub('Composição do Custo');
+    H += tab(['Item','Atual','Anterior','Total'], [['Pessoal e Encargos', moeda(cp.pessoal_atual), moeda(cp.pessoal_anterior), moeda(cp.pessoal_total)],['Outras Despesas Variáveis', moeda(cp.outras_atual), moeda(cp.outras_anterior), moeda(cp.outras_total)],['Terceirização', moeda(cp.terc_atual), moeda(cp.terc_anterior), moeda(cp.terc_total)],['CUSTO TOTAL (Bruto)', moeda(cp.custo_atual), moeda(cp.custo_anterior), moeda(cp.custo_total)],['RCL Total', moeda(cp.rcl_atual), moeda(cp.rcl_anterior), moeda(cp.rcl_total)]]);
+    H += sub('Limite e Margem');
+    H += tab(['Item','Valor'], [['Limite', moeda(cp.limite_total)],['Margem Disponível', moeda(cp.margem_disponivel_total)],['% Custo sobre RCL', pct(cp.pct_custo_total)],['Faixa de Controle', cp.faixa_controle || '-']]);
+} else { H += '<p>Módulo não encontrado.</p>'; }
+
+// ===== 13. PARECER =====
+H += tit(13, 'Parecer do Contador');
+H += '<div class="desc">Conclusão da análise contábil.</div>';
+H += '<div class="ok"><strong>Análise Concluída</strong><br>Os dados foram consolidados com sucesso.</div>';
+
+document.getElementById('conteudo').innerHTML = H;
+</script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Analise BP</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-voltar { background: #f0ad4e; }
+        .btn-salvar { background: #28a745; }
+        .btn-excluir { background: #dc3545; }
+        .btn-pdf { background: #0056b3; }
+        .btn-word { background: #2b579a; }
+        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; }
+        .filtros label { font-size: 12px; font-weight: bold; color: #555; }
+        .filtros select, .filtros input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .layout { display: flex; gap: 20px; }
+        .sidebar { width: 250px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: fit-content; }
+        .sidebar h3 { margin-top: 0; font-size: 16px; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .hist-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; color: #003366; }
+        .grid-bp { display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #003366; color: white; padding: 12px; text-align: center; }
+        td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
+        td:first-child { text-align: left; font-weight: 500; color: #003366; }
+        .pos { color: #28a745; font-weight: bold; }
+        .neg { color: #dc3545; font-weight: bold; }
+        .grafico-container { background: #f8f9fa; border-radius: 8px; padding: 20px; }
+        .grafico-container h3 { margin-top: 0; color: #003366; font-size: 16px; text-align: center; }
+        .rodape { margin-top: 30px; padding: 15px; border-left: 4px solid #0056b3; background: #f4f6f9; font-size: 13px; color: #555; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <button class="btn btn-voltar" onclick="window.location.href='/'">&larr; Voltar</button>
+        <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
+        <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn btn-word" onclick="gerarWord()">Gerar Word</button>
+    </div>
+
+    <div class="filtros">
+        <div><label>Ano:</label><input type="number" id="ano" value="2026" style="width: 80px;"></div>
+        <div><label>Tipo:</label><select id="tipo"><option value="TRIMESTRE" selected>Trimestral</option><option value="MES">Mensal</option></select></div>
+        <div><label>Periodo:</label><select id="val"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></div>
+        <button class="btn btn-pdf" onclick="carregar()">Verificar Dados</button>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <h3>Historico Salvo</h3>
+            <div id="historico-lista">Nenhum historico.</div>
+        </div>
+
+        <div class="main-content">
+            <div style="color: #0056b3; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">Análise Patrimonial</div>
+            <h2>Balanço Patrimonial — Estrutura e Evolução</h2>
+
+            <div class="grid-bp">
+                <div>
+                    <table id="tab">
+                        <thead>
+                            <tr>
+                                <th>Conta</th>
+                                <th>Período Atual (R$)</th>
+                                <th>Período Anterior (R$)</th>
+                                <th>Var. (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="4" style="text-align:center;">Clique em Verificar para carregar.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="grafico-container">
+                    <h3>Evolução das Principais Contas (R$)</h3>
+                    <canvas id="grafico-bp" style="max-height: 350px;"></canvas>
+                </div>
+            </div>
+
+            <div class="rodape" id="rodape-destaques">
+                <strong>Destaques:</strong> Clique em Verificar para carregar.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+
+        function mp(ano, tipo, val) { return ano + '-' + tipo + '-' + val; }
+
+        function fmtMil(v) {
+            // Mostra o valor cheio, sem dividir por 1 milhao
+            return v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function pct(va, vb) {
+            if (!vb || vb === 0) return '-';
+            return (((va - vb) / Math.abs(vb)) * 100).toFixed(2).replace('.', ',') + '%';
+        }
+
+        function carregar() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo').value;
+            const val = document.getElementById('val').value;
+            const periodo = mp(ano, tipo, val);
+
+            fetch('/api/analise_bp/' + periodo)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.erro === "faltando") {
+                        document.querySelector('#tab tbody').innerHTML = '<tr><td colspan="4" style="color:red; text-align:center;">Arquivo CSV do BP nao encontrado.</td></tr>';
+                        return;
+                    }
+                    render(data.dados);
+                    document.getElementById('btn-salvar').style.display = 'inline-block';
+                    document.getElementById('btn-salvar').setAttribute('data-periodo', periodo);
+                })
+                .catch(e => alert("Erro ao carregar."));
+        }
+
+        function render(d) {
+            const tb = document.querySelector('#tab tbody');
+            const linha = (label, va, vb) => {
+                const v = pct(va, vb);
+                const cls = parseFloat(v) >= 0 ? 'pos' : 'neg';
+                const sg = parseFloat(v) >= 0 ? '+' : '';
+                const val_ant = (vb === 0) ? '-' : fmtMil(vb);
+                const var_pct = (vb === 0) ? '-' : sg + v;
+                return `<tr>
+                    <td>${label}</td>
+                    <td>${fmtMil(va)}</td>
+                    <td>${val_ant}</td>
+                    <td class="${cls}">${var_pct}</td>
+                </tr>`;
+            };
+
+            let html = '';
+            html += linha('Ativo Circulante', d.ativo_circulante.atual, d.ativo_circulante.anterior);
+            html += linha('Caixa e Equivalentes', d.caixa.atual, d.caixa.anterior);
+            html += linha('Créditos a Curto Prazo', d.creditos.atual, d.creditos.anterior);
+            html += linha('Ativo Não Circulante', d.ativo_nao_circulante.atual, d.ativo_nao_circulante.anterior);
+            html += linha('Ativo Realizável a Longo Prazo', d.ativo_realizavel.atual, d.ativo_realizavel.anterior);
+            html += linha('Imobilizado', d.imobilizado.atual, d.imobilizado.anterior);
+            html += linha('TOTAL DO ATIVO', d.total_ativo.atual, d.total_ativo.anterior);
+            html += linha('Passivo Circulante', d.passivo_circulante.atual, d.passivo_circulante.anterior);
+            html += linha('Passivo Não Circulante', d.passivo_nao_circulante.atual, d.passivo_nao_circulante.anterior);
+            html += linha('TOTAL DO PASSIVO', d.total_passivo.atual, d.total_passivo.anterior);
+            html += linha('Patrimônio Líquido', d.patrimonio_liquido.atual, d.patrimonio_liquido.anterior);
+            tb.innerHTML = html;
+
+            atualizarGrafico(d);
+
+            const pl_var = pct(d.patrimonio_liquido.atual, d.patrimonio_liquido.anterior);
+            const imob_var = pct(d.imobilizado.atual, d.imobilizado.anterior);
+            document.getElementById('rodape-destaques').innerHTML =
+                `<strong>Destaques:</strong> Evolução do PL de ${pl_var}; variação do Imobilizado de ${imob_var}.`;
+        }
+
+        function atualizarGrafico(d) {
+            const ctx = document.getElementById('grafico-bp').getContext('2d');
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Ativo Circulante', 'Ativo Não Circulante', 'Passivo Circulante', 'Patrimônio Líquido'],
+                    datasets: [
+                        {
+                            label: 'Anterior',
+                            data: [
+                                d.ativo_circulante.anterior,
+                                d.ativo_nao_circulante.anterior,
+                                d.passivo_circulante.anterior,
+                                d.patrimonio_liquido.anterior
+                            ],
+                            backgroundColor: '#5b9bd5',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Atual',
+                            data: [
+                                d.ativo_circulante.atual,
+                                d.ativo_nao_circulante.atual,
+                                d.passivo_circulante.atual,
+                                d.patrimonio_liquido.atual
+                            ],
+                            backgroundColor: '#1f4e79',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        function salvar() {
+            const btn = document.getElementById('btn-salvar');
+            const periodo = btn.getAttribute('data-periodo');
+            btn.innerText = "Salvando...";
+            btn.disabled = true;
+            fetch('/salvar_analise_bp/' + periodo, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) { alert("Analise BP salva!"); carregarHistorico(); }
+                    else { alert("Erro: " + data.mensagem); }
+                })
+                .finally(() => { btn.innerText = "Confirmar e Salvar"; btn.disabled = false; });
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_analise_bp')
+                .then(r => r.json())
+                .then(data => {
+                    const lista = document.getElementById('historico-lista');
+                    if (!data || data.length === 0) { lista.innerHTML = 'Nenhum historico.'; return; }
+                    let html = '';
+                    data.forEach(item => {
+                        html += `<div class="hist-item">
+                            <input type="checkbox" value="${item.id}" class="check-hist">
+                            <div><strong>${item.periodo}</strong><br><span style="font-size:11px;color:#777;">${item.data_geracao}</span></div>
+                        </div>`;
+                    });
+                    lista.innerHTML = html;
+                });
+        }
+
+        function excluirSelecionado() {
+            const selecionados = document.querySelectorAll(".check-hist:checked");
+            if (selecionados.length === 0) { alert("Selecione um item no historico."); return; }
+            if (!confirm("Tem certeza que deseja excluir " + selecionados.length + " item(ns)?")) return;
+            const promessas = Array.from(selecionados).map(sel =>
+                fetch('/excluir_analise_bp/' + sel.value, { method: 'DELETE' }).then(r => r.json())
+            );
+            Promise.all(promessas).then(() => { alert("Excluido(s) com sucesso!"); carregarHistorico(); });
+        }
+
+        function gerarPDF() {
+            const sel = document.querySelector(".check-hist:checked");
+            if (!sel) { alert("Selecione um item no historico."); return; }
+            window.open('/gerar_pdf_analise_bp/' + sel.value, '_blank');
+        }
+
+        function gerarWord() {
+            alert("Geracao de Word sera implementada na proxima etapa.");
+        }
+
+        document.addEventListener('DOMContentLoaded', carregarHistorico);
+    </script>
+</body>
+</html>

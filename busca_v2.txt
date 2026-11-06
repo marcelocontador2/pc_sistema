@@ -1,0 +1,11 @@
+﻿
+  pc_frontend\relatorio_comparativo_receitas.html:151:            <div class="cover-logo">SGPC</div>
+  pc_frontend\relatorio_comparativo_receitas.html:152:            <h1>Relatório Comparativo de Receitas</h1>
+> pc_frontend\relatorio_comparativo_receitas.html:153:            <p>Análise de arrecadação, execução orçamentária e desempenho regional do 
+COFEN/CORENs.</p>
+  pc_frontend\relatorio_comparativo_receitas.html:154:            <div class="text-muted" id="capa-periodo">Carregando período...</div>
+  pc_frontend\relatorio_comparativo_receitas.html:155:        </div>
+  pc_frontend\relatorio_comparativo_receitas.html:156:    </div>
+  pc_frontend\relatorio_comparativo_receitas.html:157:
+
+

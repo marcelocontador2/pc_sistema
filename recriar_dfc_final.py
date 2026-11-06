@@ -1,0 +1,279 @@
+﻿import shutil, datetime
+
+ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+arq = "pc_frontend/analise_dfc.html"
+shutil.copy2(arq, f"{arq}.bak_recriar_{ts}")
+
+html_novo = '''<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Analise DFC</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-voltar { background: #f0ad4e; }
+        .btn-salvar { background: #28a745; }
+        .btn-pdf { background: #0056b3; }
+        .btn-excluir { background: #dc3545; }
+        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; }
+        .filtros label { font-size: 12px; font-weight: bold; color: #555; }
+        .filtros select, .filtros input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .layout { display: flex; gap: 20px; }
+        .sidebar { width: 250px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: fit-content; }
+        .sidebar h3 { margin-top: 0; font-size: 16px; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .hist-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; }
+        .tabela-wrapper { width: 80%; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #003366; color: white; padding: 10px; text-align: left; }
+        th.right, td.right { text-align: right; }
+        td { padding: 8px; border-bottom: 1px solid #eee; }
+        .tr-header { font-weight: bold; color: white; }
+        .bg-operacional { background: #0056b3; }
+        .bg-investimento { background: #dc3545; }
+        .bg-financiamento { background: #6c757d; }
+        .bg-apuracao { background: #28a745; }
+        .pos { color: #28a745; }
+        .neg { color: #dc3545; }
+        .bold-row { font-weight: bold; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <button class="btn btn-voltar" onclick="window.location.href='/'">&larr; Voltar</button>
+        <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
+        <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+    </div>
+
+    <div class="filtros">
+        <div>
+            <label>Ano:</label>
+            <input type="number" id="ano" value="2026" style="width: 80px;">
+        </div>
+        <div>
+            <label>Tipo:</label>
+            <select id="tipo">
+                <option value="TRIMESTRE" selected>Trimestral</option>
+                <option value="MES">Mensal</option>
+            </select>
+        </div>
+        <div>
+            <label>Periodo:</label>
+            <select id="val">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+            </select>
+        </div>
+        <button class="btn btn-pdf" onclick="carregar()">Verificar Dados</button>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <h3>Historico Salvo</h3>
+            <div id="historico-lista">Nenhum historico.</div>
+        </div>
+
+        <div class="main-content">
+            <h2 style="margin-top:0; color:#003366;">Demonstracao do Fluxo de Caixa (DFC)</h2>
+            <p style="color:#666; font-size:14px;">Comparativo do periodo atual vs. anterior.</p>
+            
+            <div class="tabela-wrapper">
+                <table id="tab">
+                    <thead>
+                        <tr>
+                            <th>Indicador</th>
+                            <th class="right">Periodo Atual</th>
+                            <th class="right">Periodo Anterior</th>
+                            <th class="right">Var. (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="4" style="text-align:center;">Clique em Verificar para carregar os dados.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function mp(ano, tipo, val) {
+            return ano + '-' + tipo + '-' + val;
+        }
+
+        function fmt(v) {
+            return (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function pct(va, vb) {
+            if (!vb || vb === 0) return '-';
+            return (((va - vb) / Math.abs(vb)) * 100).toFixed(2).replace('.', ',') + '%';
+        }
+
+        function carregar() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo').value;
+            const val = document.getElementById('val').value;
+            const periodoAtual = mp(ano, tipo, val);
+
+            fetch('/api/analise_dfc/' + periodoAtual)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.erro === "faltando") {
+                        document.querySelector('#tab tbody').innerHTML = '<tr><td colspan="4" style="color:red; text-align:center;">Arquivo CSV da DFC nao encontrado para este periodo.</td></tr>';
+                        return;
+                    }
+                    
+                    render(data.dados, data.dados);
+                    
+                    const btn = document.getElementById('btn-salvar');
+                    btn.style.display = 'inline-block';
+                    btn.setAttribute('data-periodo', periodoAtual);
+                })
+                .catch(e => {
+                    console.error(e);
+                    alert("Erro ao carregar dados.");
+                });
+        }
+
+        function render(at, ant) {
+            const tb = document.querySelector('#tab tbody');
+            
+            const line = (label, va, vb, bold) => {
+                const v = pct(va, vb);
+                const cls = v >= 0 ? 'pos' : 'neg';
+                const sg = v >= 0 ? '+' : '';
+                const trStyle = bold ? 'bold-row' : '';
+                const corVa = va < 0 ? 'neg' : '';
+                const corVb = vb < 0 ? 'neg' : '';
+                return `<tr class="${trStyle}">
+                    <td>${label}</td>
+                    <td class="right ${corVa}">${fmt(va)}</td>
+                    <td class="right ${corVb}">${fmt(vb)}</td>
+                    <td class="right ${cls}">${sg}${fmt(v)}</td>
+                </tr>`;
+            };
+
+            const header = (label, bg) => `<tr class="tr-header ${bg}"><td colspan="4">${label}</td></tr>`;
+            const blank = () => '<tr><td colspan="4" style="height:10px; border:none;"></td></tr>';
+
+            let html = '';
+
+            html += header('FLUXO DE CAIXA DAS ATIVIDADES DAS OPERACOES', 'bg-operacional');
+            html += line('Ingressos Operacionais', at.operacional.ingressos.atual, at.operacional.ingressos.anterior, false);
+            html += line('Desembolsos Operacionais', at.operacional.desembolsos.atual, at.operacional.desembolsos.anterior, false);
+            html += line('Caixa Liquido das Operacoes', at.operacional.liquido.atual, at.operacional.liquido.anterior, true);
+            html += blank();
+
+            html += header('FLUXO DE CAIXA DAS ATIVIDADES DE INVESTIMENTO', 'bg-investimento');
+            html += line('Ingressos de Investimento', at.investimento.ingressos.atual, at.investimento.ingressos.anterior, false);
+            html += line('Desembolsos de Investimento', at.investimento.desembolsos.atual, at.investimento.desembolsos.anterior, false);
+            html += line('Caixa Liquido de Investimento', at.investimento.liquido.atual, at.investimento.liquido.anterior, true);
+            html += blank();
+
+            html += header('FLUXO DE CAIXA DAS ATIVIDADES DE FINANCIAMENTO', 'bg-financiamento');
+            html += line('Ingressos de Financiamento', at.financiamento.ingressos.atual, at.financiamento.ingressos.anterior, false);
+            html += line('Desembolsos de Financiamento', at.financiamento.desembolsos.atual, at.financiamento.desembolsos.anterior, false);
+            html += line('Caixa Liquido de Financiamento', at.financiamento.liquido.atual, at.financiamento.liquido.anterior, true);
+            html += blank();
+
+            html += header('APURACAO DO FLUXO DE CAIXA DO PERIODO', 'bg-apuracao');
+            html += line('Geracao Liquida de Caixa', at.caixa.geracao.atual, at.caixa.geracao.anterior, true);
+            html += line('Caixa e Equivalentes Inicial', at.caixa.inicial.atual, at.caixa.inicial.anterior, false);
+            html += line('Caixa e Equivalentes Final', at.caixa.final.atual, at.caixa.final.anterior, true);
+
+            tb.innerHTML = html;
+        }
+
+        function salvar() {
+            const btn = document.getElementById('btn-salvar');
+            const periodo = btn.getAttribute('data-periodo');
+            btn.innerText = "Salvando...";
+            btn.disabled = true;
+
+            fetch('/salvar_analise_dfc/' + periodo + '/' + periodo, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        alert("Analise DFC salva com sucesso!");
+                        carregarHistorico();
+                    } else {
+                        alert("Erro: " + data.mensagem);
+                    }
+                })
+                .catch(e => alert("Erro ao salvar."))
+                .finally(() => {
+                    btn.innerText = "Confirmar e Salvar";
+                    btn.disabled = false;
+                });
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_analise_dfc')
+                .then(r => r.json())
+                .then(data => {
+                    const lista = document.getElementById('historico-lista');
+                    if (!data || data.length === 0) {
+                        lista.innerHTML = 'Nenhum historico.';
+                        return;
+                    }
+                    let html = '';
+                    data.forEach(item => {
+                        html += `<div class="hist-item">
+                            <input type="checkbox" value="${item.id}" class="check-hist">
+                            <div>
+                                <strong>${item.periodo}</strong><br>
+                                <span style="font-size:11px;color:#777;">${item.data_geracao}</span>
+                            </div>
+                        </div>`;
+                    });
+                    lista.innerHTML = html;
+                })
+                .catch(e => console.error(e));
+        }
+
+        function excluirSelecionado() {
+            const sel = document.querySelector(".check-hist:checked");
+            if (!sel) {
+                alert("Selecione um item no historico para excluir.");
+                return;
+            }
+            if (!confirm("Tem certeza que deseja excluir este historico?")) return;
+
+            fetch('/excluir_analise_dfc/' + sel.value, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        alert("Excluido com sucesso!");
+                        carregarHistorico();
+                    } else {
+                        alert("Erro ao excluir.");
+                    }
+                })
+                .catch(e => alert("Erro de conexao."));
+        }
+
+        function gerarPDF() {
+            const sel = document.querySelector(".check-hist:checked");
+            if (!sel) {
+                alert("Selecione um item no historico para gerar o PDF.");
+                return;
+            }
+            window.open('/gerar_pdf_analise_dfc/' + sel.value, '_blank');
+        }
+
+        document.addEventListener('DOMContentLoaded', carregarHistorico);
+    </script>
+</body>
+</html>
+'''
+
+with open(arq, "w", encoding="utf-8") as f:
+    f.write(html_novo)
+
+print("[OK] analise_dfc.html recriado e totalmente funcional (Verificar, Salvar, Excluir e PDF).")

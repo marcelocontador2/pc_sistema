@@ -1,0 +1,958 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório - Análise por Centro de Custos</title>
+    <style>
+        :root {
+            --primary: #0a1c3a;
+            --secondary: #5b8fc9;
+            --bg-light: #eef4f9;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+            --success: #28a745;
+            --danger: #dc3545;
+        }
+        @page { margin: 0; size: A4; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+        .page {
+            padding: 40px;
+            page-break-after: always;
+            position: relative;
+            box-sizing: border-box;
+            height: 100vh;
+        }
+        .page:last-child { page-break-after: auto; }
+
+        /* Capa */
+        .cover {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: #fff; position: relative;
+        }
+        .cover::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 80px;
+                background: var(--primary);
+            }
+            .cover h1 { font-size: 48px; color: var(--primary); margin: 120px 0 0 0; line-height: 1.1; }
+        .cover .subtitle { font-size: 18px; color: var(--text-muted); margin-top: 20px; }
+        .cover .total-box { margin-top: 40px; }
+        .cover .total-box .label { font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .cover .total-box .value { font-size: 32px; font-weight: bold; color: var(--primary); }
+        .cover .total-box .variation { font-size: 16px; font-weight: bold; }
+        .cover .variation.positive { color: var(--danger); }
+        .cover .variation.negative { color: var(--success); }
+
+        /* Títulos de Seção */
+        .section-title { font-size: 28px; color: var(--primary); margin-bottom: 30px; }
+        .section-subtitle { font-size: 12px; color: var(--secondary); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+
+        /* Cards */
+        .cards-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px; }
+        .card {
+            background: var(--bg-light);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--secondary);
+        }
+        .card .card-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; }
+        .card .card-value { font-size: 24px; font-weight: bold; color: var(--primary); }
+        .card .card-sub { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+
+        /* Tabela */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        th { background: var(--primary); color: #fff; padding: 12px; text-align: left; font-weight: 600; }
+        td { padding: 12px; border-bottom: 1px solid var(--border-color); }
+        tr:nth-child(even) { background: var(--bg-light); }
+        .text-right { text-align: right; }
+        .total-row { font-weight: bold; background: var(--bg-light); }
+
+        /* Badges */
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .badge.positive { background: #f8d7da; color: #721c24; }
+        .badge.negative { background: #d4edda; color: #155724; }
+    </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+    <style>
+        @media print {
+            /* Esconde botões e ícones que causam os caracteres estranhos */
+            button, .btn, .no-print, i, .fa, .fas, .far, .material-icons { display: none !important; }
+
+            /* Força o grid 2x2 nos cards do sumário */
+            .cards-grid, .grid-kpis, .cards-container {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 20px !important;
+                page-break-inside: avoid !important;
+            }
+
+            /* Ajusta os cards para não vazar */
+            .card, .kpi-card {
+                width: 100% !important;
+                box-sizing: border-box !important;
+                padding: 15px !important;
+                page-break-inside: avoid !important;
+            }
+
+            /* Valores financeiros não podem quebrar linha */
+            .card-value, .kpi-value {
+                font-size: 18px !important;
+                white-space: nowrap !important;
+            }
+            
+            /* Garante que o gráfico seja impresso */
+            canvas { max-width: 100% !important; height: auto !important; }
+        }
+    </style>
+
+
+    <style>
+        /* Botões de Edição */
+        .edit-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            margin-top: 20px;
+        }
+        .btn-edit {
+            background: #f59e0b; color: white; border: none; padding: 10px 20px; 
+            border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .btn-save {
+            background: #38a169; color: white; border: none; padding: 10px 20px; 
+            border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px;
+            display: none; align-items: center; gap: 5px;
+        }
+        .btn-save:hover, .btn-edit:hover { opacity: 0.9; }
+        
+        /* Destaque da área editável */
+        .editando {
+            outline: 3px dashed #f59e0b;
+            outline-offset: 5px;
+            background-color: #fffbeb !important;
+        }
+
+        /* REGRAS DE IMPRESSÃO: Esconde os botões e o destaque no PDF */
+        @media print {
+            .edit-toolbar { display: none !important; }
+            .editando { outline: none !important; background-color: transparent !important; }
+        }
+    </style>
+
+
+    <style>
+        .editando-conclusao {
+            outline: 3px dashed #f59e0b;
+            outline-offset: 5px;
+            background-color: #fffbeb !important;
+            padding: 15px !important;
+            border-radius: 8px !important;
+        }
+        @media print {
+            #barra-edicao-conclusao { display: none !important; }
+            .editando-conclusao { outline: none !important; background-color: transparent !important; padding: 0 !important; }
+        }
+    </style>
+
+</head>
+<body>
+
+    <!-- CAPA -->
+    <div class="page cover">
+        <div class="section-subtitle">COFEN/BR</div>
+        <h1>Análise de Despesas Mensais<br>por Centro de Custo</h1>
+        <div class="subtitle">Comparativo de Períodos | Fase de Pagamento</div>
+        <div class="total-box">
+            <div class="label">Total Executado (Atual)</div>
+            <div class="value" id="total-atual">R$ 0,00</div>
+            <div class="variation" id="variacao-total"></div>
+        </div>
+    </div>
+
+    <!-- SUMÁRIO EXECUTIVO -->
+    <div class="page">
+        <div class="section-subtitle">VISÃO GERAL</div>
+        <h2 class="section-title">Sumário Executivo</h2>
+        <div class="cards-grid">
+            <div class="card">
+                <div class="card-title">Total Executado (Atual)</div>
+                <div class="card-value" id="kpi-total-atual">R$ 0,00</div>
+                <div class="card-sub" id="kpi-total-anterior">Anterior: R$ 0,00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Média Mensal (Atual)</div>
+                <div class="card-value" id="kpi-media-atual">R$ 0,00</div>
+                <div class="card-sub" id="kpi-media-anterior">Anterior: R$ 0,00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Maior Centro de Custo</div>
+                <div class="card-value" id="kpi-maior-centro">-</div>
+                <div class="card-sub" id="kpi-maior-valor">R$ 0,00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Variação Global</div>
+                <div class="card-value" id="kpi-variacao">0,00%</div>
+                <div class="card-sub">Atual vs. Anterior</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABELA DETALHADA -->
+    <div class="page">
+        <div class="section-subtitle">DADOS</div>
+        <h2 class="section-title">Tabela Detalhada — Despesas por Centro de Custo</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Centro de Custo</th>
+                    <th class="text-right">Total Atual (R$)</th>
+                    <th class="text-right">Total Anterior (R$)</th>
+                    <th class="text-right">Variação (R$)</th>
+                    <th class="text-right">Variação (%)</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-corpo">
+                <!-- Preenchido via JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function fmt(v) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function fmtPct(v) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'; }
+
+        // Parâmetros da URL (pode ser ajustado para pegar da tela)
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        const periodoAtual = params.get('periodo_atual') || '2026-TRIMESTRE-3';
+        const periodoAnterior = params.get('periodo_anterior') || '2025-TRIMESTRE-3';
+
+        // Se tiver ID, busca os dados do histórico específico; senão, busca por período
+        let url;
+        if (id) {
+            url = `/api/relatorio_centro_custos?id=${id}&_t=${Date.now()}`;
+        } else {
+            url = `/api/relatorio_centro_custos?periodo_atual=${periodoAtual}&periodo_anterior=${periodoAnterior}&_t=${Date.now()}`;
+        }
+
+        fetch(url, { cache: 'no-store' })
+            .then(r => r.json())
+            .then(d => { window.dadosRelatorio = d;
+                // Capa
+                document.getElementById('total-atual').innerText = 'R$ ' + fmt(d.atual.total);
+                const varEl = document.getElementById('variacao-total');
+                if (d.anterior.total === 0) { varEl.innerText = 'Sem dados para comparação'; varEl.className = 'variation'; } else { varEl.innerText = (d.variacao_pct >= 0 ? '▲' : '▼') + ' ' + fmtPct(Math.abs(d.variacao_pct)) + ' vs. Período Anterior'; varEl.className = 'variation ' + (d.variacao_pct >= 0 ? 'positive' : 'negative'); }
+                varEl.className = 'variation ' + (d.variacao_pct >= 0 ? 'positive' : 'negative');
+
+                // KPIs
+                document.getElementById('kpi-total-atual').innerText = 'R$ ' + fmt(d.atual.total);
+                document.getElementById('kpi-total-anterior').innerText = d.anterior.total > 0 ? 'Anterior: R$ ' + fmt(d.anterior.total) : 'N/A (sem dados anteriores)';
+                document.getElementById('kpi-media-atual').innerText = 'R$ ' + fmt(d.atual.media_mensal);
+                document.getElementById('kpi-media-anterior').innerText = d.anterior.media_mensal > 0 ? 'Anterior: R$ ' + fmt(d.anterior.media_mensal) : 'N/A (sem dados anteriores)';
+                document.getElementById('kpi-maior-centro').innerText = d.atual.maior_centro.nome;
+                document.getElementById('kpi-maior-valor').innerText = 'R$ ' + fmt(d.atual.maior_centro.valor);
+                document.getElementById('kpi-variacao').innerText = fmtPct(d.variacao_pct);
+
+                // Tabela
+                const tbody = document.getElementById('tabela-corpo');
+                tbody.innerHTML = '';
+                // Combina os centros atuais e anteriores
+                const mapa = {};
+                d.atual.centros.forEach(c => { mapa[c.nome] = { atual: c.valor, anterior: 0 }; });
+                d.anterior.centros.forEach(c => { 
+                    if (mapa[c.nome]) mapa[c.nome].anterior = c.valor;
+                    else mapa[c.nome] = { atual: 0, anterior: c.valor };
+                });
+                // Ordena pelo valor atual
+                const ordenados = Object.keys(mapa).filter(nome => !nome.includes('Centro de Custo')).sort((a, b) => mapa[b].atual - mapa[a].atual);
+                ordenados.forEach(nome => {
+                    const at = mapa[nome].atual;
+                    const an = mapa[nome].anterior;
+                    const variacao = at - an;
+                    const variacaoPct = an > 0 ? (variacao / an) * 100 : (at > 0 ? 100 : 0);
+                    const badgeClass = variacao >= 0 ? 'positive' : 'negative';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${nome}</td>
+                            <td class="text-right">${fmt(at)}</td>
+                            <td class="text-right">${fmt(an)}</td>
+                            <td class="text-right">${fmt(variacao)}</td>
+                            <td class="text-right"><span class="badge ${badgeClass}">${fmtPct(variacaoPct)}</span></td>
+                        </tr>
+                    `;
+                });
+                // Linha de total
+                tbody.innerHTML += `
+                    <tr class="total-row">
+                        <td>TOTAL GERAL</td>
+                        <td class="text-right">${fmt(d.atual.total)}</td>
+                        <td class="text-right">${fmt(d.anterior.total)}</td>
+                        <td class="text-right">${fmt(d.variacao_total)}</td>
+                        <td class="text-right"><span class="badge ${d.variacao_pct >= 0 ? 'positive' : 'negative'}">${fmtPct(d.variacao_pct)}</span></td>
+                    </tr>
+                `;
+            })
+            .catch(e => console.error("Erro ao carregar relatório:", e));
+    </script>
+
+    <!-- TENDÊNCIA MENSAL -->
+    <div class="page">
+        <div class="section-subtitle">TENDÊNCIA</div>
+        <h2 class="section-title">Evolução Mensal do Total Geral</h2>
+        <div style="display: flex; gap: 20px; align-items: flex-start;">
+            <div style="flex: 2; max-width: 600px;">
+                <canvas id="grafico-tendencia"></canvas>
+            </div>
+            <div class="leitura-grafico" style="flex: 1; background: var(--primary); color: #fff; padding: 20px; border-radius: 8px; font-size: 13px;">
+                <h3 style="color: var(--secondary); margin-top: 0;">LEITURA DO GRÁFICO</h3>
+                <ul style="padding-left: 20px; line-height: 1.6;">
+                    <li>O gasto mensal apresenta variações ao longo do semestre.</li>
+                    <li>Março e Maio registraram os maiores picos de execução.</li>
+                    <li>Os meses de Janeiro e Fevereiro tiveram os menores gastos.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- DISTRIBUIÇÃO POR CENTRO DE CUSTO -->
+    <div class="page">
+        <div class="section-subtitle">COMPOSIÇÃO</div>
+        <h2 class="section-title">Distribuição do Gasto por Centro de Custo</h2>
+        <div style="display: flex; gap: 20px; align-items: flex-start;">
+            <div style="flex: 1; max-width: 400px;">
+                <canvas id="grafico-donut"></canvas>
+            </div>
+            <div style="flex: 1;">
+                <table id="tabela-composicao">
+                    <thead>
+                        <tr>
+                            <th>Centro de Custo</th>
+                            <th class="text-right">Total (R$)</th>
+                            <th class="text-right">%</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DOS GRÁFICOS -->
+    <script>
+        // Esse script vai rodar depois que os dados forem carregados
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                // Pega os dados do objeto global (preenchido pelo fetch principal)
+                if (!window.dadosRelatorio) {
+                    console.error("Dados do relatório não encontrados.");
+                    return;
+                }
+                const d = window.dadosRelatorio;
+                
+                // 1. Gráfico de Tendência (Barras - Comparativo Anual)
+                const meses = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN"];
+                const valoresAtual = meses.map(m => d.atual.meses[m] || 0);
+                const valoresAnterior = meses.map(m => (d.anterior && d.anterior.meses) ? (d.anterior.meses[m] || 0) : 0);
+                
+                const ctxTendencia = document.getElementById('grafico-tendencia').getContext('2d');
+                new Chart(ctxTendencia, {
+                    type: 'bar',
+                    data: {
+                        labels: meses,
+                        datasets: [
+                            {
+                                label: 'Período Atual (R$)',
+                                data: valoresAtual,
+                                backgroundColor: '#0a1c3a',
+                                borderRadius: 4
+                            },
+                            {
+                                label: 'Período Anterior (R$)',
+                                data: valoresAnterior,
+                                backgroundColor: '#5b8fc9',
+                                borderRadius: 4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: true, position: 'top' }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // 2. Gráfico de Donut com rótulos
+                const centros = d.atual.centros.sort((a, b) => b.valor - a.valor);
+                const totalGeral = d.atual.total;
+                
+                // Extrai apenas o código do centro (ex: "05 - AF 05 Coor..." -> "AF 05")
+                const labelsCurto = centros.map(c => {
+                    const match = c.nome.match(/AF\s*\d+/i);
+                    return match ? match[0].toUpperCase() : c.nome.substring(0, 15);
+                });
+                const dataValores = centros.map(c => c.valor);
+                const percentuais = centros.map(c => totalGeral > 0 ? (c.valor / totalGeral * 100) : 0);
+                const cores = ['#0a1c3a', '#1a3b5c', '#2c5282', '#5b8fc9', '#a0c4e8', '#d0e2f2'];
+                
+                const ctxDonut = document.getElementById('grafico-donut').getContext('2d');
+                new Chart(ctxDonut, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labelsCurto,
+                        datasets: [{
+                            data: dataValores,
+                            backgroundColor: cores,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            datalabels: {
+                                color: '#fff',
+                                font: { weight: 'bold', size: 11 },
+                                formatter: function(value, context) {
+                                    const idx = context.dataIndex;
+                                    return labelsCurto[idx] + '\n' + percentuais[idx].toFixed(2) + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels]
+                });
+                
+                // 3. Tabela de Composição
+                preencherConclusao(d);
+                const tbody = document.querySelector('#tabela-composicao tbody');
+                tbody.innerHTML = '';
+                const total = d.atual.total;
+                centros.forEach(c => {
+                    const pct = total > 0 ? (c.valor / total) * 100 : 0;
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${c.nome}</td>
+                            <td class="text-right">R$ ${fmt(c.valor)}</td>
+                            <td class="text-right">${fmtPct(pct)}</td>
+                        </tr>
+                    `;
+                });
+            }, 2000); // Espera 2 segundos para o fetch principal popular window.dadosRelatorio
+        });
+    
+        function preencherConclusao(d) {
+            // 1. Conclusão sobre o total
+            const total = d.atual.total;
+            const totalAnterior = d.anterior ? d.anterior.total : 0;
+            const variacao = d.variacao_pct;
+            const sinal = variacao >= 0 ? 'aumento' : 'redução';
+            const cor = variacao >= 0 ? 'vermelho' : 'verde';
+            
+            document.getElementById('conclusao-total').innerHTML = `
+                O total executado no período foi de <strong>R$ ${fmt(total)}</strong>, 
+                o que representa um <strong style="color: ${variacao >= 0 ? '#dc3545' : '#28a745'};">${sinal} de ${fmtPct(Math.abs(variacao))}</strong> 
+                em relação ao período anterior (R$ ${fmt(totalAnterior)}). 
+                A média mensal de gastos foi de <strong>R$ ${fmt(d.atual.media_mensal)}</strong>.
+            `;
+
+            // 2. Concentração
+            const centros = d.atual.centros.sort((a, b) => b.valor - a.valor);
+            const top3 = centros.slice(0, 3);
+            const somaTop3 = top3.reduce((acc, c) => acc + c.valor, 0);
+            const pctTop3 = total > 0 ? (somaTop3 / total) * 100 : 0;
+            const nomesTop3 = top3.map(c => c.nome).join(', ');
+            
+            document.getElementById('conclusao-concentracao').innerHTML = `
+                Os <strong>3 maiores centros de custo</strong> (${nomesTop3}) 
+                concentram <strong>${fmtPct(pctTop3)}</strong> do gasto total, 
+                somando R$ ${fmt(somaTop3)}. Isso indica ${pctTop3 > 60 ? 'alta concentração' : 'distribuição equilibrada'} dos gastos.
+            `;
+
+            // 3. Alertas
+            const alertas = [];
+            if (variacao > 10) {
+                alertas.push(`O gasto total cresceu ${fmtPct(variacao)} em relação ao período anterior, exigindo atenção.`);
+            } else if (variacao < -10) {
+                alertas.push(`O gasto total reduziu ${fmtPct(Math.abs(variacao))} em relação ao período anterior, o que é positivo.`);
+            } else {
+                alertas.push(`O gasto total manteve-se estável em relação ao período anterior (variação de ${fmtPct(variacao)}).`);
+            }
+            
+            // Verifica se há centro com variação muito alta
+            centros.forEach(c => {
+                const anterior = d.anterior.centros.find(x => x.nome === c.nome);
+                if (anterior && anterior.valor > 0) {
+                    const varC = ((c.valor - anterior.valor) / anterior.valor) * 100;
+                    if (varC > 50) {
+                        alertas.push(`O centro "${c.nome}" teve um aumento de ${fmtPct(varC)} em relação ao período anterior.`);
+                    }
+                }
+            });
+            
+            if (alertas.length === 0) {
+                alertas.push("Não foram identificadas variações atípicas significativas.");
+            }
+            
+            const ulAlertas = document.getElementById('conclusao-alertas');
+            ulAlertas.innerHTML = alertas.map(a => `<li>${a}</li>`).join('');
+
+            // 4. Recomendações
+            const recomendacoes = [];
+            if (pctTop3 > 60) {
+                recomendacoes.push("Monitorar os contratos e processos dos 3 maiores centros de custo, dado o alto grau de concentração.");
+            }
+            if (variacao > 10) {
+                recomendacoes.push("Investigar as causas do aumento expressivo e implementar medidas de contenção.");
+            }
+            recomendacoes.push("Manter monitoramento mensal dos centros de custo para identificar desvios precocemente.");
+            recomendacoes.push("Considerar a padronização de processos nos centros com maior variação.");
+            
+            const ulRecomendacoes = document.getElementById('conclusao-recomendacoes');
+            ulRecomendacoes.innerHTML = recomendacoes.map(r => `<li>${r}</li>`).join('');
+        }
+    
+
+        function salvarEdicao() {
+            // Pega os textos editados
+            const total = document.getElementById('conclusao-total').innerHTML;
+            const concentracao = document.getElementById('conclusao-concentracao').innerHTML;
+            const alertas = document.getElementById('conclusao-alertas').innerHTML;
+            const recomendacoes = document.getElementById('conclusao-recomendacoes').innerHTML;
+            
+            // Salva no localStorage para persistir
+            localStorage.setItem('relatorio_conclusao', JSON.stringify({
+                total: total,
+                concentracao: concentracao,
+                alertas: alertas,
+                recomendacoes: recomendacoes
+            }));
+            
+            alert('Edição salva com sucesso!');
+        }
+        
+        // Carrega as edições salvas ao iniciar
+        window.addEventListener('load', function() {
+            const saved = localStorage.getItem('relatorio_conclusao');
+            if (saved) {
+                const dados = JSON.parse(saved);
+                if (dados.total) document.getElementById('conclusao-total').innerHTML = dados.total;
+                if (dados.concentracao) document.getElementById('conclusao-concentracao').innerHTML = dados.concentracao;
+                if (dados.alertas) document.getElementById('conclusao-alertas').innerHTML = dados.alertas;
+                if (dados.recomendacoes) document.getElementById('conclusao-recomendacoes').innerHTML = dados.recomendacoes;
+            }
+        });
+    
+</script>
+
+    <!-- CONCLUSÃO E RECOMENDAÇÕES -->
+    <div class="page">
+        <div class="section-subtitle">CONCLUSÃO</div>
+        
+    <!-- BARRA DE EDIÇÃO DIRETA -->
+    <div id="barra-edicao-conclusao" style="display: flex; gap: 10px; margin-bottom: 15px; margin-top: 20px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <button id="btn-editar-conclusao" style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 14px;">✏️ Editar Conclusão</button>
+        <button id="btn-salvar-conclusao" style="background: #38a169; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: none; align-items: center; gap: 8px; font-size: 14px;">💾 Salvar Relatório</button>
+        <span id="msg-conclusao" style="display: none; color: #38a169; font-weight: bold; align-items: center;">✓ Salvo com sucesso!</span>
+    </div>
+<h2 class="section-title">Conclusão e Recomendações</h2>
+        
+        <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">
+            
+            <!-- Conclusão Principal -->
+            <div style="background: var(--bg-light); padding: 25px; border-radius: 8px; border-left: 4px solid var(--primary);">
+                <h3 style="color: var(--primary); margin-top: 0;">1. Conclusão sobre o Total Executado</h3>
+                <p id="conclusao-total" contenteditable="true" style="font-size: 14px; line-height: 1.6; border: 1px dashed #ccc; padding: 10px; border-radius: 4px; background: #fff;">
+                    Carregando...
+                </p>
+            </div>
+
+            <!-- Análise de Concentração -->
+            <div style="background: var(--bg-light); padding: 25px; border-radius: 8px; border-left: 4px solid var(--secondary);">
+                <h3 style="color: var(--primary); margin-top: 0;">2. Análise de Concentração</h3>
+                <p id="conclusao-concentracao" contenteditable="true" style="font-size: 14px; line-height: 1.6; border: 1px dashed #ccc; padding: 10px; border-radius: 4px; background: #fff;">
+                    Carregando...
+                </p>
+            </div>
+
+            <!-- Alertas e Pontos de Atenção -->
+            <div style="background: #fff8e1; padding: 25px; border-radius: 8px; border-left: 4px solid #ffc107;">
+                <h3 style="color: #856404; margin-top: 0;">3. Alertas e Pontos de Atenção</h3>
+                <ul id="conclusao-alertas" contenteditable="true" style="font-size: 14px; line-height: 1.6; padding-left: 20px; margin: 0; border: 1px dashed #ccc; padding: 10px; border-radius: 4px; background: #fff;">
+                    <li>Carregando...</li>
+                </ul>
+            </div>
+
+            <!-- Recomendações -->
+            <div style="background: #d4edda; padding: 25px; border-radius: 8px; border-left: 4px solid #28a745;">
+                <h3 style="color: #155724; margin-top: 0;">4. Recomendações</h3>
+                <ul id="conclusao-recomendacoes" contenteditable="true" style="font-size: 14px; line-height: 1.6; padding-left: 20px; margin: 0; border: 1px dashed #ccc; padding: 10px; border-radius: 4px; background: #fff;">
+                    <li>Carregando...</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+    
+
+    
+
+
+    <!-- Barra de Ações do Relatório -->
+    
+
+
+    <script id="carregar_conclusao_customizada">
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = function(url, options) {
+                return originalFetch(url, options).then(res => res.clone().json()).then(data => {
+                    if (data.conclusao_personalizada) {
+                        // Assim que a página carregar, joga o texto personalizado na tela
+                        setTimeout(() => {
+                            const headers = document.querySelectorAll('h2, h3');
+                            for (let h of headers) {
+                                if (h.innerText.toUpperCase().includes('CONCLUSÃO') || h.innerText.toUpperCase().includes('RECOMENDAÇÕES')) {
+                                    const div = h.parentElement;
+                                    const texto = div.querySelector('p') || div.querySelector('div') || div;
+                                    texto.innerHTML = data.conclusao_personalizada.replace(/\n/g, '<br>');
+                                    break;
+                                }
+                            }
+                        }, 500);
+                    }
+                    return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
+                });
+            };
+        })();
+    </script>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const historicoId = urlParams.get('historico_id');
+            
+            const btnEditar = document.getElementById('btn-editar-conclusao');
+            const btnSalvar = document.getElementById('btn-salvar-relatorio');
+            
+            // Tenta achar a seção de conclusão (procura pela palavra "Conclusão" nos títulos)
+            let conclusaoDiv = null;
+            const headers = document.querySelectorAll('h2, h3, h4');
+            for (let h of headers) {
+                if (h.innerText.toUpperCase().includes('CONCLUSÃO') || h.innerText.toUpperCase().includes('RECOMENDAÇÕES')) {
+                    conclusaoDiv = h.parentElement;
+                    break;
+                }
+            }
+            
+            // Se não achou no HTML original, cria uma área no final
+            if (!conclusaoDiv) {
+                conclusaoDiv = document.createElement('div');
+                conclusaoDiv.id = 'area-conclusao';
+                conclusaoDiv.innerHTML = '
+    <!-- BARRA DE EDIÇÃO DIRETA -->
+    <div id="barra-edicao-conclusao" style="display: flex; gap: 10px; margin-bottom: 15px; margin-top: 20px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <button id="btn-editar-conclusao" style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 14px;">✏️ Editar Conclusão</button>
+        <button id="btn-salvar-conclusao" style="background: #38a169; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: none; align-items: center; gap: 8px; font-size: 14px;">💾 Salvar Relatório</button>
+        <span id="msg-conclusao" style="display: none; color: #38a169; font-weight: bold; align-items: center;">✓ Salvo com sucesso!</span>
+    </div>
+
+    <!-- BARRA DE EDIÇÃO DIRETA -->
+    <div id="barra-edicao-conclusao" style="display: flex; gap: 10px; margin-bottom: 15px; margin-top: 20px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <button id="btn-editar-conclusao" style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 14px;">✏️ Editar Conclusão</button>
+        <button id="btn-salvar-conclusao" style="background: #38a169; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: none; align-items: center; gap: 8px; font-size: 14px;">💾 Salvar Relatório</button>
+        <span id="msg-conclusao" style="display: none; color: #38a169; font-weight: bold; align-items: center;">✓ Salvo com sucesso!</span>
+    </div>
+<h2>Conclusão e Recomendações</h2><div id="texto-conclusao">...</div>';
+                document.body.appendChild(conclusaoDiv);
+            }
+
+            btnEditar.addEventListener('click', function() {
+                // Torna o texto editável
+                const texto = conclusaoDiv.querySelector('p') || conclusaoDiv.querySelector('div') || conclusaoDiv;
+                texto.setAttribute('contenteditable', 'true');
+                texto.style.border = '2px dashed #3182ce';
+                texto.style.padding = '10px';
+                texto.focus();
+                
+                btnEditar.style.display = 'none';
+                btnSalvar.style.display = 'block';
+            });
+
+            btnSalvar.addEventListener('click', async function() {
+                if (!historicoId) {
+                    alert("Para salvar, você precisa estar visualizando um histórico.");
+                    return;
+                }
+                
+                const texto = conclusaoDiv.querySelector('p') || conclusaoDiv.querySelector('div') || conclusaoDiv;
+                const novoTexto = texto.innerText;
+                
+                btnSalvar.innerText = "Salvando...";
+                
+                try {
+                    const res = await fetch(`/salvar_conclusao_centro_custos/${historicoId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ texto: novoTexto })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.erro) {
+                        alert("Erro ao salvar: " + data.mensagem);
+                    } else {
+                        alert("Conclusão salva com sucesso! O PDF usará este texto.");
+                        texto.removeAttribute('contenteditable');
+                        texto.style.border = 'none';
+                        texto.style.padding = '0';
+                        btnEditar.style.display = 'block';
+                        btnSalvar.style.display = 'none';
+                        btnSalvar.innerText = "💾 Salvar Relatório";
+                    }
+                } catch (e) {
+                    alert("Erro de conexão ao salvar.");
+                }
+            });
+        });
+    </script>
+
+
+    <script id="interceptar_historico">
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const historicoId = urlParams.get('historico_id');
+            
+            if (historicoId) {
+                const originalFetch = window.fetch;
+                window.fetch = function(url, options) {
+                    if (url.includes('/api/relatorio_v2/') || url.includes('/api/centro_custos/')) {
+                        return originalFetch(`/historico_centro_custos/${historicoId}`, options)
+                            .then(res => res.json())
+                            .then(data => {
+                                const dados = data.dados ? data.dados : data;
+                                const centros = dados.centros || [];
+                                const centrosAnt = dados.centros_anterior || [];
+
+                                const totalAtual = centros.reduce((acc, c) => acc + c.valor, 0);
+                                const totalAnterior = centrosAnt.reduce((acc, c) => acc + c.valor, 0);
+                                const variacao_pct = totalAnterior > 0 ? ((totalAtual - totalAnterior) / totalAnterior) * 100 : 0;
+                                
+                                let maiorCentro = { nome: "Nenhum", valor: 0 };
+                                if (centros.length > 0) {
+                                    maiorCentro = centros.reduce((max, c) => c.valor > max.valor ? c : max, centros[0]);
+                                }
+
+                                const respostaFinal = {
+                                    atual: { total: totalAtual, media_mensal: totalAtual / 9, maior_centro: maiorCentro },
+                                    anterior: { total: totalAnterior, media_mensal: totalAnterior / 9 },
+                                    variacao_pct: variacao_pct,
+                                    centros: centros,
+                                    centros_anterior: centrosAnt
+                                };
+
+                                return new Response(JSON.stringify(respostaFinal), { 
+                                    headers: { 'Content-Type': 'application/json' } 
+                                });
+                            });
+                    }
+                    return originalFetch(url, options);
+                };
+
+                // Injeta o texto personalizado na tela após o carregamento
+                window.addEventListener('load', () => {
+                    fetch(`/historico_centro_custos/${historicoId}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            const dados = data.dados ? data.dados : data;
+                            if (dados.conclusao_personalizada) {
+                                // Encontra o título da conclusão e substitui o texto abaixo dele
+                                const allHeaders = document.querySelectorAll('h1, h2, h3');
+                                for (let h of allHeaders) {
+                                    const txt = h.innerText.toUpperCase();
+                                    if (txt.includes('CONCLUSÃO') || txt.includes('RECOMENDAÇÕES')) {
+                                        let parent = h.parentElement;
+                                        // Substitui o conteúdo do bloco inteiro, mantendo o título
+                                        parent.innerHTML = `<h2 style="color:#0a1c3a; font-size:16px; margin-bottom:10px;">${h.innerText}</h2><div style="white-space: pre-wrap; font-size:14px; line-height:1.6; text-align:justify;">${dados.conclusao_personalizada}</div>`;
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                });
+            }
+        })();
+    </script>
+
+
+    <!-- SISTEMA DE EDIÇÃO DA CONCLUSÃO -->
+    
+
+
+    <!-- BARRA DE FERRAMENTAS FLUTUANTE -->
+    
+
+    <style>
+        /* Estilo para quando estiver no modo de edição */
+        .editando-conclusao {
+            border: 2px dashed #f59e0b !important;
+            padding: 15px !important;
+            border-radius: 8px !important;
+            background-color: #fffbeb !important;
+        }
+        @media print {
+            #barra-edicao { display: none !important; }
+            .editando-conclusao { border: none !important; padding: 0 !important; background: transparent !important; }
+        }
+    </style>
+
+    
+
+
+    
+
+
+    <!-- BOTÃO FLUTUANTE DE EDIÇÃO -->
+    
+
+    <!-- MODAL DE EDIÇÃO -->
+    
+    </div>
+
+    <style>
+        @media print {
+            #btn-abrir-edicao, #modal-edicao-conclusao { display: none !important; }
+        }
+    </style>
+
+
+    
+
+
+    <script id="js-edicao-direta">
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const historicoId = urlParams.get('historico_id');
+            if (!historicoId) return;
+
+            const btnEditar = document.getElementById('btn-editar-conclusao');
+            const btnSalvar = document.getElementById('btn-salvar-conclusao');
+            const msgSucesso = document.getElementById('msg-conclusao');
+            
+            // Achar a div que engloba os blocos coloridos
+            let areaEdicao = null;
+            const headers = document.querySelectorAll('h2');
+            for (let h of headers) {
+                if (h.innerText.includes('Conclusão e Recomendações')) {
+                    // O pai do h2 é o container principal
+                    areaEdicao = h.parentElement;
+                    break;
+                }
+            }
+
+            if (!areaEdicao) return;
+
+            // 1. Carregar o HTML salvo
+            fetch(`/historico_centro_custos/${historicoId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const dados = data.dados ? data.dados : data;
+                    if (dados.conclusao_personalizada) {
+                        // Substitui todo o conteúdo da área pelo HTML salvo
+                        areaEdicao.innerHTML = dados.conclusao_personalizada;
+                        // Reconecta os botões que foram apagados pelo innerHTML
+                        const novaBarra = document.createElement('div');
+                        novaBarra.innerHTML = document.getElementById('barra-edicao-conclusao').outerHTML;
+                        areaEdicao.insertBefore(novaBarra.firstElementChild, areaEdicao.firstChild);
+                        // Recarrega a página para aplicar o JS aos novos botões (gambiarra segura)
+                        // Ou apenas re-adiciona os eventos
+                    }
+                }).catch(e => console.log("Erro ao carregar:", e));
+
+            // 2. Função para ativar edição
+            btnEditar.addEventListener('click', function() {
+                // Torna editável apenas o que está dentro de areaEdicao, exceto a barra de botões
+                const filhos = areaEdicao.children;
+                for (let filho of filhos) {
+                    if (filho.id !== 'barra-edicao-conclusao') {
+                        filho.setAttribute('contenteditable', 'true');
+                    }
+                }
+                areaEdicao.classList.add('editando-conclusao');
+                
+                btnEditar.style.display = 'none';
+                btnSalvar.style.display = 'flex';
+                msgSucesso.style.display = 'none';
+            });
+
+            // 3. Função para salvar
+            btnSalvar.addEventListener('click', function() {
+                const htmlEditado = areaEdicao.innerHTML;
+                btnSalvar.innerText = "Salvando...";
+                btnSalvar.disabled = true;
+
+                fetch(`/salvar_conclusao_centro_custos/${historicoId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ texto: htmlEditado })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erro) {
+                        alert("Erro: " + data.mensagem);
+                    } else {
+                        // Desativa edição
+                        const filhos = areaEdicao.children;
+                        for (let filho of filhos) {
+                            filho.removeAttribute('contenteditable');
+                        }
+                        areaEdicao.classList.remove('editando-conclusao');
+                        
+                        btnEditar.style.display = 'flex';
+                        btnSalvar.style.display = 'none';
+                        btnSalvar.innerText = "💾 Salvar Relatório";
+                        btnSalvar.disabled = false;
+                        
+                        msgSucesso.style.display = 'flex';
+                        setTimeout(() => msgSucesso.style.display = 'none', 3000);
+                    }
+                })
+                .catch(() => alert("Erro de conexão."))
+                .finally(() => {
+                    btnSalvar.innerText = "💾 Salvar Relatório";
+                    btnSalvar.disabled = false;
+                });
+            });
+        });
+    </script>
+
+</body>
+
+</html>

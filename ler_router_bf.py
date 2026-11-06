@@ -1,0 +1,5 @@
+﻿c = open("pc_backend/app/routers/balanco_financeiro.py", encoding="utf-8", errors="ignore").read()
+print("=" * 70)
+print("CONTEUDO DO ROTEADOR BF")
+print("=" * 70)
+print(c)

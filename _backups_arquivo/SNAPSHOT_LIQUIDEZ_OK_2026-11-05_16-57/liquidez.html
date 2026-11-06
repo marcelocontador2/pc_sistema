@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Índices de Liquidez e Estrutura</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; padding: 20px; color: #333; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-voltar { background: #ff7f00; color: white; text-decoration: none; display: inline-block; }
+        .btn-verde { background: #28a745; color: white; }
+        .btn-vermelho { background: #dc3545; color: white; }
+        .btn-azul { background: #0056b3; color: white; }
+        .btn:hover { opacity: 0.9; }
+        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+        .filtros label { font-size: 12px; font-weight: bold; color: #555; }
+        .filtros select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .layout { display: flex; gap: 20px; }
+        .sidebar { width: 250px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: fit-content; }
+        .sidebar h3 { margin-top: 0; font-size: 16px; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .hist-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 20px; }
+        .card { background: #f8f9fa; border-radius: 8px; padding: 15px; border-left: 4px solid #0056b3; }
+        .card .label { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .card .valor { font-size: 24px; font-weight: bold; color: #003366; }
+        .card .formula { font-size: 11px; color: #666; margin-top: 6px; line-height: 1.4; }
+        .erro { color: #dc3545; font-weight: bold; padding: 20px; text-align: center; }
+        .loading { color: #0056b3; padding: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <a href="/" class="btn btn-voltar">← Voltar</a>
+        <button class="btn btn-verde" onclick="exibirSelecionado()">Exibir Selecionado</button>
+        <button class="btn btn-vermelho" onclick="excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-azul" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn btn-verde" id="btn-salvar" onclick="salvarRelatorio()" style="display: none;">Confirmar e Salvar</button>
+    </div>
+
+    <div class="filtros">
+        <div>
+            <label>Período:</label>
+            <select id="periodo">
+                <option value="2026-TRIMESTRE-3">2026 - 3º Trimestre</option>
+                <option value="2026-TRIMESTRE-2">2026 - 2º Trimestre</option>
+                <option value="2026-TRIMESTRE-1">2026 - 1º Trimestre</option>
+            </select>
+        </div>
+        <button class="btn btn-azul" onclick="calcularLiquidez()">Verificar Índices</button>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <h3>Histórico Salvo</h3>
+            <div id="historico-lista">Carregando...</div>
+        </div>
+
+        <div class="main-content">
+            <h2>Índices de Liquidez e Estrutura</h2>
+            <div id="resultado">
+                <p style="color: #666;">Clique em "Verificar Índices" para processar os dados.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== FUNÇÕES ====================
+
+        function formatarMoeda(v) {
+            return (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function calcularLiquidez() {
+            const periodo = document.getElementById('periodo').value;
+            const resultado = document.getElementById('resultado');
+            resultado.innerHTML = '<div class="loading">Carregando índices...</div>';
+
+            fetch('/api/calcular_liquidez/' + periodo)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.erro) {
+                        resultado.innerHTML = '<div class="erro">Erro: ' + (data.mensagem || 'Arquivo não encontrado') + '</div>';
+                        return;
+                    }
+                    renderizarResultado(data);
+                    const btn = document.getElementById('btn-salvar');
+                    btn.style.display = 'inline-block';
+                    btn.setAttribute('data-periodo', periodo);
+                })
+                .catch(e => {
+                    resultado.innerHTML = '<div class="erro">Erro de conexão: ' + e.message + '</div>';
+                });
+        }
+
+        function renderizarResultado(data) {
+            const res = data.liquidez || {};
+            const est = data.estrutura || {};
+            const val = data.valores || {};
+
+            function m(v) { return formatarMoeda(v); }
+
+            let html = '<div class="cards-grid">';
+
+            // ---- Liquidez (com aviso de "vezes") ----
+            html += card('Liquidez Imediata', res.liquidez_imediata,
+                `Caixa (${m(val.caixa)}) / Passivo Circulante (${m(val.passivo_circulante)}) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>`);
+
+            html += card('Liquidez Corrente', res.liquidez_corrente,
+                `Ativo Circulante (${m(val.ativo_circulante)}) / Passivo Circulante (${m(val.passivo_circulante)}) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>`);
+
+            html += card('Liquidez Seca', res.liquidez_seca,
+                `(Ativo Circulante (${m(val.ativo_circulante)}) - Estoques (${m(val.estoques)})) / Passivo Circulante (${m(val.passivo_circulante)}) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>`);
+
+            html += card('Liquidez Geral', res.liquidez_geral,
+                `(Ativo Circulante (${m(val.ativo_circulante)}) + Realizável (${m(val.realizavel_lp)})) / (Passivo Circulante (${m(val.passivo_circulante)}) + Não Circulante (${m(val.passivo_nao_circulante)})) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>`);
+
+            // ---- Estrutura (com x100 explícito) ----
+            html += card('Endividamento Geral', (est.endividamento_geral || '0,00') + '%',
+                `(Passivo Total (${m(val.passivo_total)}) / Ativo Total (${m(val.ativo_total)})) × 100`);
+
+            html += card('Part. de Capital de Terceiros', (est.part_capital_terceiros || '0,00') + '%',
+                `(Passivo Total (${m(val.passivo_total)}) / Patrimônio Líquido (${m(val.patrimonio_liquido)})) × 100`);
+
+            html += card('Imobilização do PL', (est.imobilizacao_pl || '0,00') + '%',
+                `(Ativo Permanente (${m(val.imobilizado)}) / Patrimônio Líquido (${m(val.patrimonio_liquido)})) × 100`);
+
+            html += '</div>';
+
+            document.getElementById('resultado').innerHTML = html;
+        }
+
+        function card(label, valor, formula) {
+            return `<div class="card">
+                <div class="label">${label}</div>
+                <div class="valor">${valor !== undefined ? valor : '0,00'}</div>
+                <div class="formula">${formula}</div>
+            </div>`;
+        }
+
+        function carregarHistorico() {
+            fetch('/historico_liquidez')
+                .then(r => r.json())
+                .then(data => {
+                    const lista = document.getElementById('historico-lista');
+                    if (!data || data.length === 0) {
+                        lista.innerHTML = 'Nenhum histórico.';
+                        return;
+                    }
+                    let html = '';
+                    data.forEach(item => {
+                        html += `<div class="hist-item">
+                            <input type="checkbox" value="${item.id}" class="check-historico">
+                            <div>
+                                <strong>${item.periodo}</strong><br>
+                                <span style="font-size:11px;color:#777;">${item.data_geracao}</span>
+                            </div>
+                        </div>`;
+                    });
+                    lista.innerHTML = html;
+                })
+                .catch(e => {
+                    document.getElementById('historico-lista').innerHTML = 'Erro ao carregar histórico.';
+                });
+        }
+
+        function exibirSelecionado() {
+            const sel = document.querySelector('.check-historico:checked');
+            if (!sel) { alert('Selecione um item no histórico.'); return; }
+            fetch('/historico_liquidez/' + sel.value)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.erro) { alert('Erro ao carregar.'); return; }
+                    renderizarResultado(data);
+                })
+                .catch(e => alert('Erro de conexão.'));
+        }
+
+        function excluirSelecionado() {
+            const selecionados = document.querySelectorAll('.check-historico:checked');
+            if (selecionados.length === 0) { alert('Selecione pelo menos um item.'); return; }
+            if (!confirm('Excluir ' + selecionados.length + ' item(ns)?')) return;
+
+            const promessas = Array.from(selecionados).map(sel =>
+                fetch('/excluir_liquidez/' + sel.value, { method: 'DELETE' }).then(r => r.ok).catch(() => false)
+            );
+            Promise.all(promessas).then(() => {
+                alert('Excluído(s) com sucesso!');
+                carregarHistorico();
+            });
+        }
+
+        function gerarPDF() {
+            const sel = document.querySelector('.check-historico:checked');
+            if (!sel) { alert('Selecione um item no histórico.'); return; }
+            window.open('/gerar_pdf_liquidez/' + sel.value, '_blank');
+        }
+
+        function salvarRelatorio() {
+            const btn = document.getElementById('btn-salvar');
+            const periodo = btn.getAttribute('data-periodo');
+            if (!periodo) { alert('Clique em "Verificar Índices" primeiro.'); return; }
+            btn.innerText = 'Salvando...';
+            btn.disabled = true;
+
+            fetch('/salvar_liquidez/' + periodo, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.erro) { alert('Erro: ' + (data.mensagem || 'Falha ao salvar')); return; }
+                    alert('Relatório salvo com sucesso!');
+                    carregarHistorico();
+                })
+                .catch(e => alert('Erro de conexão.'))
+                .finally(() => {
+                    btn.innerText = 'Confirmar e Salvar';
+                    btn.disabled = false;
+                });
+        }
+
+        // ==================== INICIALIZAÇÃO ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            carregarHistorico();
+        });
+    </script>
+</body>
+</html>

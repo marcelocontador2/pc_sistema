@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custo de Pessoal x Limite da LRF (Art. 19)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f8f9fa; color: #333; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { 
+            width: 260px; 
+            background: #fff; 
+            border-right: 1px solid #e0e0e0; 
+            display: flex; 
+            flex-direction: column; 
+            flex-shrink: 0;
+            overflow-y: auto; 
+        }
+        .main { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            width: calc(100vw - 260px);
+        }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #e0e0e0; }
+        .sidebar-header h1 { color: #0072BA; font-size: 24px; font-weight: 800; }
+        .sidebar-header span { color: #888; font-size: 12px; font-weight: normal; display: block; margin-top: 4px; }
+        .topbar { height: 70px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; }
+        .topbar h2 { font-size: 20px; color: #333; }
+        .content { flex: 1; padding: 30px; overflow-y: auto; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 6px solid #0072BA; padding: 30px; width: 100%; max-width: 1200px; margin: 0 auto; }
+        .card h3 { color: #0072BA; font-size: 20px; margin-bottom: 20px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; margin-right: 10px; font-size: 14px; }
+        .btn-voltar { background: #ff8c00; }
+        .btn-exibir { background: #28a745; }
+        .btn-excluir { background: #dc3545; }
+        .btn-pdf { background: #003366; }
+        .hdr-sub { color: #0072BA; font-size: 14px; font-weight: 600; margin-bottom: 5px; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #0a1c3a; color: white; padding: 12px; text-align: left; font-size: 14px; }
+        td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        tr:hover { background: #f5f8fa; }
+        .total-row td { font-weight: bold; background: #eef4fa; }
+        .situacao { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>Histórico Salvo</h1>
+            <span>Consulte relatórios anteriores</span>
+        </div>
+        <div class="sidebar-menu" id="historico-lista">
+            <div style="padding: 15px; color: #888; font-size: 13px;">Nenhum histórico.</div>
+        </div>
+    </div>
+    <div class="main">
+        <div class="topbar">
+            <h2>Custo de Pessoal</h2>
+            <div style="font-size: 13px; color: #888;">SIGPC - Sistema de Gestão</div>
+        </div>
+        <div class="content">
+            <div class="card">
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn btn-voltar" onclick="window.location.href='/'">← Voltar</button>
+                    <button class="btn btn-exibir">Exibir Selecionado</button>
+                    <button class="btn btn-excluir">Excluir Selecionado</button>
+                    <button class="btn btn-pdf">Gerar PDF</button>
+                </div>
+                <div class="hdr-sub">Custo de Pessoal x Limite da LRF (Art. 19)</div>
+                <h1 style="font-size: 28px; color: #0a1c3a; margin-bottom: 20px;">Apuração consolidada 12 meses</h1>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Indicador</th>
+                            <th>Valor (R$)</th>
+                            <th>% da RCL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Receita Corrente Líquida (RCL)</td>
+                            <td>R$ 226.242.979,74</td>
+                            <td>100,00%</td>
+                        </tr>
+                        <tr>
+                            <td>(-) Custo de Pessoal (Bruto)</td>
+                            <td>R$ 67.338.400,07</td>
+                            <td>29,76%</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td>(=) Margem Disponível (Limite LRF - Custo)</td>
+                            <td>R$ 45.783.089,80</td>
+                            <td>20,24%</td>
+                        </tr>
+                        <tr>
+                            <td>Limite LRF (50% da RCL)</td>
+                            <td>R$ 113.121.489,87</td>
+                            <td>50,00%</td>
+                        </tr>
+                        <tr>
+                            <td>Situação</td>
+                            <td></td>
+                            <td class="situacao">29,76%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

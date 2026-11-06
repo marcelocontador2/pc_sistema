@@ -1,0 +1,703 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PC - Prestacao de Contas | COFEN</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--cofen-blue:#0072BA;--cofen-gray:#878787;--cofen-dark:#1D1D1D;--cofen-white:#FFF;--cofen-light-gray:#F5F5F5;--cofen-border:#E0E0E0}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif}
+body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;height:100vh}
+.sidebar{width:280px;background:var(--cofen-white);border-right:1px solid var(--cofen-border);display:flex;flex-direction:column;padding:20px 0;overflow-y:auto}
+.logo-area{padding:0 20px 20px;border-bottom:1px solid var(--cofen-border);margin-bottom:20px}
+.logo-area h1{color:var(--cofen-blue);font-size:24px}
+.logo-area p{color:var(--cofen-gray);font-size:12px;margin-top:5px}
+.nav-menu{list-style:none;padding:0 10px}
+.nav-menu a{display:flex;align-items:center;padding:12px 15px;text-decoration:none;color:var(--cofen-dark);font-weight:500;font-size:14px;border-radius:8px;cursor:pointer}
+.nav-menu a:hover,.nav-menu a.active{background:var(--cofen-blue);color:#fff}
+.submenu{list-style:none;padding-left:35px;display:none}
+.submenu.open{display:block}
+.submenu li a{padding:8px 15px;font-size:13px;color:var(--cofen-gray)}
+.submenu li a.active{color:var(--cofen-blue);font-weight:700;background:transparent}
+.main-content{flex:1;display:flex;flex-direction:column;overflow-y:auto}
+.header{background:var(--cofen-white);padding:15px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--cofen-border)}
+.user-avatar{width:32px;height:32px;background:var(--cofen-blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600}
+.content-area{padding:30px;display:none}
+.content-area.active{display:block}
+.page-title{font-size:24px;font-weight:700;margin-bottom:20px}
+.top-bar{display:flex;justify-content:space-between;align-items:center;background:#fff;padding:15px 20px;border-radius:8px;border:1px solid var(--cofen-border);margin-bottom:30px;flex-wrap:wrap;gap:15px}
+.filter-group{display:flex;align-items:center;gap:10px}
+.filter-group select{padding:10px 15px;border:1px solid var(--cofen-border);border-radius:6px;min-width:200px;font-size:14px;outline:none}
+.filter-group select:focus{border-color:var(--cofen-blue)}
+.action-group{display:flex;gap:10px;opacity:0;pointer-events:none;transition:opacity .3s}
+.action-group.active{opacity:1;pointer-events:auto}
+.btn-action{padding:10px 16px;font-size:13px;font-weight:600;border-radius:6px;cursor:pointer;border:1px solid transparent;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .2s}
+.btn-pdf{color:#c62828;border-color:#ffcdd2;background:#ffebee}
+.btn-pdf:hover{background:#ffcdd2}
+.btn-excel{color:#2e7d32;border-color:#c8e6c9;background:#e8f5e9}
+.btn-excel:hover{background:#c8e6c9}
+.btn-pptx{color:#ef6c00;border-color:#ffe0b2;background:#fff3e0}
+.btn-pptx:hover{background:#ffe0b2}
+.reports-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:20px}
+.report-card{background:#fff;border-radius:12px;border:1px solid var(--cofen-border);box-shadow:0 4px 10px rgba(0,0,0,0.05);display:flex;align-items:center;padding:25px;text-decoration:none;color:inherit;transition:transform .2s,box-shadow .2s;cursor:pointer}
+.report-card:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,0.1);border-color:var(--cofen-blue)}
+.report-icon{width:56px;height:56px;background:#e3f2fd;color:var(--cofen-blue);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-right:20px;flex-shrink:0}
+.report-icon svg{width:32px;height:32px}
+.report-info h3{font-size:20px;color:var(--cofen-blue);margin-bottom:6px}
+.report-info p{font-size:14px;color:var(--cofen-gray)}
+.report-info span{font-size:13px;color:var(--cofen-blue);font-weight:600;margin-top:8px;display:block}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:15px;margin-bottom:20px}
+.card{background:#fff;padding:20px;border-radius:12px;border:1px solid var(--cofen-border)}
+.card-label{display:block;font-size:12px;color:var(--cofen-gray);margin-bottom:5px}
+.card-value{font-size:20px;font-weight:700;color:var(--cofen-blue)}
+.empty-state{text-align:center;padding:40px;color:var(--cofen-gray);background:#fff;border-radius:12px;border:1px dashed var(--cofen-border)}
+.upload-box{display:none}
+</style>
+
+
+
+
+        <style>
+            /* Força o alinhamento à esquerda em todos os links do menu lateral */
+            .menu-lateral a, .sidebar a, ul li a {
+                padding-left: 10px !important;
+                display: block;
+            }
+            /* Zera a margem padrão das listas para não empurrar */
+            .menu-lateral ul, .sidebar ul, ul {
+                padding-left: 0 !important;
+                margin-left: 0 !important;
+                list-style: none !important;
+            }
+        </style>
+
+
+        <style>
+            /* Efeito sensível (hover) no menu */
+            ul li a:hover {
+                background-color: #0056b3 !important;
+                color: #ffffff !important;
+                border-radius: 6px;
+                transition: background-color 0.2s ease;
+            }
+        </style>
+
+
+        <style>
+            /* Efeito sensível (hover) no menu */
+            ul li a:hover {
+                background-color: #0056b3 !important;
+                color: #ffffff !important;
+                border-radius: 6px;
+                transition: background-color 0.2s ease;
+            }
+        </style>
+
+
+        <style>
+            /* 1. Tira o sublinhado e ajusta o tamanho dos menus principais */
+            ul li a {
+                padding: 12px 20px !important; /* 20px de respiro na esquerda */
+                font-size: 15px !important;
+                font-weight: 600 !important;
+                color: #2c3e50 !important;
+                letter-spacing: 0.3px;
+                border-radius: 4px;
+                transition: all 0.2s;
+            }
+
+            /* 2. Deixa os submenus (Balancete, DFC, etc.) mais delicados */
+            ul.submenu li a {
+                padding: 8px 20px 8px 40px !important; /* 40px de recuo para mostrar hierarquia */
+                font-size: 13px !important;
+                font-weight: 400 !important;
+                color: #666666 !important;
+                letter-spacing: 0.1px;
+            }
+
+            /* 3. Efeito de hover (fundo azul) para dar sensação de clique */
+            ul li a:hover {
+                background-color: #0056b3 !important;
+                color: #ffffff !important;
+            }
+        </style>
+
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo-area"><h1>COFEN</h1><p>Sistema PC - Prestacao de Contas</p></div>
+  <ul style="padding-left: 60px; margin-left: 0; list-style: none;">
+    
+    <li><a href="#" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
+    <li>
+      <a id="menu-demonstracoes" class="active" onclick="toggleSubmenu(this)">Demonstrações Contábeis</a>
+      <ul class="submenu open" id="submenu-demonstracoes" style="list-style: none; padding-left: 0; margin-left: 0;">
+        <li><a id="submenu-balancete" onclick="carregarRelatorio(\'BALANCETE\')">Balancete</a></li>
+        <li><a id="submenu-bp" onclick="carregarRelatorio(\'BALANCO_PATRIMONIAL\')">Balanço Patrimonial</a></li>
+        <li><a id="submenu-bo" onclick="mostrarTela('demonstracoes','BALANCO_ORCAMENTARIO')">Balanço Orçamentário</a></li>
+        <li><a id="submenu-bf" onclick="mostrarTela('demonstracoes','BALANCO_FINANCEIRO')">Balanço Financeiro</a></li>
+        <li><a id="submenu-dfc" onclick="mostrarTela('demonstracoes','DFC')">DFC</a></li>
+        <li><a id="submenu-dvp" onclick="mostrarTela('demonstracoes','DVP')">DVP</a></li>
+        <li><a id="submenu-dmpl" onclick="mostrarTela('demonstracoes','DMPL')">DMPL</a></li>
+      
+        <li><a href="/conferencia" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Conferência das Demonstrações</a></li>
+        <li><a href="/integridade" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
+<li><a href="/liquidez" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Índices de Liquidez</a></li>
+    <li><a href="/panorama" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Panorama Executivo</a></li>
+    </ul>
+    </li>
+    
+  </ul>
+</aside>
+<main class="main-content">
+  <header class="header">
+    <h2 id="header-title">Painel de Controle</h2>
+    <div style="display:flex;align-items:center;gap:10px"><span>Marcelo Medeiros</span><div class="user-avatar">MM</div></div>
+  </header>
+  
+  <div id="tela-dashboard" class="content-area active">
+    <h1 class="page-title">Resultados Gerais</h1>
+    <div class="cards-grid" id="cards-container"></div>
+  </div>
+  
+  <div id="tela-demonstracoes" class="content-area">
+    <h1 class="page-title" id="titulo-demonstracao">Demonstrações Contábeis</h1>
+    <div class="top-bar">
+      <div class="filter-group">
+        <label><strong>Período:</strong></label>
+        <select id="filtro-periodo" onchange="carregarListaRelatorios(currentTipo)">
+          <option value="">Carregando...</option>
+        </select>
+      </div>
+      <div class="action-group" id="top-buttons">
+        <a id="btn-pdf" href="#" target="_blank" class="btn-action btn-pdf">ðŸ“„ PDF</a>
+        <a id="btn-excel" href="#" class="btn-action btn-excel">ðŸ“Š Excel</a>
+        <a id="btn-pptx" href="#" class="btn-action btn-pptx">ðŸ“ˆ PPTX</a>
+      </div>
+    </div>
+    <div class="reports-grid" id="reports-list"></div>
+  </div>
+  
+  <div id="tela-upload" class="content-area">
+    <h1 class="page-title">Importar Relatórios</h1>
+    
+    <div style="background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 800px; margin-top: 20px;">
+      <form id="form-upload" onsubmit="enviarArquivo(event)">
+        
+        <div style="margin-bottom: 20px;">
+          <label style="font-weight: bold; display: block; margin-bottom: 5px;">Tipo de Relatório</label>
+          <select id="upload-tipo" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="">Selecione...</option>
+            <option value="BALANCETE">Balancete</option>
+            <option value="BALANCO_PATRIMONIAL">Balanço Patrimonial</option>
+            <option value="BALANCO_ORCAMENTARIO">Balanço Orçamentário</option>
+            <option value="BALANCO_FINANCEIRO">Balanço Financeiro</option>
+            <option value="DFC">DFC</option>
+            <option value="DVP">DVP</option>
+            <option value="DMPL">DMPL</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label style="font-weight: bold; display: block; margin-bottom: 5px;">Ano do Exercício</label>
+          <input type="number" id="upload-ano" required min="2000" max="2100" value="2026" style="width: 150px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+
+        <div style="margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #e9ecef;">
+          <label style="font-weight: bold; display: block; margin-bottom: 15px;">Período a ser importado (escolha apenas um)</label>
+          
+          <div style="display: flex; gap: 20px; align-items: flex-start;">
+            <!-- Mês -->
+            <div style="flex: 1;">
+              <label style="display: block; margin-bottom: 5px; font-size: 14px;">Mês</label>
+              <select id="upload-mes" onchange="desativarOutrosPeriodos('mes')" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="">Selecione...</option>
+                <option value="01">Janeiro</option>
+                <option value="02">Fevereiro</option>
+                <option value="03">Março</option>
+                <option value="04">Abril</option>
+                <option value="05">Maio</option>
+                <option value="06">Junho</option>
+                <option value="07">Julho</option>
+                <option value="08">Agosto</option>
+                <option value="09">Setembro</option>
+                <option value="10">Outubro</option>
+                <option value="11">Novembro</option>
+                <option value="12">Dezembro</option>
+              </select>
+            </div>
+
+            <!-- Trimestre -->
+            <div style="flex: 1;">
+              <label style="display: block; margin-bottom: 5px; font-size: 14px;">Trimestre</label>
+              <select id="upload-trimestre" onchange="desativarOutrosPeriodos('trimestre')" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="">Selecione...</option>
+                <option value="1">1º Trimestre</option>
+                <option value="2">2º Trimestre</option>
+                <option value="3">3º Trimestre</option>
+                <option value="4">4º Trimestre</option>
+              </select>
+            </div>
+
+            <!-- Ano -->
+            <div style="flex: 1;">
+              <label style="display: block; margin-bottom: 5px; font-size: 14px;">Ano (Exercício Completo)</label>
+              <select id="upload-exercicio" onchange="desativarOutrosPeriodos('exercicio')" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="">Selecione...</option>
+                <option value="ANUAL">Anual / Exercício Completo</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label style="font-weight: bold; display: block; margin-bottom: 5px;">Arquivo CSV</label>
+          <input type="file" id="upload-arquivo" accept=".csv" required style="padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+        </div>
+
+        <button type="submit" class="btn-action btn-pdf" style="border: none; cursor: pointer; font-size: 16px; padding: 12px 24px;">Enviar e Importar</button>
+      </form>
+      
+      <div id="upload-mensagem" style="margin-top: 20px; font-weight: bold;"></div>
+    </div>
+  </div>
+</main>
+<script>
+const API_URL="";
+let currentTipo="BALANCETE";
+const TITULOS={BALANCETE:"Balancete",BALANCO_PATRIMONIAL:"Balanço Patrimonial",BALANCO_ORCAMENTARIO:"Balanço Orçamentário",BALANCO_FINANCEIRO:"Balanço Financeiro",DFC:"DFC",DVP:"DVP",DMPL:"DMPL"};
+
+function toggleSubmenu(el){
+    document.getElementById('submenu-demonstracoes').classList.toggle('open');
+}
+
+function mostrarTela(tela, tipo=null) {
+    document.querySelectorAll('.content-area').forEach(e=>e.classList.remove('active'));
+    document.querySelectorAll('.nav-menu a,.submenu a').forEach(e=>e.classList.remove('active'));
+    
+    if(tela==='dashboard'){
+        document.getElementById('tela-dashboard').classList.add('active');
+        document.getElementById('menu-dashboard').classList.add('active');
+    }
+    else if(tela==='demonstracoes'){
+        document.getElementById('tela-demonstracoes').classList.add('active');
+        document.getElementById('menu-demonstracoes').classList.add('active');
+        
+        if(tipo){
+            currentTipo = tipo;
+            const submenuId = {
+                'BALANCETE': 'submenu-balancete',
+                'BALANCO_PATRIMONIAL': 'submenu-bp',
+                'BALANCO_ORCAMENTARIO': 'submenu-bo',
+                'BALANCO_FINANCEIRO': 'submenu-bf',
+                'DFC': 'submenu-dfc',
+                'DVP': 'submenu-dvp',
+                'DMPL': 'submenu-dmpl'
+            }[tipo];
+            if(submenuId) document.getElementById(submenuId).classList.add('active');
+            
+            document.getElementById('titulo-demonstracao').innerText = TITULOS[tipo] || "Demonstrações";
+            carregarPeriodos();
+        }
+        document.getElementById('submenu-demonstracoes').classList.add('open');
+    }
+    else if(tela==='upload'){
+        document.getElementById('tela-upload').classList.add('active');
+        document.getElementById('menu-upload').classList.add('active');
+    }
+}
+
+function carregarPeriodos() {
+    const select = document.getElementById('filtro-periodo');
+    const reportsDiv = document.getElementById('reports-list');
+    
+    select.innerHTML = '<option value="">Carregando...</option>';
+    if (reportsDiv) reportsDiv.innerHTML = '';
+    
+    fetch('/periodos_importados/' + currentTipo)
+        .then(res => {
+            if (!res.ok) throw new Error('Falha na resposta');
+            return res.json();
+        })
+        .then(data => {
+            select.innerHTML = '';
+            if (!data || !data.periodos || data.periodos.length === 0) {
+                select.innerHTML = '<option value="">Nenhum relatório importado</option>';
+                if (reportsDiv) reportsDiv.innerHTML = '<p style="color: gray;">Nenhum relatório importado para este tipo.</p>';
+                return;
+            }
+            data.periodos.forEach(p => {
+                const partes = p.split('-');
+                const ano = partes[0];
+                const tipoP = partes[1];
+                const valorP = partes[2];
+                
+                let textoFormatado = p;
+                if (tipoP === 'MES') {
+                    const meses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+                    textoFormatado = ano + " - " + meses[parseInt(valorP)];
+                } else if (tipoP === 'TRIMESTRE') {
+                    textoFormatado = ano + " - " + valorP + "º Trimestre";
+                } else {
+                    textoFormatado = ano + " - Exercício Completo";
+                }
+
+                const option = document.createElement('option');
+                option.value = p; 
+                option.textContent = textoFormatado;
+                select.appendChild(option);
+            });
+            select.selectedIndex = 0;
+            carregarListaRelatorios(currentTipo);
+        })
+        .catch(err => {
+            console.error("Erro ao buscar periodos:", err);
+            select.innerHTML = '<option value="">Erro ao buscar</option>';
+            if (reportsDiv) reportsDiv.innerHTML = '<p style="color: red;">Falha ao buscar períodos.</p>';
+        });
+}
+
+function carregarListaRelatorios(tipo) {
+    const reportsDiv = document.getElementById('reports-list');
+    const selectPeriodo = document.getElementById('filtro-periodo');
+    const periodoSelecionado = selectPeriodo.value;
+    
+    if (!periodoSelecionado) {
+        reportsDiv.innerHTML = '';
+        return;
+    }
+    
+    reportsDiv.innerHTML = `
+        <a href="/download/pdf/` + tipo + `?ano=` + periodoSelecionado.split('-')[0] + `&periodo=` + periodoSelecionado + `" target="_blank" style="text-decoration: none; color: inherit; display: block;">
+            <div style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 4px 10px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 5px rgba(0,0,0,0.1)';">
+                <div>
+                    <h3 style="margin: 0; color: #0d6efd;">` + TITULOS[tipo] + `</h3>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Período: ` + selectPeriodo.options[selectPeriodo.selectedIndex].text + `</p>
+                    <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Clique para baixar o PDF</p>
+                </div>
+                <div style="font-size: 32px; color: #0d6efd;">📄</div>
+            </div>
+        </a>
+    `;
+    
+    atualizarBotoesDownload();
+}
+
+function atualizarBotoesDownload() {
+    const periodo = document.getElementById('filtro-periodo').value;
+    if (!periodo) return;
+    
+    const ano = periodo.split('-')[0];
+    
+    // Garante que os links dos botões do topo apontem para o período selecionado
+    document.getElementById('btn-pdf').href = '/download/pdf/' + currentTipo + '?ano=' + ano + '&periodo=' + encodeURIComponent(periodo);
+    document.getElementById('btn-excel').href = '/download/excel/' + currentTipo + '?ano=' + ano + '&periodo=' + encodeURIComponent(periodo);
+    document.getElementById('btn-pptx').href = '/download/pptx/' + currentTipo + '?ano=' + ano + '&periodo=' + encodeURIComponent(periodo);
+}
+
+async function enviarArquivo(event) {
+    event.preventDefault();
+    
+    const tipo = document.getElementById('upload-tipo').value;
+    const ano = document.getElementById('upload-ano').value;
+    const mes = document.getElementById('upload-mes').value;
+    const trimestre = document.getElementById('upload-trimestre').value;
+    const exercicio = document.getElementById('upload-exercicio').value;
+    const arquivo = document.getElementById('upload-arquivo').files[0];
+    const msgDiv = document.getElementById('upload-mensagem');
+
+    if (!tipo) { msgDiv.innerHTML = "<span style='color: red;'>Selecione o Tipo de Relatório.</span>"; return; }
+
+    let periodo_tipo = "", periodo_valor = "";
+    if (mes) { periodo_tipo = "MES"; periodo_valor = mes; }
+    else if (trimestre) { periodo_tipo = "TRIMESTRE"; periodo_valor = trimestre; }
+    else if (exercicio) { periodo_tipo = "ANO"; periodo_valor = ano; }
+    else { msgDiv.innerHTML = "<span style='color: red;'>Selecione um dos períodos.</span>"; return; }
+    
+    if (!arquivo) { msgDiv.innerHTML = "<span style='color: red;'>Anexe um arquivo CSV.</span>"; return; }
+
+    const formData = new FormData();
+    formData.append("file", arquivo);
+    formData.append("tipo_relatorio", tipo);
+    formData.append("ano", ano);
+    formData.append("periodo_tipo", periodo_tipo);
+    formData.append("periodo_valor", periodo_valor);
+
+    msgDiv.innerHTML = "<span style='color: blue;'>Enviando arquivo... Aguarde.</span>";
+    
+    try {
+        const response = await fetch('/upload', { 
+            method: 'POST', 
+            body: formData 
+        });
+        
+        // Tenta ler a resposta do servidor (mesmo se der erro)
+        let result;
+        try {
+            result = await response.json();
+        } catch (e) {
+            throw new Error("O servidor nao retornou um JSON valido.");
+        }
+
+        if (response.ok) {
+            msgDiv.innerHTML = "<span style='color: green;'>Sucesso! " + (result.mensagem || "Arquivo enviado.") + " (" + (result.arquivo || "") + ")</span>";
+            document.getElementById('form-upload').reset();
+            document.getElementById('upload-ano').value = "2026";
+            desativarOutrosPeriodos('');
+        } else {
+            msgDiv.innerHTML = "<span style='color: red;'>Erro no servidor: " + (result.detail || "Falha desconhecida") + "</span>";
+        }
+    } catch (error) {
+        console.error("Erro no upload:", error);
+        msgDiv.innerHTML = "<span style='color: red;'>Erro de conexão: " + error.message + ". Verifique se o servidor esta rodando.</span>";
+    }
+}function desativarOutrosPeriodos(origem) {
+    const selectMes = document.getElementById('upload-mes');
+    const selectTrimestre = document.getElementById('upload-trimestre');
+    const selectExercicio = document.getElementById('upload-exercicio');
+    if (origem === 'mes' && selectMes.value !== '') { selectTrimestre.disabled = true; selectTrimestre.value = ''; selectExercicio.disabled = true; selectExercicio.value = ''; }
+    else if (origem === 'trimestre' && selectTrimestre.value !== '') { selectMes.disabled = true; selectMes.value = ''; selectExercicio.disabled = true; selectExercicio.value = ''; }
+    else if (origem === 'exercicio' && selectExercicio.value !== '') { selectMes.disabled = true; selectMes.value = ''; selectTrimestre.disabled = true; selectTrimestre.value = ''; }
+    else { selectMes.disabled = false; selectTrimestre.disabled = false; selectExercicio.disabled = false; }
+}
+
+document.getElementById('filtro-periodo').addEventListener('change', () => { carregarListaRelatorios(currentTipo); });
+</script>
+
+<div id="novo-painel-integridade" class="container mt-4"></div>`r`n
+
+<script>
+(function() {
+    // Cria o container mestre que vai segurar os cards
+    const painel = document.createElement('div');
+    painel.id = 'painel-integridade-novo';
+    painel.style.display = 'none';
+    painel.className = 'container mt-4';
+    document.body.appendChild(painel);
+
+    // Função que busca os dados e desenha
+    async function carregarIntegridade(periodo) {
+        painel.style.display = 'block';
+        painel.innerHTML = '<div style="padding: 20px; color: #666;">Carregando análises de integridade...</div>';
+        
+        try {
+            const res = await fetch(`/analise_integridade/${periodo}`);
+            const data = await res.json();
+            
+            if (data.analises && data.analises.length > 0) {
+                let html = '<h2 style="margin-bottom: 20px;">Análises de Integridade Contábil</h2>';
+                
+                data.analises.forEach(a => {
+                    const cor = a.status === 'OK' ? '#28a745' : '#dc3545';
+                    const icone = a.status === 'OK' ? '✅' : '❌';
+                    
+                    html += `
+                    <div style="border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 5px solid ${cor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+                            <h3 style="margin: 0; color: #333;">${a.titulo}</h3>
+                            <span style="font-size: 1.5rem;">${icone}</span>
+                        </div>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">${a.conceito}</p>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                            <tbody>
+                                ${a.tabela.map(l => `
+                                    <tr style="border-bottom: 1px solid #f0f0f0;">
+                                        <td style="padding: 10px 0; color: #444;">${l.label}</td>
+                                        <td style="padding: 10px 0; text-align: right; font-weight: bold; color: ${l.label.includes('Diferença') ? cor : '#333'};">${l.valor}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        <div style="background: ${a.status === 'OK' ? '#e8f5e9' : '#ffebee'}; color: ${cor}; padding: 12px; border-radius: 4px; font-weight: bold;">
+                            ${a.mensagem}
+                        </div>
+                    </div>`;
+                });
+                
+                painel.innerHTML = html;
+            } else {
+                painel.innerHTML = '<div style="padding: 20px; color: #d32f2f;">Nenhuma análise encontrada.</div>';
+            }
+        } catch (e) {
+            console.error(e);
+            painel.innerHTML = '<div style="padding: 20px; color: #d32f2f;">Erro ao carregar os dados do servidor.</div>';
+        }
+    }
+
+    // Monitora mudanças no DOM (quando o seu sistema apaga a tela)
+    const observer = new MutationObserver((mutations) => {
+        // Procura o select de período na tela
+        const selects = document.querySelectorAll('select');
+        let periodoAtual = '';
+        
+        for (let i = 0; i < selects.length; i++) {
+            if (selects[i].value && selects[i].value.includes('-')) {
+                periodoAtual = selects[i].value;
+                break;
+            }
+        }
+
+        // Verifica se estamos na tela de integração
+        const textoPagina = document.body.innerText || "";
+        const isTelaIntegracao = textoPagina.includes("Integridade");
+
+        if (isTelaIntegracao && periodoAtual && painel.style.display === 'none') {
+            // Esconde os elementos antigos da tela para não ficar bagunçado
+            const conteudoPrincipal = document.querySelector('main') || document.querySelector('.main-content') || document.querySelector('.content');
+            if (conteudoPrincipal && !conteudoPrincipal.contains(painel)) {
+                conteudoPrincipal.innerHTML = ''; // Limpa
+                conteudoPrincipal.appendChild(painel); // Coloca o nosso painel
+                painel.style.display = 'block';
+                carregarIntegridade(periodoAtual);
+            }
+        }
+    });
+
+    // Começa a monitorar o body
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Escuta mudança no select para carregar os dados
+    document.body.addEventListener('change', function(e) {
+        if (e.target.tagName === 'SELECT' && e.target.value.includes('-')) {
+            const textoPagina = document.body.innerText || "";
+            if (textoPagina.includes("Integridade")) {
+                carregarIntegridade(e.target.value);
+            }
+        }
+    });
+})();
+</script>
+
+
+
+
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Pega todos os links do menu lateral
+    const links = document.querySelectorAll('.nav-menu a, .submenu a');
+    
+    links.forEach(link => {
+        link.addEventListener('click', function() {
+            // Sempre que um link do menu for clicado, esconde o overlay
+            const overlay = document.getElementById('overlay-integridade');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
+
+
+<style>
+/* Estilo da Tabela de Relatórios (Azul e Branco) */
+.tabela-relatorio { width: 100%; border-collapse: collapse; margin-top: 15px; font-family: Arial, sans-serif; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+.tabela-relatorio th { background-color: #0056b3; color: white; padding: 12px; text-align: left; }
+.tabela-relatorio td { padding: 10px; border-bottom: 1px solid #eee; color: #333; }
+.tabela-relatorio tr:nth-child(even) { background-color: #f8fbff; }
+.tabela-relatorio tr:hover { background-color: #e6f0fa; }
+</style>
+
+<script>
+// --- CARREGADOR DE RELATORIOS (Integracao com uploads_raw) ---
+function carregarRelatorio(tipo) {
+    // Esconde a tela de integridade se ela estiver aberta
+    const overlay = document.getElementById('overlay-integridade');
+    if (overlay) overlay.style.display = 'none';
+
+    // Esconde todas as content-areas originais
+    document.querySelectorAll('.content-area').forEach(e => e.classList.remove('active'));
+    
+    // Cria ou encontra a div de exibição do relatório
+    let tela = document.getElementById('tela-relatorio-dinamico');
+    if (!tela) {
+        tela = document.createElement('div');
+        tela.id = 'tela-relatorio-dinamico';
+        tela.className = 'content-area active';
+        tela.style.padding = '20px';
+        // Insere no meio do layout principal (onde ficam os outros content-areas)
+        const mainArea = document.querySelector('main') || document.querySelector('.main-content');
+        if(mainArea) {
+            mainArea.appendChild(tela);
+        } else {
+            document.body.appendChild(tela);
+        }
+    } else {
+        tela.classList.add('active');
+    }
+
+    tela.innerHTML = '<h3 style="color:#0056b3;">Carregando ' + tipo + '...</h3>';
+
+    // Busca os dados na rota do backend
+    fetch('/api/ler_relatorio/' + tipo)
+        .then(res => res.json())
+        .then(data => {
+            if (data.erro) {
+                tela.innerHTML = '<p style="color:red;">' + data.erro + '</p>';
+                return;
+            }
+            
+            let html = '<h3 style="color:#0056b3;">Relatório: ' + data.tipo + '</h3>';
+            html += '<p style="color:#666; margin-bottom: 15px;">Arquivo: ' + data.arquivo + '</p>';
+            html += '<table class="tabela-relatorio">';
+            
+            data.dados.forEach((row, index) => {
+                html += '<tr>';
+                if (index === 0) {
+                    row.forEach(cell => { html += '<th>' + cell + '</th>'; });
+                } else {
+                    row.forEach(cell => { html += '<td>' + cell + '</td>'; });
+                }
+                html += '</tr>';
+            });
+            
+            html += '</table>';
+            tela.innerHTML = html;
+        })
+        .catch(err => {
+            tela.innerHTML = '<p style="color:red;">Erro ao buscar dados do servidor.</p>';
+        });
+}
+
+// --- CONECTANDO OS BOTOES DO MENU ---
+document.addEventListener("DOMContentLoaded", function() {
+    // Mapeia os IDs dos menus para os tipos de arquivo
+    const mapeamento = {
+        'submenu-balancete': 'BALANCETE',
+        'submenu-bp': 'BALANCO_PATRIMONIAL',
+        'submenu-bo': 'BALANCO_ORCAMENTARIO',
+        'submenu-bf': 'BALANCO_FINANCEIRO',
+        'submenu-dfc': 'DFC',
+        'submenu-dvp': 'DVP',
+        'submenu-dmpl': 'DMPL'
+    };
+
+    for (const [id, tipo] of Object.entries(mapeamento)) {
+        const link = document.getElementById(id);
+        if (link) {
+            // Sobrescreve apenas o onclick desses links específicos
+            link.onclick = function(e) {
+                e.preventDefault();
+                carregarRelatorio(tipo);
+            };
+        }
+    }
+});
+</script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+

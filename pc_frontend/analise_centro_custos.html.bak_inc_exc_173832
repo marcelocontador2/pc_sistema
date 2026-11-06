@@ -1,0 +1,620 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Análise por Centro de Custos</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #2d3748; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .header { border-bottom: 2px solid #0a1c3a; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { color: #0a1c3a; margin: 0; font-size: 22px; }
+        
+        .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 14px; text-decoration: none; display: inline-block; }
+        .btn-voltar { background-color: #ff8c00; color: white; }
+        .btn-exibir { background-color: #28a745; color: white; }
+        .btn-excluir { background-color: #dc3545; color: white; }
+        .btn-pdf { background-color: #0d6efd; color: white; }
+        .btn-salvar { background-color: #28a745; color: white; }
+        
+        .filtros { display: flex; gap: 15px; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .filtros label { font-weight: 600; font-size: 14px; }
+        .filtros select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        .btn-verificar { background-color: #0d6efd; color: white; padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        
+        .historico-panel { background: #f9f9f9; border: 1px solid #e2e8f0; border-radius: 5px; padding: 15px; margin-bottom: 20px; }
+        .historico-panel h3 { margin-top: 0; color: #0a1c3a; font-size: 16px; }
+        .historico-item { display: block; padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .historico-item:hover { background: #eef4f9; }
+        
+        .card-total { background: #eef4f9; padding: 15px; border-radius: 6px; border-left: 4px solid #0a1c3a; margin-bottom: 20px; }
+        .card-total .label { font-size: 11px; color: #718096; text-transform: uppercase; font-weight: 600; }
+        .card-total .value { font-size: 24px; font-weight: bold; color: #0a1c3a; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #eef4f9; color: #0a1c3a; font-weight: 600; }
+        tr:hover { background-color: #f9f9f9; }
+        .total-row td { font-weight: bold; background-color: #e6f0fa; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Análise por Centro de Custos</h1>
+            <p>Apuração consolidada 12 meses</p>
+        </div>
+
+        <!-- BARRA DE FERRAMENTAS -->
+        <div class="toolbar">
+            <a href="/" class="btn btn-voltar">← Voltar</a>
+            <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+            <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+            <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+<button id="btn-editar-conclusao" style="background: #f59e0b; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 10px;">✏️ Editar Conclusão</button>
+        <button class="btn btn-salvar" onclick="salvar()">Confirmar e Salvar</button>
+        </div>
+
+        <!-- FILTROS DE PERÍODO -->
+        <div class="filtros">
+            <label>Ano:</label>
+            <select id="filtro-ano">
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+            </select>
+            <label>Tipo:</label>
+            <select id="filtro-tipo">
+                <option value="TRIMESTRE">Trimestral</option>
+                <option value="MES">Mensal</option>
+            </select>
+            <label>Trimestre:</label>
+            <select id="filtro-trimestre">
+                <option value="1">1º Trimestre</option>
+                <option value="2">2º Trimestre</option>
+                <option value="3" selected>3º Trimestre</option>
+                <option value="4">4º Trimestre</option>
+            </select>
+            <button class="btn-verificar" onclick="verificar()">Verificar</button>
+        </div>
+
+        <!-- HISTÓRICO -->
+        <div class="historico-panel">
+            <h3>Histórico Salvo</h3>
+            <div id="historico-lista">Carregando...</div>
+        </div>
+
+        <!-- CARD DE TOTAL -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+            <div class="card-total">
+                <div class="label">Total Executado (Período Atual)</div>
+                <div class="value" id="total-atual">R$ 0,00</div>
+            </div>
+            <div class="card-total">
+                <div class="label">Total Executado (Período Anterior)</div>
+                <div class="value" id="total-anterior">R$ 0,00</div>
+            </div>
+            <div class="card-total">
+                <div class="label">Variação Global</div>
+                <div class="value" id="variacao-global">0,00%</div>
+            </div>
+        </div>
+
+        <!-- TABELA DE DADOS -->
+        <div id="tabela-container">
+            <div style="text-align: center; padding: 20px; color: #888;">Clique em "Verificar" para carregar os dados.</div>
+        </div>
+    </div>
+
+    <script>
+        let dadosAtuais = null;
+
+        function fmt(v) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+        // Carrega o histórico ao abrir a página
+        document.addEventListener('DOMContentLoaded', function() {
+            carregarHistorico();
+        });
+
+        async function carregarHistorico() {
+            try {
+                const r = await fetch('/historico_centro_custos?_t=' + Date.now(), { cache: 'no-store' });
+                const data = await r.json();
+                const lista = document.getElementById('historico-lista');
+                if (!data || data.length === 0) {
+                    lista.innerHTML = '<div style="padding: 10px; color: #888;">Nenhum histórico.</div>';
+                    return;
+                }
+                let html = '';
+                data.forEach(item => {
+                    html += '<label class="historico-item">';
+                    html += '<input type="checkbox" class="check-historico" value="' + item.id + '"> ';
+                    html += '<strong>' + item.periodo + '</strong> <span style="font-size: 11px; color: #888;">' + item.data_geracao + '</span>';
+                    html += '</label>';
+                });
+                lista.innerHTML = html;
+            } catch (e) {
+                console.error(e);
+                document.getElementById('historico-lista').innerHTML = '<div style="color: red;">Erro ao carregar histórico.</div>';
+            }
+        }
+
+        async function verificar() {
+            const ano = document.getElementById('filtro-ano').value;
+            const tipo = document.getElementById('filtro-tipo').value;
+            const trimestre = document.getElementById('filtro-trimestre').value;
+            const periodo = `${ano}-${tipo}-${trimestre}`;
+            
+            try {
+                document.getElementById('tabela-container').innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Verificando...</div>';
+                const r = await fetch(`/api/centro_custos/${periodo}?_t=${Date.now()}`, { cache: 'no-store' });
+                const d = await r.json();
+                
+                if (d.erro) {
+                    document.getElementById('tabela-container').innerHTML = '<div style="color: red; text-align: center; padding: 20px;">' + d.mensagem + '</div>';
+                    return;
+                }
+                dadosAtuais = d;
+                renderizarTabela(d);
+                atualizarCards(d);
+            } catch (e) {
+                console.error(e);
+                document.getElementById('tabela-container').innerHTML = '<div style="color: red; text-align: center; padding: 20px;">Erro ao verificar.</div>';
+            }
+        }
+
+        function renderizarTabela(d) {
+            const centros = d.centros || [];
+            const centrosAnterior = d.centros_anterior || [];
+            const totalAtual = centros.reduce((acc, c) => acc + c.valor, 0);
+            
+            // Mapa de centros anteriores por nome
+            const mapaAnterior = {};
+            centrosAnterior.forEach(c => { mapaAnterior[c.nome] = c.valor; });
+            
+            let html = '<table>';
+            html += '<thead><tr><th>Centro de Custo</th><th>Valor Atual (R$)</th><th>Valor Anterior (R$)</th><th>Variação (R$)</th><th>Variação (%)</th></tr></thead>';
+            html += '<tbody>';
+            
+            centros.forEach(c => {
+                const anterior = mapaAnterior[c.nome] || 0;
+                const variacao = c.valor - anterior;
+                const variacaoPct = anterior > 0 ? (variacao / anterior) * 100 : 0;
+                const cor = variacao >= 0 ? '#dc3545' : '#28a745';
+                html += `<tr>
+                    <td>${c.nome}</td>
+                    <td>${fmt(c.valor)}</td>
+                    <td>${fmt(anterior)}</td>
+                    <td style="color: ${cor};">${fmt(variacao)}</td>
+                    <td style="color: ${cor};">${fmt(variacaoPct)}%</td>
+                </tr>`;
+            });
+            
+            const totalAnterior = centrosAnterior.reduce((acc, c) => acc + c.valor, 0);
+            const variacaoTotal = totalAtual - totalAnterior;
+            const variacaoTotalPct = totalAnterior > 0 ? (variacaoTotal / totalAnterior) * 100 : 0;
+            const corTotal = variacaoTotal >= 0 ? '#dc3545' : '#28a745';
+            
+            html += `<tr class="total-row">
+                <td>TOTAL</td>
+                <td>${fmt(totalAtual)}</td>
+                <td>${fmt(totalAnterior)}</td>
+                <td style="color: ${corTotal};">${fmt(variacaoTotal)}</td>
+                <td style="color: ${corTotal};">${fmt(variacaoTotalPct)}%</td>
+            </tr>`;
+            html += '</tbody></table>';
+            document.getElementById('tabela-container').innerHTML = html;
+        }
+
+        function atualizarCards(d) {
+            const totalAtual = d.centros.reduce((acc, c) => acc + c.valor, 0);
+            const totalAnterior = (d.centros_anterior || []).reduce((acc, c) => acc + c.valor, 0);
+            const variacao = totalAnterior > 0 ? ((totalAtual - totalAnterior) / totalAnterior) * 100 : 0;
+            
+            document.getElementById('total-atual').innerText = 'R$ ' + fmt(totalAtual);
+            document.getElementById('total-anterior').innerText = 'R$ ' + fmt(totalAnterior);
+            
+            const variacaoEl = document.getElementById('variacao-global');
+            variacaoEl.innerText = (variacao >= 0 ? '▲ ' : '▼ ') + fmt(Math.abs(variacao)) + '%';
+            variacaoEl.style.color = variacao >= 0 ? '#dc3545' : '#28a745';
+        }
+
+        async function salvar() {
+            if (!dadosAtuais) { alert('Clique em "Verificar" antes de salvar.'); return; }
+            
+            const ano = document.getElementById('filtro-ano').value;
+            const tipo = document.getElementById('filtro-tipo').value;
+            const trimestre = document.getElementById('filtro-trimestre').value;
+            const periodo = `${ano}-${tipo}-${trimestre}`;
+            
+            try {
+                const r = await fetch('/salvar_centro_custos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ periodo: periodo, dados: dadosAtuais })
+                });
+                const res = await r.json();
+                if (res.ok) { alert('Salvo com sucesso!'); carregarHistorico(); }
+                else { alert('Erro ao salvar: ' + res.mensagem); }
+            } catch (e) {
+                console.error(e);
+                alert('Erro ao salvar.');
+            }
+        }
+
+        async function exibirSelecionado() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert('Selecione um item no histórico.'); return; }
+            const r = await fetch('/historico_centro_custos/' + check.value);
+            const d = await r.json();
+            if (d.dados) {
+                dadosAtuais = d.dados;
+                // Como o histórico salvo só tem o período atual, usamos os dados atuais
+                // e buscamos o comparativo da API
+                const periodo = d.periodo || '2026-TRIMESTRE-3';
+                const apiR = await fetch(`/api/centro_custos/${periodo}?_t=${Date.now()}`, { cache: 'no-store' });
+                const apiD = await apiR.json();
+                if (!apiD.erro) {
+                    dadosAtuais = apiD;
+                    renderizarTabela(apiD);
+                    atualizarCards(apiD);
+                } else {
+                    renderizarTabela({centros: d.dados.centros, centros_anterior: []});
+                    atualizarCards({centros: d.dados.centros, centros_anterior: []});
+                }
+            }
+        }
+
+        async function excluirSelecionado() {
+            const checks = document.querySelectorAll('.check-historico:checked');
+            if (checks.length === 0) { alert('Selecione pelo menos um item no histórico.'); return; }
+            
+            if (!confirm('Tem certeza que deseja excluir ' + checks.length + ' relatório(s)?')) return;
+            
+            const ids = Array.from(checks).map(c => parseInt(c.value));
+            
+            try {
+                const r = await fetch('/excluir_multiplos_centro_custos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: ids })
+                });
+                const res = await r.json();
+                if (res.ok) {
+                    alert('Excluídos ' + res.excluidos + ' relatório(s).');
+                    carregarHistorico();
+                } else {
+                    alert('Erro ao excluir.');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Erro ao excluir.');
+            }
+        }
+
+        function gerarPDF() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { 
+                alert('Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.'); 
+                return; 
+            }
+            const url = `/gerar_pdf_centro_custos/${check.value}`;
+            window.open(url, '_blank');
+        }
+    </script>
+
+    <script>
+        function abrirModalConclusao() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) { alert("Atenção: Selecione um item do Histórico Salvo primeiro."); return; }
+            
+            const id = check.value;
+            
+            fetch(`/historico_centro_custos/${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    const textoAtual = (data.dados && data.dados.conclusao_personalizada) ? data.dados.conclusao_personalizada : "";
+                    
+                    const divModal = document.createElement('div');
+                    divModal.id = 'modal-conclusao';
+                    divModal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+                    divModal.innerHTML = `
+                        <div style="background:#fff;padding:20px;border-radius:8px;width:600px;max-width:90%;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+                            <h3 style="margin-top:0;color:#1a202c;">Editar Conclusão do Relatório</h3>
+                            <p style="font-size:14px;color:#718096;margin-bottom:10px;">Este texto substituirá a conclusão automática no PDF.</p>
+                            <textarea id="txt-conclusao" style="width:100%;height:150px;padding:10px;border:1px solid #cbd5e0;border-radius:4px;font-family:inherit;font-size:14px;">${textoAtual}</textarea>
+                            <div style="margin-top:15px;text-align:right;">
+                                <button onclick="document.getElementById('modal-conclusao').remove()" style="padding:8px 15px;margin-right:10px;border:none;border-radius:4px;background:#e2e8f0;color:#4a5568;font-weight:bold;cursor:pointer;">Cancelar</button>
+                                <button onclick="salvarConclusao(${id})" style="padding:8px 15px;border:none;border-radius:4px;background:#38a169;color:white;font-weight:bold;cursor:pointer;">Salvar Conclusão</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(divModal);
+                })
+                .catch(() => alert("Erro ao carregar o histórico."));
+        }
+
+        function salvarConclusao(id) {
+            const texto = document.getElementById('txt-conclusao').value;
+            fetch(`/salvar_conclusao_centro_custos/${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({texto: texto})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.erro) { alert("Erro: " + data.mensagem); }
+                else { 
+                    alert("Conclusão salva com sucesso! O PDF usará este texto.");
+                    document.getElementById('modal-conclusao').remove();
+                }
+            })
+            .catch(() => alert("Erro de conexão ao salvar."));
+        }
+    </script>
+
+
+    <!-- MODAL DE EDIÇÃO DE CONCLUSÃO -->
+    <script>
+        document.getElementById('btn-editar-conclusao').addEventListener('click', function() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) {
+                alert("Atenção: Selecione um item no Histórico Salvo antes de editar.");
+                return;
+            }
+            
+            const id = check.value;
+            
+            // Abre o modal
+            const modal = document.getElementById('modal-conclusao');
+            modal.style.display = 'flex';
+            
+            const textarea = document.getElementById('texto-conclusao-modal');
+            textarea.value = "Carregando...";
+            
+            // Busca o texto atual salvo no histórico
+            fetch(`/historico_centro_custos/${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    const dados = data.dados ? data.dados : data;
+                    if (dados.conclusao_personalizada) {
+                        textarea.value = dados.conclusao_personalizada;
+                    } else {
+                        textarea.value = "";
+                        textarea.placeholder = "Nenhuma conclusão salva ainda. Digite a sua aqui...";
+                    }
+                })
+                .catch(() => {
+                    textarea.value = "";
+                    alert("Erro ao carregar o texto anterior.");
+                });
+        });
+
+        document.getElementById('btn-cancelar-conclusao').addEventListener('click', function() {
+            document.getElementById('modal-conclusao').style.display = 'none';
+        });
+
+        document.getElementById('btn-salvar-conclusao-modal').addEventListener('click', function() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) return;
+            
+            const id = check.value;
+            const texto = document.getElementById('texto-conclusao-modal').value;
+            const btn = document.getElementById('btn-salvar-conclusao-modal');
+            
+            btn.innerText = "Salvando...";
+            btn.disabled = true;
+
+            fetch(`/salvar_conclusao_centro_custos/${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ texto: texto })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.erro) {
+                    alert("Erro: " + data.mensagem);
+                } else {
+                    alert("Conclusão salva com sucesso! Agora você pode gerar o PDF.");
+                    document.getElementById('modal-conclusao').style.display = 'none';
+                }
+            })
+            .catch(() => alert("Erro de conexão."))
+            .finally(() => {
+                btn.innerText = "💾 Salvar Conclusão";
+                btn.disabled = false;
+            });
+        });
+    </script>
+
+
+<div id="modal-conclusao" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; justify-content: center; align-items: center;">
+    <div style="background: white; padding: 25px; border-radius: 12px; width: 900px; max-width: 95%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+        <h3 style="margin-top: 0; color: #1a202c;">✏️ Editar Conclusão do Relatório</h3>
+        <p style="color: #718096; font-size: 14px;">Edite os textos abaixo. Eles serão usados no próximo PDF que você gerar.</p>
+        
+        <label style="display: block; margin-top: 15px; font-weight: bold;">1. Conclusão sobre o Total Executado</label>
+        <div id="edit-conclusao-total" contenteditable="true" style="width: 100%; min-height: 80px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; font-size: 14px; margin-top: 5px; background: #fff; line-height: 1.6;"></div>
+        
+        <label style="display: block; margin-top: 15px; font-weight: bold;">2. Análise de Concentração</label>
+        <div id="edit-conclusao-concentracao" contenteditable="true" style="width: 100%; min-height: 80px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; font-size: 14px; margin-top: 5px; background: #fff; line-height: 1.6;"></div>
+        
+        <label style="display: block; margin-top: 15px; font-weight: bold;">3. Alertas e Pontos de Atenção</label>
+        <div id="edit-conclusao-alertas" contenteditable="true" style="width: 100%; min-height: 80px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; font-size: 14px; margin-top: 5px; background: #fff; line-height: 1.6;"></div>
+        
+        <label style="display: block; margin-top: 15px; font-weight: bold;">4. Recomendações</label>
+        <div id="edit-conclusao-recomendacoes" contenteditable="true" style="width: 100%; min-height: 80px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; font-size: 14px; margin-top: 5px; background: #fff; line-height: 1.6;"></div>
+        
+        <div style="margin-top: 20px; text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+            <button id="btn-cancelar-conclusao" style="padding: 10px 20px; border: none; border-radius: 6px; background: #e2e8f0; color: #4a5568; font-weight: bold; cursor: pointer;">Cancelar</button>
+            <button id="btn-salvar-conclusao-modal" style="padding: 10px 20px; border: none; border-radius: 6px; background: #38a169; color: white; font-weight: bold; cursor: pointer;">💾 Salvar Conclusão</button>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+<script id="js-modal-conclusao">
+document.addEventListener('DOMContentLoaded', function() {
+    const btnAbrir = document.getElementById('btn-editar-conclusao');
+    const modal = document.getElementById('modal-conclusao');
+    const btnCancelar = document.getElementById('btn-cancelar-conclusao');
+    const btnSalvar = document.getElementById('btn-salvar-conclusao-modal');
+    
+    const campos = {
+        'conclusao-total': document.getElementById('edit-conclusao-total'),
+        'conclusao-concentracao': document.getElementById('edit-conclusao-concentracao'),
+        'conclusao-alertas': document.getElementById('edit-conclusao-alertas'),
+        'conclusao-recomendacoes': document.getElementById('edit-conclusao-recomendacoes')
+    };
+    
+    window.htmlOriginal = {};
+    
+    btnAbrir.addEventListener('click', async function() {
+        const check = document.querySelector('.check-historico:checked');
+        if (!check) {
+            alert("Atenção: Selecione um item no Histórico Salvo antes de editar.");
+            return;
+        }
+        
+        const id = check.value;
+        modal.style.display = 'flex';
+        window.htmlOriginal = {};
+        
+        // Mostra "carregando"
+        for (const campo of Object.values(campos)) {
+            campo.innerHTML = '<em style="color:#999;">Carregando...</em>';
+        }
+        
+        try {
+            const res = await fetch(`/historico_centro_custos/${id}`);
+            const data = await res.json();
+            const dados = data.dados ? data.dados : data;
+            
+            let textoSalvo = null;
+            if (dados.conclusao_personalizada) {
+                try {
+                    textoSalvo = typeof dados.conclusao_personalizada === 'string' 
+                        ? JSON.parse(dados.conclusao_personalizada) 
+                        : dados.conclusao_personalizada;
+                } catch(e) {}
+            }
+            
+            if (textoSalvo && Object.keys(textoSalvo).length > 0) {
+                // Já tem conclusão salva
+                for (const [chave, campo] of Object.entries(campos)) {
+                    if (textoSalvo[chave]) {
+                        campo.innerHTML = textoSalvo[chave];
+                        window.htmlOriginal[chave] = textoSalvo[chave];
+                    } else {
+                        campo.innerHTML = '';
+                        window.htmlOriginal[chave] = '';
+                    }
+                }
+            } else {
+                // Extrai do relatório
+                await extrairDoRelatorio(id);
+            }
+        } catch(e) {
+            console.error("Erro:", e);
+            alert("Erro ao carregar os textos. Tente novamente.");
+        }
+    });
+
+    function extrairDoRelatorio(historicoId) {
+        return new Promise((resolve) => {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = `/relatorio_centro_custos?historico_id=${historicoId}&_t=${Date.now()}`;
+            document.body.appendChild(iframe);
+            
+            setTimeout(() => {
+                try {
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                    for (const [chave, campo] of Object.entries(campos)) {
+                        const el = doc.getElementById(chave);
+                        if (el) {
+                            // Copia o HTML com formatação (negritos, cores, parágrafos)
+                            campo.innerHTML = el.innerHTML;
+                            window.htmlOriginal[chave] = el.innerHTML;
+                        } else {
+                            campo.innerHTML = '';
+                            window.htmlOriginal[chave] = '';
+                        }
+                    }
+                    document.body.removeChild(iframe);
+                    resolve();
+                } catch(e) {
+                    console.error(e);
+                    document.body.removeChild(iframe);
+                    resolve();
+                }
+            }, 4000);
+        });
+    }
+    
+    btnCancelar.addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+    
+    btnSalvar.addEventListener('click', async function() {
+        const check = document.querySelector('.check-historico:checked');
+        if (!check) return;
+        
+        const id = check.value;
+        const htmlEditado = {};
+        
+        for (const [chave, campo] of Object.entries(campos)) {
+            const htmlAtual = campo.innerHTML.trim();
+            const htmlOriginal = (window.htmlOriginal[chave] || '').trim();
+            const textoAtual = campo.innerText.trim();
+            
+            if (!textoAtual) {
+                // Vazio → preserva original
+                htmlEditado[chave] = htmlOriginal;
+            } else if (htmlAtual === htmlOriginal) {
+                // Não mudou → preserva original (com formatação)
+                htmlEditado[chave] = htmlOriginal;
+            } else {
+                // Mudou → salva o HTML novo (mantendo formatação que o usuário fez)
+                htmlEditado[chave] = htmlAtual;
+            }
+        }
+        
+        btnSalvar.innerText = "Salvando...";
+        btnSalvar.disabled = true;
+        
+        try {
+            const res = await fetch(`/salvar_conclusao_centro_custos/${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ texto: JSON.stringify(htmlEditado) })
+            });
+            const data = await res.json();
+            
+            if (data.erro) {
+                alert("Erro: " + data.mensagem);
+            } else {
+                alert("Conclusão salva com sucesso! Agora clique em 'Gerar PDF' para ver o resultado.");
+                modal.style.display = 'none';
+            }
+        } catch(e) {
+            alert("Erro de conexão.");
+        } finally {
+            btnSalvar.innerText = "💾 Salvar Conclusão";
+            btnSalvar.disabled = false;
+        }
+    });
+});
+</script>
+
+</body>
+</html>
