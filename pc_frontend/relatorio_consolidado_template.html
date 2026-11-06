@@ -1137,8 +1137,33 @@ H += tit(10, 'Panorama de Resultados');
 H += '<div class="desc">Resumo executivo dos principais indicadores.</div>';
 const pan = unwrap(D.panorama);
 if (pan) {
-    const labels = { ativo_total:'Ativo Total', passivo_total:'Passivo Total', patrimonio_liquido:'Patrimônio Líquido', caixa_bp:'Caixa e Equivalentes', receita_realizada:'Receitas Realizadas', despesa_empenhada:'Despesas Empenhadas', superavit_orcamentario:'Resultado Orçamentário', superavit_patrimonial:'Superávit Patrimonial', superavit_financeiro:'Superávit Financeiro' };
-    const rows = []; Object.keys(labels).forEach(k => { if (pan[k] !== undefined) rows.push([labels[k], moeda(pan[k])]); }); H += tab(['Indicador','Valor'], rows);
+    const labels = {
+        ativo_total: { label: 'Ativo Total', cor: '#003366' },
+        passivo_total: { label: 'Passivo Total', cor: '#C00000' },
+        patrimonio_liquido: { label: 'Patrimônio Líquido', cor: '#00B050' },
+        caixa_bp: { label: 'Caixa e Equivalentes', cor: '#5B9BD5' },
+        receita_realizada: { label: 'Receitas Realizadas', cor: '#4472C4' },
+        despesa_empenhada: { label: 'Despesas Empenhadas', cor: '#FF8C00' },
+        superavit_orcamentario: { label: 'Resultado Orçamentário', cor: (pan.superavit_orcamentario >= 0 ? '#00B050' : '#C00000') },
+        superavit_patrimonial: { label: 'Superávit Patrimonial', cor: '#7030A0' },
+        superavit_financeiro: { label: 'Superávit Financeiro', cor: '#20B2AA' }
+    };
+
+    H += '<div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 20px;">';
+    
+    Object.keys(labels).forEach(k => {
+        if (pan[k] !== undefined) {
+            const item = labels[k];
+            const valorFormatado = moeda(pan[k]);
+            
+            H += '<div style="flex: 1 1 30%; min-width: 200px; background: #fff; border: 1px solid #e0e0e0; border-left: 5px solid ' + item.cor + '; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">';
+            H += '<div style="font-size: 10px; color: #666; text-transform: uppercase; font-weight: bold; margin-bottom: 8px;">' + item.label + '</div>';
+            H += '<div style="font-size: 16px; color: #333; font-weight: bold;">' + valorFormatado + '</div>';
+            H += '</div>';
+        }
+    });
+
+    H += '</div>';
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 11. CENTRO DE CUSTOS =====
@@ -1146,13 +1171,122 @@ H += tit(11, 'Análise por Centro de Custos');
 H += '<div class="desc">Distribuição das despesas por centro de custo.</div>';
 const cc = unwrap(D.centro_custos);
 if (cc && cc.centros) {
-    const at = cc.centros || []; const an = cc.centros_anterior || []; const mapa = {};
+    const at = cc.centros || [];
+    const an = cc.centros_anterior || [];
+    const mapa = {};
     at.forEach(x => { mapa[x.nome] = {at: x.valor, an: 0}; });
     an.forEach(x => { if (mapa[x.nome]) mapa[x.nome].an = x.valor; else mapa[x.nome] = {at: 0, an: x.valor}; });
-    const rows = []; let totalAt = 0, totalAn = 0;
-    Object.keys(mapa).sort().forEach(nome => { const {at: va, an: vb} = mapa[nome]; totalAt += va; totalAn += vb; const variacao = vb ? ((va - vb) / Math.abs(vb)) * 100 : 0; rows.push([nome, moeda(va), moeda(vb), pct(variacao)]); });
+    
+    const rows = [];
+    let totalAt = 0, totalAn = 0;
+    Object.keys(mapa).sort().forEach(nome => {
+        const {at: va, an: vb} = mapa[nome];
+        totalAt += va; totalAn += vb;
+        const variacao = vb ? ((va - vb) / Math.abs(vb)) * 100 : 0;
+        rows.push([nome, moeda(va), moeda(vb), pct(variacao)]);
+    });
     rows.push(['TOTAL', moeda(totalAt), moeda(totalAn), pct(totalAn ? ((totalAt-totalAn)/Math.abs(totalAn))*100 : 0)]);
     H += tab(['Centro de Custo','Atual','Anterior','Variação'], rows);
+
+    // --- GRÁFICOS (PIZZA E BARRAS) ---
+    // Transforma o mapa em uma lista ordenada pelo maior gasto atual
+    const centrosList = Object.keys(mapa).map(nome => ({
+        nome: nome,
+        atual: mapa[nome].at,
+        anterior: mapa[nome].an
+    })).sort((a, b) => b.atual - a.atual);
+
+    // --- GRÁFICO 1 (PIZZA) ---
+    const coresPizza = ['#003366', '#5B9BD5', '#C00000', '#7030A0', '#00B050', '#F08080', '#20B2AA', '#FF8C00'];
+    let svgPizza = '<svg viewBox="0 0 450 250" width="100%" height="250" style="font-family: Arial, sans-serif;">';
+    let startAngle = 0;
+    const cx = 110, cy = 125, r = 90;
+
+    centrosList.forEach((c, i) => {
+        let angle = (c.atual / totalAt) * 360;
+        let endAngle = startAngle + angle;
+        let radStart = (startAngle - 90) * Math.PI / 180;
+        let radEnd = (endAngle - 90) * Math.PI / 180;
+        
+        let x1 = cx + r * Math.cos(radStart);
+        let y1 = cy + r * Math.sin(radStart);
+        let x2 = cx + r * Math.cos(radEnd);
+        let y2 = cy + r * Math.sin(radEnd);
+        let largeArc = angle > 180 ? 1 : 0;
+        
+        svgPizza += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${coresPizza[i % coresPizza.length]}" />`;
+        
+        let midAngle = startAngle + angle / 2;
+        let radMid = (midAngle - 90) * Math.PI / 180;
+        let lx = cx + (r/2) * Math.cos(radMid);
+        let ly = cy + (r/2) * Math.sin(radMid);
+        if (angle > 10) {
+            svgPizza += `<text x="${lx}" y="${ly+3}" font-size="9" fill="#fff" text-anchor="middle" font-weight="bold">${Math.round((c.atual/totalAt)*100)}%</text>`;
+        }
+        startAngle = endAngle;
+    });
+
+    // Legenda Pizza
+    centrosList.forEach((c, i) => {
+        let label = c.nome.length > 30 ? c.nome.substring(0, 30) + '...' : c.nome;
+        let yPos = 15 + i * 22;
+        svgPizza += `<rect x="220" y="${yPos}" width="12" height="12" fill="${coresPizza[i % coresPizza.length]}" rx="2" />`;
+        svgPizza += `<text x="238" y="${yPos + 10}" font-size="9" fill="#333">${label}</text>`;
+    });
+    svgPizza += '</svg>';
+
+    // --- GRÁFICO 2 (BARRAS) ---
+    let svgBarras = '<svg viewBox="0 0 500 280" width="100%" height="280" style="font-family: Arial, sans-serif;">';
+    const maxVal = Math.max(...centrosList.map(c => Math.max(c.atual, c.anterior))) || 1;
+    const scale = 180 / maxVal;
+
+    // Eixos
+    for (let i = 0; i <= 4; i++) {
+        let y = 200 - (i * 45);
+        let val = (maxVal / 4) * i;
+        svgBarras += `<line x1="50" y1="${y}" x2="480" y2="${y}" stroke="#e0e0e0" stroke-width="1" />`;
+        svgBarras += `<text x="45" y="${y + 4}" font-size="9" fill="#666" text-anchor="end">${Math.round(val).toLocaleString('pt-BR')}</text>`;
+    }
+
+    // Barras
+    const barWidth = 20;
+    const gap = 5;
+    const startX = 60;
+    const stepX = 55;
+
+    centrosList.forEach((c, i) => {
+        let x = startX + (i * stepX);
+        let hAt = Math.max(1, c.atual * scale);
+        let hAn = Math.max(1, c.anterior * scale);
+        
+        svgBarras += `<rect x="${x}" y="${200 - hAt}" width="${barWidth}" height="${hAt}" fill="#003366" rx="2" />`;
+        svgBarras += `<rect x="${x + barWidth + gap}" y="${200 - hAn}" width="${barWidth}" height="${hAn}" fill="#5B9BD5" rx="2" />`;
+        
+        // Rótulos encurtados e rotacionados
+        let label = c.nome.substring(0, 6);
+        svgBarras += `<text x="${x + barWidth}" y="${215}" font-size="8" fill="#333" text-anchor="end" transform="rotate(-45 ${x + barWidth} 215)">${label}</text>`;
+    });
+
+    // Legenda Barras
+    svgBarras += `<rect x="180" y="260" width="12" height="12" fill="#003366" />`;
+    svgBarras += `<text x="198" y="270" font-size="10" fill="#333">Atual</text>`;
+    svgBarras += `<rect x="260" y="260" width="12" height="12" fill="#5B9BD5" />`;
+    svgBarras += `<text x="278" y="270" font-size="10" fill="#333">Anterior</text>`;
+
+    svgBarras += '</svg>';
+
+    // Renderiza lado a lado
+    H += '<div style="display: flex; gap: 20px; margin-top: 30px; page-break-inside: avoid;">';
+    H += '<div style="flex: 1; background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">';
+    H += '<h3 style="text-align: center; color: #003366; font-size: 12px; margin-top: 0; margin-bottom: 10px;">Distribuição dos Gastos (Atual)</h3>';
+    H += svgPizza;
+    H += '</div>';
+    
+    H += '<div style="flex: 1.5; background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">';
+    H += '<h3 style="text-align: center; color: #003366; font-size: 12px; margin-top: 0; margin-bottom: 10px;">Comparativo Atual x Anterior</h3>';
+    H += svgBarras;
+    H += '</div>';
+    H += '</div>';
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 12. CUSTO DE PESSOAL =====
@@ -1220,6 +1354,8 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
 
 
 
