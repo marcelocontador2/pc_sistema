@@ -937,9 +937,132 @@ const cdesp = unwrap(D.comparativo_despesas);
 if (cdesp) {
     const at = cdesp.atual || {};
     H += sub('Resumo');
-    H += tab(['Indicador','Valor'], [['Despesa Orçada', moeda(at.orcado_total)], ['Despesa Empenhada', moeda(at.empenhado_total)], ['Despesa Liquidada', moeda(at.liquidado_total)], ['% Execução', pct(at.percentual_total)]]);
-    if (at.grupos && at.grupos.length) { H += sub('Composição por Grupo'); H += tab(['Grupo','Orçado','Empenhado','Liquidado','%'], at.grupos.map(g => [g.nome, moeda(g.orcado), moeda(g.empenhado), moeda(g.liquidado), pct(g.percentual)])); }
-    if (at.detalhes && at.detalhes.length) { H += sub('Detalhamento das Despesas'); H += tab(['Descrição','Orçado','Empenhado','%'], at.detalhes.map(x => [x.nome, moeda(x.orcado), moeda(x.empenhado), pct(x.percentual)])); }
+    H += tab(['Indicador','Valor'], [
+        ['Despesa Orçada', moeda(at.orcado_total)],
+        ['Despesa Empenhada', moeda(at.empenhado_total)],
+        ['Despesa Liquidada', moeda(at.liquidado_total)],
+        ['% Execução', pct(at.percentual_total)]
+    ]);
+    if (at.grupos && at.grupos.length) {
+        H += sub('Composição por Grupo');
+        const rows = at.grupos.map(g => [g.nome, moeda(g.orcado), moeda(g.empenhado), moeda(g.liquidado), pct(g.percentual)]);
+        H += tab(['Grupo','Orçado','Empenhado','Liquidado','%'], rows);
+    }
+    if (at.detalhes && at.detalhes.length) {
+        H += sub('Detalhamento das Despesas');
+        const rows = at.detalhes.map(x => [x.nome, moeda(x.orcado), moeda(x.empenhado), pct(x.percentual)]);
+        H += tab(['Descrição','Orçado','Empenhado','%'], rows);
+
+        // --- INÍCIO DOS GRÁFICOS ---
+        const detalhes = at.detalhes.map(d => ({
+            nome: d.nome,
+            orcado: Number(d.orcado) || 0,
+            empenhado: Number(d.empenhado) || 0
+        }));
+
+        // Ordena pelo maior empenhado e pega TOP 10
+        const top10 = [...detalhes].sort((a, b) => b.empenhado - a.empenhado).slice(0, 10);
+        const outras = detalhes.slice(10).reduce((acc, d) => acc + d.empenhado, 0);
+        
+        const totalEmpenhado = top10.reduce((acc, d) => acc + d.empenhado, 0) + outras;
+        const dadosPizza = top10.map(d => ({ nome: d.nome, valor: d.empenhado }));
+        if (outras > 0) dadosPizza.push({ nome: 'Outras Despesas', valor: outras });
+
+        // --- GRÁFICO 1 (PIZZA TOP 10) ---
+        // Paleta com 11 cores (10 itens + Outras)
+        const coresPizza = ['#003366', '#5B9BD5', '#C00000', '#7030A0', '#00B050', '#FF8C00', '#F08080', '#20B2AA', '#8B4513', '#DAA520', '#A9A9A9'];
+        
+        // Aumentei a altura do SVG (320) para caber a legenda de 11 itens
+        let svgPizza = '<svg viewBox="0 0 450 320" width="100%" height="320" style="font-family: Arial, sans-serif;">';
+        let startAngle = 0;
+        const cx = 110, cy = 160, r = 90; // Centralizado no lado esquerdo
+
+        dadosPizza.forEach((d, i) => {
+            let angle = (d.valor / totalEmpenhado) * 360;
+            let endAngle = startAngle + angle;
+            let radStart = (startAngle - 90) * Math.PI / 180;
+            let radEnd = (endAngle - 90) * Math.PI / 180;
+            
+            let x1 = cx + r * Math.cos(radStart);
+            let y1 = cy + r * Math.sin(radStart);
+            let x2 = cx + r * Math.cos(radEnd);
+            let y2 = cy + r * Math.sin(radEnd);
+            let largeArc = angle > 180 ? 1 : 0;
+            
+            svgPizza += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${coresPizza[i % coresPizza.length]}" />`;
+            
+            let midAngle = startAngle + angle / 2;
+            let radMid = (midAngle - 90) * Math.PI / 180;
+            let lx = cx + (r/2) * Math.cos(radMid);
+            let ly = cy + (r/2) * Math.sin(radMid);
+            if (angle > 8) { // Mostra % só se a fatia for grande o suficiente
+                svgPizza += `<text x="${lx}" y="${ly+3}" font-size="9" fill="#fff" text-anchor="middle" font-weight="bold">${Math.round((d.valor/totalEmpenhado)*100)}%</text>`;
+            }
+            startAngle = endAngle;
+        });
+
+        // Legenda Pizza (11 itens, espaçamento de 24px)
+        dadosPizza.forEach((d, i) => {
+            let label = d.nome.length > 25 ? d.nome.substring(0, 25) + '...' : d.nome;
+            let yPos = 20 + i * 24; 
+            svgPizza += `<rect x="220" y="${yPos}" width="12" height="12" fill="${coresPizza[i % coresPizza.length]}" rx="2" />`;
+            svgPizza += `<text x="238" y="${yPos + 10}" font-size="10" fill="#333">${label}</text>`;
+        });
+        svgPizza += '</svg>';
+
+        // --- GRÁFICO 2 (BARRAS - TODAS AS DESPESAS) ---
+        let svgBarras = '<svg viewBox="0 0 500 250" width="100%" height="250" style="font-family: Arial, sans-serif;">';
+        const maxVal = Math.max(...detalhes.map(d => Math.max(d.orcado, d.empenhado))) || 1;
+        const scale = 180 / maxVal;
+
+        // Eixos
+        for (let i = 0; i <= 4; i++) {
+            let y = 200 - (i * 45);
+            let val = (maxVal / 4) * i;
+            svgBarras += `<line x1="50" y1="${y}" x2="480" y2="${y}" stroke="#e0e0e0" stroke-width="1" />`;
+            svgBarras += `<text x="45" y="${y + 4}" font-size="9" fill="#666" text-anchor="end">${Math.round(val).toLocaleString('pt-BR')}</text>`;
+        }
+
+        // Barras
+        const barWidth = 10;
+        const gap = 3;
+        const startX = 60;
+        const stepX = 25;
+
+        detalhes.forEach((d, i) => {
+            let x = startX + (i * stepX);
+            let hOrc = Math.max(1, d.orcado * scale);
+            let hEmp = Math.max(1, d.empenhado * scale);
+            
+            svgBarras += `<rect x="${x}" y="${200 - hOrc}" width="${barWidth}" height="${hOrc}" fill="#003366" rx="1" />`;
+            svgBarras += `<rect x="${x + barWidth + gap}" y="${200 - hEmp}" width="${barWidth}" height="${hEmp}" fill="#5B9BD5" rx="1" />`;
+            
+            // Labels do eixo X
+            let label = d.nome.substring(0, 4).toUpperCase();
+            svgBarras += `<text x="${x + barWidth}" y="${215}" font-size="7" fill="#333" text-anchor="end" transform="rotate(-45 ${x + barWidth} 215)">${label}</text>`;
+        });
+
+        // Legenda Barras
+        svgBarras += `<rect x="180" y="235" width="12" height="12" fill="#003366" />`;
+        svgBarras += `<text x="198" y="245" font-size="10" fill="#333">Orçado</text>`;
+        svgBarras += `<rect x="260" y="235" width="12" height="12" fill="#5B9BD5" />`;
+        svgBarras += `<text x="278" y="245" font-size="10" fill="#333">Empenhado</text>`;
+
+        svgBarras += '</svg>';
+
+        // Renderiza lado a lado
+        H += '<div style="display: flex; gap: 20px; margin-top: 30px; page-break-inside: avoid;">';
+        H += '<div style="flex: 1; background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">';
+        H += '<h3 style="text-align: center; color: #003366; font-size: 12px; margin-top: 0; margin-bottom: 10px;">Top 10 Maiores Despesas (Empenhado)</h3>';
+        H += svgPizza;
+        H += '</div>';
+        
+        H += '<div style="flex: 1.5; background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">';
+        H += '<h3 style="text-align: center; color: #003366; font-size: 12px; margin-top: 0; margin-bottom: 10px;">Orçado x Empenhado (Todas as Despesas)</h3>';
+        H += svgBarras;
+        H += '</div>';
+        H += '</div>';
+    }
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 9. LIQUIDEZ =====
@@ -1097,6 +1220,8 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
 
 
 
