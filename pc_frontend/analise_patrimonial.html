@@ -318,5 +318,41 @@
         });
     </script>
 
+
+<script>
+// CORRECAO_BOTAO_PDF
+document.addEventListener('DOMContentLoaded', function() {
+    // Procura o botão "Gerar PDF" de qualquer forma
+    const botoes = Array.from(document.querySelectorAll('button, a, .btn'));
+    const btnPdf = botoes.find(b => b.innerText.includes('Gerar PDF'));
+    
+    if (btnPdf) {
+        // Remove o onclick antigo
+        btnPdf.removeAttribute('onclick');
+        
+        // Adiciona o novo listener
+        btnPdf.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Procura radio OU checkbox marcado
+            let sel = document.querySelector('input[type="radio"]:checked');
+            if (!sel) {
+                sel = document.querySelector('input[type="checkbox"]:checked');
+            }
+            
+            if (!sel) {
+                alert('Selecione um relatório no histórico primeiro.');
+                return;
+            }
+            
+            const id = sel.value;
+            const url = '/gerar_pdf_analise_patrimonial/' + id;
+            console.log('[DEBUG] Abrindo PDF DVP:', url);
+            window.open(url, '_blank');
+        });
+    }
+});
+</script>
 </body>
+
 </html>

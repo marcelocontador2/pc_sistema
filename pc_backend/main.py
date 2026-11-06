@@ -1671,31 +1671,6 @@ async def excluir_bf(id: int):
     conn.commit(); conn.close()
     return {"mensagem": "Excluido"}
 
-@app.get("/gerar_pdf_analise_patrimonial/{historico_id}")
-def gerar_pdf_analise_patrimonial(historico_id: int):
-    from playwright.sync_api import sync_playwright
-    from fastapi.responses import Response
-    import time
-    
-    # Abre a tela do relatório passando o ID do histórico
-    url = f"http://127.0.0.1:9994/relatorio_analise_patrimonial?historico_id={historico_id}&_t={int(time.time())}"
-    
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(bypass_csp=True)
-        page = context.new_page()
-        page.goto(url, wait_until="networkidle")
-        page.wait_for_timeout(2000)
-        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
-        browser.close()
-    
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=patrimonial_{historico_id}.pdf"}
-    )
-
-
 @app.get("/gerar_pdf_analise_financeira_bf/{id}")
 async def gerar_pdf_analise_financeira_bf(id: int):
     try:
@@ -2651,6 +2626,7 @@ async def gerar_pdf_analise_orcamentaria(id: int):
 @app.get("/gerar_pdf_analise_patrimonial/{id}")
 async def gerar_pdf_analise_patrimonial(id: int):
     try:
+        fonte_padrao = "Helvetica"
         from fpdf import FPDF
         from fpdf.enums import XPos, YPos
         from fastapi.responses import Response
