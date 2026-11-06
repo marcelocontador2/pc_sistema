@@ -5149,54 +5149,7 @@ app.mount("/static_logos", StaticFiles(directory=os.path.join(os.path.dirname(os
 # ROTAS DO RELATORIO CONSOLIDADO
 # ============================================================
 
-@app.get("/api/relatorio_consolidado/{periodo}")
-async def api_relatorio_consolidado(periodo: str):
-    import sqlite3, os, json
-    # Aqui buscamos os dados de todos os modulos (BP, DFC, DVP, DMPL, BF, Integridade)
-    # Para simplificar, vamos apenas retornar o status de cada um
-    # (Na proxima etapa, cruzamos os dados reais)
-    
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    modulos = {}
-    # Verifica quais modulos tem historico salvo para esse periodo
-    for tabela in ["historico_analise_financeira_bf", "historico_analise_dfc", "historico_integridade_matriz"]:
-        try:
-            cursor.execute(f"SELECT COUNT(*) FROM {tabela} WHERE periodo LIKE ?", (f"%{periodo}%",))
-            modulos[tabela] = cursor.fetchone()[0]
-        except Exception:
-            modulos[tabela] = 0
-    
-    conn.close()
-    
-    return {
-        "periodo": periodo,
-        "modulos": modulos,
-        "status": "ok" if sum(modulos.values()) > 0 else "faltando"
-    }
 
-@app.post("/salvar_relatorio_consolidado/{periodo}")
-async def salvar_relatorio_consolidado(periodo: str):
-    import sqlite3, json
-    from datetime import datetime
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_relatorio_consolidado (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    
-    # Pega os dados de todos os modulos
-    # Por enquanto, salvamos um JSON simples (na proxima etapa sera completo)
-    dados = {"periodo": periodo, "gerado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-    data_agora = dados["gerado_em"]
-    
-    cursor.execute("INSERT INTO historico_relatorio_consolidado (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
-                   (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
-    conn.commit()
-    conn.close()
-    return {"ok": True, "mensagem": "Relatorio consolidado salvo com sucesso!"}
 
 @app.get("/historico_relatorio_consolidado")
 async def get_hist_consolidado():
@@ -5831,3 +5784,115 @@ async def excluir_panorama_multiplos(request: Request):
         return {"ok": True, "mensagem": f"{excluidos} itens excluídos"}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
+
+
+@app.get("/api/relatorio_consolidado/{periodo}")
+async def api_relatorio_consolidado_novo(periodo: str):
+    import sqlite3, os, json
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    modulos = {
+        "analise_bp": "historico_analise_bp",
+        "analise_dfc": "historico_analise_dfc",
+        "analise_patrimonial": "historico_analise_patrimonial",
+        "analise_orcamentaria": "historico_analise_orcamentaria",
+        "analise_financeira_bf": "historico_analise_financeira_bf",
+        "comparativo_receitas": "historico_comparativo_receitas",
+        "comparativo_despesas": "historico_comparativo_despesas",
+        "panorama": "historico_panorama",
+        "liquidez": "historico_liquidez",
+        "integridade": "historico_integridade_matriz",
+        "conferencia": "historico_conferencia",
+        "custo_pessoal": "historico_custo_pessoal"  # <-- ADICIONADO
+    }
+    
+    nomes_amigaveis = {
+        "analise_bp": "Análise BP",
+        "analise_dfc": "Análise DFC",
+        "analise_patrimonial": "Análise Patrimonial (DVP)",
+        "analise_orcamentaria": "Análise Orçamentária (BO)",
+        "analise_financeira_bf": "Análise Financeira (BF)",
+        "comparativo_receitas": "Comparativo de Receitas",
+        "comparativo_despesas": "Comparativo de Despesas",
+        "panorama": "Panorama de Resultados",
+        "liquidez": "Índices de Liquidez",
+        "integridade": "Integridade entre Demonstrações",
+        "conferencia": "Conferência das Demonstrações",
+        "custo_pessoal": "Custo de Pessoal"  # <-- ADICIONADO
+    }
+    
+    encontrados = {}
+    faltando = []
+    
+    for chave, tabela in modulos.items():
+        try:
+            # Tenta buscar a coluna resultado_json (padrão)
+            # Se falhar, tenta dados_json (como nos comparativos)
+            try:
+                cursor.execute(f"SELECT resultado_json, data_geracao FROM {tabela} WHERE periodo LIKE ? ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
+                row = cursor.fetchone()
+            except sqlite3.OperationalError:
+                cursor.execute(f"SELECT dados_json, data_geracao FROM {tabela} WHERE periodo LIKE ? ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
+                row = cursor.fetchone()
+            
+            if row:
+                try:
+                    dados = json.loads(row[0])
+                except:
+                    dados = {"raw": row[0]}
+                encontrados[chave] = {
+                    "nome": nomes_amigaveis[chave],
+                    "data_geracao": row[1],
+                    "dados": dados
+                }
+            else:
+                faltando.append({"chave": chave, "nome": nomes_amigaveis[chave]})
+        except Exception as e:
+            faltando.append({"chave": chave, "nome": nomes_amigaveis[chave], "erro": str(e)})
+    
+    conn.close()
+    
+    return {
+        "periodo": periodo,
+        "encontrados": encontrados,
+        "faltando": faltando,
+        "status": "ok" if len(faltando) == 0 else "faltando",
+        "total_modulos": len(modulos),
+        "total_encontrados": len(encontrados),
+        "total_faltando": len(faltando)
+    }
+
+@app.post("/salvar_relatorio_consolidado/{periodo}")
+async def salvar_relatorio_consolidado_novo(periodo: str):
+    import sqlite3, os, json
+    from datetime import datetime
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_relatorio_consolidado (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    
+    # Chama a API para coletar os dados
+    dados_api = await api_relatorio_consolidado_novo(periodo)
+    
+    if dados_api["status"] == "faltando":
+        return {
+            "ok": False,
+            "mensagem": f"Faltam {len(dados_api['faltando'])} módulo(s) para consolidar.",
+            "faltando": dados_api["faltando"]
+        }
+    
+    dados_consolidados = {
+        "periodo": periodo,
+        "data_geracao": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "dados": dados_api["encontrados"]
+    }
+    
+    cursor.execute("INSERT INTO historico_relatorio_consolidado (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+                   (periodo, dados_consolidados["data_geracao"], json.dumps(dados_consolidados, ensure_ascii=False)))
+    conn.commit()
+    conn.close()
+    
+    return {"ok": True, "mensagem": "Relatório consolidado salvo com sucesso!", "dados": dados_consolidados}
