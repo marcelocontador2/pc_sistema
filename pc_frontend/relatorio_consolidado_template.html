@@ -295,11 +295,66 @@ H += tit(9, 'Índices de Liquidez e Estrutura');
 H += '<div class="desc">Indicadores de liquidez e estrutura patrimonial.</div>';
 const liq = unwrap(D.liquidez);
 if (liq) {
-    H += sub('Liquidez'); const rowsLiq = [];
-    if (liq.liquidez) { [['Liquidez Imediata','liquidez_imediata'], ['Liquidez Corrente','liquidez_corrente'], ['Liquidez Seca','liquidez_seca'], ['Liquidez Geral','liquidez_geral']].forEach(([label, key]) => { if (liq.liquidez[key] !== undefined) rowsLiq.push([label, liq.liquidez[key]]); }); }
+    H += sub('Liquidez');
+    const rowsLiq = [];
+    if (liq.liquidez) {
+        [['Liquidez Imediata','liquidez_imediata'], ['Liquidez Corrente','liquidez_corrente'],
+         ['Liquidez Seca','liquidez_seca'], ['Liquidez Geral','liquidez_geral']].forEach(([label, key]) => {
+            if (liq.liquidez[key] !== undefined) rowsLiq.push([label, liq.liquidez[key]]);
+        });
+    }
     H += tab(['Indicador','Valor'], rowsLiq);
-    if (liq.estrutura) { H += sub('Estrutura Patrimonial'); const rowsEst = []; [['Endividamento Geral','endividamento_geral'], ['Part. Capital de Terceiros','part_capital_terceiros'], ['Imobilização do PL','imobilizacao_pl']].forEach(([label, key]) => { if (liq.estrutura[key] !== undefined) rowsEst.push([label, liq.estrutura[key] + '%']); }); H += tab(['Indicador','Valor'], rowsEst); }
-    if (liq.valores) { H += sub('Valores Base'); const labelsVal = { caixa:'Caixa', ativo_circulante:'Ativo Circulante', estoques:'Estoques', realizavel_lp:'Realizável LP', ativo_nao_circulante:'Ativo Não Circulante', imobilizado:'Imobilizado', passivo_circulante:'Passivo Circulante', passivo_nao_circulante:'Passivo Não Circulante', passivo_total:'Passivo Total', ativo_total:'Ativo Total', patrimonio_liquido:'Patrimônio Líquido' }; const rowsVal = []; Object.keys(labelsVal).forEach(k => { if (liq.valores[k] !== undefined) rowsVal.push([labelsVal[k], moeda(liq.valores[k])]); }); H += tab(['Item','Valor'], rowsVal); }
+
+    if (liq.estrutura) {
+        H += sub('Estrutura Patrimonial');
+        const rowsEst = [];
+        [['Endividamento Geral','endividamento_geral'], ['Part. Capital de Terceiros','part_capital_terceiros'],
+         ['Imobilização do PL','imobilizacao_pl']].forEach(([label, key]) => {
+            if (liq.estrutura[key] !== undefined) rowsEst.push([label, liq.estrutura[key] + '%']);
+        });
+        H += tab(['Indicador','Valor'], rowsEst);
+    }
+
+    if (liq.valores) {
+        H += sub('Valores Base');
+        const labelsVal = { caixa:'Caixa', ativo_circulante:'Ativo Circulante', estoques:'Estoques',
+            realizavel_lp:'Realizável LP', ativo_nao_circulante:'Ativo Não Circulante',
+            imobilizado:'Imobilizado', passivo_circulante:'Passivo Circulante',
+            passivo_nao_circulante:'Passivo Não Circulante', passivo_total:'Passivo Total',
+            ativo_total:'Ativo Total', patrimonio_liquido:'Patrimônio Líquido' };
+        const rowsVal = [];
+        Object.keys(labelsVal).forEach(k => {
+            if (liq.valores[k] !== undefined) rowsVal.push([labelsVal[k], moeda(liq.valores[k])]);
+        });
+        H += tab(['Item','Valor'], rowsVal);
+
+        // ===== MEMÓRIA DE CÁLCULO =====
+        H += sub('Memória de Cálculo');
+        const v = liq.valores;
+        
+        // Garante que os valores são numéricos para a conta
+        const vCx = Number(v.caixa) || 0;
+        const vAC = Number(v.ativo_circulante) || 0;
+        const vEst = Number(v.estoques) || 0;
+        const vRLP = Number(v.realizavel_lp) || 0;
+        const vPC = Number(v.passivo_circulante) || 0;
+        const vPNC = Number(v.passivo_nao_circulante) || 0;
+        const vPT = Number(v.passivo_total) || 0;
+        const vAT = Number(v.ativo_total) || 0;
+        const vPL = Number(v.patrimonio_liquido) || 0;
+        const vImob = Number(v.imobilizado) || 0;
+
+        const calcRows = [
+            ['Liquidez Imediata', 'Caixa / Passivo Circulante', `${moeda(vCx)} / ${moeda(vPC)}`, (vPC ? (vCx / vPC).toFixed(2).replace('.', ',') : '-')],
+            ['Liquidez Corrente', 'Ativo Circulante / Passivo Circulante', `${moeda(vAC)} / ${moeda(vPC)}`, (vPC ? (vAC / vPC).toFixed(2).replace('.', ',') : '-')],
+            ['Liquidez Seca', '(Ativo Circulante - Estoques) / Passivo Circulante', `(${moeda(vAC)} - ${moeda(vEst)}) / ${moeda(vPC)}`, (vPC ? ((vAC - vEst) / vPC).toFixed(2).replace('.', ',') : '-')],
+            ['Liquidez Geral', '(Ativo Circ. + Realizável LP) / (Passivo Circ. + Passivo Não Circ.)', `(${moeda(vAC)} + ${moeda(vRLP)}) / (${moeda(vPC)} + ${moeda(vPNC)})`, ((vPC + vPNC) ? ((vAC + vRLP) / (vPC + vPNC)).toFixed(2).replace('.', ',') : '-')],
+            ['Endividamento Geral', 'Passivo Total / Ativo Total', `${moeda(vPT)} / ${moeda(vAT)}`, (vAT ? ((vPT / vAT) * 100).toFixed(2).replace('.', ',') + '%' : '-')],
+            ['Part. Capital de Terceiros', '(Passivo Circ. + Passivo Não Circ.) / PL', `(${moeda(vPC)} + ${moeda(vPNC)}) / ${moeda(vPL)}`, (vPL ? (((vPC + vPNC) / vPL) * 100).toFixed(2).replace('.', ',') + '%' : '-')],
+            ['Imobilização do PL', 'Imobilizado / PL', `${moeda(vImob)} / ${moeda(vPL)}`, (vPL ? ((vImob / vPL) * 100).toFixed(2).replace('.', ',') + '%' : '-')]
+        ];
+        H += tab(['Índice', 'Fórmula', 'Cálculo com Valores', 'Resultado'], calcRows);
+    }
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 10. PANORAMA =====
@@ -327,13 +382,83 @@ if (cc && cc.centros) {
 
 // ===== 12. CUSTO DE PESSOAL =====
 H += tit(12, 'Custo de Pessoal');
-H += '<div class="desc">Custo de pessoal x limite legal.</div>';
+H += '<div class="desc">Custo de pessoal x limite legal (Resolução Cofen 814/2026).</div>';
 const cp = unwrap(D.custo_pessoal);
 if (cp) {
+    // Desembrulha o objeto 'dados' que vem do backend
+    const c = cp.dados || cp;
+
     H += sub('Composição do Custo');
-    H += tab(['Item','Atual','Anterior','Total'], [['Pessoal e Encargos', moeda(cp.pessoal_atual), moeda(cp.pessoal_anterior), moeda(cp.pessoal_total)],['Outras Despesas Variáveis', moeda(cp.outras_atual), moeda(cp.outras_anterior), moeda(cp.outras_total)],['Terceirização', moeda(cp.terc_atual), moeda(cp.terc_anterior), moeda(cp.terc_total)],['CUSTO TOTAL (Bruto)', moeda(cp.custo_atual), moeda(cp.custo_anterior), moeda(cp.custo_total)],['RCL Total', moeda(cp.rcl_atual), moeda(cp.rcl_anterior), moeda(cp.rcl_total)]]);
+    H += tab(['Item','Atual','Anterior','Total'], [
+        ['Pessoal e Encargos', moeda(c.pessoal_atual), moeda(c.pessoal_anterior), moeda(c.pessoal_total)],
+        ['Outras Despesas Variáveis', moeda(c.outras_atual), moeda(c.outras_anterior), moeda(c.outras_total)],
+        ['Terceirização', moeda(c.terc_atual), moeda(c.terc_anterior), moeda(c.terc_total)],
+        ['CUSTO TOTAL (Bruto)', moeda(c.custo_atual), moeda(c.custo_anterior), moeda(c.custo_total)],
+        ['RCL Total (12 meses)', moeda(c.rcl_atual), moeda(c.rcl_anterior), moeda(c.rcl_total)]
+    ]);
+    
     H += sub('Limite e Margem');
-    H += tab(['Item','Valor'], [['Limite', moeda(cp.limite_total)],['Margem Disponível', moeda(cp.margem_disponivel_total)],['% Custo sobre RCL', pct(cp.pct_custo_total)],['Faixa de Controle', cp.faixa_controle || '-']]);
+    H += tab(['Item','Valor'], [
+        ['Limite Resolução Cofen 814/2026', moeda(c.limite_total)],
+        ['Margem Disponível', moeda(c.margem_disponivel_total)],
+        ['% Custo sobre RCL', pct(c.pct_custo_total)],
+        ['Faixa de Controle', c.faixa_controle || '-']
+    ]);
+
+    // --- NOVO QUADRO: Apuração consolidada 12 meses ---
+    H += sub('Apuração consolidada 12 meses');
+    
+    // Puxa os valores consolidados de 12 meses direto do backend
+    const vRCL = Number(c.rcl_total) || 0;
+    const vCusto = Number(c.custo_total) || 0;
+    const vLimite = Number(c.limite_total) || (vRCL * 0.5);
+    const vMargem = Number(c.margem_disponivel_total) || (vLimite - vCusto);
+    
+    // Calcula os percentuais com base na RCL Total
+    const pctRcl = 100;
+    const pctCusto = vRCL ? (vCusto / vRCL * 100) : 0;
+    const pctMargem = vRCL ? (vMargem / vRCL * 100) : 0;
+    const pctLimite = vRCL ? (vLimite / vRCL * 100) : 0;
+    const pctSituacao = pctCusto;
+    
+    const valFmt = (v) => moeda(v).replace('R$ ', ''); // Remove o R$ da coluna de valores
+
+    H += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; border-top: 2px solid #003366;">';
+    H += '<thead>';
+    H += '<tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">';
+    H += '<th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Indicador</th>';
+    H += '<th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">Valor (R$)</th>';
+    H += '<th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">% da RCL</th>';
+    H += '</tr>';
+    H += '</thead>';
+    H += '<tbody>';
+    H += '<tr>';
+    H += '<td style="padding: 8px; border-bottom: 1px solid #eee;">Receita Corrente Líquida (RCL)</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vRCL) + '</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctRcl) + '</td>';
+    H += '</tr>';
+    H += '<tr>';
+    H += '<td style="padding: 8px; border-bottom: 1px solid #eee;">(-) Custo de Pessoal (Bruto)</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vCusto) + '</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctCusto) + '</td>';
+    H += '</tr>';
+    H += '<tr style="background: #f8f9fa;">';
+    H += '<td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">(=) Margem Disponível (Limite Resolução Cofen 814/2026 - Custo)</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + valFmt(vMargem) + '</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + pct(pctMargem) + '</td>';
+    H += '</tr>';
+    H += '<tr>';
+    H += '<td style="padding: 8px; border-bottom: 1px solid #eee;">Limite Resolução Cofen 814/2026 (50,00% da RCL)</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vLimite) + '</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctLimite) + '</td>';
+    H += '</tr>';
+    H += '<tr>';
+    H += '<td style="padding: 8px; border-bottom: 1px solid #eee;">Situação</td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;"></td>';
+    H += '<td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; color: #28a745; font-weight: bold;">' + pct(pctSituacao) + '</td>';
+    H += '</tr>';
+    H += '</tbody>';
+    H += '</table>';
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 13. PARECER =====
@@ -345,6 +470,10 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
+
+
 
 
 
