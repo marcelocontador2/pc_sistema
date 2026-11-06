@@ -59,6 +59,36 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 app = FastAPI(title="PC - Prestacao de Contas API")
 
+# ===== MONKEY-PATCH PARA UTF-8 NO FPDF (v2) =====
+import os as _os_mp
+_FONT_PATH_UTF8 = "C:/Windows/Fonts/arial.ttf"
+
+if _os_mp.path.exists(_FONT_PATH_UTF8):
+    try:
+        from fpdf import FPDF as _FPDF_Original
+
+        _original_set_font = _FPDF_Original.set_font
+
+        def _set_font_utf8(self, family="helvetica", style="", size=0):
+            if str(family).lower() in ("helvetica", "arial"):
+                try:
+                    if "ArialUTF8" not in self.fonts:
+                        self.add_font("ArialUTF8", "", _FONT_PATH_UTF8, uni=True)
+                        self.add_font("ArialUTF8", "B", _FONT_PATH_UTF8, uni=True)
+                        self.add_font("ArialUTF8", "I", _FONT_PATH_UTF8, uni=True)
+                    family = "ArialUTF8"
+                except Exception:
+                    pass
+            return _original_set_font(self, family, style, size)
+
+        _FPDF_Original.set_font = _set_font_utf8
+    except Exception as _e:
+        print(f"[FPDF-UTF8] Erro no monkey-patch: {_e}")
+# ===== FIM DO MONKEY-PATCH =====
+
+
+
+
 @app.get("/dashboard_despesas")
 def get_dashboard_despesas():
     from fastapi.responses import FileResponse
@@ -1676,7 +1706,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         import sqlite3, os
         from datetime import datetime
 
-        fonte_padrao = "Helvetica"  # Definicao da fonte
+        fonte_padrao = "ArialUnicode"  # Definicao da fonte
 
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
@@ -1697,6 +1727,12 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         d = resultado["dados"]
 
         pdf = FPDF()
+        pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
+        pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
+        pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
+        pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
+        pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
+        pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
         pdf.add_page()
         pdf.set_auto_page_break(auto=False)
 
@@ -1706,10 +1742,10 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_font(fonte_padrao, "B", 22)
         pdf.set_text_color(255, 255, 255)
         pdf.set_xy(15, 8)
-        pdf.cell(180, 10, "Balanco Financeiro", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(180, 10, "Balanço Financeiro", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font(fonte_padrao, "", 13)
         pdf.set_xy(15, 20)
-        pdf.cell(180, 8, f"Periodo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(180, 8, f"Período: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         pdf.set_draw_color(0, 51, 102)
         pdf.set_line_width(1.5)
@@ -1822,7 +1858,7 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_fill_color(240, 240, 240)
         pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
-        pdf.cell(170, 6, "EXTRAORCAMENTARIO", border=1, fill=True)
+        pdf.cell(170, 6, "EXTRAORÇAMENTÁRIO", border=1, fill=True)
         pdf.ln()
         y_pos += 6
         add_linha("Recebimentos Extraorcamentarios", d["extra"]["recebimentos"]["atual"], d["extra"]["recebimentos"]["anterior"])
@@ -1835,12 +1871,12 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.cell(170, 6, "CAIXA E EQUIVALENTES", border=1, fill=True)
         pdf.ln()
         y_pos += 6
-        add_linha("Saldo em Especie do Exercicio Anterior", d["caixa"]["saldo_anterior"]["atual"], d["caixa"]["saldo_anterior"]["anterior"])
-        add_linha("Geracao Liquida de Caixa", d["caixa"]["geracao_liquida"]["atual"], d["caixa"]["geracao_liquida"]["anterior"], bold=True)
-        add_linha("Saldo em Especie para o Exercicio Seguinte", d["caixa"]["saldo_seguinte"]["atual"], d["caixa"]["saldo_seguinte"]["anterior"], bold=True)
+        add_linha("Saldo em Espécie do Exercício Anterior", d["caixa"]["saldo_anterior"]["atual"], d["caixa"]["saldo_anterior"]["anterior"])
+        add_linha("Geração Líquida de Caixa", d["caixa"]["geracao_liquida"]["atual"], d["caixa"]["geracao_liquida"]["anterior"], bold=True)
+        add_linha("Saldo em Espécie para o Exercício Seguinte", d["caixa"]["saldo_seguinte"]["atual"], d["caixa"]["saldo_seguinte"]["anterior"], bold=True)
 
         # ==========================================
-        # NOVOS TOTAIS (INGRESSOS E DISPENDIOS)
+        # NOVOS TOTAIS (INGRESSOS E DISPÊNDIOS)
         # ==========================================
         y_pos += 5
         
@@ -1864,9 +1900,9 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.ln()
         y_pos += 6
         
-        add_linha("Receitas Orcamentarias (Corrente + Capital)", totRecAt, totRecAnt)
+        add_linha("Receitas Orçamentárias (Corrente + Capital)", totRecAt, totRecAnt)
         add_linha("Recebimentos Extraorcamentarios", totExtAt, totExtAnt)
-        add_linha("Saldo em Especie do Exercicio Anterior", saldoAntAt, saldoAntAnt)
+        add_linha("Saldo em Espécie do Exercício Anterior", saldoAntAt, saldoAntAnt)
         add_linha("TOTAL DE INGRESSOS", totalIngAt, totalIngAnt, bold=True, fill_color=(233, 236, 239), text_color=(0, 86, 179))
 
         # Calculos de Dispêndios
@@ -1886,14 +1922,14 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         pdf.set_text_color(255, 255, 255)
         pdf.set_font(fonte_padrao, "B", 10)
         pdf.set_xy(15, y_pos)
-        pdf.cell(170, 6, "TOTAL GERAL DE DISPENDIOS", border=1, fill=True)
+        pdf.cell(170, 6, "TOTAL GERAL DE DISPÊNDIOS", border=1, fill=True)
         pdf.ln()
         y_pos += 6
 
-        add_linha("Despesas Orcamentarias (Corrente + Capital)", totDespAt, totDespAnt)
+        add_linha("Despesas Orçamentárias (Corrente + Capital)", totDespAt, totDespAnt)
         add_linha("Pagamentos Extraorcamentarios", pagExtAt, pagExtAnt)
-        add_linha("Saldo em Especie para o Exercicio Seguinte", saldoSegAt, saldoSegAnt)
-        add_linha("TOTAL DE DISPENDIOS", totalDispAt, totalDispAnt, bold=True, fill_color=(233, 236, 239), text_color=(220, 53, 69))
+        add_linha("Saldo em Espécie para o Exercício Seguinte", saldoSegAt, saldoSegAnt)
+        add_linha("TOTAL DE DISPÊNDIOS", totalDispAt, totalDispAnt, bold=True, fill_color=(233, 236, 239), text_color=(220, 53, 69))
 
         # Rodape - Posiciona dinamicamente, abaixo da ultima linha (se houver espaco)
         y_rodape = max(y_pos + 5, 270)
@@ -2030,35 +2066,38 @@ async def gerar_pdf_analise_dfc(id: int):
 
     # Inicia o PDF
     pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
+    pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
+    pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
     pdf.add_page()
     
     # Cabecalho
     pdf.set_fill_color(0, 51, 102)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 15, "COFEN/BR - ANALISE DA DEMONSTRACAO DO FLUXO DE CAIXA", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
+    pdf.set_font("ArialUnicode", "B", 16)
+    pdf.cell(0, 15, "COFEN/BR - ANÁLISE DA DEMONSTRAÇÃO DO FLUXO DE CAIXA", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
     
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_font("ArialUnicode", "B", 10)
     pdf.ln(5)
-    pdf.cell(0, 6, f"Periodo de Referencia: {periodo.replace('-', ' ')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.cell(0, 6, f"Data de Geracao do Relatorio: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 6, f"Período de Referência: {periodo.replace('-', ' ')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+    pdf.cell(0, 6, f"Data de Geração do Relatório: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
     pdf.ln(10)
 
     # Tabela
-    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_font("ArialUnicode", "B", 9)
     pdf.set_fill_color(0, 86, 179)
     pdf.set_text_color(255, 255, 255)
     
     col_w = [70, 35, 35, 30]
-    headers = ["ESPECIFICACAO", "PERIODO ATUAL", "PERIODO ANTERIOR", "VAR. (%)"]
+    headers = ["ESPECIFICAÇÃO", "PERÍODO ATUAL", "PERÍODO ANTERIOR", "VAR. (%)"]
     
     for i, h in enumerate(headers):
         pdf.cell(col_w[i], 8, h, border=1, align="C", fill=True)
     pdf.ln()
 
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_font("ArialUnicode", "B", 8)
     
     def draw_row(label, va, vb, is_header=False, is_total=False):
         if is_header:
@@ -2067,9 +2106,9 @@ async def gerar_pdf_analise_dfc(id: int):
             pdf.ln()
             return
         if is_total:
-            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_font("ArialUnicode", "B", 8)
         else:
-            pdf.set_font("Helvetica", "", 8)
+            pdf.set_font("ArialUnicode", "", 8)
             
         pdf.cell(col_w[0], 6, label, border=1, align="L")
         pdf.cell(col_w[1], 6, fmt(va), border=1, align="R")
@@ -2079,86 +2118,86 @@ async def gerar_pdf_analise_dfc(id: int):
         pdf.ln()
 
     # Operacional
-    draw_row("FLUXO DE CAIXA DAS ATIVIDADES DAS OPERACOES", 0, 0, is_header=True)
+    draw_row("FLUXO DE CAIXA DAS ATIVIDADES DAS OPERAÇÕES", 0, 0, is_header=True)
     draw_row("Ingressos Operacionais", op.get("ingressos", {}).get("atual", 0), op.get("ingressos", {}).get("anterior", 0))
     draw_row("Desembolsos Operacionais", op.get("desembolsos", {}).get("atual", 0), op.get("desembolsos", {}).get("anterior", 0))
-    draw_row("Caixa Liquido das Operacoes", op.get("liquido", {}).get("atual", 0), op.get("liquido", {}).get("anterior", 0), is_total=True)
+    draw_row("Caixa Líquido das Operações", op.get("liquido", {}).get("atual", 0), op.get("liquido", {}).get("anterior", 0), is_total=True)
     
     # Investimento
     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DE INVESTIMENTO", 0, 0, is_header=True)
     draw_row("Ingressos de Investimento", inv.get("ingressos", {}).get("atual", 0), inv.get("ingressos", {}).get("anterior", 0))
     draw_row("Desembolsos de Investimento", inv.get("desembolsos", {}).get("atual", 0), inv.get("desembolsos", {}).get("anterior", 0))
-    draw_row("Caixa Liquido de Investimento", inv.get("liquido", {}).get("atual", 0), inv.get("liquido", {}).get("anterior", 0), is_total=True)
+    draw_row("Caixa Líquido de Investimento", inv.get("liquido", {}).get("atual", 0), inv.get("liquido", {}).get("anterior", 0), is_total=True)
     
     # Financiamento
     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DE FINANCIAMENTO", 0, 0, is_header=True)
     draw_row("Ingressos de Financiamento", fin.get("ingressos", {}).get("atual", 0), fin.get("ingressos", {}).get("anterior", 0))
     draw_row("Desembolsos de Financiamento", fin.get("desembolsos", {}).get("atual", 0), fin.get("desembolsos", {}).get("anterior", 0))
-    draw_row("Caixa Liquido de Financiamento", fin.get("liquido", {}).get("atual", 0), fin.get("liquido", {}).get("anterior", 0), is_total=True)
+    draw_row("Caixa Líquido de Financiamento", fin.get("liquido", {}).get("atual", 0), fin.get("liquido", {}).get("anterior", 0), is_total=True)
     
     # Apuracao
-    draw_row("APURACAO DO FLUXO DE CAIXA DO PERIODO", 0, 0, is_header=True)
-    draw_row("Geracao Liquida de Caixa", cxa.get("geracao", {}).get("atual", 0), cxa.get("geracao", {}).get("anterior", 0), is_total=True)
+    draw_row("APURAÇÃO DO FLUXO DE CAIXA DO PERÍODO", 0, 0, is_header=True)
+    draw_row("Geração Líquida de Caixa", cxa.get("geracao", {}).get("atual", 0), cxa.get("geracao", {}).get("anterior", 0), is_total=True)
     draw_row("Caixa e Equivalentes Inicial", cxa.get("inicial", {}).get("atual", 0), cxa.get("inicial", {}).get("anterior", 0))
     draw_row("Caixa e Equivalentes Final", cxa.get("final", {}).get("atual", 0), cxa.get("final", {}).get("anterior", 0), is_total=True)
     
     pdf.ln(10)
 
     # Analise Textual
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(0, 6, "1. ANALISE DAS ATIVIDADES OPERACIONAIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "", 9)
+    pdf.set_font("ArialUnicode", "B", 10)
+    pdf.cell(0, 6, "1. ANÁLISE DAS ATIVIDADES OPERACIONAIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("ArialUnicode", "", 9)
     
     liq_op = op.get("liquido", {}).get("atual", 0)
     if liq_op > 0:
-        txt_op = f"As atividades operacionais geraram um caixa liquido positivo de R$ {fmt(liq_op)} no periodo atual. Isso indica que as receitas e ingressos operacionais foram suficientes para cobrir os custos e desembolsos operacionais."
+        txt_op = f"As atividades operacionais geraram um caixa líquido positivo de R$ {fmt(liq_op)} no período atual. Isso indica que as receitas e ingressos operacionais foram suficientes para cobrir os custos e desembolsos operacionais."
     else:
-        txt_op = f"As atividades operacionais apresentaram um caixa liquido negativo de R$ {fmt(liq_op)} no periodo atual. Isso demonstra que a entidade precisou consumir reservas ou obter financiamentos para cobrir seus desembolsos operacionais."
+        txt_op = f"As atividades operacionais apresentaram um caixa líquido negativo de R$ {fmt(liq_op)} no período atual. Isso demonstra que a entidade precisou consumir reservas ou obter financiamentos para cobrir seus desembolsos operacionais."
     
     pdf.multi_cell(0, 5, txt_op)
     pdf.ln(5)
 
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(0, 6, "2. ANALISE DAS ATIVIDADES DE INVESTIMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "", 9)
+    pdf.set_font("ArialUnicode", "B", 10)
+    pdf.cell(0, 6, "2. ANÁLISE DAS ATIVIDADES DE INVESTIMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("ArialUnicode", "", 9)
     
     liq_inv = inv.get("liquido", {}).get("atual", 0)
     if liq_inv < 0:
         txt_inv = f"O fluxo de caixa de investimentos foi negativo em R$ {fmt(abs(liq_inv))}, o que e comum e esperado quando a entidade realiza aquisicoes de ativos (investimentos) e imobilizacoes."
     else:
-        txt_inv = f"O fluxo de caixa de investimentos foi positivo em R$ {fmt(liq_inv)}, indicando que a entidade obteve mais recursos com alienacao de ativos do que gastou com aquisicoes."
+        txt_inv = f"O fluxo de caixa de investimentos foi positivo em R$ {fmt(liq_inv)}, indicando que a entidade obteve mais recursos com alienação de ativos do que gastou com aquisições."
     
     pdf.multi_cell(0, 5, txt_inv)
     pdf.ln(5)
 
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(0, 6, "3. ANALISE DAS ATIVIDADES DE FINANCIAMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "", 9)
+    pdf.set_font("ArialUnicode", "B", 10)
+    pdf.cell(0, 6, "3. ANÁLISE DAS ATIVIDADES DE FINANCIAMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("ArialUnicode", "", 9)
     
     liq_fin = fin.get("liquido", {}).get("atual", 0)
     if liq_fin > 0:
-        txt_fin = f"O fluxo de caixa de financiamentos foi positivo em R$ {fmt(liq_fin)}, decorrente de captacao de emprestimos ou financiamentos."
+        txt_fin = f"O fluxo de caixa de financiamentos foi positivo em R$ {fmt(liq_fin)}, decorrente de captação de empréstimos ou financiamentos."
     elif liq_fin < 0:
-        txt_fin = f"O fluxo de caixa de financiamentos foi negativo em R$ {fmt(abs(liq_fin))}, indicando amortizacao de dividas ou devolucao de recursos."
+        txt_fin = f"O fluxo de caixa de financiamentos foi negativo em R$ {fmt(abs(liq_fin))}, indicando amortização de dívidas ou devolução de recursos."
     else:
-        txt_fin = "Nao houve movimentacao significativa no fluxo de caixa de financiamentos no periodo."
+        txt_fin = "Não houve movimentação significativa no fluxo de caixa de financiamentos no período."
         
     pdf.multi_cell(0, 5, txt_fin)
     pdf.ln(5)
 
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(0, 6, "4. CONCLUSAO SOBRE A LIQUIDEZ", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "", 9)
+    pdf.set_font("ArialUnicode", "B", 10)
+    pdf.cell(0, 6, "4. CONCLUSÃO SOBRE A LIQUIDEZ", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("ArialUnicode", "", 9)
     
     geracao = cxa.get("geracao", {}).get("atual", 0)
     inicial = cxa.get("inicial", {}).get("atual", 0)
     final = cxa.get("final", {}).get("atual", 0)
     
-    txt_concl = f"A entidade encerrou o periodo com um saldo de caixa de R$ {fmt(final)} (variacao de R$ {fmt(geracao)} em relacao ao saldo inicial de R$ {fmt(inicial)}). "
+    txt_concl = f"A entidade encerrou o período com um saldo de caixa de R$ {fmt(final)} (variacao de R$ {fmt(geracao)} em relação ao saldo inicial de R$ {fmt(inicial)}). "
     if geracao > 0:
-        txt_concl += "O aumento no saldo de caixa demonstra uma boa geracao de recursos no periodo."
+        txt_concl += "O aumento no saldo de caixa demonstra uma boa geração de recursos no período."
     else:
-        txt_concl += "A reducao no saldo de caixa requer atencao aos proximos periodos para garantir a manutencao das atividades."
+        txt_concl += "A redução no saldo de caixa requer atenção aos próximos períodos para garantir a manutenção das atividades."
         
     pdf.multi_cell(0, 5, txt_concl)
 
@@ -5175,140 +5214,6 @@ async def excluir_relatorio_consolidado(id: int):
     conn.close()
     return {"ok": True}
 
-@app.get("/gerar_pdf_relatorio_consolidado/{id}")
-async def gerar_pdf_relatorio_consolidado(id: int):
-    import sqlite3, json, os
-    from fpdf import FPDF
-    from fpdf.enums import XPos, YPos
-    from fastapi.responses import Response
-    
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT periodo, data_geracao FROM historico_relatorio_consolidado WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    
-    # Pega dados da entidade
-    cursor.execute("""CREATE TABLE IF NOT EXISTS configuracoes_entidade (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
-        email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT, contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT, logo_path TEXT)""")
-    cursor.execute("SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
-    ent = cursor.fetchone()
-    conn.close()
-    
-    if not row:
-        return Response(content="Historico nao encontrado.", status_code=404)
-    
-    periodo, data_geracao = row
-    
-    # Dados da entidade
-    razao = ent[1] if ent and len(ent) > 1 else "COFEN/BR"
-    cnpj = ent[3] if ent and len(ent) > 3 else ""
-    contador_nome = ent[7] if ent and len(ent) > 7 else ""
-    contador_crc = ent[8] if ent and len(ent) > 8 else ""
-    contador_uf = ent[9] if ent and len(ent) > 9 else ""
-    contador_cpf = ent[10] if ent and len(ent) > 10 else ""
-    logo_path = ent[13] if ent and len(ent) > 13 else ""
-    
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # CAPA
-    # Logo (se existir)
-    caminho_logo = ""
-    if logo_path:
-        if os.path.isabs(logo_path):
-            caminho_logo = logo_path
-        else:
-            caminho_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_logos", logo_path)
-        if not os.path.exists(caminho_logo):
-            caminho_logo = ""
-    
-    if caminho_logo:
-        try:
-            # Centraliza a logo no topo
-            pdf.image(caminho_logo, x=70, y=20, w=70)
-            y_inicio = 100
-        except Exception:
-            y_inicio = 50
-    else:
-        y_inicio = 50
-    
-    # Titulo
-    pdf.set_y(y_inicio)
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 10, "RELATORIO CONSOLIDADO", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "DE ANALISE CONTABIL", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    
-    pdf.ln(10)
-    pdf.set_font("Helvetica", "", 12)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 8, f"Periodo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.cell(0, 8, f"Data de Emissao: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    
-    pdf.ln(30)
-    
-    # Dados da entidade na capa
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 8, "DADOS DA ENTIDADE", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 6, f"Razao Social: {razao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.cell(0, 6, f"CNPJ: {cnpj}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    
-    pdf.ln(20)
-    
-    # Dados do contador na capa
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 8, "RESPONSAVEL TECNICO", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 6, f"Contador: {contador_nome}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.cell(0, 6, f"CRC: {contador_crc} / UF: {contador_uf}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.cell(0, 6, f"CPF: {contador_cpf}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    
-    # ========== PAGINA 2: SUMARIO ==========
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 10, "SUMARIO", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.ln(10)
-    
-    pdf.set_font("Helvetica", "", 11)
-    pdf.set_text_color(0, 0, 0)
-    capitulos = [
-        "1. Apresentacao e Escopo",
-        "2. Visao Geral Orcamentaria e Financeira",
-        "3. Analise do Balanco Patrimonial",
-        "4. Demonstracao das Variacoes Patrimoniais",
-        "5. Demonstracao dos Fluxos de Caixa",
-        "6. Demonstracao das Mutacoes do PL",
-        "7. Analise de Despesas e Custeio",
-        "8. Matriz de Integridade e Controles",
-        "9. Parecer Conclusivo",
-        "10. Anexos e Assinaturas"
-    ]
-    for cap in capitulos:
-        pdf.cell(0, 8, cap, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    
-    # ========== PAGINA FINAL: ASSINATURA ==========
-    pdf.add_page()
-    pdf.set_y(100)
-    pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, "_____________________________________________", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.cell(0, 8, "Contador Responsavel", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 8, contador_nome, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 8, f"CRC: {contador_crc} / UF: {contador_uf}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.cell(0, 8, f"CPF: {contador_cpf}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    
-    pdf_bytes = bytes(pdf.output())
-    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Relatorio_Consolidado_{periodo}.pdf"})
 
 @app.get("/relatorio_consolidado")
 async def serve_relatorio_consolidado():
@@ -5805,7 +5710,8 @@ async def api_relatorio_consolidado_novo(periodo: str):
         "liquidez": "historico_liquidez",
         "integridade": "historico_integridade_matriz",
         "conferencia": "historico_conferencia",
-        "custo_pessoal": "historico_custo_pessoal"  # <-- ADICIONADO
+        "custo_pessoal": "historico_custo_pessoal",
+        "centro_custos": "historico_centro_custos"
     }
     
     nomes_amigaveis = {
@@ -5820,7 +5726,8 @@ async def api_relatorio_consolidado_novo(periodo: str):
         "liquidez": "Índices de Liquidez",
         "integridade": "Integridade entre Demonstrações",
         "conferencia": "Conferência das Demonstrações",
-        "custo_pessoal": "Custo de Pessoal"  # <-- ADICIONADO
+        "custo_pessoal": "Custo de Pessoal",
+        "centro_custos": "Análise por Centro de Custos"
     }
     
     encontrados = {}
@@ -5936,3 +5843,197 @@ async def excluir_multiplos_relatorio_consolidado(request: Request):
         return {"ok": True, "mensagem": f"{cursor.rowcount} itens excluídos"}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@app.get("/gerar_pdf_relatorio_consolidado/{id}")
+def gerar_pdf_relatorio_consolidado(id: int):
+    from playwright.sync_api import sync_playwright
+    from pypdf import PdfWriter, PdfReader, PageObject, Transformation
+    from fastapi.responses import Response
+    from io import BytesIO
+    import sqlite3, json, os, requests
+
+    # Tamanho A4 em pontos (72 dpi): 595 x 842
+    A4_W, A4_H = 595, 842
+
+    def normalizar_pagina(page_obj):
+        """Garante que a página esteja em A4 retrato, escalonando se necessário."""
+        try:
+            w = float(page_obj.mediabox.width)
+            h = float(page_obj.mediabox.height)
+            if w == 0 or h == 0:
+                return page_obj
+
+            # Detecta se está em paisagem (w > h) e rotaciona
+            if w > h:
+                page_obj.rotate(90)
+                w, h = h, w
+
+            # Calcula escala para caber em A4 mantendo proporção
+            scale_w = A4_W / w
+            scale_h = A4_H / h
+            scale = min(scale_w, scale_h)
+
+            if abs(scale - 1.0) > 0.01:
+                # Aplica a transformação
+                page_obj.add_transformation(Transformation().scale(scale))
+                # Centraliza na página A4
+                new_w = w * scale
+                new_h = h * scale
+                offset_x = (A4_W - new_w) / 2
+                offset_y = (A4_H - new_h) / 2
+                page_obj.add_transformation(Transformation().translate(offset_x, offset_y))
+
+            # Define o mediabox para A4
+            page_obj.mediabox.upper_right = (A4_W, A4_H)
+            page_obj.mediabox.lower_left = (0, 0)
+            return page_obj
+        except Exception as e:
+            print(f"[AVISO] Falha ao normalizar página: {e}")
+            return page_obj
+
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT periodo, resultado_json FROM historico_relatorio_consolidado WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return Response(content="Histórico não encontrado.", status_code=404, media_type="text/plain")
+
+    periodo, resultado_json = row
+    modulos = json.loads(resultado_json).get("dados", {})
+
+    def buscar_id(tabela):
+        try:
+            conn2 = sqlite3.connect(db_path)
+            cur2 = conn2.cursor()
+            cur2.execute(f"SELECT id FROM {tabela} WHERE periodo LIKE ? ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
+            r = cur2.fetchone()
+            conn2.close()
+            return r[0] if r else None
+        except:
+            return None
+
+    mapeamento = [
+        ("integridade",            "historico_integridade_matriz",       "/gerar_pdf_integridade_matriz/{p}",    "id"),
+        ("analise_bp",             "historico_analise_bp",               "/gerar_pdf_analise_bp/{p}",            "id"),
+        ("analise_orcamentaria",   "historico_analise_orcamentaria",     "/gerar_pdf_analise_orcamentaria/{p}",  "id"),
+        ("analise_financeira_bf",  "historico_analise_financeira_bf",    "/gerar_pdf_analise_financeira_bf/{p}", "id"),
+        ("analise_dfc",            "historico_analise_dfc",              "/gerar_pdf_analise_dfc/{p}",           "id"),
+        ("analise_patrimonial",    "historico_analise_patrimonial",      "/gerar_pdf_analise_patrimonial/{p}",   "id"),
+        ("comparativo_receitas",   None,                                 "/gerar_pdf_comparativo_receitas",      "periodo"),
+        ("comparativo_despesas",   None,                                 "/gerar_pdf_comparativo_despesas",      "periodo"),
+        ("liquidez",               "historico_liquidez",                 "/gerar_pdf_liquidez/{p}",              "id"),
+        ("panorama",               "historico_panorama",                 "/gerar_pdf_panorama/{p}",              "id"),
+        ("centro_custos",          "historico_centro_custos",            "/gerar_pdf_centro_custos/{p}",         "id"),
+        ("custo_pessoal",          "historico_custo_pessoal",            "/gerar_pdf_completo_custo_pessoal",    "query_id"),
+    ]
+
+    # Capa
+    capa_html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        @page {{ size: A4; margin: 0; }}
+        body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }}
+        .capa {{ width: 210mm; height: 297mm; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: white; }}
+        .faixa {{ background: #003366; color: white; width: 100%; padding: 60px 0; margin-bottom: 60px; }}
+        .faixa img {{ max-height: 100px; margin-bottom: 25px; }}
+        .faixa h1 {{ font-size: 34px; margin: 0; letter-spacing: 5px; font-weight: bold; }}
+        .faixa h2 {{ font-size: 16px; margin: 10px 0 0 0; font-weight: normal; }}
+        .entidade {{ font-size: 16px; color: #555; margin-bottom: 40px; }}
+        .info {{ background: #f4f6f9; border-left: 6px solid #0056b3; padding: 25px 60px; margin: 15px 0; text-align: left; }}
+        .info strong {{ display: block; font-size: 11px; color: #666; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px; }}
+        .info span {{ font-size: 24px; font-weight: bold; color: #003366; }}
+        .rodape {{ position: absolute; bottom: 40px; font-size: 10px; color: #999; }}
+    </style></head><body>
+    <div class="capa">
+        <div class="faixa">
+            <img src="http://127.0.0.1:9994/pc_frontend/logo-cofen.png">
+            <h1>RELATÓRIO CONSOLIDADO</h1>
+            <h2>Análise Contábil Executiva</h2>
+        </div>
+        <div class="entidade">COFEN - Conselho Federal de Enfermagem</div>
+        <div class="info">
+            <strong>Período de Análise</strong>
+            <span>{periodo}</span>
+        </div>
+        <div class="rodape">SGPC - Sistema de Gestão de Prestação de Contas<br><i>Documento Confidencial - Uso Exclusivo da Diretoria</i></div>
+    </div>
+    </body></html>"""
+
+    writer = PdfWriter()
+    total_paginas = 0
+
+    # 1) CAPA (via Playwright)
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content(capa_html, wait_until="networkidle")
+        page.wait_for_timeout(300)
+        capa_pdf = page.pdf(format="A4", print_background=True, margin={"top":"0","bottom":"0","left":"0","right":"0"})
+        browser.close()
+    capa_reader = PdfReader(BytesIO(capa_pdf))
+    for page_obj in capa_reader.pages:
+        writer.add_page(normalizar_pagina(page_obj))
+        total_paginas += 1
+    print(f"[OK] Capa: 1 página")
+
+    # 2) MÓDULOS (via requests + pypdf, com normalização)
+    for chave, tabela, rota_template, tipo in mapeamento:
+        if chave not in modulos:
+            continue
+
+        hid = None
+        if tipo in ("id", "query_id") and tabela:
+            hid = buscar_id(tabela)
+            if not hid:
+                print(f"[SKIP] {chave} (sem histórico)")
+                continue
+
+        if tipo == "id":
+            rota = rota_template.replace("{p}", str(hid))
+        elif tipo == "query_id":
+            rota = f"{rota_template}?id={hid}"
+        else:
+            rota = f"{rota_template}?periodo={periodo}"
+
+        url = f"http://127.0.0.1:9994{rota}"
+        try:
+            r = requests.get(url, timeout=120)
+            if r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf"):
+                reader = PdfReader(BytesIO(r.content))
+                n = len(reader.pages)
+                for page_obj in reader.pages:
+                    writer.add_page(normalizar_pagina(page_obj))
+                    total_paginas += 1
+                print(f"[OK] {chave}: {n} página(s)")
+            else:
+                print(f"[ERRO] {chave}: status={r.status_code}")
+        except Exception as e:
+            print(f"[ERRO] {chave}: {e}")
+
+    print(f"[TOTAL] {total_paginas} páginas no PDF consolidado")
+
+    output = BytesIO()
+    writer.write(output)
+    output.seek(0)
+
+    return Response(
+        content=output.read(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=relatorio_consolidado_{id}.pdf"}
+    )
