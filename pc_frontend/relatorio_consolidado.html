@@ -319,5 +319,33 @@
             carregarHistorico();
         });
     </script>
+
+
+
+<script>
+// --- CORRECAO_BOTAO_WORD ---
+document.addEventListener('DOMContentLoaded', function() {
+    const botoes = Array.from(document.querySelectorAll('button, a, .btn'));
+    const btnWord = botoes.find(b => b.innerText.includes('Gerar Word'));
+    
+    if (btnWord) {
+        const novoBtn = btnWord.cloneNode(true);
+        btnWord.parentNode.replaceChild(novoBtn, btnWord);
+        
+        novoBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const check = document.querySelector('input[type="radio"]:checked') || document.querySelector('input[type="checkbox"]:checked');
+            if (check) {
+                const id = check.value;
+                window.open('/gerar_word_relatorio_consolidado/' + id, '_blank');
+            } else {
+                alert('Selecione um relatório primeiro.');
+            }
+        });
+    }
+});
+</script>
 </body>
+
+
 </html>

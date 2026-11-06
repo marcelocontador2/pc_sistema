@@ -5893,6 +5893,53 @@ async def excluir_multiplos_relatorio_consolidado(request: Request):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+@app.get("/gerar_word_relatorio_consolidado/{id}")
+def gerar_word_relatorio_consolidado(id: int):
+    from fastapi.responses import Response
+    from pdf2docx import Converter
+    from main import gerar_pdf_relatorio_consolidado
+    import tempfile, os
+    
+    # 1. Gera o PDF (que já está perfeito)
+    pdf_response = gerar_pdf_relatorio_consolidado(id)
+    pdf_bytes = pdf_response.body
+    
+    # 2. Salva o PDF em um arquivo temporário
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        tmp_pdf.write(pdf_bytes)
+        tmp_pdf_path = tmp_pdf.name
+        
+    tmp_docx_path = tmp_pdf_path.replace(".pdf", ".docx")
+    
+    try:
+        # 3. Converte PDF para DOCX
+        cv = Converter(tmp_pdf_path)
+        cv.convert(tmp_docx_path, start=0, end=None)
+        cv.close()
+        
+        with open(tmp_docx_path, "rb") as f:
+            docx_bytes = f.read()
+            
+        return Response(
+            content=docx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename=relatorio_consolidado_{id}.docx"}
+        )
+    finally:
+        if os.path.exists(tmp_pdf_path): os.remove(tmp_pdf_path)
+        if os.path.exists(tmp_docx_path): os.remove(tmp_docx_path)
+
 @app.get("/gerar_pdf_relatorio_consolidado/{id}")
 def gerar_pdf_relatorio_consolidado(id: int):
     from playwright.sync_api import sync_playwright
