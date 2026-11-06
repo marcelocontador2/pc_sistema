@@ -1,0 +1,70 @@
+5401:     from fpdf.enums import XPos, YPos
+5402:     from fastapi.responses import Response
+5403:     from datetime import datetime
+5404:     
+5405:     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+5406:     conn = sqlite3.connect(db_path)
+5407:     cursor = conn.cursor()
+5408:     cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_bp WHERE id = ?", (id,))
+5409:     row = cursor.fetchone()
+5410:     conn.close()
+5411:     
+5412:     if not row:
+5413:         return Response(content="Historico nao encontrado.", status_code=404)
+5414:     
+5415:     periodo, data_geracao, res_json = row
+5416:     try:
+5417:         dados = json.loads(res_json)
+5418:     except Exception:
+5419:         dados = {}
+5420:     
+5421:     d = dados.get("dados", {})
+5422:     
+5423:     def fmt(v):
+5424:         if v is None: return "0,00"
+5425:         s = f"{v:,.2f}"
+5426:         # Formato: 1,234,567.89 -> 1.234.567,89
+5427:         return s.replace(",", "X").replace(".", ",").replace("X", ".")
+5428:     
+5429:     pdf = FPDF(orientation="P", unit="mm", format="A4")
+5430:     pdf.add_page()
+5431:     
+5432:     pdf.set_fill_color(0, 51, 102)
+5433:     pdf.set_text_color(255, 255, 255)
+5434:     pdf.set_font("Helvetica", "B", 16)
+5435:     pdf.cell(0, 15, "COFEN/BR - ANALISE DO BALANCO PATRIMONIAL", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
+5436:     
+5437:     pdf.set_text_color(0, 0, 0)
+5438:     pdf.set_font("Helvetica", "", 10)
+5439:     pdf.ln(5)
+5440:     pdf.cell(0, 6, f"Periodo: {periodo} | Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+5441:     pdf.ln(10)
+5442:     
+5443:     # Tabela
+5444:     pdf.set_font("Helvetica", "B", 9)
+5445:     pdf.set_fill_color(0, 86, 179)
+5446:     pdf.set_text_color(255, 255, 255)
+5447:     col_w = [70, 40, 40, 30]
+5448:     headers = ["Conta", "Periodo Atual (R$)", "Periodo Anterior (R$)", "Var. (%)"]
+5449:     for i, h in enumerate(headers):
+5450:         pdf.cell(col_w[i], 8, h, border=1, align="C", fill=True)
+5451:     pdf.ln()
+5452:     
+5453:     pdf.set_text_color(0, 0, 0)
+5454:     pdf.set_font("Helvetica", "", 8)
+5455:     
+5456:     def linha(label, va, vb):
+5457:         pdf.cell(col_w[0], 7, label, border=1, align="L")
+5458:         pdf.cell(col_w[1], 7, fmt(va), border=1, align="R")
+5459:         pdf.cell(col_w[2], 7, fmt(vb), border=1, align="R")
+5460:         pct = "-" if not vb else f"{(((va - vb) / abs(vb)) * 100):,.2f}%".replace(".", ",")
+5461:         pdf.cell(col_w[3], 7, pct, border=1, align="R")
+5462:         pdf.ln()
+5463:     
+5464:     linha("Ativo Circulante", d.get("ativo_circulante", {}).get("atual", 0), d.get("ativo_circulante", {}).get("anterior", 0))
+5465:     linha("Caixa e Equivalentes", d.get("caixa", {}).get("atual", 0), d.get("caixa", {}).get("anterior", 0))
+5466:     linha("Creditos a Curto Prazo", d.get("creditos", {}).get("atual", 0), d.get("creditos", {}).get("anterior", 0))
+5467:     linha("Ativo Nao Circulante", d.get("ativo_nao_circulante", {}).get("atual", 0), d.get("ativo_nao_circulante", {}).get("anterior", 0))
+5468:     linha("Ativo Realizavel a Longo Prazo", d.get("ativo_realizavel", {}).get("atual", 0), d.get("ativo_realizavel", {}).get("anterior", 0))
+5469:     linha("Imobilizado", d.get("imobilizado", {}).get("atual", 0), d.get("imobilizado", {}).get("anterior", 0))
+5470:     linha("TOTAL DO ATIVO", d.get("total_ativo", {}).get("atual", 0), d.get("total_ativo", {}).get("anterior", 0))

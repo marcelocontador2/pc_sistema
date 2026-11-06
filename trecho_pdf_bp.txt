@@ -1,0 +1,62 @@
+--- TRECHO ENCONTRADO NA LINHA 1086 ---
+
+            def buscar(linhas, termos):
+                for p in linhas:
+                    for termo in termos:
+                        termo_upper = termo.upper()
+                        for col_espec in [0, 3]:
+                            if len(p) > col_espec and termo_upper in str(p[col_espec]).upper():
+                                col_valor = col_espec + 1
+                                if len(p) > col_valor:
+                                    try:
+                                        v = abs(_limpar_valor(p[col_valor]))
+                                        if v > 0:
+                                            return v
+                                    except:
+                                        pass
+                return 0.0
+                
+            def buscar_exato(linhas, termo_exato):
+                for p in linhas:
+                    for col_espec in [0, 3]:
+                        if len(p) > col_espec and str(p[col_espec]).strip().upper() == termo_exato.upper():
+                            col_valor = col_espec + 1
+                            if len(p) > col_valor:
+                                try:
+                                    v = abs(_limpar_valor(p[col_valor]))
+                                    if v > 0:
+                                        return v
+                                except:
+                                    pass
+                return 0.0
+    
+>>>         passivo_total = buscar_exato(l_bp, "TOTAL DO PASSIVO")
+            if passivo_total == 0.0:
+                passivo_total = buscar(l_bp, ["TOTAL DO PASSIVO", "PASSIVO TOTAL"])
+                
+            pl = buscar_exato(l_bp, "TOTAL DO PATRIMÔNIO LÍQUIDO")
+            if pl == 0.0:
+                pl = buscar_exato(l_bp, "TOTAL DO PATRIMONIO LIQUIDO")
+            if pl == 0.0:
+                pl = buscar(l_bp, ["TOTAL DO PATRIMÔNIO LÍQUIDO", "TOTAL DO PATRIMONIO LIQUIDO"])
+                
+            ativo_total = buscar_exato(l_bp, "TOTAL")
+            if ativo_total == 0.0:
+                ativo_total = buscar(l_bp, ["TOTAL DO ATIVO", "ATIVO TOTAL"])
+            if ativo_total == 0.0:
+                ativo_total = passivo_total + pl
+                
+            caixa_bp = buscar(l_bp, ["CAIXA E EQUIVALENTES", "CAIXA E EQUIVALENTE"])
+            superavit_financeiro = buscar(l_bp, ["SUPERÁVIT FINANCEIRO", "SUPERAVIT FINANCEIRO"])
+            
+            receita_realizada = buscar(l_bo, ["TOTAL DAS RECEITAS", "RECEITAS REALIZADAS", "RECEITA REALIZADA", "TOTAL DA RECEITA", "RECEITAS"])
+            despesa_empenhada = buscar(l_bo, ["TOTAL DAS DESPESAS", "DESPESAS EMPENHADAS", "DESPESA EMPENHADA", "TOTAL DA DESPESA", "DESPESAS"])
+            superavit_orcamentario = receita_realizada - despesa_empenhada
+            
+            total_vpa = buscar(l_dvp, ["Total das Variações Ativas", "TOTAL DAS VARIACOES ATIVAS", "VARIAÇÕES ATIVAS"])
+            total_vpd = buscar(l_dvp, ["Total das Variações Passivas", "TOTAL DAS VARIACOES PASSIVAS", "VARIAÇÕES PASSIVAS"])
+            superavit_patrimonial = total_vpa - total_vpd
+            
+            conn.close()
+            
+            return {

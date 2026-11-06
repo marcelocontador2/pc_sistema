@@ -1,0 +1,120 @@
+2579:         pdf.cell(0, 10, "Analise Orcamentaria Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+2580:         pdf.set_font(f_family, "", 10)
+2581:         pdf.set_text_color(100, 100, 100)
+2582:         pdf.cell(0, 5, f"Periodo de Referencia: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+2583:         pdf.ln(8)
+2584:         # Tabela: Indicador | Periodo Atual | Periodo Anterior | Var (%)
+2585:         pdf.set_fill_color(0, 51, 102)
+2586:         pdf.set_text_color(255, 255, 255)
+2587:         pdf.set_font(f_family, "B", 10)
+2588:         pdf.cell(80, 8, "Indicador", border=1, fill=True, align="C")
+2589:         pdf.cell(45, 8, "Periodo Atual", border=1, fill=True, align="C")
+2590:         pdf.cell(45, 8, "Periodo Anterior", border=1, fill=True, align="C")
+2591:         pdf.cell(30, 8, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+2592:         pdf.set_text_color(0, 0, 0)
+2593:         pdf.set_font(f_family, "", 9)
+2594:         def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+2595:         # Indicadores na ordem que queremos
+2596:         ind = [
+2597:             ("Receita Realizada", "receita_realizada", 1e6),
+2598:             ("Despesas Empenhadas", "despesa_empenhada", 1e6),
+2599:             ("Superavit Orcamentario", "superavit", 1e6),
+2600:             ("Restos a Pagar Inscritos", "restos_pagar", 1e6),
+2601:             ("Receitas Orcadas", "receita_orcada", 1e6),
+2602:             ("Despesas Orcadas", "despesa_orcada", 1e6),
+2603:             ("% de Realizacao das Receitas", "pct_receita", 1),
+2604:             ("% de Realizacao das Despesas", "pct_despesa", 1),
+2605:         ]
+2606:         for nome, chave, m in ind:
+2607:             va = a.get(chave, 0)
+2608:             vb = b.get(chave, 0)
+2609:             var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
+2610:             pdf.cell(80, 7, nome, border=1, align="L")
+2611:             pdf.cell(45, 7, fmt(va) if m == 1e6 else f"{va:.2f}%", border=1, align="R")
+2612:             pdf.cell(45, 7, fmt(vb) if m == 1e6 else f"{vb:.2f}%", border=1, align="R")
+2613:             if var >= 0: pdf.set_text_color(0, 128, 0)
+2614:             else: pdf.set_text_color(220, 53, 69)
+2615:             pdf.cell(30, 7, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+2616:             pdf.set_text_color(0, 0, 0)
+2617:         # Grafico e Conclusao
+2618:         pdf.ln(8)
+2619:         y_atual = pdf.get_y()
+2620:         pdf.image(img_path, x=30, y=y_atual, w=110)
+2621:         # Conclusao no lado direito
+2622:         pdf.set_xy(150, y_atual)
+2623:         pdf.set_font(f_family, "B", 10)
+2624:         pdf.cell(0, 6, "Principais conclusoes:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+2625:         pdf.set_x(150)
+2626:         pdf.set_font(f_family, "", 8)
+2627:         txt_conclusao = f"A receita realizada representa {a.get('pct_receita', 0):.2f}% da previsao atualizada, enquanto as despesas empenhadas representam {a.get('pct_despesa', 0):.2f}% da dotacao atualizada."
+2628:         pdf.multi_cell(90, 4, txt_conclusao)
+2629:         pdf_bytes = bytes(pdf.output())
+2630:         return Response(content=pdf_bytes, media_type="application/pdf", headers={
+2631:             "Content-Disposition": f"inline; filename=analise_orcamentaria_{id}.pdf"
+2632:         })
+2633:     except Exception as e:
+2634:         raise HTTPException(status_code=500, detail=str(e))
+2635: @app.get("/gerar_pdf_analise_patrimonial/{id}")
+2636: async def gerar_pdf_analise_patrimonial(id: int):
+2637:     try:
+2638:         from fpdf import FPDF
+2639:         from fpdf.enums import XPos, YPos
+2640:         from fastapi.responses import Response
+2641:         from app.routers.dvp import processar_dvp
+2642:         import sqlite3, os
+2643:         # 1. Busca o periodo no historico (ou usa fallback)
+2644:         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+2645:         conn = sqlite3.connect(db_path)
+2646:         cursor = conn.cursor()
+2647:         cursor.execute("SELECT periodo FROM historico_analise_patrimonial WHERE id = ?", (id,))
+2648:         row = cursor.fetchone()
+2649:         conn.close()
+2650:         periodo = row[0] if row else "2026-TRIMESTRE-3"
+2651:         # 2. Calcula os dados do DVP
+2652:         p_limpo = periodo.replace("-", "_")
+2653:         caminho_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", f"DVP_{p_limpo}.csv")
+2654:         if not os.path.exists(caminho_csv):
+2655:             raise Exception(f"Arquivo DVP nao encontrado para {periodo}")
+2656:         resultado = processar_dvp(caminho_csv)
+2657:         d = resultado["dados"]
+2658:         # 3. Monta o PDF Moderno
+2659:         pdf = FPDF()
+2660:         pdf.add_page()
+2661:         pdf.set_auto_page_break(auto=False)
+2662:         # Cabecalho azul escuro
+2663:         pdf.set_fill_color(0, 51, 102)
+2664:         pdf.rect(0, 0, 210, 35, "F")
+2665:         pdf.set_font(fonte_padrao, "B", 22)
+2666:         pdf.set_text_color(255, 255, 255)
+2667:         pdf.set_xy(15, 8)
+2668:         pdf.cell(180, 10, "DVP - Demonstração das Variações Patrimoniais", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+2669:         pdf.set_font(fonte_padrao, "", 13)
+2670:         pdf.set_xy(15, 20)
+2671:         pdf.cell(180, 8, f"Período: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+2672:         # Linha amarela
+2673:         pdf.set_draw_color(0, 51, 102)  # Linha azul (era amarela)
+2674:         pdf.set_line_width(1.5)
+2675:         pdf.line(0, 35, 210, 35)
+2676:         # Funcao para formatar valores
+2677:         def fmt_mi(v):
+2678:             try:
+2679:                 s = f"R$ {v:,.2f}"
+2680:                 return s.replace(",", "X").replace(".", ",").replace("X", ".")
+2681:             except Exception:
+2682:                 return str(v)
+2683:         # Cards de totais
+2684:         y_pos = 50
+2685:         card_w = 90
+2686:         card_h = 35
+2687:         # Card 1: Total VPA
+2688:         pdf.set_fill_color(232, 244, 248)
+2689:         pdf.rect(15, y_pos, card_w, card_h, "F")
+2690:         pdf.set_text_color(0, 51, 102)
+2691:         pdf.set_font(fonte_padrao, "B", 14)
+2692:         pdf.set_xy(20, y_pos + 5)
+2693:         pdf.cell(card_w, 10, fmt_mi(d['total_vpa']['atual']), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+2694:         pdf.set_font(fonte_padrao, "", 10)
+2695:         pdf.set_text_color(80, 80, 80)
+2696:         pdf.set_xy(20, y_pos + 20)
+2697:         pdf.cell(card_w, 5, "Total VPA (Variações Aumentativas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+2698:         # Card 2: Total VPD

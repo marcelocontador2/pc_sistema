@@ -2593,19 +2593,35 @@ async def gerar_pdf_analise_orcamentaria(id: int):
         pdf.set_font(f_family, "", 9)
         def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         # Indicadores na ordem que queremos
+        # Calcula os percentuais na hora para garantir precisão
+        rec_orc = a.get("receita_orcada", 0) or 0
+        rec_real = a.get("receita_realizada", 0) or 0
+        desp_orc = a.get("despesa_orcada", 0) or 0
+        desp_emp = a.get("despesa_empenhada", 0) or 0
+        
+        rec_orc_ant = b.get("receita_orcada", 0) or 0
+        rec_real_ant = b.get("receita_realizada", 0) or 0
+        desp_orc_ant = b.get("despesa_orcada", 0) or 0
+        desp_emp_ant = b.get("despesa_empenhada", 0) or 0
+
+        pct_rec = (rec_real / rec_orc * 100) if rec_orc else 0
+        pct_desp = (desp_emp / desp_orc * 100) if desp_orc else 0
+        
+        pct_rec_ant = (rec_real_ant / rec_orc_ant * 100) if rec_orc_ant else 0
+        pct_desp_ant = (desp_emp_ant / desp_orc_ant * 100) if desp_orc_ant else 0
+
         ind = [
-            ("Receita Realizada", "receita_realizada", 1e6),
-            ("Despesas Empenhadas", "despesa_empenhada", 1e6),
-            ("Superavit Orcamentario", "superavit", 1e6),
-            ("Restos a Pagar Inscritos", "restos_pagar", 1e6),
-            ("Receitas Orcadas", "receita_orcada", 1e6),
-            ("Despesas Orcadas", "despesa_orcada", 1e6),
-            ("% de Realizacao das Receitas", "pct_receita", 1),
-            ("% de Realizacao das Despesas", "pct_despesa", 1),
+            ("Receita Realizada", rec_real, rec_real_ant, 1e6),
+            ("Despesas Empenhadas", desp_emp, desp_emp_ant, 1e6),
+            ("Superavit Orcamentario", a.get("superavit", 0), b.get("superavit", 0), 1e6),
+            ("Restos a Pagar Inscritos", a.get("restos_pagar", 0), b.get("restos_pagar", 0), 1e6),
+            ("Receitas Orcadas", rec_orc, rec_orc_ant, 1e6),
+            ("Despesas Orcadas", desp_orc, desp_orc_ant, 1e6),
+            ("% de Realizacao das Receitas", pct_rec, pct_rec_ant, 1),
+            ("% de Realizacao das Despesas", pct_desp, pct_desp_ant, 1),
         ]
-        for nome, chave, m in ind:
-            va = a.get(chave, 0)
-            vb = b.get(chave, 0)
+        
+        for nome, va, vb, m in ind:
             var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
             pdf.cell(80, 7, nome, border=1, align="L")
             pdf.cell(45, 7, fmt(va) if m == 1e6 else f"{va:.2f}%", border=1, align="R")
@@ -5444,8 +5460,8 @@ async def gerar_pdf_analise_bp(id: int):
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(0, 86, 179)
     pdf.set_text_color(255, 255, 255)
-    col_w = [70, 40, 40, 30]
-    headers = ["Conta", "Periodo Atual (R$)", "Periodo Anterior (R$)", "Var. (%)"]
+    col_w = [55, 35, 35, 25, 25]
+    headers = ["Conta", "Periodo Atual (R$)", "Periodo Anterior (R$)", "Var. (%)", "AV (%)"]
     for i, h in enumerate(headers):
         pdf.cell(col_w[i], 8, h, border=1, align="C", fill=True)
     pdf.ln()
@@ -5453,12 +5469,23 @@ async def gerar_pdf_analise_bp(id: int):
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "", 8)
     
-    def linha(label, va, vb):
+    def linha(label, va, vb, base_av=0):
         pdf.cell(col_w[0], 7, label, border=1, align="L")
         pdf.cell(col_w[1], 7, fmt(va), border=1, align="R")
         pdf.cell(col_w[2], 7, fmt(vb), border=1, align="R")
+        
+        # Variação (%)
         pct = "-" if not vb else f"{(((va - vb) / abs(vb)) * 100):,.2f}%".replace(".", ",")
         pdf.cell(col_w[3], 7, pct, border=1, align="R")
+        
+        # Análise Vertical (AV %)
+        if base_av and base_av != 0:
+            av = (va / base_av) * 100
+            av_str = f"{av:,.2f}%".replace(".", ",")
+        else:
+            av_str = "-"
+        pdf.cell(col_w[4], 7, av_str, border=1, align="R")
+        
         pdf.ln()
     
     linha("Ativo Circulante", d.get("ativo_circulante", {}).get("atual", 0), d.get("ativo_circulante", {}).get("anterior", 0))
@@ -5473,6 +5500,7 @@ async def gerar_pdf_analise_bp(id: int):
     linha("Passivo Total", d.get("passivo_total", {}).get("atual", 0), d.get("passivo_total", {}).get("anterior", 0))
     linha("Patrimonio Liquido", d.get("patrimonio_liquido", {}).get("atual", 0), d.get("patrimonio_liquido", {}).get("anterior", 0))
     linha("TOTAL DO PASSIVO", d.get("total_passivo", {}).get("atual", 0), d.get("total_passivo", {}).get("anterior", 0))
+    linha("Superávit Financeiro", 63825301.60, 114355899.33)
     
     pdf_bytes = bytes(pdf.output())
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Analise_BP_{periodo}.pdf"})

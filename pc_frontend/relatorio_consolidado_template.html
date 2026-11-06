@@ -124,13 +124,39 @@ if (bpRaiz) {
 
 // ===== 3. ANÁLISE BO =====
 H += tit(3, 'Análise do Balanço Orçamentário');
-H += '<div class="desc">Comparativo de receitas e despesas.</div>';
+H += '<div class="desc">Comparativo das receitas e despesas orçamentárias.</div>';
 const bo = unwrap(D.analise_orcamentaria);
 if (bo) {
-    const campos = [['Receita Realizada','receita_realizada'],['Despesa Empenhada','despesa_empenhada'],['Superávit/Déficit','superavit'],['Restos a Pagar','restos_pagar'],['Receita Orçada','receita_orcada'],['Despesa Orçada','despesa_orcada'],['% Realização Receitas','pct_receita'],['% Realização Despesas','pct_despesa']];
+    const campos = [
+        ['Receita Realizada','receita_realizada', false],
+        ['Despesa Empenhada','despesa_empenhada', false],
+        ['Superávit/Déficit','superavit', false],
+        ['Restos a Pagar','restos_pagar', false],
+        ['Receita Orçada','receita_orcada', false],
+        ['Despesa Orçada','despesa_orcada', false],
+        ['% Realização Receitas','pct_receita', true],
+        ['% Realização Despesas','pct_despesa', true]
+    ];
     const rows = [];
-    campos.forEach(([l,k]) => { rows.push([l, moeda(bo.atual ? bo.atual[k] : null), moeda(bo.anterior ? bo.anterior[k] : null)]); });
-    H += tab(['Indicador','Atual','Anterior'], rows);
+    campos.forEach(([label, key, isPct]) => {
+        const at = bo.atual ? bo.atual[key] : 0;
+        const an = bo.anterior ? bo.anterior[key] : 0;
+        
+        // Formata os valores atuais e anteriores
+        const fAt = isPct ? pct(at) : moeda(at);
+        const fAn = isPct ? pct(an) : moeda(an);
+        
+        // Calcula a variação (%) entre atual e anterior
+        let varStr = '-';
+        if (an && an !== 0) {
+            const varP = ((at - an) / Math.abs(an)) * 100;
+            varStr = (varP > 0 ? '+' : '') + varP.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+        }
+        
+        rows.push([label, fAt, fAn, varStr]);
+    });
+    
+    H += tab(['Indicador','Período Atual','Período Anterior', 'Var. (%)'], rows);
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 4. ANÁLISE BF =====
@@ -248,6 +274,9 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
+
 
 
 
