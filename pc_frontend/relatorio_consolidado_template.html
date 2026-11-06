@@ -489,7 +489,6 @@ if (bf) {
 H += tit(5, 'Análise do Fluxo de Caixa');
 H += '<div class="desc">Demonstração do Fluxo de Caixa (método direto).</div>';
 
-// Desembrulha os dois níveis de 'dados'
 const dfcRaiz = D.analise_dfc || D.dfc;
 let dfc = null;
 if (dfcRaiz) {
@@ -503,38 +502,157 @@ if (dfcRaiz) {
 }
 
 if (dfc) {
-    const blocos = [
-        ['Fluxo Operacional', dfc.operacional],
-        ['Fluxo de Investimento', dfc.investimento],
-        ['Fluxo de Financiamento', dfc.financiamento],
-        ['Apuração de Caixa', dfc.caixa || dfc.apuracao_caixa || dfc.saldo_caixa]
-    ];
+    // --- INÍCIO DA TABELA ÚNICA (MATRIZ) ---
+    H += '<table style="width:100%; border-collapse:collapse; table-layout:fixed; font-size:8.5px;">';
+    H += '<thead><tr style="background:#003366; color:#fff;">';
+    H += '<th style="width:60%; padding:5px; text-align:left;">ITEM</th>';
+    H += '<th style="width:15%; padding:5px; text-align:right;">ATUAL</th>';
+    H += '<th style="width:15%; padding:5px; text-align:right;">ANTERIOR</th>';
+    H += '<th style="width:10%; padding:5px; text-align:right;">VAR. (%)</th>';
+    H += '</tr></thead><tbody>';
+
+    const addSecao = (texto) => {
+        H += `<tr style="background:#003366; color:#fff;"><td colspan="4" style="padding:4px 5px; text-align:left; font-size:8px; text-transform:uppercase;">${texto}</td></tr>`;
+    };
     
-    let achouDados = false;
-    blocos.forEach(([titulo, obj]) => {
-        if (!obj || typeof obj !== 'object') return;
-        
-        const rows = [];
+    const addLinha = (item, at, an, variacao, classe) => {
+        const bg = classe === 'zebra' ? '#f8f9fa' : (classe === 'total' ? '#e9ecef' : '#fff');
+        const fw = classe === 'total' ? 'bold' : 'normal';
+        H += `<tr style="background:${bg}; font-weight:${fw};">`;
+        H += `<td style="padding:4px 5px; border:1px solid #ddd; text-align:left;">${item}</td>`;
+        H += `<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">${at}</td>`;
+        H += `<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">${an}</td>`;
+        H += `<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">${variacao}</td>`;
+        H += '</tr>';
+    };
+
+    const renderBlocoDFC = (titulo, obj) => {
+        if (!obj) return;
+        addSecao(titulo);
+        let count = 0;
         Object.keys(obj).forEach(k => {
             const v = obj[k];
             if (v && typeof v === 'object' && 'atual' in v) {
                 const at = v.atual || 0;
                 const an = v.anterior || 0;
-                const varStr = varPct(at, an);
-                rows.push([k.replace(/_/g,' ').toUpperCase(), moeda(at), moeda(an), varStr]);
-                achouDados = true;
+                const label = k.replace(/_/g,' ').toUpperCase();
+                addLinha(label, moeda(at).replace('R$ ',''), moeda(an).replace('R$ ',''), varPct(at, an), count%2===0 ? 'zebra' : '');
+                count++;
             }
         });
-        
-        if (rows.length > 0) {
-            H += sub(titulo);
-            H += tab(['Item','Atual','Anterior','Var. (%)'], rows);
-        }
-    });
+    };
+
+    renderBlocoDFC('Fluxo Operacional', dfc.operacional);
+    renderBlocoDFC('Fluxo de Investimento', dfc.investimento);
+    renderBlocoDFC('Fluxo de Financiamento', dfc.financiamento);
+    renderBlocoDFC('Apuração de Caixa', dfc.caixa || dfc.apuracao_caixa || dfc.saldo_caixa);
+
+    H += '</tbody></table>';
+
+    // =======================================================
+    // --- GRÁFICO SVG DINÂMICO (FLUXO DE CAIXA) ---
+    // =======================================================
     
-    if (!achouDados) {
-        H += '<p>Módulo encontrado, mas as contas não estão no formato esperado.</p>';
+    const getLiq = (obj) => {
+        if (!obj) return { at: 0, an: 0 };
+        if (obj.liquido && typeof obj.liquido === 'object') {
+            return { at: obj.liquido.atual || 0, an: obj.liquido.anterior || 0 };
+        }
+        const ingAt = obj.ingressos ? obj.ingressos.atual || 0 : 0;
+        const desAt = obj.desembolsos ? obj.desembolsos.atual || 0 : 0;
+        const ingAn = obj.ingressos ? obj.ingressos.anterior || 0 : 0;
+        const desAn = obj.desembolsos ? obj.desembolsos.anterior || 0 : 0;
+        return { at: ingAt - desAt, an: ingAn - desAn };
+    };
+
+    const liqOp = getLiq(dfc.operacional);
+    const liqInv = getLiq(dfc.investimento);
+    const liqFin = getLiq(dfc.financiamento);
+    
+    const apCaixa = dfc.caixa || dfc.apuracao_caixa || dfc.saldo_caixa;
+    const geracaoAt = apCaixa && apCaixa.geracao ? apCaixa.geracao.atual || 0 : 0;
+    const geracaoAn = apCaixa && apCaixa.geracao ? apCaixa.geracao.anterior || 0 : 0;
+
+    const maxPos = Math.max(liqOp.at, liqOp.an, liqInv.at, liqInv.an, liqFin.at, liqFin.an, geracaoAt, geracaoAn, 0);
+    const maxNeg = Math.min(liqOp.at, liqOp.an, liqInv.at, liqInv.an, liqFin.at, liqFin.an, geracaoAt, geracaoAn, 0);
+    
+    const scale = 200 / (maxPos - maxNeg || 1); 
+
+    // Definindo a área do gráfico e a área da legenda
+    const chartHeight = 250; 
+    const legendY = 300; // Posição Y inicial para a legenda
+    const zeroY = chartHeight - (Math.abs(maxNeg) * scale);
+
+    let svg = '<svg viewBox="0 0 800 380" width="100%" height="380" style="font-family: Arial, sans-serif;">';
+    
+    // Linhas de Grade
+    for (let i = -2; i <= 2; i++) {
+        let val = (maxPos / 2) * i;
+        if (i === 0) val = 0;
+        let y = zeroY - (val * scale);
+        if (y >= 20 && y <= chartHeight) {
+            svg += `<line x1="60" y1="${y}" x2="760" y2="${y}" stroke="#e0e0e0" stroke-width="1" />`;
+            svg += `<text x="55" y="${y + 4}" font-size="10" fill="#666" text-anchor="end">${Math.round(val).toLocaleString('pt-BR')}</text>`;
+        }
     }
+    
+    const barWidth = 30;
+    const gap = 15;
+    const posX = { op: 150, inv: 350, fin: 550, ger: 700 };
+    
+    const drawBar = (val, x, cor) => {
+        let h = Math.max(1, Math.abs(val) * scale);
+        let yStart = val >= 0 ? zeroY - h : zeroY;
+        return `<rect x="${x}" y="${yStart}" width="${barWidth}" height="${h}" fill="${cor}" rx="2" />`;
+    };
+
+    svg += drawBar(liqOp.at, posX.op - (barWidth+gap/2), '#003366');
+    svg += drawBar(liqOp.an, posX.op + (gap/2), '#5B9BD5');
+    
+    svg += drawBar(liqInv.at, posX.inv - (barWidth+gap/2), '#C00000');
+    svg += drawBar(liqInv.an, posX.inv + (gap/2), '#F08080');
+    
+    svg += drawBar(liqFin.at, posX.fin - (barWidth+gap/2), '#4472C4');
+    svg += drawBar(liqFin.an, posX.fin + (gap/2), '#9DC3E6');
+    
+    svg += drawBar(geracaoAt, posX.ger - (barWidth+gap/2), '#00B050');
+    svg += drawBar(geracaoAn, posX.ger + (gap/2), '#90EE90');
+
+    // Labels do eixo X
+    svg += `<text x="${posX.op}" y="${chartHeight + 15}" font-size="10" fill="#333" text-anchor="middle">Fluxo Operacional</text>`;
+    svg += `<text x="${posX.inv}" y="${chartHeight + 15}" font-size="10" fill="#333" text-anchor="middle">Fluxo Investimento</text>`;
+    svg += `<text x="${posX.fin}" y="${chartHeight + 15}" font-size="10" fill="#333" text-anchor="middle">Fluxo Financiamento</text>`;
+    svg += `<text x="${posX.ger}" y="${chartHeight + 15}" font-size="10" fill="#333" text-anchor="middle">Geração Líquida</text>`;
+
+    // --- LEGENDA (2 LINHAS, BEM ESPAÇADAS) ---
+    const legItemWidth = 180;
+    const legInicioX = 80;
+
+    const addLegenda = (texto, cor, x, y) => {
+        return `<rect x="${x}" y="${y}" width="12" height="12" fill="${cor}" rx="2" />` +
+               `<text x="${x+18}" y="${y+10}" font-size="10" fill="#333">${texto}</text>`;
+    };
+
+    // Linha 1 da Legenda
+    svg += addLegenda('Fluxo Operacional (Atual)', '#003366', legInicioX, legendY);
+    svg += addLegenda('Fluxo Operacional (Anterior)', '#5B9BD5', legInicioX + legItemWidth, legendY);
+    svg += addLegenda('Fluxo de Investimento (Atual)', '#C00000', legInicioX + legItemWidth*2, legendY);
+    svg += addLegenda('Fluxo de Investimento (Anterior)', '#F08080', legInicioX + legItemWidth*3, legendY);
+    
+    // Linha 2 da Legenda
+    svg += addLegenda('Fluxo de Financiamento (Atual)', '#4472C4', legInicioX, legendY + 25);
+    svg += addLegenda('Fluxo de Financiamento (Anterior)', '#9DC3E6', legInicioX + legItemWidth, legendY + 25);
+    svg += addLegenda('Geração Líquida (Atual)', '#00B050', legInicioX + legItemWidth*2, legendY + 25);
+    svg += addLegenda('Geração Líquida (Anterior)', '#90EE90', legInicioX + legItemWidth*3, legendY + 25);
+
+    svg += '</svg>';
+
+    H += '<div style="margin-top: 30px; page-break-inside: avoid;">';
+    H += '<div style="background: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">';
+    H += '<h3 style="text-align: center; color: #003366; font-size: 13px; margin-top: 0; margin-bottom: 15px;">Evolução dos Fluxos de Caixa (Líquidos)</h3>';
+    H += svg;
+    H += '</div></div>';
+
 } else {
     H += '<p>Módulo não encontrado.</p>';
 }
@@ -736,6 +854,9 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
+
 
 
 
