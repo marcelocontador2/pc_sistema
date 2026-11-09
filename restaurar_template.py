@@ -1,20 +1,22 @@
-﻿import glob, os, shutil, datetime
+﻿arq = r"pc_frontend\relatorio_consolidado_template.html"
+with open(arq, "r", encoding="utf-8") as f:
+    html = f.read()
 
-# 1. Salva o template quebrado como backup
-arq = r"pc_frontend\relatorio_consolidado_template.html"
-shutil.copy2(arq, f"pc_frontend\\relatorio_consolidado_template_BROKEN_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.html")
+import re
 
-# 2. Restaura do backup mais recente que NÃO seja o BROKEN
-backups = glob.glob(r"pc_frontend\relatorio_consolidado_template_BROKEN_*.html") + \
-          glob.glob(r"pc_frontend\relatorio_consolidado_template.bak_*.html")
+# 1. Remove a linha que adiciona a variavel OBSERVACOES
+html = re.sub(r'\nconst OBSERVACOES = \{observacoes_json\};', '', html)
 
-# Remove o backup que acabamos de criar (BROKEN) da lista
-backups = [b for b in backups if "BROKEN" not in b]
-
-if backups:
-    backup = max(backups, key=os.path.getctime)
-    print(f"[OK] Restaurando de: {backup}")
-    shutil.copy2(backup, arq)
-    print("[OK] Template restaurado.")
+# 2. Restaura a funcao tit() para o formato original
+funcao_quebrada = re.search(r'function tit\(n, t\) \{.*?\n\}', html, re.DOTALL)
+if funcao_quebrada:
+    funcao_original = """function tit(n, t) { return '<h2 class="secao-titulo">' + n + '. ' + t + '</h2>'; }"""
+    html = html.replace(funcao_quebrada.group(0), funcao_original)
+    print("[OK] Funcao tit() restaurada para o original.")
 else:
-    print("[AVISO] Nenhum backup encontrado. Tentando outro método...")
+    print("[AVISO] Nao encontrei a funcao tit() modificada.")
+
+with open(arq, "w", encoding="utf-8") as f:
+    f.write(html)
+
+print("[OK] Template restaurado.")

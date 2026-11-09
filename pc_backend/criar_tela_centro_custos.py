@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análise por Centro de Custos - SIGPC</title>
+    <title>Análise por Centro de Custos - SGPC</title>
     <style>
         :root {
             --primary: #003366;

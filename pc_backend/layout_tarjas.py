@@ -223,7 +223,7 @@
     <!-- TARJA INFERIOR -->
     <div class="tarja-rodape">
         <span>Resolução Cofen nº 814/2026</span>
-        <span>Documento gerado pelo SIGPC</span>
+        <span>Documento gerado pelo SGPC</span>
     </div>
 
     <!-- CONTEÚDO -->

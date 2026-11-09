@@ -1,67 +1,55 @@
-﻿import re, sqlite3, os
+﻿import sqlite3
+import json
 
-print("=" * 70)
-print("AUDITORIA DE ROTAS E HISTÓRICOS DO SISTEMA")
-print("=" * 70)
-
-# 1. Auditoria do main.py
-with open(r"pc_backend\main.py", "r", encoding="utf-8") as f:
-    codigo = f.read()
-
-print("\n[1] ROTAS DE GERAÇÃO DE ARQUIVO (PDF, WORD, EXCEL)")
-print("-" * 70)
-rotas_gerar = re.findall(r'@app\.get\("(/gerar[^"]*)"\)', codigo)
-for r in sorted(set(rotas_gerar)):
-    print(f"  {r}")
-
-print("\n[2] ROTAS DE DOWNLOAD")
-print("-" * 70)
-rotas_down = re.findall(r'@app\.get\("(/download[^"]*)"\)', codigo)
-for r in sorted(set(rotas_down)):
-    print(f"  {r}")
-
-print("\n[3] ROTAS DE API DE ANÁLISE")
-print("-" * 70)
-rotas_api = re.findall(r'@app\.get\("(/api/analise[^"]*)"\)', codigo)
-for r in sorted(set(rotas_api)):
-    print(f"  {r}")
-
-# 2. Auditoria do banco de dados
-print("\n" + "=" * 70)
-print("[4] ESTRUTURA DAS TABELAS DE HISTÓRICO")
-print("=" * 70)
-
-db_path = os.path.join("pc_storage", "banco_dados.db")
+db_path = r"pc_storage\banco_dados.db"
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
-cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'historico_%' ORDER BY name")
-tabelas = cursor.fetchall()
+print("=== AUDITORIA COMPLETA ===")
 
-for (tab,) in tabelas:
-    cursor.execute(f"PRAGMA table_info({tab})")
-    colunas = [c[1] for c in cursor.fetchall()]
-    print(f"\n  Tabela: {tab}")
-    print(f"  Colunas: {', '.join(colunas)}")
+# 1. Verificar observacoes no banco
+print("\n1. OBSERVACOES NO BANCO:")
+cursor.execute("SELECT id, relatorio_id, item, texto FROM observacoes_consolidado")
+rows = cursor.fetchall()
+if not rows:
+    print("   [VAZIO] Nenhuma observacao no banco.")
+else:
+    for r in rows:
+        print(f"   ID: {r[0]} | Relatorio ID: {r[1]} | Item: {r[2]} | Texto: {r[3][:50]}...")
 
-# 3. Verifica quais tabelas tem dados para o período 2026-TRIMESTRE-3
-print("\n" + "=" * 70)
-print("[5] DADOS DISPONÍVEIS PARA 2026-TRIMESTRE-3")
-print("=" * 70)
+# 2. Verificar se o backend tem a rota
+print("\n2. VERIFICANDO ROTA NO BACKEND:")
+import subprocess
+result = subprocess.run(["findstr", "/C:api/observacoes_consolidado", "pc_backend\\main.py"], capture_output=True, text=True)
+if result.stdout:
+    print("   [OK] Rota encontrada no main.py:")
+    print("   " + result.stdout.strip().replace("\n", "\n   "))
+else:
+    print("   [ERRO] Rota NAO encontrada no main.py!")
 
-periodo = "2026-TRIMESTRE-3"
-for (tab,) in tabelas:
-    try:
-        cursor.execute(f"SELECT COUNT(*) FROM {tab} WHERE periodo LIKE ?", (f"%{periodo}%",))
-        count = cursor.fetchone()[0]
-        if count > 0:
-            cursor.execute(f"SELECT id, data_geracao FROM {tab} WHERE periodo LIKE ? ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
-            row = cursor.fetchone()
-            print(f"  ✓ {tab}: {count} registros (último ID: {row[0]}, data: {row[1]})")
-    except Exception as e:
-        pass
+# 3. Verificar se o frontend tem o modal
+print("\n3. VERIFICANDO MODAL NO FRONTEND:")
+with open(r"pc_frontend\relatorio_consolidado.html", "r", encoding="utf-8") as f:
+    html = f.read()
+if 'id="modal-obs"' in html:
+    print("   [OK] Modal encontrado no HTML.")
+else:
+    print("   [ERRO] Modal NAO encontrado no HTML!")
+
+if 'XMLHttpRequest' in html:
+    print("   [OK] XMLHttpRequest encontrado no HTML.")
+else:
+    print("   [ERRO] XMLHttpRequest NAO encontrado no HTML!")
+
+# 4. Verificar se o backend esta rodando
+print("\n4. VERIFICANDO SERVIDOR:")
+import urllib.request
+try:
+    response = urllib.request.urlopen("http://127.0.0.1:9994/api/observacoes_consolidado/22", timeout=3)
+    data = response.read().decode()
+    print(f"   [OK] Servidor respondendo. Resposta: {data}")
+except Exception as e:
+    print(f"   [ERRO] Servidor nao respondeu: {e}")
 
 conn.close()
-print("\n" + "=" * 70)
-print("FIM DA AUDITORIA")
-print("=" * 70)
+print("\n=== FIM DA AUDITORIA ===")
