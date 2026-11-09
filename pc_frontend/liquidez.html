@@ -101,34 +101,59 @@
             const est = data.estrutura || {};
             const val = data.valores || {};
 
+            const resAnt = data.liquidez_anterior || {};
+            const estAnt = data.estrutura_anterior || {};
+            const valAnt = data.valores_anterior || {};
+
             function m(v) { return formatarMoeda(v); }
 
-            let html = '<div class="cards-grid">';
+            let html = '';
 
-            // ---- Liquidez (com aviso de "vezes") ----
+            // ===== PERIODO ATUAL =====
+            html += '<h3 style="margin-top: 20px; color: #003366;">Período Atual: ' + (data.periodo_atual || '') + '</h3>';
+            html += '<div class="cards-grid">';
+
             html += card('Liquidez Imediata', res.liquidez_imediata,
-                `Caixa (${m(val.caixa)}) / Passivo Circulante (${m(val.passivo_circulante)}) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>`);
-
+                'Caixa (' + m(val.caixa) + ') / Passivo Circulante (' + m(val.passivo_circulante) + ') <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>');
             html += card('Liquidez Corrente', res.liquidez_corrente,
-                `Ativo Circulante (${m(val.ativo_circulante)}) / Passivo Circulante (${m(val.passivo_circulante)}) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>`);
-
+                'Ativo Circulante (' + m(val.ativo_circulante) + ') / Passivo Circulante (' + m(val.passivo_circulante) + ') <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>');
             html += card('Liquidez Seca', res.liquidez_seca,
-                `(Ativo Circulante (${m(val.ativo_circulante)}) - Estoques (${m(val.estoques)})) / Passivo Circulante (${m(val.passivo_circulante)}) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>`);
-
+                '(Ativo Circulante (' + m(val.ativo_circulante) + ') - Estoques (' + m(val.estoques) + ')) / Passivo Circulante (' + m(val.passivo_circulante) + ') <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>');
             html += card('Liquidez Geral', res.liquidez_geral,
-                `(Ativo Circulante (${m(val.ativo_circulante)}) + Realizável (${m(val.realizavel_lp)})) / (Passivo Circulante (${m(val.passivo_circulante)}) + Não Circulante (${m(val.passivo_nao_circulante)})) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>`);
+                '(Ativo Circulante (' + m(val.ativo_circulante) + ') + Realizável (' + m(val.realizavel_lp) + ')) / (Passivo Circulante (' + m(val.passivo_circulante) + ') + Não Circulante (' + m(val.passivo_nao_circulante) + ')) <br><span style="color:#0056b3; font-weight:bold; font-size:11px;">Resultado em vezes (R$ por R$ 1,00 de dívida)</span>');
 
-            // ---- Estrutura (com x100 explícito) ----
             html += card('Endividamento Geral', (est.endividamento_geral || '0,00') + '%',
-                `(Passivo Total (${m(val.passivo_total)}) / Ativo Total (${m(val.ativo_total)})) × 100`);
-
+                '(Passivo Total (' + m(val.passivo_total) + ') / Ativo Total (' + m(val.ativo_total) + ')) x 100');
             html += card('Part. de Capital de Terceiros', (est.part_capital_terceiros || '0,00') + '%',
-                `(Passivo Total (${m(val.passivo_total)}) / Patrimônio Líquido (${m(val.patrimonio_liquido)})) × 100`);
-
+                '(Passivo Total (' + m(val.passivo_total) + ') / Patrimônio Líquido (' + m(val.patrimonio_liquido) + ')) x 100');
             html += card('Imobilização do PL', (est.imobilizacao_pl || '0,00') + '%',
-                `(Ativo Permanente (${m(val.imobilizado)}) / Patrimônio Líquido (${m(val.patrimonio_liquido)})) × 100`);
+                '(Ativo Permanente (' + m(val.imobilizado) + ') / Patrimônio Líquido (' + m(val.patrimonio_liquido) + ')) x 100');
 
             html += '</div>';
+
+            // ===== PERIODO ANTERIOR =====
+            html += '<h3 style="margin-top: 30px; color: #003366;">Período Anterior: ' + (data.periodo_anterior || '') + '</h3>';
+
+            if (Object.keys(resAnt).length > 0) {
+                html += '<div class="cards-grid">';
+                html += card('Liquidez Imediata', resAnt.liquidez_imediata,
+                    'Caixa (' + m(valAnt.caixa) + ') / Passivo Circulante (' + m(valAnt.passivo_circulante) + ')');
+                html += card('Liquidez Corrente', resAnt.liquidez_corrente,
+                    'Ativo Circulante (' + m(valAnt.ativo_circulante) + ') / Passivo Circulante (' + m(valAnt.passivo_circulante) + ')');
+                html += card('Liquidez Seca', resAnt.liquidez_seca,
+                    '(Ativo Circulante (' + m(valAnt.ativo_circulante) + ') - Estoques (' + m(valAnt.estoques) + ')) / Passivo Circulante (' + m(valAnt.passivo_circulante) + ')');
+                html += card('Liquidez Geral', resAnt.liquidez_geral,
+                    '(Ativo Circulante (' + m(valAnt.ativo_circulante) + ') + Realizável (' + m(valAnt.realizavel_lp) + ')) / (Passivo Circulante (' + m(valAnt.passivo_circulante) + ') + Não Circulante (' + m(valAnt.passivo_nao_circulante) + '))');
+                html += card('Endividamento Geral', (estAnt.endividamento_geral || '0,00') + '%',
+                    '(Passivo Total (' + m(valAnt.passivo_total) + ') / Ativo Total (' + m(valAnt.ativo_total) + ')) x 100');
+                html += card('Part. de Capital de Terceiros', (estAnt.part_capital_terceiros || '0,00') + '%',
+                    '(Passivo Total (' + m(valAnt.passivo_total) + ') / Patrimônio Líquido (' + m(valAnt.patrimonio_liquido) + ')) x 100');
+                html += card('Imobilização do PL', (estAnt.imobilizacao_pl || '0,00') + '%',
+                    '(Ativo Permanente (' + m(valAnt.imobilizado) + ') / Patrimônio Líquido (' + m(valAnt.patrimonio_liquido) + ')) x 100');
+                html += '</div>';
+            } else {
+                html += '<div style="padding: 16px; background: #fff3cd; border-left: 4px solid #ffc107; color: #856404; border-radius: 4px; font-size: 14px;">Sem dados do período anterior.</div>';
+            }
 
             document.getElementById('resultado').innerHTML = html;
         }

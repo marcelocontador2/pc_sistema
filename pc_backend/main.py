@@ -3233,7 +3233,7 @@ async def serve_liquidez():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "liquidez.html")
     return FileResponse(caminho)
 def _calc_liquidez(periodo):
-    """Calcula indices de liquidez e estrutura a partir do Balanco Patrimonial."""
+    """Calcula indices de liquidez/estrutura para exercicio ATUAL e ANTERIOR."""
     from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
     caminho_bp = _get_csv("BALANCO_PATRIMONIAL", periodo)
     if not caminho_bp:
@@ -3246,66 +3246,63 @@ def _calc_liquidez(periodo):
         return "".join(c for c in s if not unicodedata.combining(c)).upper().strip()
 
     def buscar(*termos):
-        """Retorna o primeiro valor > 0 encontrado para qualquer um dos termos (col 0=Ativo, 3=Passivo)."""
         for termo in termos:
             termo_norm = _norm(termo)
             for p in l_bp:
                 for col_espec in (0, 3):
                     if len(p) > col_espec and termo_norm in _norm(p[col_espec]):
-                        col_valor = col_espec + 1
-                        if len(p) > col_valor:
+                        col_atual = col_espec + 1
+                        col_ant = col_espec + 2
+                        v_atual = v_ant = 0.0
+                        if len(p) > col_atual:
                             try:
-                                v = abs(_limpar_valor(p[col_valor]))
-                                if v > 0:
-                                    return v
+                                v_atual = abs(_limpar_valor(p[col_atual]))
                             except Exception:
                                 pass
-        return 0.0
+                        if len(p) > col_ant:
+                            try:
+                                v_ant = abs(_limpar_valor(p[col_ant]))
+                            except Exception:
+                                pass
+                        if v_atual > 0 or v_ant > 0:
+                            return v_atual, v_ant
+        return 0.0, 0.0
 
-    caixa = buscar("CAIXA E EQUIVALENTES", "DISPONIBILIDADES", "CAIXA")
-    ativo_circulante = buscar("ATIVO CIRCULANTE")
-    estoques = buscar("ESTOQUES")
-    realizavel_lp = buscar("ATIVO REALIZAVEL A LONGO PRAZO", "REALIZAVEL A LONGO PRAZO", "REALIZAVEL LONGO PRAZO")
-    ativo_nao_circulante = buscar("ATIVO NAO CIRCULANTE", "ATIVO NAO-CIRCULANTE")
-    imobilizado = buscar("IMOBILIZADO", "IMOBILIZADO LIQUIDO")
-    passivo_circulante = buscar("PASSIVO CIRCULANTE")
-    passivo_nao_circulante = buscar("PASSIVO NAO CIRCULANTE", "PASSIVO NAO-CIRCULANTE")
-    passivo_total = buscar("TOTAL DO PASSIVO", "PASSIVO TOTAL", "TOTAL PASSIVO")
-    ativo_total = buscar("ATIVO TOTAL", "TOTAL DO ATIVO", "TOTAL ATIVO")
-    patrimonio_liquido = buscar("TOTAL DO PATRIMONIO LIQUIDO", "PATRIMONIO LIQUIDO", "PATRIMONIO SOCIAL")
+    caixa_a, caixa_p = buscar("CAIXA E EQUIVALENTES", "DISPONIBILIDADES", "CAIXA")
+    ac_a, ac_p = buscar("ATIVO CIRCULANTE")
+    est_a, est_p = buscar("ESTOQUES")
+    rlp_a, rlp_p = buscar("ATIVO REALIZAVEL A LONGO PRAZO", "REALIZAVEL A LONGO PRAZO", "REALIZAVEL LONGO PRAZO")
+    anc_a, anc_p = buscar("ATIVO NAO CIRCULANTE", "ATIVO NAO-CIRCULANTE")
+    imob_a, imob_p = buscar("IMOBILIZADO", "IMOBILIZADO LIQUIDO")
+    pc_a, pc_p = buscar("PASSIVO CIRCULANTE")
+    pnc_a, pnc_p = buscar("PASSIVO NAO CIRCULANTE", "PASSIVO NAO-CIRCULANTE")
+    pt_a, pt_p = buscar("TOTAL DO PASSIVO", "PASSIVO TOTAL", "TOTAL PASSIVO")
+    at_a, at_p = buscar("ATIVO TOTAL", "TOTAL DO ATIVO", "TOTAL ATIVO")
+    pl_a, pl_p = buscar("TOTAL DO PATRIMONIO LIQUIDO", "PATRIMONIO LIQUIDO", "PATRIMONIO SOCIAL")
 
-    # ===== Fallbacks robustos =====
-    # CUIDADO: no BP brasileiro, ARLP e Imobilizado JA ESTAO dentro do ANC.
-    # Por isso NAO somar ARLP ao ANC novamente.
+    def _bloco(caixa, ac, est, rlp, anc, imob, pc, pnc, pt, at, pl):
+        if not anc and imob:
+            anc = imob
+        if not pt and pc and pnc:
+            pt = pc + pnc
+        if not at:
+            if ac and anc:
+                at = ac + anc
+            elif ac:
+                at = ac + (rlp or 0.0) + (imob or 0.0)
+        if not at and pt and pl:
+            at = pt + pl
+        if not pl and at and pt:
+            pl = at - pt
+        if at and pt and pl:
+            soma = pt + pl
+            if abs(at - soma) > 1.0:
+                at = soma
+        return dict(caixa=caixa, ac=ac, est=est, rlp=rlp, anc=anc, imob=imob,
+                    pc=pc, pnc=pnc, pt=pt, at=at, pl=pl)
 
-    # 1) Se nao achou ANC mas achou Imobilizado, usa Imobilizado como piso
-    if not ativo_nao_circulante and imobilizado:
-        ativo_nao_circulante = imobilizado
-
-    # 2) Se nao achou passivo_total, calcula pela soma dos componentes
-    if not passivo_total and passivo_circulante and passivo_nao_circulante:
-        passivo_total = passivo_circulante + passivo_nao_circulante
-
-    # 3) Ativo total: AC + ANC (ARLP ja esta dentro de ANC)
-    if not ativo_total:
-        if ativo_circulante and ativo_nao_circulante:
-            ativo_total = ativo_circulante + ativo_nao_circulante
-        elif ativo_circulante:
-            ativo_total = ativo_circulante + (realizavel_lp or 0.0) + (imobilizado or 0.0)
-
-    # 4) Se ainda nao tem ativo_total mas tem passivo + PL, usa a equacao contabil
-    if not ativo_total and passivo_total and patrimonio_liquido:
-        ativo_total = passivo_total + patrimonio_liquido
-
-    # 5) Se nao achou PL mas tem ativo e passivo totais
-    if not patrimonio_liquido and ativo_total and passivo_total:
-        patrimonio_liquido = ativo_total - passivo_total
-
-    # 6) VALIDACAO FINAL: se ativo_total nao bate com (passivo_total + PL), forca a equacao contabil
-    if ativo_total and passivo_total and patrimonio_liquido:
-        soma_esperada = passivo_total + patrimonio_liquido
-        if abs(ativo_total - soma_esperada) > 1.0:  # tolerancia de R$ 1
-            ativo_total = soma_esperada
+    b_atual = _bloco(caixa_a, ac_a, est_a, rlp_a, anc_a, imob_a, pc_a, pnc_a, pt_a, at_a, pl_a)
+    b_ant   = _bloco(caixa_p, ac_p, est_p, rlp_p, anc_p, imob_p, pc_p, pnc_p, pt_p, at_p, pl_p)
 
     def div(a, b):
         return (a / b) if b else 0.0
@@ -3316,39 +3313,56 @@ def _calc_liquidez(periodo):
     def fmt(v):
         return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-    liq_imediata = div(caixa, passivo_circulante)
-    liq_corrente = div(ativo_circulante, passivo_circulante)
-    liq_seca = div(ativo_circulante - estoques, passivo_circulante)
-    liq_geral = div(ativo_circulante + realizavel_lp, passivo_circulante + passivo_nao_circulante)
-    endividamento = pct(passivo_total, ativo_total)
-    part_cap_terceiros = pct(passivo_total, patrimonio_liquido)
-    imob_pl = pct(imobilizado, patrimonio_liquido)
+    def _indices(b):
+        return {
+            "liquidez": {
+                "liquidez_imediata": fmt(div(b["caixa"], b["pc"])),
+                "liquidez_corrente": fmt(div(b["ac"], b["pc"])),
+                "liquidez_seca": fmt(div(b["ac"] - b["est"], b["pc"])),
+                "liquidez_geral": fmt(div(b["ac"] + b["rlp"], b["pc"] + b["pnc"])),
+            },
+            "estrutura": {
+                "endividamento_geral": fmt(pct(b["pt"], b["at"])),
+                "part_capital_terceiros": fmt(pct(b["pt"], b["pl"])),
+                "imobilizacao_pl": fmt(pct(b["imob"], b["pl"])),
+            },
+            "valores": {
+                "caixa": b["caixa"],
+                "ativo_circulante": b["ac"],
+                "estoques": b["est"],
+                "realizavel_lp": b["rlp"],
+                "ativo_nao_circulante": b["anc"],
+                "imobilizado": b["imob"],
+                "passivo_circulante": b["pc"],
+                "passivo_nao_circulante": b["pnc"],
+                "passivo_total": b["pt"],
+                "ativo_total": b["at"],
+                "patrimonio_liquido": b["pl"],
+            },
+        }
+
+    idx_atual = _indices(b_atual)
+    idx_ant = _indices(b_ant)
+
+    periodo_anterior_label = None
+    for p in l_bp[:12]:
+        linha = ";".join(str(c) for c in p)
+        if "PERIODO ANTERIOR" in _norm(linha):
+            import re as _re
+            m2 = _re.search(r"(\d{2}/\d{2}/(\d{4}))\s*a\s*(\d{2}/\d{2}/(\d{4}))", linha)
+            if m2:
+                periodo_anterior_label = f"{m2.group(2)} - TRIMESTRE 3"
+            break
 
     return {
-        "liquidez": {
-            "liquidez_imediata": fmt(liq_imediata),
-            "liquidez_corrente": fmt(liq_corrente),
-            "liquidez_seca": fmt(liq_seca),
-            "liquidez_geral": fmt(liq_geral),
-        },
-        "estrutura": {
-            "endividamento_geral": fmt(endividamento),
-            "part_capital_terceiros": fmt(part_cap_terceiros),
-            "imobilizacao_pl": fmt(imob_pl),
-        },
-        "valores": {
-            "caixa": caixa,
-            "ativo_circulante": ativo_circulante,
-            "estoques": estoques,
-            "realizavel_lp": realizavel_lp,
-            "ativo_nao_circulante": ativo_nao_circulante,
-            "imobilizado": imobilizado,
-            "passivo_circulante": passivo_circulante,
-            "passivo_nao_circulante": passivo_nao_circulante,
-            "passivo_total": passivo_total,
-            "ativo_total": ativo_total,
-            "patrimonio_liquido": patrimonio_liquido,
-        },
+        "periodo_atual": periodo,
+        "periodo_anterior": periodo_anterior_label or "Exercício Anterior",
+        "liquidez": idx_atual["liquidez"],
+        "estrutura": idx_atual["estrutura"],
+        "valores": idx_atual["valores"],
+        "liquidez_anterior": idx_ant["liquidez"],
+        "estrutura_anterior": idx_ant["estrutura"],
+        "valores_anterior": idx_ant["valores"],
     }
 
 
@@ -5492,13 +5506,13 @@ async def gerar_pdf_analise_bp(id: int):
 # ROTAS DE LIQUIDEZ (adicionadas automaticamente)
 # =========================================================
 
+
 @app.get("/api/calcular_liquidez/{periodo}")
 async def api_calcular_liquidez(periodo: str):
     dados = _calc_liquidez(periodo)
     if not dados:
         return {"erro": True, "mensagem": "Balanco Patrimonial nao encontrado para este periodo."}
     return dados
-
 
 @app.post("/salvar_liquidez/{periodo}")
 async def salvar_liquidez_rota(periodo: str):
@@ -5567,7 +5581,7 @@ async def excluir_liquidez(id: int):
 
 @app.get("/gerar_pdf_liquidez/{id}")
 def gerar_pdf_liquidez(id: int):
-    import sqlite3 as _sq, json as _js
+    import sqlite3 as _sq
     from fpdf import FPDF
     from fpdf.enums import XPos, YPos
     from fastapi.responses import Response
@@ -5575,89 +5589,157 @@ def gerar_pdf_liquidez(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = _sq.connect(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_liquidez WHERE id = ?", (id,))
+    cur.execute("SELECT periodo, data_geracao FROM historico_liquidez WHERE id = ?", (id,))
     row = cur.fetchone()
     conn.close()
     if not row:
         return Response(content="Historico nao encontrado.", status_code=404, media_type="text/plain")
 
-    periodo, data_geracao, res_json = row
-    dados = _js.loads(res_json)
-    liq = dados.get("liquidez", {})
-    est = dados.get("estrutura", {})
-    val = dados.get("valores", {})
+    periodo, data_geracao = row
+    dados = _calc_liquidez(periodo)
+    if not dados:
+        return Response(content="Balanco Patrimonial nao encontrado.", status_code=404, media_type="text/plain")
+
+    liq      = dados.get("liquidez", {})           or {}
+    est      = dados.get("estrutura", {})          or {}
+    liq_ant  = dados.get("liquidez_anterior", {})  or {}
+    est_ant  = dados.get("estrutura_anterior", {}) or {}
+    val      = dados.get("valores", {})            or {}
+    val_ant  = dados.get("valores_anterior", {})   or {}
 
     def fmt_moeda(v):
+        if v is None: return "R$ 0,00"
         try:
-            return f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            return "R$ " + f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         except Exception:
             return str(v)
+            
+    def fmt_num(v):
+        if v is None: return "-"
+        return str(v).replace(".", ",")
 
-    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    def var_pct(atual, anterior):
+        try:
+            a = float(str(atual).replace(".", "").replace(",", "."))
+            p = float(str(anterior).replace(".", "").replace(",", "."))
+            if p == 0: return "-"
+            return f"{((a-p)/p)*100:+.2f}%".replace(".", ",")
+        except:
+            return "-"
+
+    # Paisagem (Landscape)
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_page()
-    pdf.set_fill_color(0, 51, 102)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 15)
-    pdf.cell(0, 15, "INDICES DE LIQUIDEZ E ESTRUTURA", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
+    pdf.set_margins(10, 10, 10)
 
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 10)
+    # --- TITULO PRINCIPAL ---
+    pdf.set_fill_color(0, 45, 90)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(277, 10, "Indicadores de Liquidez e Estrutura Patrimonial (Atual x Anterior)", border=0, align="L", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(4)
-    pdf.cell(0, 6, f"Periodo: {periodo.replace('-', ' ')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.cell(0, 6, f"Data de Geracao: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.ln(6)
 
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_fill_color(0, 86, 179)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 8, "1. INDICES DE LIQUIDEZ", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "", 10)
-    for label, chave in [
-        ("Liquidez Imediata", "liquidez_imediata"),
-        ("Liquidez Corrente", "liquidez_corrente"),
-        ("Liquidez Seca", "liquidez_seca"),
-        ("Liquidez Geral", "liquidez_geral"),
-    ]:
-        pdf.cell(110, 7, label, border=1)
-        pdf.cell(0, 7, str(liq.get(chave, "0,00")), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    # --- TABELA 1: RESUMO ---
+    # Larguras: 100 + 50 + 50 + 77 = 277mm
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(0, 70, 140)
+    pdf.cell(100, 7, "INDICADOR", border=0, fill=True)
+    pdf.cell(50, 7, "ATUAL", border=0, align="C", fill=True)
+    pdf.cell(50, 7, "ANTERIOR", border=0, align="C", fill=True)
+    pdf.cell(77, 7, "VAR. (%)", border=0, align="C", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    pdf.ln(5)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_fill_color(0, 86, 179)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 8, "2. ESTRUTURA PATRIMONIAL", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "", 10)
-    for label, chave in [
-        ("Endividamento Geral (%)", "endividamento_geral"),
-        ("Part. Capital de Terceiros (%)", "part_capital_terceiros"),
-        ("Imobilizacao do PL (%)", "imobilizacao_pl"),
-    ]:
-        pdf.cell(110, 7, label, border=1)
-        pdf.cell(0, 7, str(est.get(chave, "0,00")) + "%", border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    def sub_header(texto):
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(0, 45, 90)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(277, 7, texto, border=0, fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 9)
 
-    pdf.ln(5)
+    def linha_resumo(label, va, vp, v_var):
+        pdf.cell(100, 7, label, border="B")
+        pdf.cell(50, 7, va, border="B", align="C")
+        pdf.cell(50, 7, vp, border="B", align="C")
+        pdf.cell(77, 7, v_var, border="B", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    sub_header("LIQUIDEZ")
+    for label, chave in [("Liquidez Imediata", "liquidez_imediata"), ("Liquidez Corrente", "liquidez_corrente"), ("Liquidez Seca", "liquidez_seca"), ("Liquidez Geral", "liquidez_geral")]:
+        va = fmt_num(liq.get(chave, "-"))
+        vp = fmt_num(liq_ant.get(chave, "-"))
+        linha_resumo(label, va, vp, var_pct(va, vp))
+
+    sub_header("ESTRUTURA PATRIMONIAL")
+    for label, chave in [("Endividamento Geral", "endividamento_geral"), ("Part. Capital de Terceiros", "part_capital_terceiros"), ("Imobilização do PL", "imobilizacao_pl")]:
+        va = fmt_num(est.get(chave, "-"))
+        vp = fmt_num(est_ant.get(chave, "-"))
+        linha_resumo(label, va + "%", vp + "%", var_pct(va, vp))
+
+    pdf.ln(8)
+
+    # --- TABELA 2: MEMÓRIA DE CÁLCULO ---
     pdf.set_font("Helvetica", "B", 11)
-    pdf.set_fill_color(0, 86, 179)
+    pdf.set_text_color(0, 45, 90)
+    pdf.cell(277, 6, "Memória de Cálculo (Atual x Anterior)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.ln(2)
+
+    # Larguras ajustadas: 35 + 55 + 71 + 20 + 71 + 25 = 277mm
+    pdf.set_font("Helvetica", "B", 7)
+    pdf.set_fill_color(0, 70, 140)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 8, "3. VALORES BASE", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+    pdf.cell(35, 7, "INDICE", border=0, align="C", fill=True)
+    pdf.cell(55, 7, "FÓRMULA", border=0, align="C", fill=True)
+    pdf.cell(71, 7, "CÁLCULO (ATUAL)", border=0, align="C", fill=True)
+    pdf.cell(20, 7, "RESULTADO", border=0, align="C", fill=True)
+    pdf.cell(71, 7, "CÁLCULO (ANTERIOR)", border=0, align="C", fill=True)
+    pdf.cell(25, 7, "RESULTADO", border=0, align="C", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "", 10)
-    for label, chave in [
-        ("Caixa e Equivalentes", "caixa"),
-        ("Ativo Circulante", "ativo_circulante"),
-        ("Estoques", "estoques"),
-        ("Realizavel a Longo Prazo", "realizavel_lp"),
-        ("Imobilizado", "imobilizado"),
-        ("Passivo Circulante", "passivo_circulante"),
-        ("Passivo Nao Circulante", "passivo_nao_circulante"),
-        ("Passivo Total", "passivo_total"),
-        ("Ativo Total", "ativo_total"),
-        ("Patrimonio Liquido", "patrimonio_liquido"),
-    ]:
-        pdf.cell(110, 7, label, border=1)
-        pdf.cell(0, 7, fmt_moeda(val.get(chave, 0)), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("Helvetica", "", 6)
+
+    def draw_row_memoria(label, formula, calc_a, res_a, calc_p, res_p):
+        h = 7
+        pdf.cell(35, h, label, border="B", align="L")
+        pdf.cell(55, h, formula, border="B", align="L")
+        pdf.cell(71, h, calc_a, border="B", align="L")
+        pdf.cell(20, h, res_a, border="B", align="C")
+        pdf.cell(71, h, calc_p, border="B", align="L")
+        pdf.cell(25, h, res_p, border="B", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    draw_row_memoria(
+        "Liquidez Imediata", "Caixa / Passivo Circ.",
+        f"{fmt_moeda(val.get('caixa'))} / {fmt_moeda(val.get('passivo_circulante'))}", str(liq.get("liquidez_imediata", "-")),
+        f"{fmt_moeda(val_ant.get('caixa'))} / {fmt_moeda(val_ant.get('passivo_circulante'))}", str(liq_ant.get("liquidez_imediata", "-"))
+    )
+    draw_row_memoria(
+        "Liquidez Corrente", "Ativo Circ. / Passivo Circ.",
+        f"{fmt_moeda(val.get('ativo_circulante'))} / {fmt_moeda(val.get('passivo_circulante'))}", str(liq.get("liquidez_corrente", "-")),
+        f"{fmt_moeda(val_ant.get('ativo_circulante'))} / {fmt_moeda(val_ant.get('passivo_circulante'))}", str(liq_ant.get("liquidez_corrente", "-"))
+    )
+    draw_row_memoria(
+        "Liquidez Seca", "(Ativo Circ. - Estoques) / Passivo Circ.",
+        f"({fmt_moeda(val.get('ativo_circulante'))} - {fmt_moeda(val.get('estoques'))}) / {fmt_moeda(val.get('passivo_circulante'))}", str(liq.get("liquidez_seca", "-")),
+        f"({fmt_moeda(val_ant.get('ativo_circulante'))} - {fmt_moeda(val_ant.get('estoques'))}) / {fmt_moeda(val_ant.get('passivo_circulante'))}", str(liq_ant.get("liquidez_seca", "-"))
+    )
+    draw_row_memoria(
+        "Liquidez Geral", "(AC + Realiz. LP) / (PC + P. N. Circ.)",
+        f"({fmt_moeda(val.get('ativo_circulante'))} + {fmt_moeda(val.get('realizavel_lp'))}) / ({fmt_moeda(val.get('passivo_circulante'))} + {fmt_moeda(val.get('passivo_nao_circulante'))})", str(liq.get("liquidez_geral", "-")),
+        f"({fmt_moeda(val_ant.get('ativo_circulante'))} + {fmt_moeda(val_ant.get('realizavel_lp'))}) / ({fmt_moeda(val_ant.get('passivo_circulante'))} + {fmt_moeda(val_ant.get('passivo_nao_circulante'))})", str(liq_ant.get("liquidez_geral", "-"))
+    )
+    draw_row_memoria(
+        "Endividamento Geral", "Passivo Total / Ativo Total",
+        f"{fmt_moeda(val.get('passivo_total'))} / {fmt_moeda(val.get('ativo_total'))}", str(est.get("endividamento_geral", "-")) + "%",
+        f"{fmt_moeda(val_ant.get('passivo_total'))} / {fmt_moeda(val_ant.get('ativo_total'))}", str(est_ant.get("endividamento_geral", "-")) + "%"
+    )
+    draw_row_memoria(
+        "Part. Capital Terceiros", "Passivo Total / PL",
+        f"{fmt_moeda(val.get('passivo_total'))} / {fmt_moeda(val.get('patrimonio_liquido'))}", str(est.get("part_capital_terceiros", "-")) + "%",
+        f"{fmt_moeda(val_ant.get('passivo_total'))} / {fmt_moeda(val_ant.get('patrimonio_liquido'))}", str(est_ant.get("part_capital_terceiros", "-")) + "%"
+    )
+    draw_row_memoria(
+        "Imobilização do PL", "Imobilizado / PL",
+        f"{fmt_moeda(val.get('imobilizado'))} / {fmt_moeda(val.get('patrimonio_liquido'))}", str(est.get("imobilizacao_pl", "-")) + "%",
+        f"{fmt_moeda(val_ant.get('imobilizado'))} / {fmt_moeda(val_ant.get('patrimonio_liquido'))}", str(est_ant.get("imobilizacao_pl", "-")) + "%"
+    )
 
     pdf_bytes = bytes(pdf.output())
     return Response(

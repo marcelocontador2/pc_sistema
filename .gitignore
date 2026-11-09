@@ -1,8 +1,54 @@
-﻿pc_venv/
+﻿# Python
 __pycache__/
 *.pyc
-*.zip
-_backups_arquivo/backups/
+pc_venv/
+
+# Banco de dados e dados sensiveis
 pc_storage/banco_dados.db
-_arquivo_20261031/
+pc_storage/uploads_raw/*.csv
+
+# Backups
+*.bak_*
+*.bak
+
+# Arquivo corrompido
+pc_backend/\342\210\222
+
+# Scripts temporarios de correcao (rodados uma vez, ja cumpriram seu papel)
+pc_backend/aplicar_*.py
+aplicar_front_liquidez*.py
+adicionar_*.py
+ajustar_*.py
+atualizar_*.py
+corrigir_*.py
+criar_*.py
+injetar_*.py
+remover_*.py
+substituir_*.py
+restaurar_*.py
+reverter_*.py
+limpar_*.py
+auditar_*.py
+verificar_*.py
+trecho_*.txt
+auditoria_*.txt
+# Arquivos compactados de backup
 *.zip
+
+# Arquivo corrompido (regra alternativa)
+
+# Scripts soltos de trabalho
+base_legal_capa.py
+colorir_integridade.py
+esconder_botao_word.py
+estrutura_base_legal.py
+extrair_consolidado.py
+extrair_custo_pessoal.py
+liquidez_api_anterior.py
+listar_tabelas.py
+obs_sem_titulo.py
+secao9_*.py
+pc_backend/????
+"pc_backend/\342\210\222"
+pc_backend/\\\\342*
+pc_backend/???*
