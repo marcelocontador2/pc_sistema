@@ -836,8 +836,27 @@ if (dvp) {
 
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
-// ===== 7. COMPARATIVO DE RECEITAS =====
-H += tit(7, 'Comparativo de Receitas');
+// ===== 7. ANÁLISE DMPL =====
+H += tit(7, 'Demonstração das Mutações do Patrimônio Líquido (DMPL)');
+H += '<div class="desc">Demonstração das mutações do patrimônio líquido.</div>';
+if (D.dmpl && D.dmpl.dados && D.dmpl.dados.length > 0) {
+    H += '<table class="tabela-relatorio"><thead><tr>';
+    H += '<th>Especificação</th><th>Patrimônio Social</th><th>Adiant. Capital</th><th>Reservas Capital</th><th>Ajustes Avaliação</th><th>Reservas Lucros</th><th>Demais Reservas</th><th>Result. Acumulados</th><th>Total</th>';
+    H += '</tr></thead><tbody>';
+    for (let i = 6; i < D.dmpl.dados.length; i++) {
+        let linha = D.dmpl.dados[i];
+        if (linha.length < 3) continue;
+        while (linha.length < 9) linha.push('');
+        H += '<tr>';
+        for (let j = 0; j < 9; j++) {
+            H += `<td style="text-align: ${j === 0 ? 'left' : 'right'};">${(linha[j] || '').trim()}</td>`;
+        }
+        H += '</tr>';
+    }
+    H += '</tbody></table>';
+}
+// ===== 8. COMPARATIVO DE RECEITAS =====
+H += tit(8, 'Comparativo de Receitas');
 H += '<div class="desc">Comparativo consolidado de receitas.</div>';
 const crec = unwrap(D.comparativo_receitas);
 if (crec) {
@@ -960,7 +979,7 @@ if (crec) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 8. COMPARATIVO DE DESPESAS =====
-H += tit(8, 'Comparativo de Despesas');
+H += tit(9, 'Comparativo de Despesas');
 H += '<div class="desc">Comparativo consolidado de despesas.</div>';
 const cdesp = unwrap(D.comparativo_despesas);
 if (cdesp) {
@@ -1095,7 +1114,7 @@ if (cdesp) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 9. LIQUIDEZ =====
-H += tit(9, 'Índices de Liquidez e Estrutura');
+H += tit(10, 'Índices de Liquidez e Estrutura');
 H += '<div class="desc">Indicadores de liquidez e estrutura patrimonial (atual x anterior).</div>';
 
 const liqRaw = unwrap(D.liquidez);
@@ -1227,7 +1246,7 @@ if (liqRaw && liqRaw.valores) {
     H += tab(['Índice', 'Fórmula', 'Cálculo (Atual)', 'Resultado (Atual)', 'Cálculo (Anterior)', 'Resultado (Anterior)'], formulas);
 } else { H += '<p>Módulo não encontrado.</p>'; }
 // ===== 10. PANORAMA =====
-H += tit(10, 'Panorama de Resultados');
+H += tit(11, 'Panorama de Resultados');
 H += '<div class="desc">Resumo executivo dos principais indicadores.</div>';
 const pan = unwrap(D.panorama);
 if (pan) {
@@ -1261,7 +1280,7 @@ if (pan) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 11. CENTRO DE CUSTOS =====
-H += tit(11, 'Análise por Centro de Custos');
+H += tit(12, 'Análise por Centro de Custos');
 H += '<div class="desc">Distribuição das despesas por centro de custo.</div>';
 const cc = unwrap(D.centro_custos);
 if (cc && cc.centros) {
@@ -1384,7 +1403,7 @@ if (cc && cc.centros) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 12. CUSTO DE PESSOAL =====
-H += tit(12, 'Custo de Pessoal');
+H += tit(13, 'Custo de Pessoal');
 H += '<div class="desc">Custo de pessoal x limite legal (Resolução Cofen 814/2026).</div>';
 const cp = unwrap(D.custo_pessoal);
 if (cp) {
@@ -1535,7 +1554,7 @@ if (cp) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 13. PARECER =====
-H += tit(13, 'Parecer do Contador');
+H += tit(14, 'Parecer do Contador');
 H += '<div class="desc">Conclusão da análise contábil.</div>';
 H += '<div class="ok"><strong>Análise Concluída</strong><br>Os dados foram consolidados com sucesso.</div>';
 

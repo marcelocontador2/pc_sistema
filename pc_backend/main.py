@@ -9080,6 +9080,19 @@ def gerar_pdf_relatorio_consolidado(id: int):
 
     periodo, data_geracao, res_json = row
     dados = json.loads(res_json).get("dados", {})
+    
+    # --- INJECAO DA DMPL (Item 7) ---
+    try:
+        conn_dmpl = sqlite3.connect(db_path)
+        cursor_dmpl = conn_dmpl.cursor()
+        cursor_dmpl.execute("SELECT resultado_json FROM historico_analise_dmpl ORDER BY id DESC LIMIT 1")
+        row_dmpl = cursor_dmpl.fetchone()
+        if row_dmpl:
+            dados["dmpl"] = json.loads(row_dmpl[0])
+        conn_dmpl.close()
+    except Exception as e:
+        print("Erro ao injetar DMPL:", e)
+    # --------------------------------
 
     template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_consolidado_template.html")
     with open(template_path, "r", encoding="utf-8") as f:
