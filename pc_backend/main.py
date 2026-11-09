@@ -6162,7 +6162,21 @@ def gerar_pdf_relatorio_consolidado(id: int):
 
     # Injeta conclusao
     if row_concl and row_concl[0]:
-        conclusao_html = '<div style="margin-top:30px; padding:15px; background:#f8f9fa; border-left:4px solid #003366; font-size:11px;"><b>Conclusão do Contador:</b><br>' + row_concl[0] + '</div>'
+        import re as _re
+        _txt = row_concl[0]
+        # Força quebra antes dos itens numerados (1., 2., etc)
+        _txt = _re.sub(r'\s+(\d+\.)\s+', r'<br><br><b>\1</b> ', _txt)
+        # Força quebra antes das palavras-chave
+        _txt = _re.sub(r'\s+(Recomenda-se:)', r'<br><br><b>\1</b>', _txt)
+        _txt = _re.sub(r'\s+(Conclusão:)', r'<br><br><b>\1</b>', _txt)
+        # Substitui eventuais quebras de linha originais
+        _txt = _txt.replace(chr(10), '<br><br>')
+        
+        conclusao_html = '<div style="margin-top: 40px; padding: 20px; background: #f4f7f9; border-left: 5px solid #003366; font-size: 10px; line-height: 1.6; text-align: justify; color: #333; page-break-inside: avoid;">'
+        conclusao_html += '<b style="color: #003366; font-size: 14px; display: block; margin-bottom: 15px;">Conclusão do Contador:</b>'
+        conclusao_html += '<div style="font-family: Arial, sans-serif;">' + _txt + '</div>'
+        conclusao_html += '</div>'
+        
         html_final = html_final.replace('</body>', conclusao_html + '</body>')
 
     # Injeta dados do contador

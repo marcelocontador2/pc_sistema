@@ -108,6 +108,11 @@
         }
 
         async function verificarDados() {
+            // Injeta ID global para o botão de Conclusão
+            if (typeof relatorioId !== 'undefined') window.idRelatorioAtual = relatorioId;
+            if (typeof id !== 'undefined') window.idRelatorioAtual = id;
+            if (typeof data !== 'undefined' && data.id) window.idRelatorioAtual = data.id;
+
             const periodo = pegarPeriodo();
             const statusArea = document.getElementById('status-area');
             const modulosArea = document.getElementById('modulos-area');
@@ -360,6 +365,88 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
+
+<!-- MODAL DE CONCLUSÃO -->
+<div id="modal-conclusao" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; padding:20px; border-radius:8px; width:600px; max-width:90%; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin-top:0; color:#003366;">Conclusão do Relatório</h3>
+        <textarea id="texto-conclusao" style="width:100%; height:150px; padding:10px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px; margin-bottom:15px; box-sizing:border-box;" placeholder="Digite aqui a conclusão..."></textarea>
+        <div style="text-align:right;">
+            <button onclick="fecharConclusao()" style="padding:8px 16px; background:#ccc; border:none; border-radius:4px; cursor:pointer; margin-right:10px;">Cancelar</button>
+            <button onclick="salvarConclusao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar Conclusão</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variável global para armazenar o ID do relatório atual
+window.idRelatorioAtual = null;
+
+function abrirConclusao() {
+    // Busca o ID do relatório mais recente direto do banco via API
+    fetch('/historico_relatorio_consolidado')
+        .then(res => res.json())
+        .then(lista => {
+            if (!lista || lista.length === 0) {
+                alert("Nenhum relatório consolidado salvo foi encontrado no banco. Gere o relatório primeiro.");
+                return;
+            }
+            
+            // Pega o ID do primeiro item da lista (o mais recente)
+            const idRelatorio = lista[0].id;
+            
+            // Agora busca a conclusão desse ID
+            return fetch(`/api/conclusao_consolidado/${idRelatorio}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('texto-conclusao').value = data.texto || '';
+                    document.getElementById('modal-conclusao').style.display = 'flex';
+                    // Salva o ID no input para usar na hora de salvar
+                    document.getElementById('modal-conclusao').setAttribute('data-id', idRelatorio);
+                });
+        })
+        .catch(err => {
+            console.error("Erro ao buscar histórico:", err);
+            alert("Erro de comunicação com o servidor.");
+        });
+}
+
+function fecharConclusao() {
+    document.getElementById('modal-conclusao').style.display = 'none';
+}
+
+function salvarConclusao() {
+    const texto = document.getElementById('texto-conclusao').value;
+    if (!texto.trim()) {
+        alert("Digite um texto para a conclusão.");
+        return;
+    }
+
+    // Pega o ID que foi salvo no atributo data-id do modal
+    const idRelatorio = document.getElementById('modal-conclusao').getAttribute('data-id');
+    if (!idRelatorio) {
+        alert("Erro: ID do relatório não encontrado.");
+        return;
+    }
+
+    fetch(`/api/conclusao_consolidado/${idRelatorio}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: texto })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.erro) throw new Error(data.mensagem || "Erro ao salvar");
+        alert("Conclusão salva com sucesso!");
+        document.getElementById('modal-conclusao').style.display = 'none';
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Erro ao salvar conclusão: " + err.message);
+    });
+}
+</script>
+
 </body>
 
 
@@ -556,4 +643,86 @@ function excluirObservacao(id) {
     }
 }
 </script>
+
+<!-- MODAL DE CONCLUSÃO -->
+<div id="modal-conclusao" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; padding:20px; border-radius:8px; width:600px; max-width:90%; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin-top:0; color:#003366;">Conclusão do Relatório</h3>
+        <textarea id="texto-conclusao" style="width:100%; height:150px; padding:10px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px; margin-bottom:15px; box-sizing:border-box;" placeholder="Digite aqui a conclusão..."></textarea>
+        <div style="text-align:right;">
+            <button onclick="fecharConclusao()" style="padding:8px 16px; background:#ccc; border:none; border-radius:4px; cursor:pointer; margin-right:10px;">Cancelar</button>
+            <button onclick="salvarConclusao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar Conclusão</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variável global para armazenar o ID do relatório atual
+window.idRelatorioAtual = null;
+
+function abrirConclusao() {
+    // Busca o ID do relatório mais recente direto do banco via API
+    fetch('/historico_relatorio_consolidado')
+        .then(res => res.json())
+        .then(lista => {
+            if (!lista || lista.length === 0) {
+                alert("Nenhum relatório consolidado salvo foi encontrado no banco. Gere o relatório primeiro.");
+                return;
+            }
+            
+            // Pega o ID do primeiro item da lista (o mais recente)
+            const idRelatorio = lista[0].id;
+            
+            // Agora busca a conclusão desse ID
+            return fetch(`/api/conclusao_consolidado/${idRelatorio}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('texto-conclusao').value = data.texto || '';
+                    document.getElementById('modal-conclusao').style.display = 'flex';
+                    // Salva o ID no input para usar na hora de salvar
+                    document.getElementById('modal-conclusao').setAttribute('data-id', idRelatorio);
+                });
+        })
+        .catch(err => {
+            console.error("Erro ao buscar histórico:", err);
+            alert("Erro de comunicação com o servidor.");
+        });
+}
+
+function fecharConclusao() {
+    document.getElementById('modal-conclusao').style.display = 'none';
+}
+
+function salvarConclusao() {
+    const texto = document.getElementById('texto-conclusao').value;
+    if (!texto.trim()) {
+        alert("Digite um texto para a conclusão.");
+        return;
+    }
+
+    // Pega o ID que foi salvo no atributo data-id do modal
+    const idRelatorio = document.getElementById('modal-conclusao').getAttribute('data-id');
+    if (!idRelatorio) {
+        alert("Erro: ID do relatório não encontrado.");
+        return;
+    }
+
+    fetch(`/api/conclusao_consolidado/${idRelatorio}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: texto })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.erro) throw new Error(data.mensagem || "Erro ao salvar");
+        alert("Conclusão salva com sucesso!");
+        document.getElementById('modal-conclusao').style.display = 'none';
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Erro ao salvar conclusão: " + err.message);
+    });
+}
+</script>
+
 </body>

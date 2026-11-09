@@ -34,7 +34,7 @@
     <div class="faixa"><h1>RELATÓRIO CONSOLIDADO</h1><h2>Análise Contábil</h2></div>
     <div class="entidade">COFEN - Conselho Federal de Enfermagem</div>
     <div class="info"><div class="label">Período de Análise</div><div class="valor">{periodo}</div></div>
-    <div class="rodape">Gerado em: {data_geracao}<br>SGPC - Sistema de Gestão de Prestação de Contas</div>
+    
 
     <div style="margin-top: 40px; padding: 20px; text-align: left; font-size: 9px; color: #555; border-top: 1px solid #ddd; max-width: 500px; margin-left: auto; margin-right: auto;">
         <p style="margin: 0 0 5px 0; font-weight: bold; color: #003366; text-transform: uppercase; letter-spacing: 1px;">Legislação e Normas Aplicadas:</p>
@@ -1096,71 +1096,136 @@ if (cdesp) {
 
 // ===== 9. LIQUIDEZ =====
 H += tit(9, 'Índices de Liquidez e Estrutura');
-H += '<div class="desc">Indicadores de liquidez e estrutura patrimonial.</div>';
-const liq = unwrap(D.liquidez);
-if (liq) {
-    H += sub('Liquidez');
-    const rowsLiq = [];
-    if (liq.liquidez) {
-        [['Liquidez Imediata','liquidez_imediata'], ['Liquidez Corrente','liquidez_corrente'],
-         ['Liquidez Seca','liquidez_seca'], ['Liquidez Geral','liquidez_geral']].forEach(([label, key]) => {
-            if (liq.liquidez[key] !== undefined) rowsLiq.push([label, liq.liquidez[key]]);
-        });
+H += '<div class="desc">Indicadores de liquidez e estrutura patrimonial (atual x anterior).</div>';
+
+const liqRaw = unwrap(D.liquidez);
+const bpRaw = unwrap(D.analise_bp);
+
+if (liqRaw && liqRaw.valores) {
+    const v = liqRaw.valores;
+    const caixaAt = Number(v.caixa) || 0;
+    const acAt = Number(v.ativo_circulante) || 0;
+    const estAt = Number(v.estoques) || 0;
+    const rlpAt = Number(v.realizavel_lp) || 0;
+    const pcAt = Number(v.passivo_circulante) || 0;
+    const pncAt = Number(v.passivo_nao_circulante) || 0;
+    const ptAt = Number(v.passivo_total) || 0;
+    const atAt = Number(v.ativo_total) || 0;
+    const plAt = Number(v.patrimonio_liquido) || 0;
+    const imobAt = Number(v.imobilizado) || 0;
+
+    function getAnterior(obj, chave) {
+        if (!obj) return 0;
+        if (obj.dados && obj.dados.dados && obj.dados.dados[chave]) return Number(obj.dados.dados[chave].anterior) || 0;
+        if (obj.dados && obj.dados[chave]) return Number(obj.dados[chave].anterior) || 0;
+        if (obj[chave]) return Number(obj[chave].anterior) || 0;
+        return 0;
     }
-    H += tab(['Indicador','Valor'], rowsLiq);
 
-    if (liq.estrutura) {
-        H += sub('Estrutura Patrimonial');
-        const rowsEst = [];
-        [['Endividamento Geral','endividamento_geral'], ['Part. Capital de Terceiros','part_capital_terceiros'],
-         ['Imobilização do PL','imobilizacao_pl']].forEach(([label, key]) => {
-            if (liq.estrutura[key] !== undefined) rowsEst.push([label, liq.estrutura[key] + '%']);
-        });
-        H += tab(['Indicador','Valor'], rowsEst);
-    }
+    const caixaAn = getAnterior(bpRaw, 'caixa');
+    const acAn = getAnterior(bpRaw, 'ativo_circulante');
+    const estAn = getAnterior(bpRaw, 'estoques');
+    const rlpAn = getAnterior(bpRaw, 'ativo_realizavel');
+    const pcAn = getAnterior(bpRaw, 'passivo_circulante');
+    const pncAn = getAnterior(bpRaw, 'passivo_nao_circulante');
+    const ptAn = getAnterior(bpRaw, 'passivo_total');
+    const atAn = getAnterior(bpRaw, 'total_ativo');
+    const plAn = getAnterior(bpRaw, 'patrimonio_liquido');
+    const imobAn = getAnterior(bpRaw, 'imobilizado');
 
-    if (liq.valores) {
-        H += sub('Valores Base');
-        const labelsVal = { caixa:'Caixa', ativo_circulante:'Ativo Circulante', estoques:'Estoques',
-            realizavel_lp:'Realizável LP', ativo_nao_circulante:'Ativo Não Circulante',
-            imobilizado:'Imobilizado', passivo_circulante:'Passivo Circulante',
-            passivo_nao_circulante:'Passivo Não Circulante', passivo_total:'Passivo Total',
-            ativo_total:'Ativo Total', patrimonio_liquido:'Patrimônio Líquido' };
-        const rowsVal = [];
-        Object.keys(labelsVal).forEach(k => {
-            if (liq.valores[k] !== undefined) rowsVal.push([labelsVal[k], moeda(liq.valores[k])]);
-        });
-        H += tab(['Item','Valor'], rowsVal);
+    const fmtVar = (at, an) => {
+        if (!an || an === 0 || isNaN(an)) return '-';
+        const v = ((at - an) / Math.abs(an)) * 100;
+        return (v > 0 ? '+' : '') + v.toFixed(2).replace('.', ',') + '%';
+    };
 
-        // ===== MEMÓRIA DE CÁLCULO =====
-        H += sub('Memória de Cálculo');
-        const v = liq.valores;
-        
-        // Garante que os valores são numéricos para a conta
-        const vCx = Number(v.caixa) || 0;
-        const vAC = Number(v.ativo_circulante) || 0;
-        const vEst = Number(v.estoques) || 0;
-        const vRLP = Number(v.realizavel_lp) || 0;
-        const vPC = Number(v.passivo_circulante) || 0;
-        const vPNC = Number(v.passivo_nao_circulante) || 0;
-        const vPT = Number(v.passivo_total) || 0;
-        const vAT = Number(v.ativo_total) || 0;
-        const vPL = Number(v.patrimonio_liquido) || 0;
-        const vImob = Number(v.imobilizado) || 0;
+    // --- TABELA PRINCIPAL ---
+    H += '<table style="width:100%; border-collapse:collapse; table-layout:fixed; font-size:8.5px;">';
+    H += '<thead><tr style="background:#003366; color:#fff;">';
+    H += '<th style="width:40%; padding:5px; text-align:left;">Indicador</th>';
+    H += '<th style="width:20%; padding:5px; text-align:right;">Atual</th>';
+    H += '<th style="width:20%; padding:5px; text-align:right;">Anterior</th>';
+    H += '<th style="width:20%; padding:5px; text-align:right;">Var. (%)</th>';
+    H += '</tr></thead><tbody>';
 
-        const calcRows = [
-            ['Liquidez Imediata', 'Caixa / Passivo Circulante', `${moeda(vCx)} / ${moeda(vPC)}`, (vPC ? (vCx / vPC).toFixed(2).replace('.', ',') : '-')],
-            ['Liquidez Corrente', 'Ativo Circulante / Passivo Circulante', `${moeda(vAC)} / ${moeda(vPC)}`, (vPC ? (vAC / vPC).toFixed(2).replace('.', ',') : '-')],
-            ['Liquidez Seca', '(Ativo Circulante - Estoques) / Passivo Circulante', `(${moeda(vAC)} - ${moeda(vEst)}) / ${moeda(vPC)}`, (vPC ? ((vAC - vEst) / vPC).toFixed(2).replace('.', ',') : '-')],
-            ['Liquidez Geral', '(Ativo Circ. + Realizável LP) / (Passivo Circ. + Passivo Não Circ.)', `(${moeda(vAC)} + ${moeda(vRLP)}) / (${moeda(vPC)} + ${moeda(vPNC)})`, ((vPC + vPNC) ? ((vAC + vRLP) / (vPC + vPNC)).toFixed(2).replace('.', ',') : '-')],
-            ['Endividamento Geral', 'Passivo Total / Ativo Total', `${moeda(vPT)} / ${moeda(vAT)}`, (vAT ? ((vPT / vAT) * 100).toFixed(2).replace('.', ',') + '%' : '-')],
-            ['Part. Capital de Terceiros', '(Passivo Circ. + Passivo Não Circ.) / PL', `(${moeda(vPC)} + ${moeda(vPNC)}) / ${moeda(vPL)}`, (vPL ? (((vPC + vPNC) / vPL) * 100).toFixed(2).replace('.', ',') + '%' : '-')],
-            ['Imobilização do PL', 'Imobilizado / PL', `${moeda(vImob)} / ${moeda(vPL)}`, (vPL ? ((vImob / vPL) * 100).toFixed(2).replace('.', ',') + '%' : '-')]
-        ];
-        H += tab(['Índice', 'Fórmula', 'Cálculo com Valores', 'Resultado'], calcRows);
-    }
+    // --- LIQUIDEZ ---
+    H += '<tr style="background:#f0f4f8;"><td colspan="4" style="padding:5px; font-weight:bold; color:#003366;">LIQUIDEZ</td></tr>';
+    const liqData = [
+        ['Liquidez Imediata', caixaAt / pcAt, caixaAn / pcAn],
+        ['Liquidez Corrente', acAt / pcAt, acAn / pcAn],
+        ['Liquidez Seca', (acAt - estAt) / pcAt, (acAn - estAn) / pcAn],
+        ['Liquidez Geral', (acAt + rlpAt) / (pcAt + pncAt), (acAn + rlpAn) / (pcAn + pncAn)]
+    ];
+    liqData.forEach(([label, at, an], i) => {
+        const bg = i % 2 === 0 ? '#f8f9fa' : '#fff';
+        H += '<tr style="background:' + bg + ';">';
+        H += '<td style="padding:4px 5px; border:1px solid #ddd;">' + label + '</td>';
+        H += '<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">' + (isNaN(at) ? '-' : at.toFixed(2).replace('.', ',')) + '</td>';
+        H += '<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">' + (isNaN(an) ? '-' : an.toFixed(2).replace('.', ',')) + '</td>';
+        H += '<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">' + fmtVar(at, an) + '</td>';
+        H += '</tr>';
+    });
+
+    // --- ESTRUTURA PATRIMONIAL ---
+    H += '<tr style="background:#f0f4f8;"><td colspan="4" style="padding:5px; font-weight:bold; color:#003366;">ESTRUTURA PATRIMONIAL</td></tr>';
+    const estData = [
+        ['Endividamento Geral', (ptAt / atAt) * 100, (ptAn / atAn) * 100],
+        ['Part. Capital de Terceiros', ((pcAt + pncAt) / plAt) * 100, ((pcAn + pncAn) / plAn) * 100],
+        ['Imobilização do PL', (imobAt / plAt) * 100, (imobAn / plAn) * 100]
+    ];
+    estData.forEach(([label, at, an], i) => {
+        const bg = i % 2 === 0 ? '#f8f9fa' : '#fff';
+        H += '<tr style="background:' + bg + ';">';
+        H += '<td style="padding:4px 5px; border:1px solid #ddd;">' + label + '</td>';
+        H += '<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">' + (isNaN(at) ? '-' : at.toFixed(2).replace('.', ',') + '%') + '</td>';
+        H += '<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">' + (isNaN(an) ? '-' : an.toFixed(2).replace('.', ',') + '%') + '</td>';
+        H += '<td style="padding:4px 5px; border:1px solid #ddd; text-align:right;">' + fmtVar(at, an) + '</td>';
+        H += '</tr>';
+    });
+
+    H += '</tbody></table>';
+
+    // --- MEMORIA DE CALCULO (ATUAL E ANTERIOR) ---
+    H += sub('Memória de Cálculo (Atual x Anterior)');
+    const formulas = [
+        ['Liquidez Imediata', 'Caixa / Passivo Circulante', 
+         moeda(caixaAt) + ' / ' + moeda(pcAt), 
+         (pcAt ? (caixaAt / pcAt).toFixed(2).replace('.', ',') : '-'),
+         moeda(caixaAn) + ' / ' + moeda(pcAn), 
+         (pcAn ? (caixaAn / pcAn).toFixed(2).replace('.', ',') : '-')],
+        ['Liquidez Corrente', 'Ativo Circulante / Passivo Circulante', 
+         moeda(acAt) + ' / ' + moeda(pcAt), 
+         (pcAt ? (acAt / pcAt).toFixed(2).replace('.', ',') : '-'),
+         moeda(acAn) + ' / ' + moeda(pcAn), 
+         (pcAn ? (acAn / pcAn).toFixed(2).replace('.', ',') : '-')],
+        ['Liquidez Seca', '(Ativo Circulante - Estoques) / Passivo Circulante', 
+         '(' + moeda(acAt) + ' - ' + moeda(estAt) + ') / ' + moeda(pcAt), 
+         (pcAt ? ((acAt - estAt) / pcAt).toFixed(2).replace('.', ',') : '-'),
+         '(' + moeda(acAn) + ' - ' + moeda(estAn) + ') / ' + moeda(pcAn), 
+         (pcAn ? ((acAn - estAn) / pcAn).toFixed(2).replace('.', ',') : '-')],
+        ['Liquidez Geral', '(Ativo Circ. + Realizável LP) / (Passivo Circ. + Passivo Não Circ.)', 
+         '(' + moeda(acAt) + ' + ' + moeda(rlpAt) + ') / (' + moeda(pcAt) + ' + ' + moeda(pncAt) + ')', 
+         ((pcAt + pncAt) ? ((acAt + rlpAt) / (pcAt + pncAt)).toFixed(2).replace('.', ',') : '-'),
+         '(' + moeda(acAn) + ' + ' + moeda(rlpAn) + ') / (' + moeda(pcAn) + ' + ' + moeda(pncAn) + ')', 
+         ((pcAn + pncAn) ? ((acAn + rlpAn) / (pcAn + pncAn)).toFixed(2).replace('.', ',') : '-')],
+        ['Endividamento Geral', 'Passivo Total / Ativo Total', 
+         moeda(ptAt) + ' / ' + moeda(atAt), 
+         (atAt ? ((ptAt / atAt) * 100).toFixed(2).replace('.', ',') + '%' : '-'),
+         moeda(ptAn) + ' / ' + moeda(atAn), 
+         (atAn ? ((ptAn / atAn) * 100).toFixed(2).replace('.', ',') + '%' : '-')],
+        ['Part. Capital de Terceiros', '(Passivo Circ. + Passivo Não Circ.) / PL', 
+         '(' + moeda(pcAt) + ' + ' + moeda(pncAt) + ') / ' + moeda(plAt), 
+         (plAt ? (((pcAt + pncAt) / plAt) * 100).toFixed(2).replace('.', ',') + '%' : '-'),
+         '(' + moeda(pcAn) + ' + ' + moeda(pncAn) + ') / ' + moeda(plAn), 
+         (plAn ? (((pcAn + pncAn) / plAn) * 100).toFixed(2).replace('.', ',') + '%' : '-')],
+        ['Imobilização do PL', 'Imobilizado / PL', 
+         moeda(imobAt) + ' / ' + moeda(plAt), 
+         (plAt ? ((imobAt / plAt) * 100).toFixed(2).replace('.', ',') + '%' : '-'),
+         moeda(imobAn) + ' / ' + moeda(plAn), 
+         (plAn ? ((imobAn / plAn) * 100).toFixed(2).replace('.', ',') + '%' : '-')]
+    ];
+    H += tab(['Índice', 'Fórmula', 'Cálculo (Atual)', 'Resultado (Atual)', 'Cálculo (Anterior)', 'Resultado (Anterior)'], formulas);
 } else { H += '<p>Módulo não encontrado.</p>'; }
-
 // ===== 10. PANORAMA =====
 H += tit(10, 'Panorama de Resultados');
 H += '<div class="desc">Resumo executivo dos principais indicadores.</div>';
