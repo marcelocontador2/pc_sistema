@@ -163,7 +163,7 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
             <a href="/analise_bp" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise BP</a>
         <a href="/analise_dfc" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise DFC</a>
         <a href="/analise_patrimonial" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Patrimonial (DVP)</a>
-    </li>
+        
 
         <li><a href="/integridade" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
     <li></li>
@@ -661,65 +661,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    // 1. Encontra a lista principal do menu
-    const menuPrincipal = Array.from(document.querySelectorAll('ul')).find(ul => ul.textContent.includes('Importar Relatórios'));
-    if (!menuPrincipal) return;
-    // 2. Cria o novo item "Análises Contábeis" e seu submenu
-    const novoLi = document.createElement('li');
-    const linkPai = document.createElement('a');
-    linkPai.href = '#';
-    linkPai.textContent = 'Análises Contábeis';
-    linkPai.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold; cursor:pointer;';
-    const submenu = document.createElement('ul');
-    submenu.className = 'submenu';
-    submenu.id = 'submenu-analises';
-    submenu.style.cssText = 'list-style: none; padding-left: 0; margin-left: 0; display: none;';
-    linkPai.addEventListener('click', function(e) {
-        e.preventDefault();
-        submenu.classList.toggle('open');
-        submenu.style.display = (submenu.style.display === 'none' || submenu.style.display === '') ? 'block' : 'none';
-    });
-    novoLi.appendChild(linkPai);
-    novoLi.appendChild(submenu);
-    // 3. Insere o novo item após "Demonstrações Contábeis"
-    const liDemonstracoes = Array.from(menuPrincipal.querySelectorAll('li')).find(li => li.textContent.includes('Demonstrações Contábeis'));
-    if (liDemonstracoes) {
-        liDemonstracoes.parentElement.insertBefore(novoLi, liDemonstracoes.nextSibling);
-    } else {
-        menuPrincipal.appendChild(novoLi);
-    }
-    // 4. Move os links de análise para dentro do novo submenu
-    const linksParaMover = [
-        'Conferência das Demonstrações',
-        'Integridade entre Demonstrações',
-        'Análise Orçamentária (BO)',
-        'Análise Financeira (BF)',
-        'Análise DFC',
-        'Análise Patrimonial (DVP)',
-        'Composição Receitas/Despesas',
-        'Índices de Liquidez',
-        'Resultados Gerais',
-        'Análise BP',
-        'Comparativo de Receitas',
-        'Comparativo de Despesas',
-        'Análise por Centro de Custos',
-        'Custo de Pessoal'];
-    const todosLinks = Array.from(menuPrincipal.querySelectorAll('a'));
-    todosLinks.forEach(link => {
-        const texto = link.textContent.trim();
-        if (linksParaMover.includes(texto)) {
-            const novoSubLi = document.createElement('li');
-            const novoLink = link.cloneNode(true);
-            novoLink.style.cssText = 'display:block; padding:8px 20px 8px 40px; text-decoration:none; color:#666; font-weight:400; font-size:13px;';
-            novoSubLi.appendChild(novoLink);
-            submenu.appendChild(novoSubLi);
-            link.parentElement.remove();
-        }
-    });
-});
-</script>
+
 <script>
 // Script para ajustar os textos dos links após o menu ser gerado
 document.addEventListener("DOMContentLoaded", function() {
@@ -752,6 +694,90 @@ document.addEventListener("DOMContentLoaded", function() {
 <!-- ORDENACAO SUBMENU ANALISES -->
 
 <!-- FIM ORDENACAO -->
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Encontra a lista principal do menu
+    const menuPrincipal = Array.from(document.querySelectorAll('ul')).find(ul => ul.textContent.includes('Importar Relatórios'));
+    if (!menuPrincipal) return;
+
+    // 2. Remove a lista antiga de análises se já existir
+    const menuAntigo = document.getElementById('submenu-analises');
+    if (menuAntigo) {
+        menuAntigo.parentElement.remove();
+    }
+
+    // 3. Cria o novo item "Análises Contábeis"
+    const novoLi = document.createElement('li');
+    const linkPai = document.createElement('a');
+    linkPai.href = '#';
+    linkPai.textContent = 'Análises Contábeis';
+    linkPai.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold; cursor:pointer;';
+    
+    const submenu = document.createElement('ul');
+    submenu.className = 'submenu open';
+    submenu.id = 'submenu-analises';
+    submenu.style.cssText = 'list-style: none; padding-left: 0; margin-left: 0; display: block;'; // Força ficar aberto
+
+    linkPai.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (submenu.style.display === 'none') {
+            submenu.style.display = 'block';
+        } else {
+            submenu.style.display = 'none';
+        }
+    });
+
+    novoLi.appendChild(linkPai);
+    novoLi.appendChild(submenu);
+
+    // 4. Insere o menu de Análises depois de "Relatório Consolidado"
+    const liConsolidado = Array.from(menuPrincipal.querySelectorAll('li')).find(li => li.textContent.includes('Relatório Consolidado'));
+    if (liConsolidado) {
+        liConsolidado.parentElement.insertBefore(novoLi, liConsolidado.nextSibling);
+    } else {
+        menuPrincipal.appendChild(novoLi);
+    }
+
+    // 5. Cria os links na ORDEM EXATA desejada
+    const ordemLinks = [
+        { txt: 'Conferência das Demonstrações', href: '/conferencia' },
+        { txt: 'Integridade entre Demonstrações', href: '/integridade' },
+        { txt: 'Análise Orçamentária (BO)', href: '/analise_orcamentaria' },
+        { txt: 'Análise Financeira (BF)', href: '/analise_financeira_bf' },
+        { txt: 'Análise BP', href: '/analise_bp' },
+        { txt: 'Análise DFC', href: '/analise_dfc' },
+        { txt: 'Análise Patrimonial (DVP)', href: '/analise_patrimonial' },
+        { txt: 'Análise DMPL', href: '/analise_dmpl' },
+        { txt: 'Composição Receitas/Despesas', href: '/composicao_receitas_despesas' },
+        { txt: 'Índices de Liquidez', href: '/liquidez' },
+        { txt: 'Resultados Gerais', href: '/panorama' },
+        { txt: 'Comparativo de Receitas', href: '/analise_comparativo_receitas' },
+        { txt: 'Comparativo de Despesas', href: '/analise_comparativo_despesas' },
+        { txt: 'Análise por Centro de Custos', href: '/analise_centro_custos' },
+        { txt: 'Custo de Pessoal', href: '/analise_custo_pessoal' }
+    ];
+
+    ordemLinks.forEach(linkInfo => {
+        const novoSubLi = document.createElement('li');
+        const novoLink = document.createElement('a');
+        novoLink.href = linkInfo.href;
+        novoLink.textContent = linkInfo.txt;
+        novoLink.style.cssText = 'display:block; padding:8px 20px 8px 40px; text-decoration:none; color:#666; font-weight:400; font-size:13px;';
+        novoSubLi.appendChild(novoLink);
+        submenu.appendChild(novoSubLi);
+    });
+
+    // 6. Remove qualquer link antigo que tenha ficado solto
+    const linksParaRemover = ordemLinks.map(l => l.txt);
+    menuPrincipal.querySelectorAll('a').forEach(link => {
+        if (linksParaRemover.includes(link.textContent.trim()) && !submenu.contains(link)) {
+            link.parentElement.remove();
+        }
+    });
+});
+</script>
+
 </body>
 
 </html>
