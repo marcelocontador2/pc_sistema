@@ -5891,6 +5891,98 @@ async def excluir_multiplos_relatorio_consolidado(request: Request):
 
 
 
+
+
+@app.get("/api/observacoes_consolidado/{relatorio_id}")
+async def get_observacoes(relatorio_id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, item, texto FROM observacoes_consolidado WHERE relatorio_id = ?", (relatorio_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r[0], "item": r[1], "texto": r[2]} for r in rows]
+
+@app.post("/api/observacoes_consolidado/{relatorio_id}")
+async def post_observacao(relatorio_id: int, request: Request):
+    import sqlite3, os
+    from datetime import datetime
+    dados = await request.json()
+    item = dados.get("item", "")
+    texto = dados.get("texto", "")
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO observacoes_consolidado (relatorio_id, item, texto, data_criacao) VALUES (?, ?, ?, ?)",
+        (relatorio_id, item, texto, datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.put("/api/observacoes_consolidado/{obs_id}")
+async def put_observacao(obs_id: int, request: Request):
+    import sqlite3, os
+    from datetime import datetime
+    dados = await request.json()
+    texto = dados.get("texto", "")
+    item = dados.get("item", "")
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE observacoes_consolidado SET item = ?, texto = ?, data_criacao = ? WHERE id = ?",
+        (item, texto, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), obs_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/observacoes_consolidado/{obs_id}")
+async def del_observacao(obs_id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM observacoes_consolidado WHERE id = ?", (obs_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.get("/api/conclusao_consolidado/{relatorio_id}")
+async def get_conclusao(relatorio_id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT texto FROM conclusao_consolidado WHERE relatorio_id = ?", (relatorio_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return {"texto": row[0] if row else ""}
+
+@app.post("/api/conclusao_consolidado/{relatorio_id}")
+async def post_conclusao(relatorio_id: int, request: Request):
+    import sqlite3, os
+    from datetime import datetime
+    dados = await request.json()
+    texto = dados.get("texto", "")
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM conclusao_consolidado WHERE relatorio_id = ?", (relatorio_id,))
+    cursor.execute(
+        "INSERT INTO conclusao_consolidado (relatorio_id, texto, data_criacao) VALUES (?, ?, ?)",
+        (relatorio_id, texto, datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+
+
 @app.get("/gerar_pdf_relatorio_consolidado/{id}")
 def gerar_pdf_relatorio_consolidado(id: int):
     from playwright.sync_api import sync_playwright
@@ -5910,30 +6002,6 @@ def gerar_pdf_relatorio_consolidado(id: int):
     periodo, data_geracao, res_json = row
     dados = json.loads(res_json).get("dados", {})
 
-    # --- CORRECAO_ENTIDADE_DINAMICA ---
-    try:
-        if 'custo_pessoal' in dados and dados['custo_pessoal']:
-            _conn_cfg = sqlite3.connect(db_path)
-            _cur_cfg = _conn_cfg.cursor()
-            _cur_cfg.execute("SELECT valor FROM configuracoes WHERE chave = 'tipo_entidade'")
-            _row_cfg = _cur_cfg.fetchone()
-            _conn_cfg.close()
-            _entidade_real = (_row_cfg[0] if _row_cfg else 'COFEN').upper()
-            _cp = dados['custo_pessoal']
-            _cp_inner = _cp
-            if isinstance(_cp, dict) and 'dados' in _cp and isinstance(_cp['dados'], dict):
-                _cp_inner = _cp['dados']
-                if 'dados' in _cp_inner and isinstance(_cp_inner['dados'], dict):
-                    _cp_inner = _cp_inner['dados']
-            if isinstance(_cp_inner, dict):
-                _cp_inner['entidade'] = _entidade_real
-                print(f"[PDF CONSOLIDADO] Entidade ajustada dinamicamente: {_entidade_real}")
-    except Exception as _e:
-        print(f"[PDF CONSOLIDADO] Erro ao ajustar entidade: {_e}")
-    # --- FIM CORRECAO_ENTIDADE_DINAMICA ---
-
-
-
     template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_consolidado_template.html")
     with open(template_path, "r", encoding="utf-8") as f:
         template = f.read()
@@ -5951,11 +6019,52 @@ def gerar_pdf_relatorio_consolidado(id: int):
         .replace("{data_geracao}", data_geracao)
         .replace("src=\"logo\"", "src=\"" + logo_base64 + "\""))
 
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT item, texto FROM observacoes_consolidado WHERE relatorio_id = ?", (id,))
+    obs_rows = cursor.fetchall()
+    
+    cursor.execute("SELECT texto FROM conclusao_consolidado WHERE relatorio_id = ?", (id,))
+    row_concl = cursor.fetchone()
+    conn.close()
+
+    # Injeta um script que insere as observacoes NO FINAL de cada secao (antes do proximo titulo)
+    if obs_rows:
+        obs_js = "\n<script>\n"
+        obs_js += "document.addEventListener('DOMContentLoaded', function() {\n"
+        obs_js += "  setTimeout(function() {\n"
+        obs_js += "    var titulos = Array.from(document.querySelectorAll('h2.secao-titulo'));\n"
+        for item, texto in obs_rows:
+            texto_escapado = texto.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+            obs_js += f"    (function() {{\n"
+            obs_js += f"      var idx = titulos.findIndex(function(h) {{ return h.innerText.trim().startsWith('{item}. '); }});\n"
+            obs_js += f"      if (idx >= 0) {{\n"
+            obs_js += f"        var div = document.createElement('div');\n"
+            obs_js += f"        div.style.cssText = 'background:#E3F2FD; border-left:4px solid #2196F3; padding:10px; margin:15px 0 20px 0; font-size:11px; color:#0D47A1;';\n"
+            obs_js += f"        div.innerHTML = '<b>Observação (Item {item}):</b> {texto_escapado}';\n"
+            obs_js += f"        var proximo = titulos[idx + 1];\n"
+            obs_js += f"        if (proximo) {{\n"
+            obs_js += f"          proximo.parentNode.insertBefore(div, proximo);\n"
+            obs_js += f"        }} else {{\n"
+            obs_js += f"          titulos[idx].parentNode.appendChild(div);\n"
+            obs_js += f"        }}\n"
+            obs_js += f"      }}\n"
+            obs_js += f"    }})();\n"
+        obs_js += "  }, 500);\n"
+        obs_js += "});\n"
+        obs_js += "</script>\n"
+        html_final = html_final.replace('</body>', obs_js + '</body>')
+
+    # Adiciona a conclusao no final
+    if row_concl and row_concl[0]:
+        conclusao_html = f'<div style="margin-top:30px; padding:15px; background:#f8f9fa; border-left:4px solid #003366; font-size:11px;"><b>Conclusão do Contador:</b><br>{row_concl[0]}</div>'
+        html_final = html_final.replace('</body>', conclusao_html + '</body>')
+
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_final, wait_until="networkidle")
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(1500)
         pdf_bytes = page.pdf(format="A4", landscape=False, print_background=True,
                              margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
         browser.close()

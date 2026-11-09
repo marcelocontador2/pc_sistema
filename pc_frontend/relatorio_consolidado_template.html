@@ -53,8 +53,33 @@ H += tit(1, 'Integridade entre Demonstrações');
 H += '<div class="desc">Matriz de integridade com o cruzamento de todas as demonstrações.</div>';
 const integ = unwrap(D.integridade);
 if (integ && integ.matriz) {
-    function limpaRS(v) { if (v === null || v === undefined) return '-'; let s = String(v); s = s.replace(/R\$\s*/g, ''); return s.trim() || '-'; }
-    const rows = integ.matriz.map(m => [m.item || '-', limpaRS(m.balancete), limpaRS(m.bp), limpaRS(m.bf), limpaRS(m.bo), limpaRS(m.dfc), limpaRS(m.dvp), limpaRS(m.dmpl), m.conf || '-']);
+    function limpaRS(v) {
+        if (v === null || v === undefined) return '-';
+        let s = String(v);
+        s = s.replace(/R\$\s*/g, '');
+        return s.trim() || '-';
+    }
+    const rows = integ.matriz.map(m => {
+        const conf = m.conf || m.CONFERENCIA || '-';
+        // Define a cor: verde para OK, vermelho para o resto (numeros, (1), etc)
+        let cor = '#28a745'; // verde padrao
+        if (conf && conf.toUpperCase() !== 'OK') {
+            cor = '#dc3545'; // vermelho
+        }
+        return [
+            m.item || m.NOMENCLATURA || '-',
+            limpaRS(m.balancete || m.BALANCETE),
+            limpaRS(m.bp || m.BP),
+            limpaRS(m.bf || m.BF),
+            limpaRS(m.bo || m.BO),
+            limpaRS(m.dfc || m.DFC),
+            limpaRS(m.dvp || m.DVP),
+            limpaRS(m.dmpl || m.DMPL),
+            '<span style="color:' + cor + '; font-weight:bold;">' + conf + '</span>'
+        ];
+    });
+    // Usa a funcao tab, mas precisamos de uma versao que aceite HTML na ultima coluna
+    // A funcao tab padrao ja renderiza o conteudo como string, entao o HTML dentro da string funciona
     H += tab(['Item','Balancete','BP','BF','BO','DFC','DVP','DMPL','Conf.'], rows);
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
@@ -1295,22 +1320,8 @@ H += '<div class="desc">Custo de pessoal x limite legal (Resolução Cofen 814/2
 const cp = unwrap(D.custo_pessoal);
 if (cp) {
     const c = cp.dados || cp;
-    
-    // Lê a entidade dinamicamente do JSON (que foi ajustada no backend)
-    const entidadeAtual = (c.entidade || 'COFEN').toUpperCase();
-    const limitePctNum = (entidadeAtual === 'COREN') ? 60 : 50;
-    
-    const vRCL = Number(c.rcl_total) || 0;
-    const vCusto = Number(c.custo_total) || 0;
-    
-    // Recalcula os valores com a alíquota correta
-    const vLimite = vRCL * (limitePctNum / 100);
-    const vMargem = vLimite - vCusto;
-    const pctCusto = vRCL ? (vCusto / vRCL * 100) : 0;
-    const pctMargem = vRCL ? (vMargem / vRCL * 100) : 0;
-    const limitePctStr = limitePctNum.toFixed(2).replace('.', ',');
-    const valFmt = function(v) { return moeda(v).replace('R$ ', ''); };
 
+    // --- TABELA 1: COMPOSIÇÃO DO CUSTO ---
     H += sub('Composição do Custo');
     H += tab(['Item','Atual','Anterior','Total'], [
         ['Pessoal e Encargos', moeda(c.pessoal_atual), moeda(c.pessoal_anterior), moeda(c.pessoal_total)],
@@ -1319,16 +1330,35 @@ if (cp) {
         ['CUSTO TOTAL (Bruto)', moeda(c.custo_atual), moeda(c.custo_anterior), moeda(c.custo_total)],
         ['RCL Total (12 meses)', moeda(c.rcl_atual), moeda(c.rcl_anterior), moeda(c.rcl_total)]
     ]);
+
+    // --- TABELA 2: LIMITE E MARGEM ---
+    let limitePctNum = 50;
+    const entidadeStr = (c.entidade || 'COFEN').toUpperCase();
+    if (entidadeStr === 'COREN') limitePctNum = 60;
+    else if (entidadeStr === 'COFEN') limitePctNum = 50;
     
+    const vRCL = Number(c.rcl_total) || 0;
+    const vCusto = Number(c.custo_total) || 0;
+    const vLimite = vRCL * (limitePctNum / 100);
+    const vMargem = vLimite - vCusto;
+
     H += sub('Limite e Margem');
     H += tab(['Item','Valor'], [
         ['Limite Legal Aplicável', moeda(vLimite)],
         ['Margem Disponível', moeda(vMargem)],
-        ['% Custo sobre RCL', pct(pctCusto)],
+        ['% Custo sobre RCL', pct(c.pct_custo_total)],
         ['Faixa de Controle', c.faixa_controle || '-']
     ]);
 
+    // --- TABELA 3: APURAÇÃO CONSOLIDADA ---
     H += sub('Apuração consolidada 12 meses');
+    const pctRcl = 100;
+    const pctCustoTotal = vRCL ? (vCusto / vRCL * 100) : 0;
+    const pctMargemTotal = vRCL ? (vMargem / vRCL * 100) : 0;
+    const pctSituacao = pctCustoTotal;
+    const limitePctStr = limitePctNum.toFixed(2).replace('.', ',');
+    const valFmt = (v) => moeda(v).replace('R$ ', '');
+
     H += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; border-top: 2px solid #003366;">';
     H += '<thead><tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">';
     H += '<th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Indicador</th>';
@@ -1336,13 +1366,103 @@ if (cp) {
     H += '<th style="text-align: right; padding: 8px; border-bottom: 1px solid #ddd;">% da RCL</th>';
     H += '</tr></thead>';
     H += '<tbody>';
-    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">Receita Corrente Líquida (RCL)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vRCL) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(100) + '</td></tr>';
-    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">(-) Custo de Pessoal (Bruto)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vCusto) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctCusto) + '</td></tr>';
-    H += '<tr style="background: #f8f9fa;"><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">(=) Margem Disponível (Limite - Custo)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + valFmt(vMargem) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + pct(pctMargem) + '</td></tr>';
+    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">Receita Corrente Líquida (RCL)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vRCL) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctRcl) + '</td></tr>';
+    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">(-) Custo de Pessoal (Bruto)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vCusto) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(pctCustoTotal) + '</td></tr>';
+    H += '<tr style="background: #f8f9fa;"><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">(=) Margem Disponível (Limite - Custo)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + valFmt(vMargem) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">' + pct(pctMargemTotal) + '</td></tr>';
     H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">Limite Resolução Cofen 814/2026 (' + limitePctStr + '% da RCL)</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + valFmt(vLimite) + '</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;">' + pct(limitePctNum) + '</td></tr>';
-    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">Situação (' + entidadeAtual + ')</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;"></td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; color: #28a745; font-weight: bold;">' + pct(pctCusto) + '</td></tr>';
-    H += '</tbody>';
-    H += '</table>';
+    H += '<tr><td style="padding: 8px; border-bottom: 1px solid #eee;">Situação (' + entidadeStr + ')</td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee;"></td><td style="text-align: right; padding: 8px; border-bottom: 1px solid #eee; color: #28a745; font-weight: bold;">' + pct(pctSituacao) + '</td></tr>';
+    H += '</tbody></table>';
+
+    // =======================================================
+    // --- INÍCIO DOS GRÁFICOS (NO FINAL DA SEÇÃO) ---
+    // =======================================================
+    
+    // Dados do Gráfico de Colunas
+    const maxCusto = Math.max(c.pessoal_atual, c.outras_atual, c.terc_atual) || 1;
+    const scaleCol = 120 / maxCusto;
+
+    let svgColunas = '<svg viewBox="0 0 400 160" width="100%" height="160" style="font-family: Arial, sans-serif;">';
+    for (let i = 0; i <= 4; i++) {
+        let y = 120 - (i * 30);
+        let val = (maxCusto / 4) * i;
+        svgColunas += `<line x1="50" y1="${y}" x2="380" y2="${y}" stroke="#e0e0e0" stroke-width="1" />`;
+        svgColunas += `<text x="45" y="${y + 4}" font-size="9" fill="#666" text-anchor="end">${Math.round(val).toLocaleString('pt-BR')}</text>`;
+    }
+    const drawBar = (val, x, cor) => {
+        let h = Math.max(1, val * scaleCol);
+        let yStart = 120 - h;
+        return `<rect x="${x}" y="${yStart}" width="40" height="${h}" fill="${cor}" rx="2" />`;
+    };
+    svgColunas += drawBar(c.pessoal_atual, 80, '#003366');
+    svgColunas += drawBar(c.outras_atual, 180, '#5B9BD5');
+    svgColunas += drawBar(c.terc_atual, 280, '#C00000');
+    svgColunas += `<text x="100" y="140" font-size="9" fill="#333" text-anchor="middle">Pessoal</text>`;
+    svgColunas += `<text x="200" y="140" font-size="9" fill="#333" text-anchor="middle">Outras Desp.</text>`;
+    svgColunas += `<text x="300" y="140" font-size="9" fill="#333" text-anchor="middle">Terceirização</text>`;
+    svgColunas += '</svg>';
+
+    // Dados do Gráfico de Pizza (Custo, Margem e Fora do Limite)
+    let svgPizza = '<svg viewBox="0 0 350 180" width="100%" height="180" style="font-family: Arial, sans-serif;">';
+    
+    const pctCustoNaRCL = (vCusto / vRCL) * 100;
+    const pctMargemNaRCL = (vMargem / vRCL) * 100;
+    const pctForaLimite = 100 - limitePctNum;
+
+    const dadosPizza = [
+        { nome: 'Custo', valor: vCusto, cor: '#C00000', pct: pctCustoNaRCL },
+        { nome: 'Margem', valor: vMargem, cor: '#00B050', pct: pctMargemNaRCL },
+        { nome: 'Fora do Limite', valor: (vRCL * (pctForaLimite / 100)), cor: '#0070C0', pct: pctForaLimite }
+    ];
+
+    let startAngle = 0;
+    const cx = 90, cy = 90, r = 70;
+
+    dadosPizza.forEach((d, i) => {
+        let angle = (d.valor / vRCL) * 360;
+        let endAngle = startAngle + angle;
+        let radStart = (startAngle - 90) * Math.PI / 180;
+        let radEnd = (endAngle - 90) * Math.PI / 180;
+        let x1 = cx + r * Math.cos(radStart);
+        let y1 = cy + r * Math.sin(radStart);
+        let x2 = cx + r * Math.cos(radEnd);
+        let y2 = cy + r * Math.sin(radEnd);
+        let largeArc = angle > 180 ? 1 : 0;
+        
+        svgPizza += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${d.cor}" />`;
+        
+        let midAngle = startAngle + angle / 2;
+        let radMid = (midAngle - 90) * Math.PI / 180;
+        let lx = cx + (r/2) * Math.cos(radMid);
+        let ly = cy + (r/2) * Math.sin(radMid);
+        if (angle > 8) {
+            svgPizza += `<text x="${lx}" y="${ly+3}" font-size="9" fill="#fff" text-anchor="middle" font-weight="bold">${Math.round(d.pct)}%</text>`;
+        }
+        startAngle = endAngle;
+    });
+
+    // Legenda do Pizza
+    svgPizza += `<rect x="180" y="50" width="12" height="12" fill="#C00000" />`;
+    svgPizza += `<text x="198" y="60" font-size="9" fill="#333">Custo: R$ ${(vCusto/1e6).toFixed(2)}M</text>`;
+    svgPizza += `<rect x="180" y="70" width="12" height="12" fill="#00B050" />`;
+    svgPizza += `<text x="198" y="80" font-size="9" fill="#333">Margem: R$ ${(vMargem/1e6).toFixed(2)}M</text>`;
+    svgPizza += `<rect x="180" y="90" width="12" height="12" fill="#0070C0" />`;
+    svgPizza += `<text x="198" y="100" font-size="9" fill="#333">Fora do Limite: R$ ${((vRCL * (pctForaLimite / 100))/1e6).toFixed(2)}M</text>`;
+    
+    svgPizza += '</svg>';
+
+    // Renderiza os gráficos no final, em layout flex
+    H += '<div style="display: flex; gap: 20px; margin-top: 30px; page-break-inside: avoid;">';
+    H += '<div style="flex: 1; background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">';
+    H += '<h3 style="text-align: center; color: #003366; font-size: 12px; margin-top: 0; margin-bottom: 10px;">Composição do Custo</h3>';
+    H += svgColunas;
+    H += '</div>';
+    
+    H += '<div style="flex: 1; background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">';
+    H += '<h3 style="text-align: center; color: #003366; font-size: 12px; margin-top: 0; margin-bottom: 10px;">Distribuição na RCL</h3>';
+    H += svgPizza;
+    H += '</div>';
+    H += '</div>';
+
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 13. PARECER =====
@@ -1354,6 +1474,12 @@ document.getElementById('conteudo').innerHTML = H;
 </script>
 </body>
 </html>
+
+
+
+
+
+
 
 
 
