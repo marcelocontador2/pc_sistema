@@ -357,6 +357,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+
+
+
+</body>
+
+
+
+
+
+
+
+
+</html>
+
 <!-- Modal de Observacoes -->
 <div id="modal-obs" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
     <div style="background:#fff; width:600px; max-width:90%; padding:20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.2); max-height:80vh; overflow-y:auto;">
@@ -372,24 +386,26 @@ document.addEventListener('DOMContentLoaded', function() {
             <textarea id="obs-texto" maxlength="400" style="width:100%; height:100px; padding:8px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"></textarea>
             
             <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="fecharObservacoes()" style="padding:8px 16px; background:#ccc; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
-                <button id="btn-salvar-obs" onclick="salvarObservacao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar</button>
+                <button type="button" onclick="fecharObservacoes()" style="padding:8px 16px; background:#ccc; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
+                <button type="button" id="btn-salvar-obs" onclick="salvarObservacao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar</button>
             </div>
         </div>
         
         <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
         <h4 style="margin-top:0; color:#003366;">Observações Cadastradas</h4>
-        <div id="lista-obs" style="max-height:250px; overflow-y:auto; font-size:12px;"></div>
+        <div id="lista-obs" style="max-height:250px; overflow-y:auto; font-size:12px;">
+            <p id="msg-carregando" style="color:#999;">Carregando...</p>
+        </div>
     </div>
 </div>
 
 <script>
 // OBSERVACOES_SCRIPT
-let relatorioIdAtual = null;
-let obsEditandoId = null;
+var relatorioIdAtual = null;
+var obsData = [];
 
 function abrirObservacoes() {
-    const check = document.querySelector('input[type="radio"]:checked') || document.querySelector('input[type="checkbox"]:checked');
+    var check = document.querySelector('input[type="radio"]:checked') || document.querySelector('input[type="checkbox"]:checked');
     if (!check) {
         alert('Selecione um relatório primeiro.');
         return;
@@ -401,159 +417,143 @@ function abrirObservacoes() {
 
 function fecharObservacoes() {
     document.getElementById('modal-obs').style.display = 'none';
-    limparForm();
-}
-
-function limparForm() {
     document.getElementById('obs-id').value = '';
     document.getElementById('obs-item').value = '';
     document.getElementById('obs-texto').value = '';
     document.getElementById('btn-salvar-obs').innerText = 'Salvar';
-    obsEditandoId = null;
 }
 
 function carregarObservacoes(id) {
-    fetch('/api/observacoes_consolidado/' + id)
-        .then(r => r.json())
-        .then(data => {
-            const div = document.getElementById('lista-obs');
-            if (data.length === 0) {
-                div.innerHTML = '<p style="color:#999;">Nenhuma observação cadastrada.</p>';
-                return;
+    var lista = document.getElementById('lista-obs');
+    lista.innerHTML = '<p id="msg-carregando" style="color:#999;">Carregando...</p>';
+    
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/observacoes_consolidado/' + id, true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            try {
+                obsData = JSON.parse(xhr.responseText);
+                console.log('DADOS RECEBIDOS:', obsData);
+                renderizarLista();
+            } catch (e) {
+                lista.innerHTML = '<p style="color:red;">Erro ao processar dados: ' + e.message + '</p>';
             }
-            div.innerHTML = data.map(o => `
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:8px 0;">
-                    <div style="flex:1;"><b>Item ${o.item}:</b> ${o.texto}</div>
-                    <div style="display:flex; gap:5px;">
-                        <button onclick="editarObservacao(${o.id}, '${o.item}', '${o.texto.replace(/'/g, "\\'")}')" style="color:blue; background:none; border:none; cursor:pointer;">Editar</button>
-                        <button onclick="excluirObservacao(${o.id})" style="color:red; background:none; border:none; cursor:pointer;">Excluir</button>
-                    </div>
-                </div>
-            `).join('');
-        });
+        } else {
+            lista.innerHTML = '<p style="color:red;">Erro HTTP: ' + xhr.status + '</p>';
+        }
+    };
+    xhr.onerror = function() {
+        lista.innerHTML = '<p style="color:red;">Erro de rede.</p>';
+    };
+    xhr.send();
 }
 
-function editarObservacao(id, item, texto) {
-    obsEditandoId = id;
-    document.getElementById('obs-id').value = id;
-    document.getElementById('obs-item').value = item;
-    document.getElementById('obs-texto').value = texto;
-    document.getElementById('btn-salvar-obs').innerText = 'Atualizar';
+function renderizarLista() {
+    var lista = document.getElementById('lista-obs');
+    lista.innerHTML = '';
+    
+    if (!obsData || obsData.length === 0) {
+        lista.innerHTML = '<p style="color:#999;">Nenhuma observação cadastrada.</p>';
+        return;
+    }
+    
+    for (var i = 0; i < obsData.length; i++) {
+        var o = obsData[i];
+        var div = document.createElement('div');
+        div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:8px 0;';
+        
+        var divTexto = document.createElement('div');
+        divTexto.style.flex = '1';
+        divTexto.innerHTML = '<b>Item ' + o.item + ':</b> ' + o.texto;
+        
+        var divBotoes = document.createElement('div');
+        divBotoes.style.cssText = 'display:flex; gap:5px;';
+        
+        var btnEditar = document.createElement('button');
+        btnEditar.type = 'button';
+        btnEditar.innerText = 'Editar';
+        btnEditar.style.cssText = 'color:blue; background:none; border:none; cursor:pointer;';
+        btnEditar.onclick = (function(id) {
+            return function() { editarObservacao(id); };
+        })(o.id);
+        
+        var btnExcluir = document.createElement('button');
+        btnExcluir.type = 'button';
+        btnExcluir.innerText = 'Excluir';
+        btnExcluir.style.cssText = 'color:red; background:none; border:none; cursor:pointer;';
+        btnExcluir.onclick = (function(id) {
+            return function() { excluirObservacao(id); };
+        })(o.id);
+        
+        divBotoes.appendChild(btnEditar);
+        divBotoes.appendChild(btnExcluir);
+        div.appendChild(divTexto);
+        div.appendChild(divBotoes);
+        lista.appendChild(div);
+    }
+}
+
+function editarObservacao(id) {
+    for (var i = 0; i < obsData.length; i++) {
+        if (obsData[i].id === id) {
+            document.getElementById('obs-id').value = obsData[i].id;
+            document.getElementById('obs-item').value = obsData[i].item;
+            document.getElementById('obs-texto').value = obsData[i].texto;
+            document.getElementById('btn-salvar-obs').innerText = 'Atualizar';
+            return;
+        }
+    }
+    alert('Observação não encontrada.');
 }
 
 function salvarObservacao() {
-    const id = document.getElementById('obs-id').value;
-    const item = document.getElementById('obs-item').value.trim();
-    const texto = document.getElementById('obs-texto').value.trim();
+    var id = document.getElementById('obs-id').value;
+    var item = document.getElementById('obs-item').value.trim();
+    var texto = document.getElementById('obs-texto').value.trim();
     if (!item || !texto) {
         alert('Preencha o item e o texto.');
         return;
     }
     
+    var url, method;
     if (id) {
-        fetch('/api/observacoes_consolidado/' + id, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({item: item, texto: texto})
-        }).then(r => r.json()).then(() => {
-            limparForm();
-            carregarObservacoes(relatorioIdAtual);
-        });
+        url = '/api/observacoes_consolidado/' + id;
+        method = 'PUT';
     } else {
-        fetch('/api/observacoes_consolidado/' + relatorioIdAtual, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({item: item, texto: texto})
-        }).then(r => r.json()).then(() => {
-            limparForm();
-            carregarObservacoes(relatorioIdAtual);
-        });
+        url = '/api/observacoes_consolidado/' + relatorioIdAtual;
+        method = 'POST';
     }
+    
+    var xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            fecharObservacoes();
+            abrirObservacoes();
+        } else {
+            alert('Erro ao salvar: HTTP ' + xhr.status);
+        }
+    };
+    xhr.onerror = function() {
+        alert('Erro de rede ao salvar.');
+    };
+    xhr.send(JSON.stringify({item: item, texto: texto}));
 }
 
 function excluirObservacao(id) {
     if (confirm('Excluir esta observação?')) {
-        fetch('/api/observacoes_consolidado/' + id, {method: 'DELETE'})
-            .then(() => carregarObservacoes(relatorioIdAtual));
-    }
-}
-</script>
-
-<!-- Modal de Conclusao -->
-<div id="modal-concl" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
-    <div style="background:#fff; width:700px; max-width:90%; padding:20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
-        <h3 style="margin-top:0; color:#003366;">Conclusão do Contador</h3>
-        
-        <label style="display:block; margin-bottom:5px; font-weight:bold;">Texto da Conclusão (máx 1000 caracteres):</label>
-        <textarea id="concl-texto" maxlength="1000" style="width:100%; height:200px; padding:8px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"></textarea>
-        
-        <div style="display:flex; justify-content:flex-end; gap:10px;">
-            <button onclick="fecharConclusao()" style="padding:8px 16px; background:#ccc; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
-            <button onclick="excluirConclusao()" style="padding:8px 16px; background:#dc3545; color:#fff; border:none; border-radius:4px; cursor:pointer;">Excluir</button>
-            <button onclick="salvarConclusao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar</button>
-        </div>
-    </div>
-</div>
-
-<script>
-// CONCLUSAO_SCRIPT
-let relatorioIdConcl = null;
-
-function abrirConclusao() {
-    const check = document.querySelector('input[type="radio"]:checked') || document.querySelector('input[type="checkbox"]:checked');
-    if (!check) {
-        alert('Selecione um relatório primeiro.');
-        return;
-    }
-    relatorioIdConcl = check.value;
-    document.getElementById('modal-concl').style.display = 'flex';
-    carregarConclusao(relatorioIdConcl);
-}
-
-function fecharConclusao() {
-    document.getElementById('modal-concl').style.display = 'none';
-    document.getElementById('concl-texto').value = '';
-}
-
-function carregarConclusao(id) {
-    fetch('/api/conclusao_consolidado/' + id)
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('concl-texto').value = data.texto || '';
-        });
-}
-
-function salvarConclusao() {
-    const texto = document.getElementById('concl-texto').value.trim();
-    if (!texto) {
-        alert('Digite a conclusão.');
-        return;
-    }
-    fetch('/api/conclusao_consolidado/' + relatorioIdConcl, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({texto: texto})
-    }).then(r => r.json()).then(() => {
-        alert('Conclusão salva com sucesso!');
-        fecharConclusao();
-    });
-}
-
-function excluirConclusao() {
-    if (confirm('Excluir a conclusão deste relatório?')) {
-        fetch('/api/conclusao_consolidado/' + relatorioIdConcl, {method: 'DELETE'})
-            .then(() => {
-                document.getElementById('concl-texto').value = '';
-                alert('Conclusão excluída!');
-                fecharConclusao();
-            });
+        var xhr = new XMLHttpRequest();
+        xhr.open('DELETE', '/api/observacoes_consolidado/' + id, true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                carregarObservacoes(relatorioIdAtual);
+            } else {
+                alert('Erro ao excluir: HTTP ' + xhr.status);
+            }
+        };
+        xhr.send();
     }
 }
 </script>
 </body>
-
-
-
-
-
-</html>
