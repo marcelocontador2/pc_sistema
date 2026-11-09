@@ -5951,16 +5951,19 @@ async def del_observacao(obs_id: int):
     conn.close()
     return {"ok": True}
 
+
 @app.get("/api/conclusao_consolidado/{relatorio_id}")
 async def get_conclusao(relatorio_id: int):
     import sqlite3, os
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT texto FROM conclusao_consolidado WHERE relatorio_id = ?", (relatorio_id,))
+    cursor.execute("SELECT id, texto FROM conclusao_consolidado WHERE relatorio_id = ?", (relatorio_id,))
     row = cursor.fetchone()
     conn.close()
-    return {"texto": row[0] if row else ""}
+    if row:
+        return {"id": row[0], "texto": row[1]}
+    return {"id": None, "texto": ""}
 
 @app.post("/api/conclusao_consolidado/{relatorio_id}")
 async def post_conclusao(relatorio_id: int, request: Request):
@@ -5976,6 +5979,17 @@ async def post_conclusao(relatorio_id: int, request: Request):
         "INSERT INTO conclusao_consolidado (relatorio_id, texto, data_criacao) VALUES (?, ?, ?)",
         (relatorio_id, texto, datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
     )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/conclusao_consolidado/{relatorio_id}")
+async def del_conclusao(relatorio_id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM conclusao_consolidado WHERE relatorio_id = ?", (relatorio_id,))
     conn.commit()
     conn.close()
     return {"ok": True}
@@ -6012,23 +6026,30 @@ def gerar_pdf_relatorio_consolidado(id: int):
         with open(logo_path, "rb") as f:
             logo_base64 = "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
-    dados_json_str = json.dumps(dados, ensure_ascii=False).replace("</", "<\\/")
+    dados_json_str = json.dumps(dados, ensure_ascii=False).replace("</", "<\\\\/")
     html_final = (template
         .replace("{dados_json}", dados_json_str)
         .replace("{periodo}", periodo)
         .replace("{data_geracao}", data_geracao)
-        .replace("src=\"logo\"", "src=\"" + logo_base64 + "\""))
+        .replace('src="logo"', 'src="' + logo_base64 + '"'))
+
+    # --- REMOCAO SEGURA DOS TEXTOS FIXOS DA SECAO 13 ---
+    html_final = html_final.replace('Conclusão da análise contábil.', '')
+    html_final = html_final.replace('Análise Concluída', '')
+    html_final = html_final.replace('Os dados foram consolidados com sucesso.', '')
+    # ---------------------------------------------------
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT item, texto FROM observacoes_consolidado WHERE relatorio_id = ?", (id,))
     obs_rows = cursor.fetchall()
-    
     cursor.execute("SELECT texto FROM conclusao_consolidado WHERE relatorio_id = ?", (id,))
     row_concl = cursor.fetchone()
+    cursor.execute("SELECT contador_nome, contador_crc, contador_cpf FROM configuracoes_entidade LIMIT 1")
+    row_contador = cursor.fetchone()
     conn.close()
 
-    # Injeta um script que insere as observacoes NO FINAL de cada secao (antes do proximo titulo)
+    # Injeta script de observacoes
     if obs_rows:
         obs_js = "\n<script>\n"
         obs_js += "document.addEventListener('DOMContentLoaded', function() {\n"
@@ -6036,29 +6057,37 @@ def gerar_pdf_relatorio_consolidado(id: int):
         obs_js += "    var titulos = Array.from(document.querySelectorAll('h2.secao-titulo'));\n"
         for item, texto in obs_rows:
             texto_escapado = texto.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
-            obs_js += f"    (function() {{\n"
-            obs_js += f"      var idx = titulos.findIndex(function(h) {{ return h.innerText.trim().startsWith('{item}. '); }});\n"
-            obs_js += f"      if (idx >= 0) {{\n"
-            obs_js += f"        var div = document.createElement('div');\n"
-            obs_js += f"        div.style.cssText = 'background:#E3F2FD; border-left:4px solid #2196F3; padding:10px; margin:15px 0 20px 0; font-size:11px; color:#0D47A1;';\n"
-            obs_js += f"        div.innerHTML = '<b>Observação (Item {item}):</b> {texto_escapado}';\n"
-            obs_js += f"        var proximo = titulos[idx + 1];\n"
-            obs_js += f"        if (proximo) {{\n"
-            obs_js += f"          proximo.parentNode.insertBefore(div, proximo);\n"
-            obs_js += f"        }} else {{\n"
-            obs_js += f"          titulos[idx].parentNode.appendChild(div);\n"
-            obs_js += f"        }}\n"
-            obs_js += f"      }}\n"
-            obs_js += f"    }})();\n"
+            obs_js += "    (function() {\n"
+            obs_js += "      var idx = titulos.findIndex(function(h) { return h.innerText.trim().startsWith('" + item + ". '); });\n"
+            obs_js += "      if (idx >= 0) {\n"
+            obs_js += "        var div = document.createElement('div');\n"
+            obs_js += "        div.style.cssText = 'background:#E3F2FD; border-left:4px solid #2196F3; padding:10px; margin:15px 0 20px 0; font-size:11px; color:#0D47A1;';\n"
+            obs_js += "        div.innerHTML = '<b>Observação (Item " + item + "):</b> " + texto_escapado + "';\n"
+            obs_js += "        var proximo = titulos[idx + 1];\n"
+            obs_js += "        if (proximo) {\n"
+            obs_js += "          proximo.parentNode.insertBefore(div, proximo);\n"
+            obs_js += "        } else {\n"
+            obs_js += "          titulos[idx].parentNode.appendChild(div);\n"
+            obs_js += "        }\n"
+            obs_js += "      }\n"
+            obs_js += "    })();\n"
         obs_js += "  }, 500);\n"
         obs_js += "});\n"
         obs_js += "</script>\n"
         html_final = html_final.replace('</body>', obs_js + '</body>')
 
-    # Adiciona a conclusao no final
+    # Injeta conclusao
     if row_concl and row_concl[0]:
-        conclusao_html = f'<div style="margin-top:30px; padding:15px; background:#f8f9fa; border-left:4px solid #003366; font-size:11px;"><b>Conclusão do Contador:</b><br>{row_concl[0]}</div>'
+        conclusao_html = '<div style="margin-top:30px; padding:15px; background:#f8f9fa; border-left:4px solid #003366; font-size:11px;"><b>Conclusão do Contador:</b><br>' + row_concl[0] + '</div>'
         html_final = html_final.replace('</body>', conclusao_html + '</body>')
+
+    # Injeta dados do contador
+    if row_contador:
+        nome = row_contador[0] or ""
+        crc = row_contador[1] or ""
+        cpf = row_contador[2] or ""
+        dados_contador = '<div style="margin-top:40px; text-align:center; font-size:11px;"><p style="margin:0;"><b>' + nome + '</b></p><p style="margin:0;">CRC: ' + crc + ' - CPF: ' + cpf + '</p></div>'
+        html_final = html_final.replace('</body>', dados_contador + '</body>')
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -6072,5 +6101,5 @@ def gerar_pdf_relatorio_consolidado(id: int):
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=relatorio_consolidado_{id}.pdf"}
+        headers={"Content-Disposition": "inline; filename=relatorio_consolidado_" + str(id) + ".pdf"}
     )
