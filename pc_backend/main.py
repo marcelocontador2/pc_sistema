@@ -5997,6 +5997,7 @@ async def del_conclusao(relatorio_id: int):
 
 
 
+
 @app.get("/gerar_pdf_relatorio_consolidado/{id}")
 def gerar_pdf_relatorio_consolidado(id: int):
     from playwright.sync_api import sync_playwright
@@ -6033,12 +6034,12 @@ def gerar_pdf_relatorio_consolidado(id: int):
         .replace("{data_geracao}", data_geracao)
         .replace('src="logo"', 'src="' + logo_base64 + '"'))
 
-    # --- REMOCAO SEGURA DOS TEXTOS FIXOS DA SECAO 13 ---
+    # --- REMOCAO DOS TEXTOS FIXOS DA SECAO 13 ---
     html_final = html_final.replace('Conclusão da análise contábil.', '')
     html_final = html_final.replace('Análise Concluída', '')
     html_final = html_final.replace('Os dados foram consolidados com sucesso.', '')
-    # ---------------------------------------------------
 
+    # --- BUSCA OBSERVACOES ---
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT item, texto FROM observacoes_consolidado WHERE relatorio_id = ?", (id,))
@@ -6049,7 +6050,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
     row_contador = cursor.fetchone()
     conn.close()
 
-    # Injeta script de observacoes
+    # --- INJETA OBSERVACOES SEM O TITULO "OBSERVACAO (ITEM X):" ---
     if obs_rows:
         obs_js = "\n<script>\n"
         obs_js += "document.addEventListener('DOMContentLoaded', function() {\n"
@@ -6062,7 +6063,8 @@ def gerar_pdf_relatorio_consolidado(id: int):
             obs_js += "      if (idx >= 0) {\n"
             obs_js += "        var div = document.createElement('div');\n"
             obs_js += "        div.style.cssText = 'background:#E3F2FD; border-left:4px solid #2196F3; padding:10px; margin:15px 0 20px 0; font-size:11px; color:#0D47A1;';\n"
-            obs_js += "        div.innerHTML = '<b>Observação (Item " + item + "):</b> " + texto_escapado + "';\n"
+            # AQUI: apenas o texto, sem o titulo "Observacao (Item X):"
+            obs_js += "        div.innerHTML = '" + texto_escapado + "';\n"
             obs_js += "        var proximo = titulos[idx + 1];\n"
             obs_js += "        if (proximo) {\n"
             obs_js += "          proximo.parentNode.insertBefore(div, proximo);\n"

@@ -194,9 +194,7 @@ if (bpRaiz) {
         const varPL = plAn ? ((plAt - plAn) / Math.abs(plAn) * 100) : 0;
         const varImob = imobAn ? ((imobAt - imobAn) / Math.abs(imobAn) * 100) : 0;
         
-        H += '<div style="margin-top: 20px; padding: 12px; background-color: #f8f9fa; border-left: 4px solid #003366; font-size: 11px; color: #333;">';
-        H += '<b>Destaques:</b> Evolução do PL de ' + varPL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%; variação do Imobilizado de ' + varImob.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%.';
-        H += '</div>';
+        
 
     } else {
         H += '<p>Módulo encontrado, mas sem dados para exibir.</p>';
@@ -315,9 +313,7 @@ if (bo) {
     // --- CAIXA DE CONCLUSÕES DINÂMICAS ---
     const pctRec = Number(a.pct_receita) || 0;
     const pctDesp = Number(a.pct_despesa) || 0;
-    H += '<div style="margin-top: 20px; padding: 12px; background-color: #f8f9fa; border-left: 4px solid #003366; font-size: 11px; color: #333;">';
-    H += '<b>Principais conclusões:</b> a receita realizada representa ' + pct(pctRec) + ' da previsão atualizada, enquanto as despesas empenhadas representam ' + pct(pctDesp) + ' da dotação atualizada. A variação do superávit orçamentário e os restos a pagar inscritos merecem monitoramento.';
-    H += '</div>';
+    
 
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
