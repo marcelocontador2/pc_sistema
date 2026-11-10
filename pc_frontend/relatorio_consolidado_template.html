@@ -382,7 +382,6 @@ if (bf) {
                 count++;
             }
         });
-        addLinha('TOTAL', moeda(sumAt).replace('R$ ',''), moeda(sumAn).replace('R$ ',''), varPct(sumAt, sumAn), 'total');
     };
 
     renderBloco('Receitas', bf.receitas);
@@ -1147,17 +1146,32 @@ if (liqRaw && liqRaw.valores) {
 
     function getAnterior(obj, chave) {
         if (!obj) return 0;
-        if (obj.dados && obj.dados.dados && obj.dados.dados[chave]) return Number(obj.dados.dados[chave].anterior) || 0;
-        if (obj.dados && obj.dados[chave]) return Number(obj.dados[chave].anterior) || 0;
-        if (obj[chave]) return Number(obj[chave].anterior) || 0;
+        // Tenta caminhos comuns para o valor anterior
+        if (obj.dados && obj.dados.dados && obj.dados.dados[chave]) {
+            var val = obj.dados.dados[chave];
+            return Number(val.anterior) || Number(val) || 0;
+        }
+        if (obj.dados && obj.dados[chave]) {
+            var val = obj.dados[chave];
+            return Number(val.anterior) || Number(val) || 0;
+        }
+        if (obj[chave]) {
+            var val = obj[chave];
+            return Number(val.anterior) || Number(val) || 0;
+        }
+        // Fallback: se for um objeto com 'dados' que tem a chave diretamente
+        if (obj.dados && obj.dados[chave] !== undefined) {
+            var val = obj.dados[chave];
+            return Number(val.anterior) || Number(val) || 0;
+        }
         return 0;
     }
 
-    const caixaAn = getAnterior(bpRaw, 'caixa');
-    const acAn = getAnterior(bpRaw, 'ativo_circulante');
-    const estAn = getAnterior(bpRaw, 'estoques');
-    const rlpAn = getAnterior(bpRaw, 'ativo_realizavel');
-    const pcAn = getAnterior(bpRaw, 'passivo_circulante');
+    const caixaAn = getAnterior(bpRaw, 'caixa') || 0;
+    const acAn = getAnterior(bpRaw, 'ativo_circulante') || 0;
+    const estAn = getAnterior(bpRaw, 'estoques') || getAnterior(bpRaw, 'estoque') || getAnterior(bpRaw, 'estoques_anterior') || 0;
+    const rlpAn = getAnterior(bpRaw, 'ativo_realizavel') || getAnterior(bpRaw, 'realizavel_lp') || 0;
+    const pcAn = getAnterior(bpRaw, 'passivo_circulante') || 0;
     const pncAn = getAnterior(bpRaw, 'passivo_nao_circulante');
     const ptAn = getAnterior(bpRaw, 'passivo_total');
     const atAn = getAnterior(bpRaw, 'total_ativo');

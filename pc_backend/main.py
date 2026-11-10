@@ -5380,6 +5380,7 @@ async def api_analise_bp(periodo: str):
         # Busca os valores (atual, anterior)
         ativo_circ_at, ativo_circ_ant = buscar_ativo("ATIVO CIRCULANTE")
         caixa_at, caixa_ant = buscar_ativo("CAIXA E EQUIVALENTES")
+        estoques_at, estoques_ant = buscar_ativo("ESTOQUES")
         creditos_at, creditos_ant = buscar_ativo("CRÉDITOS A CURTO PRAZO")
         ativo_nao_circ_at, ativo_nao_circ_ant = buscar_ativo("ATIVO NÃO CIRCULANTE")
         ativo_realizavel_at, ativo_realizavel_ant = buscar_ativo("ATIVO REALIZÁVEL A LONGO PRAZO")
@@ -5404,6 +5405,7 @@ async def api_analise_bp(periodo: str):
         dados = {
             "ativo_circulante": {"atual": ativo_circ_at, "anterior": ativo_circ_ant},
             "caixa": {"atual": caixa_at, "anterior": caixa_ant},
+            "estoques": {"atual": estoques_at, "anterior": estoques_ant},
             "creditos": {"atual": creditos_at, "anterior": creditos_ant},
             "ativo_nao_circulante": {"atual": ativo_nao_circ_at, "anterior": ativo_nao_circ_ant},
             "ativo_realizavel": {"atual": ativo_realizavel_at, "anterior": ativo_realizavel_ant},
@@ -8317,6 +8319,7 @@ async def api_analise_bp(periodo: str):
         # Busca os valores (atual, anterior)
         ativo_circ_at, ativo_circ_ant = buscar_ativo("ATIVO CIRCULANTE")
         caixa_at, caixa_ant = buscar_ativo("CAIXA E EQUIVALENTES")
+        estoques_at, estoques_ant = buscar_ativo("ESTOQUES")
         creditos_at, creditos_ant = buscar_ativo("CRÉDITOS A CURTO PRAZO")
         ativo_nao_circ_at, ativo_nao_circ_ant = buscar_ativo("ATIVO NÃO CIRCULANTE")
         ativo_realizavel_at, ativo_realizavel_ant = buscar_ativo("ATIVO REALIZÁVEL A LONGO PRAZO")
@@ -8341,6 +8344,7 @@ async def api_analise_bp(periodo: str):
         dados = {
             "ativo_circulante": {"atual": ativo_circ_at, "anterior": ativo_circ_ant},
             "caixa": {"atual": caixa_at, "anterior": caixa_ant},
+            "estoques": {"atual": estoques_at, "anterior": estoques_ant},
             "creditos": {"atual": creditos_at, "anterior": creditos_ant},
             "ativo_nao_circulante": {"atual": ativo_nao_circ_at, "anterior": ativo_nao_circ_ant},
             "ativo_realizavel": {"atual": ativo_realizavel_at, "anterior": ativo_realizavel_ant},
