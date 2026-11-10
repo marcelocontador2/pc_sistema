@@ -27,6 +27,18 @@
     tr:nth-child(even) { background: #f8f9fa; }
     tr.total { font-weight: bold; background: #e9ecef; }
 </style>
+
+<style>
+/* Força a justificação do texto da legislação */
+.legislacao, .legislacao p, div[id*="legislacao"], .capa-legislacao {
+    text-align: justify !important;
+    text-justify: inter-word !important;
+}
+/* Caso o texto esteja solto em um parágrafo após o título */
+h3 + p, h2 + p, .titulo-secao + p {
+    text-align: justify !important;
+}
+</style>
 </head>
 <body>
 <div class="capa">
@@ -38,7 +50,7 @@
 
     <div style="margin-top: 40px; padding: 20px; text-align: left; font-size: 9px; color: #555; border-top: 1px solid #ddd; max-width: 500px; margin-left: auto; margin-right: auto;">
         <p style="margin: 0 0 5px 0; font-weight: bold; color: #003366; text-transform: uppercase; letter-spacing: 1px;">Legislação e Normas Aplicadas:</p>
-        <p style="margin: 0; line-height: 1.4;">Lei nº 4.320/1964 • Resolução Cofen nº 814/2026 • MCASP • Resolução COFEN nº 340/2008 (Regulamento da Administração Financeira e Contábil) • Resolução COFEN nº 764/2024 (Prestação de Contas) • NBC TSP • Resolução COFEN nº 814/2026 (Limites de Despesa com Pessoal e Governança)</p>
+        <p style="text-align: justify; margin: 0; line-height: 1.4;">Lei nº 4.320/1964 <span style='font-size:9px; color:#666; font-style:italic;'>(Normas gerais de direito financeiro para elaboração e controle dos orçamentos e balanços.)</span> • Resolução COFEN nº 340/2008 (Regulamento da Administração Financeira e Contábil) <span style='font-size:9px; color:#666; font-style:italic;'>(Regulamento da Administração Financeira e Contábil do COFEN.)</span> • Normas Brasileiras de Contabilidade – Setor Público (NBC TSP) <span style='font-size:9px; color:#666; font-style:italic;'>(Normas técnicas para transparência e comparabilidade.)</span> • Resolução COFEN nº 764/2024 (Prestação de Contas) <span style='font-size:9px; color:#666; font-style:italic;'>(Processo de prestação de contas anual no Sistema Cofen/Conselhos Regionais.)</span> • Resolução Cofen nº 799/2025 <span style='font-size:9px; color:#666; font-style:italic;'>(Estabelece diretrizes para a gestão de riscos e controles internos administrativos.)</span> • Resolução Cofen nº 814/2026 <span style='font-size:9px; color:#666; font-style:italic;'>(Limites de despesa com pessoal e governança corporativa.)</span> • Manual de Contabilidade Aplicada ao Setor Público (MCASP) <span style='font-size:9px; color:#666; font-style:italic;'>(Diretrizes técnicas para o registro contábil no setor público.)</span></p>
         
         <p style="margin: 10px 0 5px 0; font-weight: bold; color: #003366; text-transform: uppercase; letter-spacing: 1px;">Demonstrações Analisadas:</p>
         <p style="margin: 0; line-height: 1.4;">Balancete de Verificação • Balanço Financeiro (BF) • Balanço Orçamentário (BO) • Balanço Patrimonial (BP) • Demonstração do Fluxo de Caixa (DFC) • Demonstração das Mutações do PL (DMPL) • Demonstração das Variações Patrimoniais (DVP)</p>
