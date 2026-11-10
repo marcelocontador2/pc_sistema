@@ -9066,120 +9066,111 @@ async def del_conclusao(relatorio_id: int):
 def gerar_pdf_relatorio_consolidado(id: int):
     from playwright.sync_api import sync_playwright
     from fastapi.responses import Response
-    import sqlite3, json, os, base64
+    import sqlite3, json, os, base64, re
 
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_relatorio_consolidado WHERE id = ?", (id,))
     row = cursor.fetchone()
-    conn.close()
-
+    
     if not row:
+        conn.close()
         return Response(content="Historico nao encontrado.", status_code=404, media_type="text/plain")
 
     periodo, data_geracao, res_json = row
     dados = json.loads(res_json).get("dados", {})
-    
-    # --- INJECAO DA DMPL (Item 7) ---
+
+    # Injeção da DMPL
     try:
-        conn_dmpl = sqlite3.connect(db_path)
-        cursor_dmpl = conn_dmpl.cursor()
-        cursor_dmpl.execute("SELECT resultado_json FROM historico_analise_dmpl ORDER BY id DESC LIMIT 1")
-        row_dmpl = cursor_dmpl.fetchone()
+        cursor.execute("SELECT resultado_json FROM historico_analise_dmpl ORDER BY id DESC LIMIT 1")
+        row_dmpl = cursor.fetchone()
         if row_dmpl:
             dados["dmpl"] = json.loads(row_dmpl[0])
-        conn_dmpl.close()
     except Exception as e:
         print("Erro ao injetar DMPL:", e)
-    # --------------------------------
+    
+    # Busca observações, conclusão e contador
+    cursor.execute("SELECT item, texto FROM observacoes_consolidado WHERE relatorio_id = ?", (id,))
+    obs_rows = cursor.fetchall()
+    cursor.execute("SELECT texto FROM conclusao_consolidado WHERE relatorio_id = ?", (id,))
+    row_concl = cursor.fetchone()
+    cursor.execute("SELECT contador_nome, contador_crc, contador_uf, contador_cpf FROM configuracoes_entidade LIMIT 1")
+    row_contador = cursor.fetchone()
+    conn.close()
 
+    # Carrega o template
     template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_consolidado_template.html")
     with open(template_path, "r", encoding="utf-8") as f:
         template = f.read()
 
+    # Carrega o logo em base64
     logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "logo-cofen.png")
     logo_base64 = ""
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as f:
             logo_base64 = "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
-    dados_json_str = json.dumps(dados, ensure_ascii=False).replace("</", "<\\\\/")
+    # Substitui os dados no template
+    dados_json_str = json.dumps(dados, ensure_ascii=False).replace("</", "<\\/")
     html_final = (template
         .replace("{dados_json}", dados_json_str)
         .replace("{periodo}", periodo)
         .replace("{data_geracao}", data_geracao)
         .replace('src="logo"', 'src="' + logo_base64 + '"'))
 
-    # --- REMOCAO DOS TEXTOS FIXOS DA SECAO 13 ---
+    # Remove textos fixos indesejados
     html_final = html_final.replace('Conclusão da análise contábil.', '')
     html_final = html_final.replace('Análise Concluída', '')
     html_final = html_final.replace('Os dados foram consolidados com sucesso.', '')
 
-    # --- BUSCA OBSERVACOES ---
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT item, texto FROM observacoes_consolidado WHERE relatorio_id = ?", (id,))
-    obs_rows = cursor.fetchall()
-    cursor.execute("SELECT texto FROM conclusao_consolidado WHERE relatorio_id = ?", (id,))
-    row_concl = cursor.fetchone()
-    cursor.execute("SELECT contador_nome, contador_crc, contador_cpf FROM configuracoes_entidade LIMIT 1")
-    row_contador = cursor.fetchone()
-    conn.close()
-
-    # --- INJETA OBSERVACOES SEM O TITULO "OBSERVACAO (ITEM X):" ---
+    # Injeta observações
     if obs_rows:
-        obs_js = "\n<script>\n"
-        obs_js += "document.addEventListener('DOMContentLoaded', function() {\n"
-        obs_js += "  setTimeout(function() {\n"
-        obs_js += "    var titulos = Array.from(document.querySelectorAll('h2.secao-titulo'));\n"
+        obs_js = "\n<script>\ndocument.addEventListener('DOMContentLoaded', function() {\n  setTimeout(function() {\n    var titulos = Array.from(document.querySelectorAll('h2.secao-titulo'));\n"
         for item, texto in obs_rows:
             texto_escapado = texto.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
-            obs_js += "    (function() {\n"
-            obs_js += "      var idx = titulos.findIndex(function(h) { return h.innerText.trim().startsWith('" + item + ". '); });\n"
-            obs_js += "      if (idx >= 0) {\n"
-            obs_js += "        var div = document.createElement('div');\n"
-            obs_js += "        div.style.cssText = 'background:#E3F2FD; border-left:4px solid #2196F3; padding:10px; margin:15px 0 20px 0; font-size:11px; color:#0D47A1;';\n"
-            # AQUI: apenas o texto, sem o titulo "Observacao (Item X):"
-            obs_js += "        div.innerHTML = '" + texto_escapado + "';\n"
-            obs_js += "        var proximo = titulos[idx + 1];\n"
-            obs_js += "        if (proximo) {\n"
-            obs_js += "          proximo.parentNode.insertBefore(div, proximo);\n"
-            obs_js += "        } else {\n"
-            obs_js += "          titulos[idx].parentNode.appendChild(div);\n"
-            obs_js += "        }\n"
-            obs_js += "      }\n"
-            obs_js += "    })();\n"
-        obs_js += "  }, 500);\n"
-        obs_js += "});\n"
-        obs_js += "</script>\n"
+            obs_js += "    (function() {\n      var idx = titulos.findIndex(function(h) { return h.innerText.trim().startsWith('" + item + ". '); });\n      if (idx >= 0) {\n        var div = document.createElement('div');\n        div.style.cssText = 'background:#E3F2FD; border-left:4px solid #2196F3; padding:10px; margin:15px 0 20px 0; font-size:11px; color:#0D47A1;';\n        div.innerHTML = '" + texto_escapado + "';\n        var proximo = titulos[idx + 1];\n        if (proximo) { proximo.parentNode.insertBefore(div, proximo); } else { titulos[idx].parentNode.appendChild(div); }\n      }\n    })();\n"
+        obs_js += "  }, 500);\n});\n</script>\n"
         html_final = html_final.replace('</body>', obs_js + '</body>')
 
-    # Injeta conclusao
+    # Injeta conclusão (com formatação ABNT)
     if row_concl and row_concl[0]:
-        import re as _re
         _txt = row_concl[0]
-        # Força quebra antes dos itens numerados (1., 2., etc)
-        _txt = _re.sub(r'\s+(\d+\.)\s+', r'<br><br><b>\1</b> ', _txt)
-        # Força quebra antes das palavras-chave
-        _txt = _re.sub(r'\s+(Recomenda-se:)', r'<br><br><b>\1</b>', _txt)
-        _txt = _re.sub(r'\s+(Conclusão:)', r'<br><br><b>\1</b>', _txt)
-        # Substitui eventuais quebras de linha originais
         _txt = _txt.replace(chr(10), '<br><br>')
-
-        conclusao_html = '<div style="margin-top: 40px; padding: 20px; background: #f4f7f9; border-left: 5px solid #003366; font-size: 10px; line-height: 1.6; text-align: justify; color: #333; page-break-inside: avoid;">'
-        conclusao_html += '<b style="color: #003366; font-size: 14px; display: block; margin-bottom: 15px;">Conclusão do Contador:</b>'
-        conclusao_html += '<div style="font-family: Arial, sans-serif;">' + _txt + '</div>'
-        conclusao_html += '</div>'
-
+        _txt = re.sub(r'\s+(\d+\.)\s+', r'<br><br><b>\1</b> ', _txt)
+        _txt = re.sub(r'\s+(Recomenda-se:)', r'<br><br><b>\1</b>', _txt)
+        _txt = re.sub(r'\s+(Conclusão:)', r'<br><br><b>\1</b>', _txt)
+        _txt = re.sub(r'(<br><br>)+', '<br><br>', _txt)
+        
+        conclusao_html = '<div style="margin-top: 40px; padding: 20px; background: #f4f7f9; border-left: 5px solid #003366; font-size: 11px; line-height: 1.5; text-align: justify; color: #333; page-break-inside: avoid;">'
+        conclusao_html += '<div style="font-family: Arial, sans-serif;">' + _txt + '</div></div>'
         html_final = html_final.replace('</body>', conclusao_html + '</body>')
 
-    # Injeta dados do contador
+            # Injeta dados do contador (Formato: Numero/UF)
     if row_contador:
         nome = row_contador[0] or ""
-        crc = row_contador[1] or ""
-        cpf = row_contador[2] or ""
-        dados_contador = '<div style="margin-top:40px; text-align:center; font-size:11px;"><p style="margin:0;"><b>' + nome + '</b></p><p style="margin:0;">CRC: ' + crc + ' - CPF: ' + cpf + '</p></div>'
+        crc_bruto = row_contador[1] or ""
+        uf_banco = row_contador[2] or ""
+        cpf = row_contador[3] or ""
+        
+        # Limpa o CRC (apenas A-Z0-9)
+        crc_limpo = re.sub(r'[^A-Z0-9]', '', crc_bruto.upper())
+        
+        # Remove a UF do início do CRC (se existir)
+        if len(crc_limpo) >= 3 and crc_limpo[:2].isalpha():
+            numero_crc = crc_limpo[2:]
+        else:
+            numero_crc = crc_limpo
+            
+        # Formata: Numero/UF (ex: 066005O8T/DF)
+        crc_formatado = f"{numero_crc}/{uf_banco.upper()}"
+
+        dados_contador = f"""
+        <div style="margin-top:40px; text-align:center; font-size:11px; page-break-inside: avoid;">
+            <p style="margin:0;"><b>{nome}</b></p>
+            <p style="margin:0;">CRC: {crc_formatado} - CPF: {cpf}</p>
+        </div>
+        """
         html_final = html_final.replace('</body>', dados_contador + '</body>')
 
     with sync_playwright() as p:
@@ -9187,29 +9178,10 @@ def gerar_pdf_relatorio_consolidado(id: int):
         page = browser.new_page()
         page.set_content(html_final, wait_until="networkidle")
         page.wait_for_timeout(1500)
-        pdf_bytes = page.pdf(format="A4", landscape=False, print_background=True,
-                             margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+        pdf_bytes = page.pdf(format="A4", landscape=False, print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
         browser.close()
 
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=relatorio_consolidado_" + str(id) + ".pdf"}
-    )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": "inline; filename=relatorio_consolidado_" + str(id) + ".pdf"})
 
 @app.get("/gerar_pdf_analise_dmpl/{id}")
 def gerar_pdf_analise_dmpl(id: int):

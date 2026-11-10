@@ -837,7 +837,7 @@ if (dvp) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 7. ANÁLISE DMPL =====
-H += tit(7, 'Demonstração das Mutações do Patrimônio Líquido (DMPL)');
+H += tit(8, 'Demonstração das Mutações do Patrimônio Líquido (DMPL)');
 H += '<div class="desc">Demonstração das mutações do patrimônio líquido.</div>';
 if (D.dmpl && D.dmpl.dados && D.dmpl.dados.length > 0) {
     H += '<table class="tabela-relatorio"><thead><tr>';
@@ -856,7 +856,7 @@ if (D.dmpl && D.dmpl.dados && D.dmpl.dados.length > 0) {
     H += '</tbody></table>';
 }
 // ===== 8. COMPARATIVO DE RECEITAS =====
-H += tit(8, 'Comparativo de Receitas');
+H += tit(9, 'Comparativo de Receitas');
 H += '<div class="desc">Comparativo consolidado de receitas.</div>';
 const crec = unwrap(D.comparativo_receitas);
 if (crec) {
@@ -979,7 +979,7 @@ if (crec) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 8. COMPARATIVO DE DESPESAS =====
-H += tit(9, 'Comparativo de Despesas');
+H += tit(10, 'Comparativo de Despesas');
 H += '<div class="desc">Comparativo consolidado de despesas.</div>';
 const cdesp = unwrap(D.comparativo_despesas);
 if (cdesp) {
@@ -1114,7 +1114,7 @@ if (cdesp) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 9. LIQUIDEZ =====
-H += tit(10, 'Índices de Liquidez e Estrutura');
+H += tit(11, 'Índices de Liquidez e Estrutura');
 H += '<div class="desc">Indicadores de liquidez e estrutura patrimonial (atual x anterior).</div>';
 
 const liqRaw = unwrap(D.liquidez);
@@ -1246,7 +1246,7 @@ if (liqRaw && liqRaw.valores) {
     H += tab(['Índice', 'Fórmula', 'Cálculo (Atual)', 'Resultado (Atual)', 'Cálculo (Anterior)', 'Resultado (Anterior)'], formulas);
 } else { H += '<p>Módulo não encontrado.</p>'; }
 // ===== 10. PANORAMA =====
-H += tit(11, 'Panorama de Resultados');
+H += tit(12, 'Panorama de Resultados');
 H += '<div class="desc">Resumo executivo dos principais indicadores.</div>';
 const pan = unwrap(D.panorama);
 if (pan) {
@@ -1280,7 +1280,7 @@ if (pan) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 11. CENTRO DE CUSTOS =====
-H += tit(12, 'Análise por Centro de Custos');
+H += tit(13, 'Análise por Centro de Custos');
 H += '<div class="desc">Distribuição das despesas por centro de custo.</div>';
 const cc = unwrap(D.centro_custos);
 if (cc && cc.centros) {
@@ -1403,7 +1403,7 @@ if (cc && cc.centros) {
 } else { H += '<p>Módulo não encontrado.</p>'; }
 
 // ===== 12. CUSTO DE PESSOAL =====
-H += tit(13, 'Custo de Pessoal');
+H += tit(14, 'Custo de Pessoal');
 H += '<div class="desc">Custo de pessoal x limite legal (Resolução Cofen 814/2026).</div>';
 const cp = unwrap(D.custo_pessoal);
 if (cp) {
