@@ -9146,12 +9146,12 @@ def gerar_pdf_relatorio_consolidado(id: int):
         conclusao_html += '<div style="font-family: Arial, sans-serif;">' + _txt + '</div></div>'
         html_final = html_final.replace('</body>', conclusao_html + '</body>')
 
-            # Injeta dados do contador (Formato: Numero/UF)
+                # Injeta dados do contador (Com máscara LGPD no CPF)
     if row_contador:
         nome = row_contador[0] or ""
         crc_bruto = row_contador[1] or ""
         uf_banco = row_contador[2] or ""
-        cpf = row_contador[3] or ""
+        cpf_bruto = row_contador[3] or ""
         
         # Limpa o CRC (apenas A-Z0-9)
         crc_limpo = re.sub(r'[^A-Z0-9]', '', crc_bruto.upper())
@@ -9165,10 +9165,18 @@ def gerar_pdf_relatorio_consolidado(id: int):
         # Formata: Numero/UF (ex: 066005O8T/DF)
         crc_formatado = f"{numero_crc}/{uf_banco.upper()}"
 
+        # MÁSCARA LGPD DO CPF: ***.212.***-**
+        # Remove formatação e mantém apenas dígitos
+        cpf_limpo = re.sub(r'[^0-9]', '', cpf_bruto)
+        if len(cpf_limpo) == 11:
+            cpf_formatado = f"***.{cpf_limpo[3:6]}.***-**"
+        else:
+            cpf_formatado = cpf_bruto  # Fallback se não for 11 dígitos
+
         dados_contador = f"""
         <div style="margin-top:40px; text-align:center; font-size:11px; page-break-inside: avoid;">
             <p style="margin:0;"><b>{nome}</b></p>
-            <p style="margin:0;">CRC: {crc_formatado} - CPF: {cpf}</p>
+            <p style="margin:0;">CRC: {crc_formatado} - CPF: {cpf_formatado}</p>
         </div>
         """
         html_final = html_final.replace('</body>', dados_contador + '</body>')
