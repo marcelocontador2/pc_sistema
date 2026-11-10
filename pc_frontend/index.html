@@ -137,46 +137,21 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
         overflow: visible !important;
     }
 </style>
+
+
 </head>
 <body>
 <aside class="sidebar">
   <div class="logo-area"><img src="/pc_frontend/logo-cofen.png" alt="Logo COFEN" style="max-height: 40px; width: auto; display: block;"></div>
   <ul style="padding-left: 60px; margin-left: 0; list-style: none;">
-    <li><a href="#" id="menu-upload" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
-    <li><a href="/base_legal" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Base Legal</a></li>
-    <li><a href="/configuracoes" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Configuracoes</a></li>
-    <li><a href="/relatorio_consolidado" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Relatório Consolidado</a></li>
-    <li><a href="/notas_explicativas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Notas Explicativas</a></li>
     
-    <li>
-      <a id="menu-demonstracoes" id="menu-demonstracoes" id="menu-demonstracoes"  aria-disabled="true" title="Em desenvolvimento"aria-disabled="true" title="Em desenvolvimento" style="display: none;">Demonstrações Contábeis</a>
-      <ul class="submenu" id="submenu-demonstracoes" style="list-style: none; padding-left: 0; margin-left: 0;" style="display: none;">
-        <li><a id="submenu-balancete" onclick="carregarRelatorio(\'BALANCETE\')">Balancete</a></li>
-        <li><a id="submenu-bp" onclick="carregarRelatorio(\'BALANCO_PATRIMONIAL\')">Balanço Patrimonial</a></li>
-        <li><a id="submenu-bo" onclick="mostrarTela('demonstracoes','BALANCO_ORCAMENTARIO')">Balanço Orçamentário</a></li>
-        <li><a id="submenu-bf" onclick="mostrarTela('demonstracoes','BALANCO_FINANCEIRO')">Balanço Financeiro</a></li>
-        <li><a id="submenu-dfc" onclick="mostrarTela('demonstracoes','DFC')">DFC</a></li>
-        <li><a id="submenu-dvp" onclick="mostrarTela('demonstracoes','DVP')">DVP</a></li>
-        <li><a id="submenu-dmpl" onclick="mostrarTela('demonstracoes','DMPL')">DMPL</a></li>
-        <li><a href="/conferencia" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Conferência das Demonstrações</a></li>
-        <li>
-        <a href="/analise_orcamentaria" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Orçamentária (BO)</a>
-        <a href="/analise_financeira_bf" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Financeira (BF)</a>
-            <a href="/analise_bp" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise BP</a>
-        <a href="/analise_dfc" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise DFC</a>
-        <a href="/analise_patrimonial" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Patrimonial (DVP)</a>
-        
-
-        <li><a href="/integridade" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Integridade entre Demonstrações</a></li>
-    <li></li>
-<li></li>
-    <li><a href="/composicao_receitas_despesas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Composição Receitas/Despesas</a></li>
-<li><a href="/liquidez" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Índices de Liquidez</a></li>
-    <li><a href="/panorama" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Resultados Gerais</a></li>
-            <a href="/analise_comparativo_receitas" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Comparativo de Receitas</a>
-            <a href="/analise_comparativo_despesas" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Comparativo de Despesas</a>
-            <a href="/analise_centro_custos" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise por Centro de Custos</a>
-            <a href="/analise_custo_pessoal" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Custo de Pessoal</a>
+        <li><a href="#" id="menu-upload" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
+        <li><a href="/base_legal" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Base Legal</a></li>
+        <li><a href="/configuracoes" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Configuracoes</a></li>
+        <li><a href="/relatorio_consolidado" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Relatório Consolidado</a>
+        <li><a href="/notas_explicativas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Notas Explicativas</a></li></li>
+        <li></li>
+    
         
     </ul>
     </li>
@@ -733,14 +708,19 @@ document.addEventListener("DOMContentLoaded", function() {
     novoLi.appendChild(linkPai);
     novoLi.appendChild(submenu);
 
-    // 4. Insere o menu de Análises depois de "Relatório Consolidado"
+    
+    // 4. Insere o menu de Análises APÓS o link de Notas Explicativas
+    const liNotas = Array.from(menuPrincipal.querySelectorAll('li')).find(li => li.textContent.includes('Notas Explicativas'));
     const liConsolidado = Array.from(menuPrincipal.querySelectorAll('li')).find(li => li.textContent.includes('Relatório Consolidado'));
-    if (liConsolidado) {
+    
+    if (liNotas) {
+        liNotas.parentElement.insertBefore(novoLi, liNotas.nextSibling);
+    } else if (liConsolidado) {
         liConsolidado.parentElement.insertBefore(novoLi, liConsolidado.nextSibling);
-        
     } else {
         menuPrincipal.appendChild(novoLi);
     }
+    
 
     // 5. Cria os links na ORDEM EXATA desejada
     const ordemLinks = [
