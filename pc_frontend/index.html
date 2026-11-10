@@ -139,18 +139,55 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
 </style>
 
 
+
+<style>
+    .dashboard-welcome { padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; text-align: center; }
+    .dashboard-welcome h1 { color: #003366; margin-top: 0; }
+    .dashboard-welcome p { color: #666; font-size: 16px; }
+    .dashboard-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .dashboard-cards { grid-template-columns: repeat(2, 1fr); } }
+    .dash-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 4px solid #0056b3; }
+    .dash-card h3 { margin: 0 0 10px 0; font-size: 14px; color: #666; }
+    .dash-card .value { font-size: 24px; font-weight: bold; color: #003366; }
+    .shortcuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+    .shortcut-btn { display: flex; align-items: center; justify-content: center; padding: 15px; background: #003366; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; transition: 0.2s; text-align: center; }
+    .shortcut-btn:hover { background: #0056b3; transform: translateY(-2px); }
+</style>
 </head>
 <body>
 <aside class="sidebar">
   <div class="logo-area"><img src="/pc_frontend/logo-cofen.png" alt="Logo COFEN" style="max-height: 40px; width: auto; display: block;"></div>
   <ul style="padding-left: 60px; margin-left: 0; list-style: none;">
     
+        
         <li><a href="#" id="menu-upload" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
         <li><a href="/base_legal" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Base Legal</a></li>
         <li><a href="/configuracoes" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Configuracoes</a></li>
-        <li><a href="/relatorio_consolidado" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Relatório Consolidado</a>
-        <li><a href="/notas_explicativas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Notas Explicativas</a></li></li>
-        <li></li>
+        <li><a href="/relatorio_consolidado" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Relatório Consolidado</a></li>
+        <li><a href="/notas_explicativas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Notas Explicativas</a></li>
+    <li>
+      <a id="menu-demonstracoes" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold; cursor:pointer;">Análises Contábeis</a>
+      <ul class="submenu" id="submenu-analises" style="list-style: none; padding-left: 0; margin-left: 0; display: block;">
+        <li><a href="/conferencia" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Conferência das Demonstrações</a></li>
+        <li><a href="/integridade" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Integridade entre Demonstrações</a></li>
+        <li><a href="/analise_orcamentaria" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Orçamentária (BO)</a></li>
+        <li><a href="/analise_financeira_bf" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Financeira (BF)</a></li>
+        <li><a href="/analise_bp" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise BP</a></li>
+        <li><a href="/analise_dfc" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise DFC</a></li>
+        <li><a href="/analise_patrimonial" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise Patrimonial (DVP)</a></li>
+        <li><a href="/analise_dmpl" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise DMPL</a></li>
+        <li><a href="/composicao_receitas_despesas" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Composição Receitas/Despesas</a></li>
+        <li><a href="/liquidez" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Índices de Liquidez</a></li>
+        <li><a href="/panorama" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Resultados Gerais</a></li>
+        <li><a href="/analise_comparativo_receitas" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Comparativo de Receitas</a></li>
+        <li><a href="/analise_comparativo_despesas" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Comparativo de Despesas</a></li>
+        <li><a href="/analise_centro_custos" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise por Centro de Custos</a></li>
+        <li><a href="/analise_custo_pessoal" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Custo de Pessoal</a></li>
+      </ul>
+    </li>
+  </ul>
+
+    
     
         
     </ul>
@@ -162,8 +199,63 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
     <h2 id="header-title" style="color: #0072BA; font-size: 18px; font-weight: bold; margin: 0;">SGPC - SISTEMA DE GESTÃO DE PRESTAÇÃO DE CONTAS</h2>
     <div style="display:flex;align-items:center;gap:10px"><span>Marcelo Medeiros</span><div class="user-avatar">MM</div></div>
   </header>
-  <div id="tela-dashboard" class="content-area active">
-    <div class="cards-grid" id="cards-container"></div>
+  
+<div id="tela-dashboard-welcome" class="content-area active" style="padding: 30px;">
+    <div class="dashboard-welcome">
+        <h1>Bem-vindo ao SGPC</h1>
+        <p>Sistema de Gestão de Prestação de Contas - COFEN</p>
+    </div>
+    
+    <div class="dashboard-cards">
+        <div class="dash-card">
+            <h3>Ativo Total</h3>
+            <div class="value" id="dash-ativo">R$ --</div>
+        </div>
+        <div class="dash-card">
+            <h3>Superávit Financeiro</h3>
+            <div class="value" id="dash-superavit">R$ --</div>
+        </div>
+        <div class="dash-card">
+            <h3>Receita Realizada</h3>
+            <div class="value" id="dash-receita">R$ --</div>
+        </div>
+        <div class="dash-card">
+            <h3>Despesa Empenhada</h3>
+            <div class="value" id="dash-despesa">R$ --</div>
+        </div>
+    <div class="dashboard-cards">
+        <div class="dash-card" style="border-left-color: #28a745;">
+            <h3>Liquidez Corrente</h3>
+            <div class="value" id="dash-liq-corrente">--</div>
+        </div>
+        <div class="dash-card" style="border-left-color: #28a745;">
+            <h3>Liquidez Imediata</h3>
+            <div class="value" id="dash-liq-imediata">--</div>
+        </div>
+        <div class="dash-card" style="border-left-color: #ffc107;">
+            <h3>Endividamento Geral</h3>
+            <div class="value" id="dash-endividamento">--</div>
+        </div>
+        <div class="dash-card" style="border-left-color: #ffc107;">
+            <h3>Imobilização do PL</h3>
+            <div class="value" id="dash-imobilizacao">--</div>
+        </div>
+    </div>
+
+    </div>
+    
+    <h3 style="color: #003366; margin-bottom: 15px;">Atalhos Rápidos</h3>
+    <div class="shortcuts">
+        <a href="/analise_bp" class="shortcut-btn">📊 Análise BP</a>
+        <a href="/analise_dfc" class="shortcut-btn">💵 Análise DFC</a>
+        <a href="/liquidez" class="shortcut-btn">📈 Índices de Liquidez</a>
+        <a href="/relatorio_consolidado" class="shortcut-btn">📄 Relatório Consolidado</a>
+        <a href="/notas_explicativas" class="shortcut-btn">📝 Notas Explicativas</a>
+        <a href="/analise_custo_pessoal" class="shortcut-btn">👥 Custo de Pessoal</a>
+    </div>
+</div>
+
+
   </div>
   <div id="tela-demonstracoes" class="content-area">
     <h1 class="page-title" id="titulo-demonstracao">Demonstrações Contábeis</h1>
@@ -672,92 +764,59 @@ document.addEventListener("DOMContentLoaded", function() {
 
 <!-- FIM ORDENACAO -->
 
+
+
+
+
+
+
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // 1. Encontra a lista principal do menu
-    const menuPrincipal = Array.from(document.querySelectorAll('ul')).find(ul => ul.textContent.includes('Importar Relatórios'));
-    if (!menuPrincipal) return;
+    // 1. Busca os dados do relatório consolidado (para os totais e índices)
+    fetch('/api/relatorio_consolidado/2026-TRIMESTRE-3')
+        .then(r => r.json())
+        .then(data => {
+            const bp = data.encontrados?.analise_bp?.dados?.dados || {};
+            const orc = data.encontrados?.analise_orcamentaria?.dados?.atual || {};
+            const liq_raw = data.encontrados?.liquidez?.dados || {};
+            const liq = liq_raw.liquidez || {};
+            const est = liq_raw.estrutura || {};
 
-    // 2. Remove a lista antiga de análises se já existir
-    const menuAntigo = document.getElementById('submenu-analises');
-    if (menuAntigo) {
-        menuAntigo.parentElement.remove();
-    }
+            const fmt = (v) => {
+                if (v === undefined || v === null) return 'R$ --';
+                return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            };
+            const fmtPct = (v) => {
+                if (v === undefined || v === null) return '--';
+                return v + '%';
+            };
 
-    // 3. Cria o novo item "Análises Contábeis"
-    const novoLi = document.createElement('li');
-    const linkPai = document.createElement('a');
-    linkPai.href = '#';
-    linkPai.textContent = 'Análises Contábeis';
-    linkPai.style.cssText = 'display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold; cursor:pointer;';
-    
-    const submenu = document.createElement('ul');
-    submenu.className = 'submenu open';
-    submenu.id = 'submenu-analises';
-    submenu.style.cssText = 'list-style: none; padding-left: 0; margin-left: 0; display: block;'; // Força ficar aberto
+            // Totais
+            document.getElementById('dash-ativo').innerText = fmt(bp.total_ativo?.atual);
+            document.getElementById('dash-receita').innerText = fmt(orc.receita_realizada);
+            document.getElementById('dash-despesa').innerText = fmt(orc.despesa_empenhada);
 
-    linkPai.addEventListener('click', function(e) {
-        e.preventDefault();
-        if (submenu.style.display === 'none') {
-            submenu.style.display = 'block';
-        } else {
-            submenu.style.display = 'none';
-        }
-    });
+            // Índices
+            document.getElementById('dash-liq-corrente').innerText = liq.liquidez_corrente || '--';
+            document.getElementById('dash-liq-imediata').innerText = liq.liquidez_imediata || '--';
+            document.getElementById('dash-endividamento').innerText = fmtPct(est.endividamento_geral);
+            document.getElementById('dash-imobilizacao').innerText = fmtPct(est.imobilizacao_pl);
+        })
+        .catch(err => console.error('Erro ao carregar consolidado:', err));
 
-    novoLi.appendChild(linkPai);
-    novoLi.appendChild(submenu);
-
-    
-    // 4. Insere o menu de Análises APÓS o link de Notas Explicativas
-    const liNotas = Array.from(menuPrincipal.querySelectorAll('li')).find(li => li.textContent.includes('Notas Explicativas'));
-    const liConsolidado = Array.from(menuPrincipal.querySelectorAll('li')).find(li => li.textContent.includes('Relatório Consolidado'));
-    
-    if (liNotas) {
-        liNotas.parentElement.insertBefore(novoLi, liNotas.nextSibling);
-    } else if (liConsolidado) {
-        liConsolidado.parentElement.insertBefore(novoLi, liConsolidado.nextSibling);
-    } else {
-        menuPrincipal.appendChild(novoLi);
-    }
-    
-
-    // 5. Cria os links na ORDEM EXATA desejada
-    const ordemLinks = [
-        { txt: 'Conferência das Demonstrações', href: '/conferencia' },
-        { txt: 'Integridade entre Demonstrações', href: '/integridade' },
-        { txt: 'Análise Orçamentária (BO)', href: '/analise_orcamentaria' },
-        { txt: 'Análise Financeira (BF)', href: '/analise_financeira_bf' },
-        { txt: 'Análise BP', href: '/analise_bp' },
-        { txt: 'Análise DFC', href: '/analise_dfc' },
-        { txt: 'Análise Patrimonial (DVP)', href: '/analise_patrimonial' },
-        { txt: 'Análise DMPL', href: '/analise_dmpl' },
-        { txt: 'Composição Receitas/Despesas', href: '/composicao_receitas_despesas' },
-        { txt: 'Índices de Liquidez', href: '/liquidez' },
-        { txt: 'Resultados Gerais', href: '/panorama' },
-        { txt: 'Comparativo de Receitas', href: '/analise_comparativo_receitas' },
-        { txt: 'Comparativo de Despesas', href: '/analise_comparativo_despesas' },
-        { txt: 'Análise por Centro de Custos', href: '/analise_centro_custos' },
-        { txt: 'Custo de Pessoal', href: '/analise_custo_pessoal' }
-    ];
-
-    ordemLinks.forEach(linkInfo => {
-        const novoSubLi = document.createElement('li');
-        const novoLink = document.createElement('a');
-        novoLink.href = linkInfo.href;
-        novoLink.textContent = linkInfo.txt;
-        novoLink.style.cssText = 'display:block; padding:8px 20px 8px 40px; text-decoration:none; color:#666; font-weight:400; font-size:13px;';
-        novoSubLi.appendChild(novoLink);
-        submenu.appendChild(novoSubLi);
-    });
-
-    // 6. Remove qualquer link antigo que tenha ficado solto
-    const linksParaRemover = ordemLinks.map(l => l.txt);
-    menuPrincipal.querySelectorAll('a').forEach(link => {
-        if (linksParaRemover.includes(link.textContent.trim()) && !submenu.contains(link)) {
-            link.parentElement.remove();
-        }
-    });
+    // 2. Busca o Superávit Financeiro diretamente da API do BP
+    fetch('/api/analise_bp/2026-TRIMESTRE-3')
+        .then(r => r.json())
+        .then(data => {
+            const bp = data.dados?.dados || data.dados || {};
+            const superavit = bp.superavit_financeiro?.atual || 0;
+            const fmt = (v) => {
+                if (v === undefined || v === null || v === 0) return 'R$ --';
+                return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            };
+            document.getElementById('dash-superavit').innerText = fmt(superavit);
+        })
+        .catch(err => console.error('Erro ao carregar superávit:', err));
 });
 </script>
 

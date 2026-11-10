@@ -5380,6 +5380,17 @@ async def api_analise_bp(periodo: str):
         # Busca os valores (atual, anterior)
         ativo_circ_at, ativo_circ_ant = buscar_ativo("ATIVO CIRCULANTE")
         caixa_at, caixa_ant = buscar_ativo("CAIXA E EQUIVALENTES")
+        # Busca o Superávit Financeiro na coluna 3 (valor) da linha que contém "SUPERVIT" ou "SUPERAVIT"
+        superavit_at = 0.0
+        superavit_ant = 0.0
+        for p in linhas:
+            if len(p) > 3 and ("SUPERVIT" in remover_acentos(str(p[0])).upper() or "SUPERAVIT" in remover_acentos(str(p[0])).upper()):
+                try:
+                    superavit_at = limpar(p[3])
+                    superavit_ant = limpar(p[4]) if len(p) > 4 else 0.0
+                except:
+                    pass
+                break
         estoques_at, estoques_ant = buscar_ativo("ESTOQUES")
         creditos_at, creditos_ant = buscar_ativo("CRÉDITOS A CURTO PRAZO")
         ativo_nao_circ_at, ativo_nao_circ_ant = buscar_ativo("ATIVO NÃO CIRCULANTE")
@@ -5405,6 +5416,7 @@ async def api_analise_bp(periodo: str):
         dados = {
             "ativo_circulante": {"atual": ativo_circ_at, "anterior": ativo_circ_ant},
             "caixa": {"atual": caixa_at, "anterior": caixa_ant},
+            "superavit_financeiro": {"atual": superavit_at, "anterior": superavit_ant},
             "estoques": {"atual": estoques_at, "anterior": estoques_ant},
             "creditos": {"atual": creditos_at, "anterior": creditos_ant},
             "ativo_nao_circulante": {"atual": ativo_nao_circ_at, "anterior": ativo_nao_circ_ant},
@@ -8319,6 +8331,17 @@ async def api_analise_bp(periodo: str):
         # Busca os valores (atual, anterior)
         ativo_circ_at, ativo_circ_ant = buscar_ativo("ATIVO CIRCULANTE")
         caixa_at, caixa_ant = buscar_ativo("CAIXA E EQUIVALENTES")
+        # Busca o Superávit Financeiro na coluna 3 (valor) da linha que contém "SUPERVIT" ou "SUPERAVIT"
+        superavit_at = 0.0
+        superavit_ant = 0.0
+        for p in linhas:
+            if len(p) > 3 and ("SUPERVIT" in remover_acentos(str(p[0])).upper() or "SUPERAVIT" in remover_acentos(str(p[0])).upper()):
+                try:
+                    superavit_at = limpar(p[3])
+                    superavit_ant = limpar(p[4]) if len(p) > 4 else 0.0
+                except:
+                    pass
+                break
         estoques_at, estoques_ant = buscar_ativo("ESTOQUES")
         creditos_at, creditos_ant = buscar_ativo("CRÉDITOS A CURTO PRAZO")
         ativo_nao_circ_at, ativo_nao_circ_ant = buscar_ativo("ATIVO NÃO CIRCULANTE")
@@ -8344,6 +8367,7 @@ async def api_analise_bp(periodo: str):
         dados = {
             "ativo_circulante": {"atual": ativo_circ_at, "anterior": ativo_circ_ant},
             "caixa": {"atual": caixa_at, "anterior": caixa_ant},
+            "superavit_financeiro": {"atual": superavit_at, "anterior": superavit_ant},
             "estoques": {"atual": estoques_at, "anterior": estoques_ant},
             "creditos": {"atual": creditos_at, "anterior": creditos_ant},
             "ativo_nao_circulante": {"atual": ativo_nao_circ_at, "anterior": ativo_nao_circ_ant},
