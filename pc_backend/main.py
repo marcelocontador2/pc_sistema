@@ -9305,3 +9305,471 @@ def gerar_pdf_analise_dmpl(id: int):
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename=dmpl_{id}.pdf"},
     )
+
+
+# ========================================================
+# MÓDULO DE NOTAS EXPLICATIVAS (padrão Relatório Consolidado)
+# ========================================================
+
+# --- Tabelas do banco (criadas no primeiro uso) ---
+def _init_notas_tables():
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS historico_notas_explicativas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS observacoes_notas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, relatorio_id INTEGER, item TEXT, texto TEXT, data_criacao TEXT)""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS conclusao_notas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, relatorio_id INTEGER, texto TEXT, data_criacao TEXT)""")
+    conn.commit()
+    conn.close()
+
+_init_notas_tables()
+
+# --- Rota para abrir a tela ---
+@app.get("/notas_explicativas")
+async def serve_notas_explicativas():
+    from fastapi.responses import FileResponse
+    import os
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "notas_explicativas.html")
+    return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
+# --- Coleta dados consolidados e monta as notas ---
+def _gerar_notas_por_periodo(periodo: str) -> dict:
+    import sqlite3, json, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT resultado_json FROM historico_relatorio_consolidado WHERE periodo = ? ORDER BY id DESC LIMIT 1", (periodo,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return {"erro": True, "mensagem": "Nenhum relatório consolidado encontrado para o período."}
+    
+    dados_consolidados = json.loads(row[0]).get("dados", {})
+    
+    # Navega na estrutura aninhada
+    bp_raw = dados_consolidados.get("analise_bp", {})
+    bp = bp_raw.get("dados", {}).get("dados", {}) if bp_raw.get("dados") else {}
+    if not bp:
+        bp = bp_raw.get("dados", {})
+    
+    orc_raw = dados_consolidados.get("analise_orcamentaria", {})
+    orc = orc_raw.get("dados", {}).get("atual", {}) if orc_raw.get("dados") else {}
+    
+    custo_raw = dados_consolidados.get("custo_pessoal", {})
+    custo = custo_raw.get("dados", {}) if custo_raw.get("dados") else {}
+    
+    bf_raw = dados_consolidados.get("analise_financeira_bf", {})
+    bf = bf_raw.get("dados", {}) if bf_raw.get("dados") else {}
+    
+    dfc_raw = dados_consolidados.get("analise_dfc", {})
+    dfc = dfc_raw.get("dados", {}) if dfc_raw.get("dados") else {}
+    
+    dvp_raw = dados_consolidados.get("analise_patrimonial", {})
+    dvp = dvp_raw.get("dados", {}) if dvp_raw.get("dados") else {}
+    
+    centro_raw = dados_consolidados.get("centro_custos", {})
+    centro = centro_raw.get("dados", {}) if centro_raw.get("dados") else {}
+    
+    liq_raw = dados_consolidados.get("liquidez", {})
+    liq = liq_raw.get("dados", {}) if liq_raw.get("dados") else {}
+    
+    def fmt(v):
+        if not v: return "R$ 0,00"
+        return "R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    
+    def pct(v):
+        if not v: return "0,00%"
+        return f"{v:.2f}%".replace(".", ",")
+    
+    def var(a, b):
+        if not b: return "0,00%"
+        return f"{((a-b)/b)*100:.2f}%".replace(".", ",")
+    
+    def vl(chave, tipo="atual"):
+        d = bp.get(chave, {})
+        return d.get(tipo, 0) if isinstance(d, dict) else 0
+    
+    notas = []
+    
+    # Nota 1 - Contexto
+    notas.append({"titulo": "NOTA 1 – CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
+        "texto": "O Conselho Federal de Enfermagem (Cofen) é autarquia federal que integra o Sistema Cofen/Conselhos Regionais. Estas notas acompanham o Relatório Consolidado de Análise Contábil do 3º trimestre de 2026 e compreendem o Balancete de Verificação, o Balanço Financeiro (BF), o Balanço Orçamentário (BO), o Balanço Patrimonial (BP), a Demonstração dos Fluxos de Caixa (DFC), a Demonstração das Mutações do Patrimônio Líquido (DMPL) e a Demonstração das Variações Patrimoniais (DVP).<br><br>As demonstrações foram elaboradas conforme a Lei nº 4.320/1964, a Resolução Cofen nº 340/2008, as Normas Brasileiras de Contabilidade Aplicadas ao Setor Público (NBC TSP), o Manual de Contabilidade Aplicada ao Setor Público (MCASP) e as Resoluções Cofen nº 764/2024, nº 799/2025 e nº 814/2026. Os saldos do período anterior utilizados para comparação correspondem à posição de setembro de 2025."})
+    
+    # Nota 2 - Caixa
+    caixa_at = vl("caixa", "atual")
+    caixa_an = vl("caixa", "anterior")
+    if caixa_at > 0:
+        notas.append({"titulo": "NOTA 2 – CAIXA E EQUIVALENTES DE CAIXA",
+            "texto": f"O saldo de caixa e equivalentes em 30/09/2026 é de {fmt(caixa_at)}, redução de {var(caixa_at, caixa_an)} frente aos {fmt(caixa_an)} do período anterior. A variação decorre do fluxo de pagamentos de despesas, com destaque para o grupo de serviços de pessoa jurídica. O saldo foi conciliado entre Balancete, BP, BF e DFC.<br><br>A geração líquida de caixa no período foi positiva em R$ 17.076.790,82 (DFC), contra R$ 14.337.040,60 no período anterior (+19,11%)."})
+    
+    # Nota 3 - Créditos
+    ac_at = vl("ativo_circulante", "atual")
+    ac_an = vl("ativo_circulante", "anterior")
+    rlp_at = vl("ativo_realizavel", "atual")
+    rlp_an = vl("ativo_realizavel", "anterior")
+    if ac_at > 0:
+        notas.append({"titulo": "NOTA 3 – CRÉDITOS E ATIVO REALIZÁVEL (COTAS-PARTES A RECEBER)",
+            "texto": f"O Ativo Circulante totalizou {fmt(ac_at)} ({var(ac_at, ac_an)}), dos quais R$ 112.729.432,69 correspondem a créditos de curto prazo. O Ativo Realizável de longo prazo soma {fmt(rlp_at)}, e o Ativo Não Circulante, R$ 315.111.651,51 (+149,94%).<br><br>Essas variações decorrem do registro da previsão de receitas de cotas-partes a receber dos Conselhos Regionais. Em 2025, esse registro foi realizado somente em dezembro; por isso, em 30/09/2025 o saldo comparativo era praticamente nulo (R$ 1.004,19 no realizável)."})
+    
+    # Nota 4 - Imobilizado
+    notas.append({"titulo": "NOTA 4 – IMOBILIZADO, INTANGÍVEL E INCORPORAÇÃO DE ATIVOS",
+        "texto": "O Imobilizado é de R$ 129.453.937,95 (+4,44%) e o Intangível, de R$ 832.266,06. No período foram incorporados ativos no total de R$ 16.271.957,08, conforme o relatório, assim discriminados:<br><br>• Outras máquinas, aparelhos e equipamentos: R$ 65.962,97<br>• Mobiliário em geral: R$ 240.628,83<br>• Edifício Futura Sede Cofen: R$ 6.682.639,01<br>• Bens não ativáveis: R$ 21.081,55<br>• PLATEC – Cofen, investimentos: R$ 9.261.645,32<br><br><i>Observação: a soma aritmética das parcelas acima resulta em R$ 16.271.957,68, diferença de R$ 0,60 em relação ao total informado. A discriminação será revisada antes da divulgação definitiva.</i><br><br>Os estoques somam R$ 185.551,08 (R$ 69.447,74 no período anterior)."})
+    
+    # Nota 5 - Passivos
+    pc_at = vl("passivo_circulante", "atual")
+    pc_an = vl("passivo_circulante", "anterior")
+    pnc_at = vl("passivo_nao_circulante", "atual")
+    pnc_an = vl("passivo_nao_circulante", "anterior")
+    if pc_at > 0:
+        notas.append({"titulo": "NOTA 5 – PASSIVO CIRCULANTE E NÃO CIRCULANTE",
+            "texto": f"O Passivo Circulante é de {fmt(pc_at)} ({var(pc_at, pc_an)}), estável. O Passivo Não Circulante é de {fmt(pnc_at)}, redução de {var(pnc_at, pnc_an)} em relação aos {fmt(pnc_an)} anteriores, em razão da quitação do PCCS ao longo de 2025, que em setembro daquele ano ainda estava provisionado. O passivo total é de R$ 12.238.786,04 (–48,28%).<br><br>Os valores restituíveis (ingressos e dispêndios extraorçamentários) compreendem retenções de tributos, consignações, cauções e garantias."})
+    
+    # Nota 6 - PL
+    pl_at = vl("patrimonio_liquido", "atual")
+    pl_an = vl("patrimonio_liquido", "anterior")
+    if pl_at > 0:
+        notas.append({"titulo": "NOTA 6 – PATRIMÔNIO LÍQUIDO",
+            "texto": f"O Patrimônio Líquido é de {fmt(pl_at)} ({var(pl_at, pl_an)}). Conforme a DMPL, o saldo inicial de R$ 588.096.000,72 foi acrescido do resultado patrimonial do período de R$ 16.272.243,89, sem outras mutações. O crescimento frente ao período anterior reflete principalmente o registro, em dezembro de 2025, das previsões de receitas de curto e longo prazo de cotas-partes a receber de anos anteriores."})
+    
+    # Nota 7 - Orçamento Receita
+    rec_at = orc.get("receita_realizada", 0)
+    if rec_at > 0:
+        notas.append({"titulo": "NOTA 7 – EXECUÇÃO ORÇAMENTÁRIA DA RECEITA",
+            "texto": f"A receita orçada para 2026 é de R$ 232.000.000,00 (+1,01% sobre 2025) e a receita realizada, de {fmt(rec_at)} (+1,73%), equivalente a 79,58% do orçamento.<br><br>O crescimento modesto da receita recomenda conservadorismo na assunção de novos gastos. As receitas de capital são eventuais; a variação de –85,47% decorre de, em 2025, ter havido a baixa de veículo sinistrado e indenizado pela seguradora (R$ 57.487,00)."})
+    
+    # Nota 8 - Orçamento Despesa
+    desp_at = orc.get("despesa_empenhada", 0)
+    if desp_at > 0:
+        notas.append({"titulo": "NOTA 8 – EXECUÇÃO ORÇAMENTÁRIA DA DESPESA E RESTOS A PAGAR",
+            "texto": f"A despesa orçada é de R$ 319.721.745,52 (–4,97%) e a despesa empenhada, de {fmt(desp_at)} (+9,80%), com execução de 79,94%. O resultado orçamentário é deficitário em R$ 70.944.403,02, coberto pelo superávit financeiro de exercícios anteriores. Os restos a pagar não processados a liquidar somam R$ 17.170.546,09 (–9,20%)."})
+    
+    # Nota 9 - DFC
+    notas.append({"titulo": "NOTA 9 – FLUXOS DE CAIXA",
+        "texto": "Pelo método direto, o fluxo operacional líquido foi de R$ 33.340.393,59 (–9,38%); o fluxo de investimento foi de –R$ 16.263.602,77; e não houve fluxo de financiamento. A geração líquida de caixa foi de R$ 17.076.790,82. A DFC é elaborada pelo regime de caixa, sem considerar empenhos emitidos ou liquidados e não pagos."})
+    
+    # Nota 10 - DVP
+    notas.append({"titulo": "NOTA 10 – VARIAÇÕES PATRIMONIAIS",
+        "texto": "As Variações Patrimoniais Aumentativas (VPA) somaram R$ 181.312.304,85 (–3,81%). As Variações Patrimoniais Diminutivas (VPD) somaram R$ 165.040.060,96 (–10,97%), com destaque para Pessoal e Encargos (R$ 45.949.294,00), Serviços de Terceiros (R$ 65.884.180,07) e Transferências Concedidas (R$ 30.067.473,23). O superávit patrimonial é de R$ 16.272.243,89, com margem patrimonial de 8,97%."})
+    
+    # Nota 11 - Custo
+    pct_custo = custo.get("pct_custo_total", 0)
+    if pct_custo > 0:
+        notas.append({"titulo": "NOTA 11 – DESPESA COM PESSOAL E LIMITE LEGAL",
+            "texto": f"A apuração em 12 meses, nos termos da Resolução Cofen nº 814/2026, resulta em custo de pessoal bruto de R$ 67.338.400,07 sobre Receita Corrente Líquida de R$ 226.242.979,74. O custo equivale a {pct(pct_custo)} da RCL, abaixo do limite de 50% (R$ 113.121.489,87), com margem disponível de R$ 45.783.089,80. A entidade está abaixo da faixa de alerta."})
+    
+    # Nota 12 - Balanço Financeiro (NOVO)
+    if bf:
+        notas.append({"titulo": "NOTA 12 – BALANÇO FINANCEIRO",
+            "texto": "As receitas orçamentárias de R$ 184.635.554,82 e os recebimentos extraorçamentários de R$ 17.241.359,90, somados ao saldo do exercício anterior de R$ 169.963.364,97, totalizam ingressos de R$ 371.840.279,69, igual ao total de dispêndios. As despesas orçamentárias pagas foram de R$ 151.902.488,03 (correntes: R$ 135.637.750,95; capital: R$ 16.264.737,08) e os pagamentos extraorçamentários, de R$ 33.052.038,03. Os recebimentos extraorçamentários caíram 13,62% e os pagamentos aumentaram 5,45%."})
+    
+    # Nota 13 - Centro de Custos (NOVO)
+    if centro:
+        notas.append({"titulo": "NOTA 13 – DESPESAS POR CENTRO DE CUSTO",
+            "texto": "O custo total apropriado aos centros de custo foi de R$ 167.542.179,02 (+0,41%). O maior é AF 05 – Coordenação/Orientação, com R$ 57.933.243,18 (+28,35%), seguido de AF 06 – Despesas Administrativas (R$ 37.055.602,36) e AF 02 – Inscrição, Registro e Cadastro (R$ 24.264.700,14). Os demais centros apresentaram redução entre 5,21% e 15,50%. O crescimento de AF 05 deve ser monitorado quanto à eficiência alocativa."})
+    
+    # Nota 14 - Índices de Liquidez (NOVO)
+    if liq:
+        notas.append({"titulo": "NOTA 14 – ÍNDICES DE LIQUIDEZ E ESTRUTURA",
+            "texto": "Os índices de liquidez geral e corrente foram influenciados pelo registro das cotas-partes a receber (Nota 3). Os de liquidez estão calculados sobre o passivo circulante de R$ 11.725.635,04.<br><br><table style='width:100%; border-collapse:collapse; margin-top:10px; font-size:11px;'><tr style='background:#003366; color:#fff;'><th style='padding:5px; border:1px solid #ccc;'>Indicador</th><th style='padding:5px; border:1px solid #ccc;'>Atual</th><th style='padding:5px; border:1px solid #ccc;'>Anterior</th></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Imediata</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>15,93</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,28</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Corrente</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>25,71</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,47</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Seca</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>25,70</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,46</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Geral</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>39,74</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>9,06</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Endividamento Geral</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>1,98%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>6,95%</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Part. Capital de Terceiros</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>2,03%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>7,47%</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Imobilização do PL</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>21,42%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>39,13%</td></tr></table>"})
+    
+    # Nota 15 - Integridade (NOVO)
+    notas.append({"titulo": "NOTA 15 – INTEGRIDADE ENTRE DEMONSTRAÇÕES E RESSALVAS",
+        "texto": "A matriz de integridade cruzou Balancete, BP, BF, BO, DFC, DVP e DMPL. A conformidade foi confirmada para os grupos patrimoniais, VPA, VPD, receitas correntes, caixa e equivalentes, despesas correntes e de capital pagas e incorporação de ativos.<br><br>Quatro itens apresentaram divergência, decorrentes de estornos de restos a pagar que o sistema contábil (Implanta) não tratou adequadamente; o chamado correspondente foi aberto junto ao fornecedor:<br><br>• Valores restituíveis – dispêndios: R$ 222.353,33<br>• RP não processados – a liquidar: R$ 134.400,00<br>• RP não proc. – despesas correntes canceladas: R$ 58.302,51<br>• RP não processados pagos: R$ 7.220,00<br><br>As diferenças referem-se ao tratamento de estornos de restos a pagar e não afetam o resultado patrimonial nem o saldo de caixa. Ficam pendentes de regularização e serão reavaliadas após resposta do chamado."})
+    
+    return {"erro": False, "periodo": periodo, "notas": notas}
+
+@app.get("/api/notas_explicativas/{periodo}")
+async def api_notas_explicativas(periodo: str):
+    return _gerar_notas_por_periodo(periodo)
+
+# --- API: salvar histórico ---
+@app.post("/salvar_notas_explicativas/{periodo}")
+async def salvar_notas_explicativas(periodo: str):
+    import sqlite3, json, os
+    from datetime import datetime
+    dados = _gerar_notas_por_periodo(periodo)
+    if dados.get("erro"):
+        return {"ok": False, "mensagem": dados.get("mensagem")}
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    data_agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    cur.execute("INSERT INTO historico_notas_explicativas (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+                (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "mensagem": "Notas explicativas salvas com sucesso!"}
+
+# --- API: listar histórico ---
+@app.get("/historico_notas_explicativas")
+async def historico_notas_explicativas():
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao FROM historico_notas_explicativas ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+
+# --- API: buscar histórico por id ---
+@app.get("/historico_notas_explicativas/{id}")
+async def buscar_notas_explicativas(id: int):
+    import sqlite3, json, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_notas_explicativas WHERE id = ?", (id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return {"erro": "não encontrado"}
+    return {"periodo": row[0], "data_geracao": row[1], "dados": json.loads(row[2])}
+
+# --- API: excluir histórico ---
+@app.delete("/excluir_notas_explicativas/{id}")
+async def excluir_notas_explicativas(id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM historico_notas_explicativas WHERE id = ?", (id,))
+    cur.execute("DELETE FROM observacoes_notas WHERE relatorio_id = ?", (id,))
+    cur.execute("DELETE FROM conclusao_notas WHERE relatorio_id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+# --- Observações por item ---
+@app.get("/api/observacoes_notas/{relatorio_id}")
+async def get_observacoes_notas(relatorio_id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT id, item, texto FROM observacoes_notas WHERE relatorio_id = ?", (relatorio_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return [{"id": r[0], "item": r[1], "texto": r[2]} for r in rows]
+
+@app.post("/api/observacoes_notas/{relatorio_id}")
+async def post_observacao_notas(relatorio_id: int, request: Request):
+    import sqlite3, os
+    from datetime import datetime
+    dados = await request.json()
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO observacoes_notas (relatorio_id, item, texto, data_criacao) VALUES (?, ?, ?, ?)",
+                (relatorio_id, dados.get("item", ""), dados.get("texto", ""), datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/observacoes_notas/{obs_id}")
+async def del_observacao_notas(obs_id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM observacoes_notas WHERE id = ?", (obs_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+# --- Conclusão ---
+@app.get("/api/conclusao_notas/{relatorio_id}")
+async def get_conclusao_notas(relatorio_id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT id, texto FROM conclusao_notas WHERE relatorio_id = ?", (relatorio_id,))
+    row = cur.fetchone()
+    conn.close()
+    return {"id": row[0], "texto": row[1]} if row else {"id": None, "texto": ""}
+
+@app.post("/api/conclusao_notas/{relatorio_id}")
+async def post_conclusao_notas(relatorio_id: int, request: Request):
+    import sqlite3, os
+    from datetime import datetime
+    dados = await request.json()
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM conclusao_notas WHERE relatorio_id = ?", (relatorio_id,))
+    cur.execute("INSERT INTO conclusao_notas (relatorio_id, texto, data_criacao) VALUES (?, ?, ?)",
+                (relatorio_id, dados.get("texto", ""), datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+# --- PDF ---
+@app.get("/gerar_pdf_notas/{id}")
+def gerar_pdf_notas(id: int):
+    from playwright.sync_api import sync_playwright
+    from fastapi.responses import Response
+    import time, sqlite3, os, json, re
+
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT periodo, resultado_json FROM historico_notas_explicativas WHERE id = ?", (id,))
+    row = cur.fetchone()
+    cur.execute("SELECT contador_nome, contador_crc, contador_uf, contador_cpf FROM configuracoes_entidade LIMIT 1")
+    row_contador = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return Response(content="Historico nao encontrado.", status_code=404, media_type="text/plain")
+
+    periodo, res_json = row
+    dados_notas = json.loads(res_json)
+    notas = dados_notas.get("notas", [])
+
+    nome_contador = row_contador[0] if row_contador else ""
+    crc_bruto = row_contador[1] if row_contador else ""
+    uf_contador = row_contador[2] if row_contador else ""
+    cpf_bruto = row_contador[3] if row_contador else ""
+
+    crc_limpo = re.sub(r"[^A-Z0-9]", "", crc_bruto.upper())
+    if len(crc_limpo) >= 3 and crc_limpo[:2].isalpha():
+        numero_crc = crc_limpo[2:]
+    else:
+        numero_crc = crc_limpo
+    crc_formatado = numero_crc + "/" + uf_contador.upper() if uf_contador else numero_crc
+
+    cpf_limpo = re.sub(r"[^0-9]", "", cpf_bruto)
+    if len(cpf_limpo) == 11:
+        cpf_formatado = "***." + cpf_limpo[3:6] + ".***-**"
+    else:
+        cpf_formatado = cpf_bruto
+
+    html_notas = ""
+    for n in notas:
+        html_notas += '<div class="nota"><div class="nota-header"><h3>' + n["titulo"] + '</h3></div><p>' + n["texto"] + '</p></div>'
+
+    html_declaracao = (
+        '<div style="margin-top: 40px; background: #fff; padding: 30px; border-radius: 8px; border-left: 5px solid #003366; page-break-before: always;">'
+        '<h3 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; font-size: 15px; text-transform: uppercase;">Declaração de Conformidade</h3>'
+        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;">Declaramos, na qualidade de responsáveis pela gestão e pela elaboração das demonstrações contábeis consolidadas do Conselho Federal de Enfermagem (COFEN), referentes ao período de ' + periodo + ', que:</p>'
+        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>1.</b> As informações contábeis foram elaboradas em conformidade com as disposições da Lei nº 4.320/1964, as diretrizes do MCASP e as NBC TSP.</p>'
+        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>2.</b> As demonstrações contábeis consolidadas refletem, de forma fidedigna, a posição patrimonial e financeira do COFEN e o desempenho da execução orçamentária no período.</p>'
+        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>3.</b> Os registros contábeis estão amparados em documentação de suporte idônea e devidamente auditada internamente.</p>'
+        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>4.</b> As práticas de gestão de riscos e controles internos foram implementados e mantidos operantes durante todo o período analisado.</p>'
+        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>5.</b> Esta declaração é firmada com base nas informações extraídas dos sistemas corporativos e validadas pelos responsáveis técnicos.</p>'
+        '<div style="margin-top: 50px; text-align: center;">'
+        '<p style="margin: 0; font-size: 14px; font-weight: bold; color: #003366;">' + nome_contador + '</p>'
+        '<p style="margin: 5px 0 0 0; font-size: 12px; color: #555;">CRC: ' + crc_formatado + '</p>'
+        '<p style="margin: 5px 0 0 0; font-size: 12px; color: #555;">CPF: ' + cpf_formatado + '</p>'
+        '</div></div>'
+    )
+
+    html_pdf = ('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+        '<style>'
+        'body { font-family: Arial, sans-serif; padding: 20px; color: #333; }'
+        '.nota { margin-bottom: 30px; page-break-inside: avoid; }'
+        '.nota-header { border-bottom: 1px solid #003366; padding-bottom: 5px; margin-bottom: 10px; }'
+        '.nota-header h3 { color: #003366; margin: 0; font-size: 14px; text-transform: uppercase; }'
+        '.nota p { text-align: justify; line-height: 1.6; font-size: 12px; margin: 0; color: #444; }'
+        '</style></head><body>'
+        '<h1 style="color: #003366; text-align: center; margin-bottom: 30px;">Notas Explicativas - ' + periodo + '</h1>'
+        + html_notas + html_declaracao + '</body></html>')
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content(html_pdf, wait_until="networkidle")
+        page.wait_for_timeout(1500)
+        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+        browser.close()
+
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": "inline; filename=notas_explicativas_" + str(id) + ".pdf"})
+@app.post("/api/editar_nota/{relatorio_id}/{indice}")
+async def editar_nota(relatorio_id: int, indice: int, request: Request):
+    import sqlite3, json, os
+    dados = await request.json()
+    novo_texto = dados.get("texto", "")
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT resultado_json FROM historico_notas_explicativas WHERE id = ?", (relatorio_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return {"ok": False, "mensagem": "Histórico não encontrado."}
+    
+    dados_notas = json.loads(row[0])
+    notas = dados_notas.get("notas", [])
+    if indice < 0 or indice >= len(notas):
+        conn.close()
+        return {"ok": False, "mensagem": "Índice inválido."}
+    
+    notas[indice]["texto"] = novo_texto
+    dados_notas["notas"] = notas
+    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = ? WHERE id = ?",
+                (json.dumps(dados_notas, ensure_ascii=False), relatorio_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.post("/api/incluir_nota/{relatorio_id}")
+async def incluir_nota(relatorio_id: int, request: Request):
+    import sqlite3, json, os
+    dados = await request.json()
+    titulo = dados.get("titulo", "")
+    texto = dados.get("texto", "")
+    
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT resultado_json FROM historico_notas_explicativas WHERE id = ?", (relatorio_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return {"ok": False, "mensagem": "Histórico não encontrado."}
+    
+    dados_notas = json.loads(row[0])
+    notas = dados_notas.get("notas", [])
+    notas.append({"titulo": titulo, "texto": texto})
+    dados_notas["notas"] = notas
+    
+    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = ? WHERE id = ?",
+                (json.dumps(dados_notas, ensure_ascii=False), relatorio_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/excluir_nota/{relatorio_id}/{indice}")
+async def excluir_nota(relatorio_id: int, indice: int):
+    import sqlite3, json, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT resultado_json FROM historico_notas_explicativas WHERE id = ?", (relatorio_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return {"ok": False, "mensagem": "Histórico não encontrado."}
+    
+    dados_notas = json.loads(row[0])
+    notas = dados_notas.get("notas", [])
+    if indice < 0 or indice >= len(notas):
+        conn.close()
+        return {"ok": False, "mensagem": "Índice inválido."}
+    
+    notas.pop(indice)
+    dados_notas["notas"] = notas
+    
+    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = ? WHERE id = ?",
+                (json.dumps(dados_notas, ensure_ascii=False), relatorio_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}

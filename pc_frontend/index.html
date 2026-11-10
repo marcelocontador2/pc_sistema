@@ -146,6 +146,8 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
     <li><a href="/base_legal" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Base Legal</a></li>
     <li><a href="/configuracoes" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Configuracoes</a></li>
     <li><a href="/relatorio_consolidado" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Relatório Consolidado</a></li>
+    <li><a href="/notas_explicativas" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Notas Explicativas</a></li>
+    
     <li>
       <a id="menu-demonstracoes" id="menu-demonstracoes" id="menu-demonstracoes"  aria-disabled="true" title="Em desenvolvimento"aria-disabled="true" title="Em desenvolvimento" style="display: none;">Demonstrações Contábeis</a>
       <ul class="submenu" id="submenu-demonstracoes" style="list-style: none; padding-left: 0; margin-left: 0;" style="display: none;">
@@ -175,6 +177,7 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
             <a href="/analise_comparativo_despesas" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Comparativo de Despesas</a>
             <a href="/analise_centro_custos" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Análise por Centro de Custos</a>
             <a href="/analise_custo_pessoal" style="display:block; padding:8px 0px 8px 15px; text-decoration:none; color:#555;">Custo de Pessoal</a>
+        
     </ul>
     </li>
   </ul>
@@ -398,7 +401,6 @@ function mostrarTela(tela, tipo=null) {
     }
 }
 
-async 
 function enviarArquivo(event) {
     event.preventDefault();
     
@@ -735,6 +737,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const liConsolidado = Array.from(menuPrincipal.querySelectorAll('li')).find(li => li.textContent.includes('Relatório Consolidado'));
     if (liConsolidado) {
         liConsolidado.parentElement.insertBefore(novoLi, liConsolidado.nextSibling);
+        
     } else {
         menuPrincipal.appendChild(novoLi);
     }
