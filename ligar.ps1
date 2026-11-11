@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Continue"
 $base = "C:\Users\Marcelo Medeiros\pc_sistema"
 
 Write-Host "=== 1. PostgreSQL ===" -ForegroundColor Cyan
