@@ -55,3 +55,14 @@ pc_backend/???*
 
 # Excecao: shim SQLite->PostgreSQL (necessario para o sistema)
 !pc_backend/sqlite_compat.py
+
+# Migracao PG - dumps e logs (binarios, nao versionar)
+pc_storage/*.dump
+pc_storage/*.db.*
+pc_storage/banco_dados_PRE_MIGRACAO.db
+*.log
+rewrite_ligar.py
+fix_lastval.py
+ver_sqlite.py
+teste_write.py
+uvicorn.log
