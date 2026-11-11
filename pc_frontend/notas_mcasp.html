@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Notas Explicativas - Padrão MCASP</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-top: 0; font-size: 24px; }
+        .aviso { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; color: #856404; border-radius: 4px; }
+        .item-nivel-1 { margin-top: 30px; margin-bottom: 10px; padding: 10px; background: #e9ecef; border-left: 4px solid #003366; font-weight: bold; font-size: 18px; color: #003366; }
+        .item-nivel-2 { margin-top: 20px; margin-left: 20px; font-weight: bold; font-size: 15px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .item-nivel-3 { margin-top: 15px; margin-left: 40px; font-size: 14px; font-weight: bold; color: #444; }
+        .codigo { color: #666; margin-right: 10px; }
+        textarea { width: 100%; min-height: 80px; padding: 10px; margin-top: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px; resize: vertical; line-height: 1.5; box-sizing: border-box; }
+        textarea:focus { border-color: #003366; outline: none; }
+        .btn-salvar { position: fixed; bottom: 30px; right: 30px; background: #28a745; color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 10px rgba(40,167,69,0.3); font-weight: bold; }
+        .btn-auto { position: fixed; bottom: 100px; right: 30px; background: #007bff; color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,123,255,0.3); font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Notas Explicativas - Modelo MCASP</h1>
+        <div class="aviso"><b>Rascunho:</b> Edite os textos e clique em Salvar.</div>
+        <div id="formulario"><p style="text-align:center;">Carregando estrutura...</p></div>
+    </div>
+
+    <button class="btn-auto" onclick="gerarAuto()">✨ Gerar Rascunho (T3)</button>
+    <button class="btn-salvar" onclick="salvarTudo()">💾 Salvar Alterações</button>
+
+    <script>
+        let itensGlobais = [];
+        async function carregar() {
+            try {
+                const resp = await fetch('/api/notas_mcasp');
+                itensGlobais = await resp.json();
+                const div = document.getElementById('formulario');
+                div.innerHTML = '';
+                
+                itensGlobais.forEach(item => {
+                    const el = document.createElement('div');
+                    if (item.nivel == 1) {
+                        el.className = 'item-nivel-1';
+                        el.innerHTML = `<span class="codigo">${item.codigo}</span> ${item.titulo}`;
+                        div.appendChild(el);
+                    } else if (item.nivel == 2) {
+                        el.className = 'item-nivel-2';
+                        el.innerHTML = `<span class="codigo">${item.codigo}</span> ${item.titulo}`;
+                        div.appendChild(el);
+                        const ta = document.createElement('textarea');
+                        ta.id = 'txt-' + item.id;
+                        ta.value = item.texto || '';
+                        div.appendChild(ta);
+                    } else {
+                        el.className = 'item-nivel-3';
+                        el.innerHTML = `<span class="codigo">${item.codigo}</span> ${item.titulo}`;
+                        div.appendChild(el);
+                        const ta = document.createElement('textarea');
+                        ta.id = 'txt-' + item.id;
+                        ta.value = item.texto || '';
+                        div.appendChild(ta);
+                    }
+                });
+            } catch (e) {
+                document.getElementById('formulario').innerHTML = '<p style="color:red;">Erro ao carregar dados.</p>';
+            }
+        }
+
+        async function salvarTudo() {
+            const itensParaSalvar = itensGlobais.map(item => {
+                const ta = document.getElementById('txt-' + item.id);
+                return { id: item.id, texto: ta ? ta.value.trim() : (item.texto || '') };
+            });
+            const resp = await fetch('/api/notas_mcasp/salvar', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ itens: itensParaSalvar })
+            });
+            if ((await resp.json()).ok) alert('Salvo com sucesso!');
+        }
+
+        async function gerarAuto() {
+            if (!confirm("Sobrescrever com o rascunho T3?")) return;
+            await fetch('/api/notas_mcasp/gerar_auto', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ periodo: '2026-TRIMESTRE-3' })
+            });
+            carregar();
+        }
+        window.onload = carregar;
+    </script>
+</body>
+</html>
