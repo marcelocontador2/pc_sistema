@@ -9797,6 +9797,85 @@ def rota_notas_mcasp():
     caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "notas_mcasp.html")
     return FileResponse(caminho)
 
+@app.get("/gerar_pdf_notas_mcasp")
+def gerar_pdf_notas_mcasp(periodo: str = "2026-TRIMESTRE-3"):
+    from playwright.sync_api import sync_playwright
+    from fastapi.responses import Response
+    import sqlite3, os, re, datetime
+
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    
+    cur.execute("SELECT codigo, nivel, titulo, texto FROM notas_mcasp_modelo ORDER BY ordem")
+    itens = cur.fetchall()
+    
+    cur.execute("SELECT contador_nome, contador_crc, contador_uf, contador_cpf FROM configuracoes_entidade LIMIT 1")
+    row_contador = cur.fetchone()
+    conn.close()
+    
+    nome_contador = row_contador[0] if row_contador else ""
+    crc_bruto = row_contador[1] if row_contador else ""
+    uf_contador = row_contador[2] if row_contador else ""
+    cpf_bruto = row_contador[3] if row_contador else ""
+    
+    crc_limpo = re.sub(r"[^A-Z0-9]", "", crc_bruto.upper())
+    numero_crc = crc_limpo[2:] if len(crc_limpo) >= 3 and crc_limpo[:2].isalpha() else crc_limpo
+    crc_formatado = numero_crc + "/" + uf_contador.upper() if uf_contador else numero_crc
+    
+    cpf_limpo = re.sub(r"[^0-9]", "", cpf_bruto)
+    cpf_formatado = "***." + cpf_limpo[3:6] + ".***-**" if len(cpf_limpo) == 11 else cpf_bruto
+    
+    html_itens = ""
+    for codigo, nivel, titulo, texto in itens:
+        if nivel == 1:
+            html_itens += '<h2 style="color: #003366; border-bottom: 2px solid #003366; margin-top: 30px; font-size: 16px; text-transform: uppercase;">' + codigo + ' ' + titulo + '</h2>'
+        elif nivel == 2:
+            html_itens += '<h3 style="color: #333; margin-top: 20px; font-size: 14px;">' + codigo + ' ' + titulo + '</h3>'
+        else:
+            html_itens += '<h4 style="color: #444; margin-top: 15px; font-size: 12px;">' + codigo + ' ' + titulo + '</h4>'
+        
+        if texto:
+            html_itens += '<p style="text-align: justify; line-height: 1.6; font-size: 11px; margin-bottom: 15px;">' + str(texto) + '</p>'
+        else:
+            html_itens += '<p style="text-align: justify; line-height: 1.6; font-size: 11px; margin-bottom: 15px; color: #999;"><i>(Sem informação preenchida)</i></p>'
+    
+    data_geracao = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    
+    html_pdf = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>'
+    html_pdf += 'body { font-family: Arial, sans-serif; padding: 30px; color: #333; }'
+    html_pdf += 'h1 { color: #003366; text-align: center; font-size: 18px; }'
+    html_pdf += '.capa { text-align: center; margin-bottom: 50px; page-break-after: always; }'
+    html_pdf += '.capa h1 { margin-top: 150px; font-size: 22px; }'
+    html_pdf += '.capa p { font-size: 14px; color: #666; }'
+    html_pdf += '.assinatura { margin-top: 60px; text-align: center; page-break-inside: avoid; }'
+    html_pdf += '.assinatura p { margin: 3px 0; font-size: 12px; }'
+    html_pdf += '.footer { margin-top: 30px; text-align: center; font-size: 10px; color: #999; }'
+    html_pdf += '</style></head><body>'
+    html_pdf += '<div class="capa">'
+    html_pdf += '<h1>NOTAS EXPLICATIVAS - PADRÃO MCASP</h1>'
+    html_pdf += '<p>Período: ' + periodo + '</p>'
+    html_pdf += '<p>Conselho Federal de Enfermagem (COFEN)</p>'
+    html_pdf += '<p>Gerado em: ' + data_geracao + '</p>'
+    html_pdf += '</div>'
+    html_pdf += '<div>' + html_itens + '</div>'
+    html_pdf += '<div class="assinatura">'
+    html_pdf += '<p style="font-weight: bold; color: #003366;">' + nome_contador + '</p>'
+    html_pdf += '<p>CRC: ' + crc_formatado + '</p>'
+    html_pdf += '<p>CPF: ' + cpf_formatado + '</p>'
+    html_pdf += '<p style="margin-top: 20px; font-size: 10px; color: #666;">Declaração de conformidade com as normas NBC TSP e MCASP</p>'
+    html_pdf += '</div>'
+    html_pdf += '<div class="footer"><p>Documento gerado pelo Sistema de Prestação de Contas - PC Sistema</p></div>'
+    html_pdf += '</body></html>'
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content(html_pdf, wait_until="networkidle")
+        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+        browser.close()
+
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": "inline; filename=notas_mcasp_" + periodo + ".pdf"})
 @app.get("/gerar_pdf_notas/{id}")
 def gerar_pdf_notas(id: int):
     from playwright.sync_api import sync_playwright
@@ -9967,3 +10046,5 @@ async def excluir_nota(relatorio_id: int, indice: int):
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
