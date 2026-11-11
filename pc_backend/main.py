@@ -1505,7 +1505,7 @@ async def salvar_analise_orcamentaria(periodo: str):
     ano_anterior = str(int(periodo.split("-")[0]) - 1)
     periodo_anterior = periodo.replace(periodo.split("-")[0], ano_anterior, 1)
     anterior = await api_analise_orcamentaria_bo(periodo_anterior)
-    dados = {"periodo_anterior": periodo_anterior, "periodo_atual": periodo,
+    dados = {"periodo_anterior": periodo_anterior, "periodo": periodo,
              "atual": atual, "anterior": anterior if not anterior.get("erro") else {}}
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -1557,12 +1557,12 @@ async def api_composicao_rd(periodo: str):
         return {"erro": False, "receitas": receitas, "despesas": despesas}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
-@app.post("/salvar_composicao_receitas_despesas/{periodo_atual}/{periodo_anterior}")
-async def salvar_composicao_rd(periodo_atual: str, periodo_anterior: str):
-    atual = await api_composicao_rd(periodo_atual)
+@app.post("/salvar_composicao_receitas_despesas/{periodo}/{periodo_anterior}")
+async def salvar_composicao_rd(periodo: str, periodo_anterior: str):
+    atual = await api_composicao_rd(periodo)
     if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
     anterior = await api_composicao_rd(periodo_anterior)
-    dados = {"periodo_atual": periodo_atual, "periodo_anterior": periodo_anterior,
+    dados = {"periodo": periodo, "periodo_anterior": periodo_anterior,
              "atual": atual, "anterior": anterior if not anterior.get("erro") else {}}
     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS historico_composicao_rd (
@@ -1570,7 +1570,7 @@ async def salvar_composicao_rd(periodo_atual: str, periodo_anterior: str):
         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
     data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     cur.execute("INSERT INTO historico_composicao_rd (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
-                (f"{periodo_atual} vs {periodo_anterior}", data_agora, json.dumps(dados)))
+                (f"{periodo} vs {periodo_anterior}", data_agora, json.dumps(dados)))
     conn.commit(); conn.close()
     return {"mensagem": "Salvo"}
 @app.get("/historico_composicao_receitas_despesas")
@@ -1634,12 +1634,12 @@ async def api_analise_financeira_bf(periodo: str):
         return {"erro": False, "dados": dados}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
-@app.post("/salvar_analise_financeira_bf/{periodo_atual}/{periodo_anterior}")
-async def salvar_analise_financeira_bf(periodo_atual: str, periodo_anterior: str):
-    atual = await api_analise_financeira_bf(periodo_atual)
+@app.post("/salvar_analise_financeira_bf/{periodo}/{periodo_anterior}")
+async def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str):
+    atual = await api_analise_financeira_bf(periodo)
     if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
     # O periodo anterior JA esta no mesmo CSV (coluna 2). Nao precisa buscar outro arquivo.
-    dados = {"periodo_atual": periodo_atual, "periodo_anterior": periodo_anterior,
+    dados = {"periodo": periodo, "periodo_anterior": periodo_anterior,
              "atual": atual.get("dados", {}), "anterior": {}}
     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_financeira_bf (
@@ -1647,7 +1647,7 @@ async def salvar_analise_financeira_bf(periodo_atual: str, periodo_anterior: str
         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
     data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     cur.execute("INSERT INTO historico_analise_financeira_bf (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
-                (f"{periodo_atual} vs {periodo_anterior}", data_agora, json.dumps(dados)))
+                (f"{periodo} vs {periodo_anterior}", data_agora, json.dumps(dados)))
     conn.commit(); conn.close()
     return {"mensagem": "Salvo"}
 @app.get("/historico_analise_financeira_bf")
@@ -1690,8 +1690,8 @@ async def gerar_pdf_analise_financeira_bf(id: int):
         conn.close()
         periodo = row[0] if row else "2026-TRIMESTRE-3"
 
-        periodo_atual = periodo.split(" vs ")[0].strip() if " vs " in periodo else periodo
-        p_limpo = periodo_atual.replace("-", "_")
+        periodo = periodo.split(" vs ")[0].strip() if " vs " in periodo else periodo
+        p_limpo = periodo.replace("-", "_")
         caminho_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", f"BALANCO_FINANCEIRO_{p_limpo}.csv")
 
         if not os.path.exists(caminho_csv):
@@ -1941,8 +1941,8 @@ async def serve_analise_financeira_bf():
 
 # ============ ROTAS DFC (Analise do Fluxo de Caixa) ============
 
-@app.post("/salvar_analise_dfc/{periodo_atual}/{periodo_anterior}")
-async def salvar_analise_dfc(periodo_atual: str, periodo_anterior: str):
+@app.post("/salvar_analise_dfc/{periodo}/{periodo_anterior}")
+async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
     import sqlite3, json
     from datetime import datetime
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -1953,12 +1953,12 @@ async def salvar_analise_dfc(periodo_atual: str, periodo_anterior: str):
     # Chama a API da DFC para obter os dados
     try:
         from app.routers.dfc import api_analise_dfc
-        dados = await api_analise_dfc(periodo_atual)
+        dados = await api_analise_dfc(periodo)
     except Exception as e:
         return {"ok": False, "mensagem": f"Erro ao calcular DFC: {e}"}
     data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("INSERT INTO historico_analise_dfc (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
-                   (periodo_atual, data_agora, json.dumps(dados, ensure_ascii=False)))
+                   (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
     conn.commit()
     conn.close()
     return {"ok": True, "mensagem": "Analise DFC salva com sucesso!"}
@@ -3305,8 +3305,8 @@ async def api_relatorios_importados():
 async def serve_base_legal():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "base_legal.html")
     return FileResponse(caminho)
-@app.get("/salvar_base_legal/{periodo_atual}")
-async def salvar_base_legal(periodo_atual: str, periodo_anterior: str = "2025-TRIMESTRE-3"):
+@app.get("/salvar_base_legal/{periodo}")
+async def salvar_base_legal(periodo: str, periodo_anterior: str = "2025-TRIMESTRE-3"):
     try:
         import sqlite3, json, datetime, os
         # Simulamos o salvamento dos dados do Base Legal (que são fixos, mas dependem do perí­odo)
@@ -3316,10 +3316,10 @@ async def salvar_base_legal(periodo_atual: str, periodo_anterior: str = "2025-TR
         cursor = conn.cursor()
         cursor.execute("""CREATE TABLE IF NOT EXISTS historico_base_legal (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo_atual TEXT, periodo_anterior TEXT, data_geracao TEXT)""")
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, periodo_anterior TEXT, data_geracao TEXT)""")
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cursor.execute("INSERT INTO historico_base_legal (periodo_atual, periodo_anterior, data_geracao) VALUES (?, ?, ?)",
-                       (periodo_atual, periodo_anterior, data_agora))
+        cursor.execute("INSERT INTO historico_base_legal (periodo, periodo_anterior, data_geracao) VALUES (?, ?, ?)",
+                       (periodo, periodo_anterior, data_agora))
         conn.commit()
         conn.close()
         return {"mensagem": "Base Legal salva!", "id": cursor.lastrowid}
@@ -3331,10 +3331,10 @@ async def listar_base_legal():
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo_atual, periodo_anterior, data_geracao FROM historico_base_legal ORDER BY id DESC")
+    cursor.execute("SELECT id, periodo, periodo_anterior, data_geracao FROM historico_base_legal ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo_atual": r[1], "periodo_anterior": r[2], "data_geracao": r[3]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "periodo_anterior": r[2], "data_geracao": r[3]} for r in rows]
 @app.get("/liquidez")
 async def serve_liquidez():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "liquidez.html")
@@ -3462,7 +3462,7 @@ def _calc_liquidez(periodo):
             break
 
     return {
-        "periodo_atual": periodo,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior_label or "Exercí­cio Anterior",
         "liquidez": idx_atual["liquidez"],
         "estrutura": idx_atual["estrutura"],
@@ -3791,7 +3791,7 @@ async def importar_centro_custos(file: UploadFile = File(...)):
 
 
 @app.get("/api/relatorio_centro_custos")
-def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIMESTRE-3", periodo_anterior: str = None):
+def api_relatorio_centro_custos(id: int = None, periodo: str = "2026-TRIMESTRE-3", periodo_anterior: str = None):
     import sqlite3, os, json, csv, io
 
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -3802,7 +3802,7 @@ def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIME
 
     # Calcula o perí­odo anterior automaticamente (mesmo trimestre do ano anterior)
     if not periodo_anterior:
-        partes = periodo_atual.split("-")
+        partes = periodo.split("-")
         if len(partes) == 3:
             ano = int(partes[0])
             tipo = partes[1]
@@ -3903,9 +3903,9 @@ def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIME
             "meses": meses
         }
 
-    centros_atual = ler_csv(periodo_atual)
+    centros_atual = ler_csv(periodo)
     if not centros_atual:
-        dados_banco = buscar_historico(periodo_atual)
+        dados_banco = buscar_historico(periodo)
         if dados_banco:
             centros_atual = dados_banco.get("centros", [])
 
@@ -3917,12 +3917,12 @@ def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIME
 
     conn.close()
 
-    atual = processar(centros_atual, periodo_atual)
+    atual = processar(centros_atual, periodo)
     anterior = processar(centros_anterior, periodo_anterior) if centros_anterior else None
 
     if anterior is None or anterior["total"] == 0:
         return {
-            "periodo_atual": periodo_atual,
+            "periodo": periodo,
             "periodo_anterior": periodo_anterior,
             "atual": atual,
             "anterior": {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}},
@@ -3932,7 +3932,7 @@ def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIME
         }
 
     return {
-        "periodo_atual": periodo_atual,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior,
         "atual": atual,
         "anterior": anterior,
@@ -4071,15 +4071,15 @@ def api_centro_custos(periodo: str):
     }
 
 
-@app.get("/api/relatorio_v2/{periodo_atual}")
-def api_relatorio_v2(periodo_atual: str):
+@app.get("/api/relatorio_v2/{periodo}")
+def api_relatorio_v2(periodo: str):
     import sqlite3, os, json, csv, io
 
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
 
     # Calcula o perí­odo anterior (mesmo trimestre do ano anterior)
-    partes = periodo_atual.split("-")
+    partes = periodo.split("-")
     if len(partes) == 3:
         ano = int(partes[0])
         tipo = partes[1]
@@ -4200,7 +4200,7 @@ def api_relatorio_v2(periodo_atual: str):
         except:
             return {"centros": [], "meses": [], "meses_por_centro": []}
 
-    dados_atual = ler_csv(periodo_atual)
+    dados_atual = ler_csv(periodo)
     dados_anterior = ler_csv(periodo_anterior)
 
     def processar(dados):
@@ -4232,7 +4232,7 @@ def api_relatorio_v2(periodo_atual: str):
     anterior = processar(dados_anterior) if dados_anterior and dados_anterior.get("centros") else {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}, "meses_disponiveis": []}
 
     return {
-        "periodo_atual": periodo_atual,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior,
         "atual": atual,
         "anterior": anterior,
@@ -4374,14 +4374,14 @@ def serve_relatorio_comparativo_receitas():
     return HTMLResponse(content="<h1>Relatí³rio não encontrado</h1>", status_code=404)
 
 
-@app.get("/api/comparativo_receitas_v2/{periodo_atual}")
-def api_comparativo_receitas_v2(periodo_atual: str):
+@app.get("/api/comparativo_receitas_v2/{periodo}")
+def api_comparativo_receitas_v2(periodo: str):
     import os, re
 
     upload_dir = r"C:\Users\Marcelo Medeiros\pc_sistema\pc_storage\uploads_raw"
 
     # Calcula o perí­odo anterior (mesmo trimestre do ano anterior)
-    partes = periodo_atual.split("-")
+    partes = periodo.split("-")
     if len(partes) == 3:
         ano = int(partes[0])
         tipo = partes[1]
@@ -4474,7 +4474,7 @@ def api_comparativo_receitas_v2(periodo_atual: str):
             print(f"[ERRO] Falha ao ler CSV {arquivo}: {e}")
             return None
 
-    atual = ler_csv(periodo_atual)
+    atual = ler_csv(periodo)
     anterior = ler_csv(periodo_anterior)
 
     if not atual:
@@ -4482,7 +4482,7 @@ def api_comparativo_receitas_v2(periodo_atual: str):
 
     return {
         "erro": False,
-        "periodo_atual": periodo_atual,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior,
         "atual": atual,
         "anterior": anterior or {"orcado_total": 0, "realizado_total": 0, "percentual_total": 0, "grupos": [], "cores": []}
@@ -4490,7 +4490,7 @@ def api_comparativo_receitas_v2(periodo_atual: str):
 
 
 @app.get("/gerar_pdf_comparativo_receitas")
-def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3", historico_id: int = None):
+def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
     from playwright.sync_api import sync_playwright
     from fastapi.responses import Response
     import time, os
@@ -4498,7 +4498,7 @@ def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3", hist
     if historico_id:
         url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?periodo_atual={periodo_atual}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -4522,17 +4522,17 @@ def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3", hist
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=relatorio_receitas_{periodo_atual}.pdf"}
+        headers={"Content-Disposition": f"inline; filename=relatorio_receitas_{periodo}.pdf"}
     )
 
 
 # ========== ROTAS DO COMPARATIVO DE DESPESAS ==========
-@app.get("/api/comparativo_despesas_v2/{periodo_atual}")
-def api_comparativo_despesas_v2(periodo_atual: str):
+@app.get("/api/comparativo_despesas_v2/{periodo}")
+def api_comparativo_despesas_v2(periodo: str):
     import os, unicodedata
     upload_dir = r"C:\\Users\\Marcelo Medeiros\\pc_sistema\\pc_storage\\uploads_raw"
 
-    partes = periodo_atual.split("-")
+    partes = periodo.split("-")
     if len(partes) == 3:
         ano = int(partes[0]); tipo = partes[1]; valor = partes[2]
         periodo_anterior = f"{ano - 1}-{tipo}-{valor}"
@@ -4667,7 +4667,7 @@ def api_comparativo_despesas_v2(periodo_atual: str):
             print(f"[ERRO] Falha ao ler CSV: {e}")
             return None
 
-    atual = ler_csv(periodo_atual)
+    atual = ler_csv(periodo)
     anterior = ler_csv(periodo_anterior)
 
     if not atual:
@@ -4675,7 +4675,7 @@ def api_comparativo_despesas_v2(periodo_atual: str):
 
     return {
         "erro": False,
-        "periodo_atual": periodo_atual,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior,
         "atual": atual,
         "anterior": anterior or {
@@ -4791,14 +4791,14 @@ def gerar_pdf_conferencia(check_id: str):
 
 
 @app.get("/gerar_pdf_comparativo_despesas")
-def gerar_pdf_comparativo_despesas(periodo_atual: str = "2026-TRIMESTRE-3", historico_id: int = None):
+def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
     from playwright.sync_api import sync_playwright
     from fastapi.responses import Response
     import time, os
     if historico_id:
         url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?periodo_atual={periodo_atual}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(bypass_csp=True)
@@ -4808,7 +4808,7 @@ def gerar_pdf_comparativo_despesas(periodo_atual: str = "2026-TRIMESTRE-3", hist
         page.wait_for_timeout(3000)
         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
         browser.close()
-    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_despesas_{periodo_atual}.pdf"})
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_despesas_{periodo}.pdf"})
 
 
 @app.get("/relatorio_comparativo_despesas", response_class=HTMLResponse)
@@ -4821,12 +4821,12 @@ def serve_relatorio_comparativo_despesas():
 
 
 # ========== ROTAS DE HISTí“RICO DESPESAS (FORí‡ADAS) ==========
-@app.post("/api/comparativo_despesas_v2/{periodo_atual}/salvar")
-def rota_salvar_comparativo_despesas(periodo_atual: str):
+@app.post("/api/comparativo_despesas_v2/{periodo}/salvar")
+def rota_salvar_comparativo_despesas(periodo: str):
     import sqlite3, os, json
     from datetime import datetime
 
-    dados = api_comparativo_despesas_v2(periodo_atual)
+    dados = api_comparativo_despesas_v2(periodo)
     if dados.get("erro"): return {"erro": True, "mensagem": dados.get("mensagem")}
 
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -4838,7 +4838,7 @@ def rota_salvar_comparativo_despesas(periodo_atual: str):
     data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
     dados_json = json.dumps(dados)
 
-    cur.execute("INSERT INTO historico_comparativo_despesas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo_atual, data_geracao, dados_json))
+    cur.execute("INSERT INTO historico_comparativo_despesas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo, data_geracao, dados_json))
     conn.commit()
     conn.close()
     return {"erro": False, "mensagem": "Salvo com sucesso!"}
@@ -4977,14 +4977,14 @@ def serve_relatorio_receitas_v2():
 # ROTAS DE SALVAR E EXCLUIR - COMPARATIVO DE RECEITAS
 # ============================================================
 
-@app.post("/api/comparativo_receitas_v2/{periodo_atual}/salvar")
-def salvar_comparativo_receitas(periodo_atual: str):
+@app.post("/api/comparativo_receitas_v2/{periodo}/salvar")
+def salvar_comparativo_receitas(periodo: str):
     import sqlite3, os, json
     from datetime import datetime
 
     # Pega os dados atuais via API
     try:
-        dados = api_comparativo_receitas_v2(periodo_atual)
+        dados = api_comparativo_receitas_v2(periodo)
     except Exception as e:
         return {"erro": True, "mensagem": f"Erro ao buscar dados: {str(e)}"}
 
@@ -5001,7 +5001,7 @@ def salvar_comparativo_receitas(periodo_atual: str):
     dados_json = json.dumps(dados)
 
     cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)",
-                (periodo_atual, data_geracao, dados_json))
+                (periodo, data_geracao, dados_json))
     conn.commit()
     conn.close()
     return {"erro": False, "mensagem": "Salvo com sucesso!"}
@@ -6256,8 +6256,8 @@ async def api_relatorios_importados():
 async def serve_base_legal():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "base_legal.html")
     return FileResponse(caminho)
-@app.get("/salvar_base_legal/{periodo_atual}")
-async def salvar_base_legal(periodo_atual: str, periodo_anterior: str = "2025-TRIMESTRE-3"):
+@app.get("/salvar_base_legal/{periodo}")
+async def salvar_base_legal(periodo: str, periodo_anterior: str = "2025-TRIMESTRE-3"):
     try:
         import sqlite3, json, datetime, os
         # Simulamos o salvamento dos dados do Base Legal (que são fixos, mas dependem do perí­odo)
@@ -6267,10 +6267,10 @@ async def salvar_base_legal(periodo_atual: str, periodo_anterior: str = "2025-TR
         cursor = conn.cursor()
         cursor.execute("""CREATE TABLE IF NOT EXISTS historico_base_legal (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo_atual TEXT, periodo_anterior TEXT, data_geracao TEXT)""")
+            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, periodo_anterior TEXT, data_geracao TEXT)""")
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cursor.execute("INSERT INTO historico_base_legal (periodo_atual, periodo_anterior, data_geracao) VALUES (?, ?, ?)",
-                       (periodo_atual, periodo_anterior, data_agora))
+        cursor.execute("INSERT INTO historico_base_legal (periodo, periodo_anterior, data_geracao) VALUES (?, ?, ?)",
+                       (periodo, periodo_anterior, data_agora))
         conn.commit()
         conn.close()
         return {"mensagem": "Base Legal salva!", "id": cursor.lastrowid}
@@ -6282,10 +6282,10 @@ async def listar_base_legal():
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo_atual, periodo_anterior, data_geracao FROM historico_base_legal ORDER BY id DESC")
+    cursor.execute("SELECT id, periodo, periodo_anterior, data_geracao FROM historico_base_legal ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo_atual": r[1], "periodo_anterior": r[2], "data_geracao": r[3]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "periodo_anterior": r[2], "data_geracao": r[3]} for r in rows]
 @app.get("/liquidez")
 async def serve_liquidez():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "liquidez.html")
@@ -6413,7 +6413,7 @@ def _calc_liquidez(periodo):
             break
 
     return {
-        "periodo_atual": periodo,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior_label or "Exercí­cio Anterior",
         "liquidez": idx_atual["liquidez"],
         "estrutura": idx_atual["estrutura"],
@@ -6742,7 +6742,7 @@ async def importar_centro_custos(file: UploadFile = File(...)):
 
 
 @app.get("/api/relatorio_centro_custos")
-def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIMESTRE-3", periodo_anterior: str = None):
+def api_relatorio_centro_custos(id: int = None, periodo: str = "2026-TRIMESTRE-3", periodo_anterior: str = None):
     import sqlite3, os, json, csv, io
 
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -6753,7 +6753,7 @@ def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIME
 
     # Calcula o perí­odo anterior automaticamente (mesmo trimestre do ano anterior)
     if not periodo_anterior:
-        partes = periodo_atual.split("-")
+        partes = periodo.split("-")
         if len(partes) == 3:
             ano = int(partes[0])
             tipo = partes[1]
@@ -6854,9 +6854,9 @@ def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIME
             "meses": meses
         }
 
-    centros_atual = ler_csv(periodo_atual)
+    centros_atual = ler_csv(periodo)
     if not centros_atual:
-        dados_banco = buscar_historico(periodo_atual)
+        dados_banco = buscar_historico(periodo)
         if dados_banco:
             centros_atual = dados_banco.get("centros", [])
 
@@ -6868,12 +6868,12 @@ def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIME
 
     conn.close()
 
-    atual = processar(centros_atual, periodo_atual)
+    atual = processar(centros_atual, periodo)
     anterior = processar(centros_anterior, periodo_anterior) if centros_anterior else None
 
     if anterior is None or anterior["total"] == 0:
         return {
-            "periodo_atual": periodo_atual,
+            "periodo": periodo,
             "periodo_anterior": periodo_anterior,
             "atual": atual,
             "anterior": {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}},
@@ -6883,7 +6883,7 @@ def api_relatorio_centro_custos(id: int = None, periodo_atual: str = "2026-TRIME
         }
 
     return {
-        "periodo_atual": periodo_atual,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior,
         "atual": atual,
         "anterior": anterior,
@@ -7022,15 +7022,15 @@ def api_centro_custos(periodo: str):
     }
 
 
-@app.get("/api/relatorio_v2/{periodo_atual}")
-def api_relatorio_v2(periodo_atual: str):
+@app.get("/api/relatorio_v2/{periodo}")
+def api_relatorio_v2(periodo: str):
     import sqlite3, os, json, csv, io
 
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
 
     # Calcula o perí­odo anterior (mesmo trimestre do ano anterior)
-    partes = periodo_atual.split("-")
+    partes = periodo.split("-")
     if len(partes) == 3:
         ano = int(partes[0])
         tipo = partes[1]
@@ -7151,7 +7151,7 @@ def api_relatorio_v2(periodo_atual: str):
         except:
             return {"centros": [], "meses": [], "meses_por_centro": []}
 
-    dados_atual = ler_csv(periodo_atual)
+    dados_atual = ler_csv(periodo)
     dados_anterior = ler_csv(periodo_anterior)
 
     def processar(dados):
@@ -7183,7 +7183,7 @@ def api_relatorio_v2(periodo_atual: str):
     anterior = processar(dados_anterior) if dados_anterior and dados_anterior.get("centros") else {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}, "meses_disponiveis": []}
 
     return {
-        "periodo_atual": periodo_atual,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior,
         "atual": atual,
         "anterior": anterior,
@@ -7325,14 +7325,14 @@ def serve_relatorio_comparativo_receitas():
     return HTMLResponse(content="<h1>Relatí³rio não encontrado</h1>", status_code=404)
 
 
-@app.get("/api/comparativo_receitas_v2/{periodo_atual}")
-def api_comparativo_receitas_v2(periodo_atual: str):
+@app.get("/api/comparativo_receitas_v2/{periodo}")
+def api_comparativo_receitas_v2(periodo: str):
     import os, re
 
     upload_dir = r"C:\Users\Marcelo Medeiros\pc_sistema\pc_storage\uploads_raw"
 
     # Calcula o perí­odo anterior (mesmo trimestre do ano anterior)
-    partes = periodo_atual.split("-")
+    partes = periodo.split("-")
     if len(partes) == 3:
         ano = int(partes[0])
         tipo = partes[1]
@@ -7425,7 +7425,7 @@ def api_comparativo_receitas_v2(periodo_atual: str):
             print(f"[ERRO] Falha ao ler CSV {arquivo}: {e}")
             return None
 
-    atual = ler_csv(periodo_atual)
+    atual = ler_csv(periodo)
     anterior = ler_csv(periodo_anterior)
 
     if not atual:
@@ -7433,7 +7433,7 @@ def api_comparativo_receitas_v2(periodo_atual: str):
 
     return {
         "erro": False,
-        "periodo_atual": periodo_atual,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior,
         "atual": atual,
         "anterior": anterior or {"orcado_total": 0, "realizado_total": 0, "percentual_total": 0, "grupos": [], "cores": []}
@@ -7441,7 +7441,7 @@ def api_comparativo_receitas_v2(periodo_atual: str):
 
 
 @app.get("/gerar_pdf_comparativo_receitas")
-def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3", historico_id: int = None):
+def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
     from playwright.sync_api import sync_playwright
     from fastapi.responses import Response
     import time, os
@@ -7449,7 +7449,7 @@ def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3", hist
     if historico_id:
         url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?periodo_atual={periodo_atual}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -7473,17 +7473,17 @@ def gerar_pdf_comparativo_receitas(periodo_atual: str = "2026-TRIMESTRE-3", hist
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=relatorio_receitas_{periodo_atual}.pdf"}
+        headers={"Content-Disposition": f"inline; filename=relatorio_receitas_{periodo}.pdf"}
     )
 
 
 # ========== ROTAS DO COMPARATIVO DE DESPESAS ==========
-@app.get("/api/comparativo_despesas_v2/{periodo_atual}")
-def api_comparativo_despesas_v2(periodo_atual: str):
+@app.get("/api/comparativo_despesas_v2/{periodo}")
+def api_comparativo_despesas_v2(periodo: str):
     import os, unicodedata
     upload_dir = r"C:\\Users\\Marcelo Medeiros\\pc_sistema\\pc_storage\\uploads_raw"
 
-    partes = periodo_atual.split("-")
+    partes = periodo.split("-")
     if len(partes) == 3:
         ano = int(partes[0]); tipo = partes[1]; valor = partes[2]
         periodo_anterior = f"{ano - 1}-{tipo}-{valor}"
@@ -7618,7 +7618,7 @@ def api_comparativo_despesas_v2(periodo_atual: str):
             print(f"[ERRO] Falha ao ler CSV: {e}")
             return None
 
-    atual = ler_csv(periodo_atual)
+    atual = ler_csv(periodo)
     anterior = ler_csv(periodo_anterior)
 
     if not atual:
@@ -7626,7 +7626,7 @@ def api_comparativo_despesas_v2(periodo_atual: str):
 
     return {
         "erro": False,
-        "periodo_atual": periodo_atual,
+        "periodo": periodo,
         "periodo_anterior": periodo_anterior,
         "atual": atual,
         "anterior": anterior or {
@@ -7742,14 +7742,14 @@ def gerar_pdf_conferencia(check_id: str):
 
 
 @app.get("/gerar_pdf_comparativo_despesas")
-def gerar_pdf_comparativo_despesas(periodo_atual: str = "2026-TRIMESTRE-3", historico_id: int = None):
+def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
     from playwright.sync_api import sync_playwright
     from fastapi.responses import Response
     import time, os
     if historico_id:
         url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?periodo_atual={periodo_atual}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(bypass_csp=True)
@@ -7759,7 +7759,7 @@ def gerar_pdf_comparativo_despesas(periodo_atual: str = "2026-TRIMESTRE-3", hist
         page.wait_for_timeout(3000)
         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
         browser.close()
-    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_despesas_{periodo_atual}.pdf"})
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_despesas_{periodo}.pdf"})
 
 
 @app.get("/relatorio_comparativo_despesas", response_class=HTMLResponse)
@@ -7772,12 +7772,12 @@ def serve_relatorio_comparativo_despesas():
 
 
 # ========== ROTAS DE HISTí“RICO DESPESAS (FORí‡ADAS) ==========
-@app.post("/api/comparativo_despesas_v2/{periodo_atual}/salvar")
-def rota_salvar_comparativo_despesas(periodo_atual: str):
+@app.post("/api/comparativo_despesas_v2/{periodo}/salvar")
+def rota_salvar_comparativo_despesas(periodo: str):
     import sqlite3, os, json
     from datetime import datetime
 
-    dados = api_comparativo_despesas_v2(periodo_atual)
+    dados = api_comparativo_despesas_v2(periodo)
     if dados.get("erro"): return {"erro": True, "mensagem": dados.get("mensagem")}
 
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -7789,7 +7789,7 @@ def rota_salvar_comparativo_despesas(periodo_atual: str):
     data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
     dados_json = json.dumps(dados)
 
-    cur.execute("INSERT INTO historico_comparativo_despesas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo_atual, data_geracao, dados_json))
+    cur.execute("INSERT INTO historico_comparativo_despesas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo, data_geracao, dados_json))
     conn.commit()
     conn.close()
     return {"erro": False, "mensagem": "Salvo com sucesso!"}
@@ -7928,14 +7928,14 @@ def serve_relatorio_receitas_v2():
 # ROTAS DE SALVAR E EXCLUIR - COMPARATIVO DE RECEITAS
 # ============================================================
 
-@app.post("/api/comparativo_receitas_v2/{periodo_atual}/salvar")
-def salvar_comparativo_receitas(periodo_atual: str):
+@app.post("/api/comparativo_receitas_v2/{periodo}/salvar")
+def salvar_comparativo_receitas(periodo: str):
     import sqlite3, os, json
     from datetime import datetime
 
     # Pega os dados atuais via API
     try:
-        dados = api_comparativo_receitas_v2(periodo_atual)
+        dados = api_comparativo_receitas_v2(periodo)
     except Exception as e:
         return {"erro": True, "mensagem": f"Erro ao buscar dados: {str(e)}"}
 
@@ -7952,7 +7952,7 @@ def salvar_comparativo_receitas(periodo_atual: str):
     dados_json = json.dumps(dados)
 
     cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)",
-                (periodo_atual, data_geracao, dados_json))
+                (periodo, data_geracao, dados_json))
     conn.commit()
     conn.close()
     return {"erro": False, "mensagem": "Salvo com sucesso!"}
@@ -9424,7 +9424,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     
     # Nota 1 - Contexto
     notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
-        "texto": "O Conselho Federal de Enfermagem (Cofen) é autarquia federal que integra o Sistema Cofen/Conselhos Regionais. Estas notas acompanham o Relatí³rio Consolidado de Análise Contábil do 3Âº trimestre de 2026 e compreendem o Balancete de Verificação, o Balanço Financeiro (BF), o Balanço Orçamentário (BO), o Balanço Patrimonial (BP), a Demonstração dos Fluxos de Caixa (DFC), a Demonstração das Mutaçíµes do Patrimí´nio Lí­quido (DMPL) e a Demonstração das Variaçíµes Patrimoniais (DVP).<br><br>As demonstraçíµes foram elaboradas conforme a Lei nº 4.320/1964, a Resolução Cofen nº 340/2008, as Normas Brasileiras de Contabilidade Aplicadas ao Setor Píºblico (NBC TSP), o Manual de Contabilidade Aplicada ao Setor Píºblico (MCASP) e as Resoluçíµes Cofen nº 764/2024, nº 799/2025 e nº 814/2026. Os saldos do perí­odo anterior utilizados para comparação correspondem í  posição de setembro de 2025."})
+        "texto": "O Conselho Federal de Enfermagem (Cofen) é autarquia federal que integra o Sistema Cofen/Conselhos Regionais. Estas notas acompanham o Relatório Consolidado de Análise Contábil do 3º trimestre de 2026 e compreendem o Balancete de Verificação, o Balanço Financeiro (BF), o Balanço Orçamentário (BO), o Balanço Patrimonial (BP), a Demonstração dos Fluxos de Caixa (DFC), a Demonstração das Mutações do Patrimônio Líquido (DMPL) e a Demonstração das Variações Patrimoniais (DVP).<br><br>As demonstraçíµes foram elaboradas conforme a Lei nº 4.320/1964, a Resolução Cofen nº 340/2008, as Normas Brasileiras de Contabilidade Aplicadas ao Setor Píºblico (NBC TSP), o Manual de Contabilidade Aplicada ao Setor Píºblico (MCASP) e as Resoluçíµes Cofen nº 764/2024, nº 799/2025 e nº 814/2026. Os saldos do perí­odo anterior utilizados para comparação correspondem í  posição de setembro de 2025."})
     
     # Nota 2 - Caixa
     caixa_at = vl("caixa", "atual")
@@ -9439,7 +9439,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     rlp_at = vl("ativo_realizavel", "atual")
     rlp_an = vl("ativo_realizavel", "anterior")
     if ac_at > 0:
-        notas.append({"titulo": "NOTA 3 — CRí‰DITOS E ATIVO REALIZíVEL (COTAS-PARTES A RECEBER)",
+        notas.append({"titulo": "NOTA 3 — CRÉDITOS E ATIVO REALIZÁVEL (COTAS-PARTES A RECEBER)",
             "texto": f"O Ativo Circulante totalizou {fmt(ac_at)} ({var(ac_at, ac_an)}), dos quais R$ 112.729.432,69 correspondem a créditos de curto prazo. O Ativo Realizável de longo prazo soma {fmt(rlp_at)}, e o Ativo Não Circulante, R$ 315.111.651,51 (+149,94%).<br><br>Essas variaçíµes decorrem do registro da previsão de receitas de cotas-partes a receber dos Conselhos Regionais. Em 2025, esse registro foi realizado somente em dezembro; por isso, em 30/09/2025 o saldo comparativo era praticamente nulo (R$ 1.004,19 no realizável)."})
     
     # Nota 4 - Imobilizado
@@ -9479,32 +9479,32 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
         "texto": "Pelo método direto, o fluxo operacional lí­quido foi de R$ 33.340.393,59 (—9,38%); o fluxo de investimento foi de —R$ 16.263.602,77; e não houve fluxo de financiamento. A geração lí­quida de caixa foi de R$ 17.076.790,82. A DFC é elaborada pelo regime de caixa, sem considerar empenhos emitidos ou liquidados e não pagos."})
     
     # Nota 10 - DVP
-    notas.append({"titulo": "NOTA 10 — VARIAí‡í•ES PATRIMONIAIS",
+    notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
         "texto": "As Variaçíµes Patrimoniais Aumentativas (VPA) somaram R$ 181.312.304,85 (—3,81%). As Variaçíµes Patrimoniais Diminutivas (VPD) somaram R$ 165.040.060,96 (—10,97%), com destaque para Pessoal e Encargos (R$ 45.949.294,00), Serviços de Terceiros (R$ 65.884.180,07) e Transferíªncias Concedidas (R$ 30.067.473,23). O superávit patrimonial é de R$ 16.272.243,89, com margem patrimonial de 8,97%."})
     
     # Nota 11 - Custo
     pct_custo = custo.get("pct_custo_total", 0)
     if pct_custo > 0:
-        notas.append({"titulo": "NOTA 11 — DESPESA COM PESSOAL E LIMITE LEGAL",
+        notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
             "texto": f"A apuração em 12 meses, nos termos da Resolução Cofen nº 814/2026, resulta em custo de pessoal bruto de R$ 67.338.400,07 sobre Receita Corrente Lí­quida de R$ 226.242.979,74. O custo equivale a {pct(pct_custo)} da RCL, abaixo do limite de 50% (R$ 113.121.489,87), com margem disponí­vel de R$ 45.783.089,80. A entidade está abaixo da faixa de alerta."})
     
     # Nota 12 - Balanço Financeiro (NOVO)
     if bf:
-        notas.append({"titulo": "NOTA 12 — BALANí‡O FINANCEIRO",
+        notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
             "texto": "As receitas orçamentárias de R$ 184.635.554,82 e os recebimentos extraorçamentários de R$ 17.241.359,90, somados ao saldo do exercí­cio anterior de R$ 169.963.364,97, totalizam ingressos de R$ 371.840.279,69, igual ao total de dispíªndios. As despesas orçamentárias pagas foram de R$ 151.902.488,03 (correntes: R$ 135.637.750,95; capital: R$ 16.264.737,08) e os pagamentos extraorçamentários, de R$ 33.052.038,03. Os recebimentos extraorçamentários caí­ram 13,62% e os pagamentos aumentaram 5,45%."})
     
     # Nota 13 - Centro de Custos (NOVO)
     if centro:
-        notas.append({"titulo": "NOTA 13 — DESPESAS POR CENTRO DE CUSTO",
+        notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
             "texto": "O custo total apropriado aos centros de custo foi de R$ 167.542.179,02 (+0,41%). O maior é AF 05 — Coordenação/Orientação, com R$ 57.933.243,18 (+28,35%), seguido de AF 06 — Despesas Administrativas (R$ 37.055.602,36) e AF 02 — Inscrição, Registro e Cadastro (R$ 24.264.700,14). Os demais centros apresentaram redução entre 5,21% e 15,50%. O crescimento de AF 05 deve ser monitorado quanto í  eficiíªncia alocativa."})
     
     # Nota 14 - índices de Liquidez (NOVO)
     if liq:
-        notas.append({"titulo": "NOTA 14 — íNDICES DE LIQUIDEZ E ESTRUTURA",
+        notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
             "texto": "Os í­ndices de liquidez geral e corrente foram influenciados pelo registro das cotas-partes a receber (Nota 3). Os de liquidez estão calculados sobre o passivo circulante de R$ 11.725.635,04.<br><br><table style='width:100%; border-collapse:collapse; margin-top:10px; font-size:11px;'><tr style='background:#003366; color:#fff;'><th style='padding:5px; border:1px solid #ccc;'>Indicador</th><th style='padding:5px; border:1px solid #ccc;'>Atual</th><th style='padding:5px; border:1px solid #ccc;'>Anterior</th></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Imediata</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>15,93</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,28</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Corrente</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>25,71</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,47</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Seca</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>25,70</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,46</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Geral</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>39,74</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>9,06</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Endividamento Geral</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>1,98%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>6,95%</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Part. Capital de Terceiros</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>2,03%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>7,47%</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Imobilização do PL</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>21,42%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>39,13%</td></tr></table>"})
     
     # Nota 15 - Integridade (NOVO)
-    notas.append({"titulo": "NOTA 15 — INTEGRIDADE ENTRE DEMONSTRAí‡í•ES E RESSALVAS",
+    notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
         "texto": "A matriz de integridade cruzou Balancete, BP, BF, BO, DFC, DVP e DMPL. A conformidade foi confirmada para os grupos patrimoniais, VPA, VPD, receitas correntes, caixa e equivalentes, despesas correntes e de capital pagas e incorporação de ativos.<br><br>Quatro itens apresentaram divergíªncia, decorrentes de estornos de restos a pagar que o sistema contábil (Implanta) não tratou adequadamente; o chamado correspondente foi aberto junto ao fornecedor:<br><br>â€¢ Valores restituí­veis — dispíªndios: R$ 222.353,33<br>â€¢ RP não processados — a liquidar: R$ 134.400,00<br>â€¢ RP não proc. — despesas correntes canceladas: R$ 58.302,51<br>â€¢ RP não processados pagos: R$ 7.220,00<br><br>As diferenças referem-se ao tratamento de estornos de restos a pagar e não afetam o resultado patrimonial nem o saldo de caixa. Ficam pendentes de regularização e serão reavaliadas apí³s resposta do chamado."})
     
     return {"erro": False, "periodo": periodo, "notas": notas}
@@ -9745,7 +9745,7 @@ async def api_gerar_auto_mcasp(request: Request):
     bp = json.loads(row_bp[0]).get('dados', {}) if row_bp else {}
     
     # 2. Le Balanco Orcamentario
-    cur.execute("SELECT resultado_json FROM historico_analise_orcamentaria WHERE periodo_atual = ? ORDER BY id DESC LIMIT 1", (periodo,))
+    cur.execute("SELECT resultado_json FROM historico_analise_orcamentaria WHERE periodo = ? ORDER BY id DESC LIMIT 1", (periodo,))
     row_bo = cur.fetchone()
     bo = json.loads(row_bo[0]).get('atual', {}) if row_bo else {}
     
@@ -9781,6 +9781,14 @@ async def api_gerar_auto_mcasp(request: Request):
     finally:
         conn.close()
 
+
+
+@app.get("/notas_mcasp_novo")
+def rota_notas_mcasp_novo():
+    from fastapi.responses import FileResponse
+    import os
+    caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "notas_explicativas.html")
+    return FileResponse(caminho)
 
 @app.get("/notas_mcasp")
 def rota_notas_mcasp():
