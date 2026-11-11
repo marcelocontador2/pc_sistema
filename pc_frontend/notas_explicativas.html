@@ -95,12 +95,10 @@
 
     <div id="declaracao-conformidade" style="display: none; margin-top: 40px; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 5px solid #003366;">
         <h3 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; font-size: 15px; text-transform: uppercase;">Declaração de Conformidade</h3>
-        <p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;">Declaramos, na qualidade de responsáveis pela gestão e pela elaboração das demonstrações contábeis consolidadas do Conselho Federal de Enfermagem (COFEN), referentes ao período de 01/01/2026 a 30/09/2026 (2026-TRIMESTRE-3), que:</p>
-        <p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>1.</b> As informações contábeis foram elaboradas em conformidade com as disposições da Lei nº 4.320/1964, as diretrizes do Manual de Contabilidade Aplicada ao Setor Público (MCASP) e as Normas Brasileiras de Contabilidade Técnicas do Setor Público (NBC TSP).</p>
-        <p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>2.</b> As demonstrações contábeis consolidadas (Balanço Patrimonial, Balanço Orçamentário, Balanço Financeiro, Demonstração das Variações Patrimoniais, Demonstração dos Fluxos de Caixa e Demonstração das Mutações do Patrimônio Líquido) refletem, de forma fidedigna, a posição patrimonial e financeira do COFEN e o desempenho da execução orçamentária no período.</p>
-        <p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>3.</b> Os registros contábeis estão amparados em documentação de suporte idônea e devidamente auditada internamente, observando os princípios da legalidade, da transparência, da economicidade e da segregação de funções.</p>
-        <p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>4.</b> As práticas de gestão de riscos, os controles internos administrativos e o processo de conformidade foram implementados e mantidos operantes durante todo o período analisado, garantindo a integridade dos dados apresentados.</p>
-        <p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>5.</b> Esta declaração é firmada com base nas informações extraídas dos sistemas corporativos e validadas pelos responsáveis técnicos, nos termos da Resolução COFEN nº 764/2024 (Prestação de Contas).</p>
+        <div id="itens-declaracao-container" style="margin-top: 15px;">
+            <p style="text-align:center; color:#666;">Carregando itens...</p>
+        </div>
+        <button type="button" onclick="abrirModalIncluirDeclaracao()" style="margin-top: 15px; padding: 8px 16px; background: #003366; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">➕ Incluir Item</button>
         
         <div style="margin-top: 50px; text-align: center;">
             <p style="margin: 0; font-size: 14px; font-weight: bold; color: #003366;" id="nome-contador">Carregando...</p>
@@ -944,5 +942,113 @@ carregarHistorico();
         </div>
     </div>
 </div>
+
+<!-- MODAL DECLARACAO -->
+<div id="modal-declaracao" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+    <div style="background:#fff; padding:25px; border-radius:8px; width:90%; max-width:600px;">
+        <h3 id="modal-decl-titulo" style="margin-top:0; color:#003366;">Item da Declaração</h3>
+        <textarea id="modal-decl-texto" style="width:100%; height:120px; padding:10px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:13px;" placeholder="Digite o texto do item..."></textarea>
+        <input type="hidden" id="modal-decl-id">
+        <div style="margin-top:15px; text-align:right;">
+            <button type="button" onclick="fecharModalDeclaracao()" style="padding:8px 16px; margin-right:8px; background:#ccc; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
+            <button type="button" onclick="salvarItemDeclaracao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function carregarItensDeclaracao() {
+    const container = document.getElementById('itens-declaracao-container');
+    if (!container) return;
+    try {
+        const resp = await fetch('/api/declaracao_conformidade');
+        const itens = await resp.json();
+        if (!itens || itens.length === 0) {
+            container.innerHTML = '<p style="color:#999;">Nenhum item cadastrado.</p>';
+            return;
+        }
+        let html = '';
+        itens.forEach((item, idx) => {
+            html += `<div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start; justify-content:space-between;">
+                <p style="text-align: justify; line-height: 1.6; font-size: 13px; margin: 0; flex: 1;"><b>${idx+1}.</b> ${item.texto}</p>
+                <div style="display:flex; gap:5px; flex-shrink:0;">
+                    <button onclick="abrirModalEditarDeclaracao(${item.id})" title="Editar" style="background:none; border:none; cursor:pointer; font-size:16px;">✏️</button>
+                    <button onclick="excluirItemDeclaracao(${item.id})" title="Excluir" style="background:none; border:none; cursor:pointer; font-size:16px;">🗑️</button>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p style="color:red;">Erro ao carregar itens: ' + e.message + '</p>';
+    }
+}
+
+function abrirModalIncluirDeclaracao() {
+    document.getElementById('modal-decl-titulo').innerText = 'Incluir Item na Declaração';
+    document.getElementById('modal-decl-texto').value = '';
+    document.getElementById('modal-decl-id').value = '';
+    document.getElementById('modal-declaracao').style.display = 'flex';
+}
+
+async function abrirModalEditarDeclaracao(id) {
+    try {
+        const resp = await fetch('/api/declaracao_conformidade');
+        const itens = await resp.json();
+        const item = itens.find(i => i.id === id);
+        if (!item) return alert('Item não encontrado');
+        document.getElementById('modal-decl-titulo').innerText = 'Editar Item da Declaração';
+        document.getElementById('modal-decl-texto').value = item.texto;
+        document.getElementById('modal-decl-id').value = item.id;
+        document.getElementById('modal-declaracao').style.display = 'flex';
+    } catch(e) { alert('Erro: ' + e.message); }
+}
+
+function fecharModalDeclaracao() {
+    document.getElementById('modal-declaracao').style.display = 'none';
+}
+
+async function salvarItemDeclaracao() {
+    const id = document.getElementById('modal-decl-id').value;
+    const texto = document.getElementById('modal-decl-texto').value.trim();
+    if (!texto) return alert('Texto vazio');
+    try {
+        const url = id ? '/api/declaracao_conformidade/' + id : '/api/declaracao_conformidade';
+        const method = id ? 'PUT' : 'POST';
+        const resp = await fetch(url, {
+            method: method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({texto: texto})
+        });
+        const r = await resp.json();
+        if (r.ok) {
+            fecharModalDeclaracao();
+            carregarItensDeclaracao();
+        } else {
+            alert('Erro: ' + (r.mensagem || 'desconhecido'));
+        }
+    } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function excluirItemDeclaracao(id) {
+    if (!confirm('Tem certeza que deseja excluir este item?')) return;
+    try {
+        const resp = await fetch('/api/declaracao_conformidade/' + id, { method: 'DELETE' });
+        const r = await resp.json();
+        if (r.ok) carregarItensDeclaracao();
+        else alert('Erro ao excluir');
+    } catch(e) { alert('Erro: ' + e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const obs = new MutationObserver(() => {
+        const el = document.getElementById('declaracao-conformidade');
+        if (el && el.style.display !== 'none' && !el.dataset.loaded) {
+            el.dataset.loaded = '1';
+            carregarItensDeclaracao();
+        }
+    });
+    obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style'] });
+});
+</script>
 </body>
 </html>

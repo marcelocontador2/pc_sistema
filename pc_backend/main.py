@@ -9636,6 +9636,61 @@ async def post_conclusao_notas(relatorio_id: int, request: Request):
     return {"ok": True}
 
 # --- PDF ---
+@app.get("/api/declaracao_conformidade")
+async def listar_itens_declaracao():
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT id, ordem, texto, ativo FROM itens_declaracao_conformidade WHERE ativo = TRUE ORDER BY ordem, id")
+    rows = cur.fetchall()
+    conn.close()
+    return [{"id": r[0], "ordem": r[1], "texto": r[2], "ativo": r[3]} for r in rows]
+
+@app.post("/api/declaracao_conformidade")
+async def incluir_item_declaracao(request: Request):
+    import sqlite3, os
+    body = await request.json()
+    texto = (body.get("texto") or "").strip()
+    if not texto:
+        return {"ok": False, "mensagem": "Texto vazio"}
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT COALESCE(MAX(ordem), 0) + 1 FROM itens_declaracao_conformidade")
+    prox_ordem = cur.fetchone()[0]
+    cur.execute("INSERT INTO itens_declaracao_conformidade (ordem, texto) VALUES (?, ?)", (prox_ordem, texto))
+    novo_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return {"ok": True, "id": novo_id, "ordem": prox_ordem, "texto": texto}
+
+@app.put("/api/declaracao_conformidade/{item_id}")
+async def editar_item_declaracao(item_id: int, request: Request):
+    import sqlite3, os
+    body = await request.json()
+    texto = (body.get("texto") or "").strip()
+    if not texto:
+        return {"ok": False, "mensagem": "Texto vazio"}
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("UPDATE itens_declaracao_conformidade SET texto = ? WHERE id = ?", (texto, item_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/declaracao_conformidade/{item_id}")
+async def excluir_item_declaracao(item_id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM itens_declaracao_conformidade WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
 @app.get("/gerar_pdf_notas/{id}")
 def gerar_pdf_notas(id: int):
     from playwright.sync_api import sync_playwright
@@ -9680,16 +9735,22 @@ def gerar_pdf_notas(id: int):
     for n in notas:
         html_notas += '<div class="nota"><div class="nota-header"><h3>' + n["titulo"] + '</h3></div><p>' + n["texto"] + '</p></div>'
 
+    # Le itens da declaracao do banco
+    conn2 = sqlite3.connect(db_path)
+    cur2 = conn2.cursor()
+    cur2.execute("SELECT texto FROM itens_declaracao_conformidade WHERE ativo = TRUE ORDER BY ordem, id")
+    itens_decl = [r[0] for r in cur2.fetchall()]
+    conn2.close()
+    html_itens_declaracao = ""
+    for i, txt in enumerate(itens_decl, start=1):
+        html_itens_declaracao += '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>' + str(i) + '.</b> ' + txt + '</p>'
+
     html_declaracao = (
         '<div style="margin-top: 40px; background: #fff; padding: 30px; border-radius: 8px; border-left: 5px solid #003366; page-break-before: always;">'
         '<h3 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; font-size: 15px; text-transform: uppercase;">DeclaraÃ§Ã£o de Conformidade</h3>'
         '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;">Declaramos, na qualidade de responsÃ¡veis pela gestÃ£o e pela elaboraÃ§Ã£o das demonstraÃ§Ãµes contÃ¡beis consolidadas do Conselho Federal de Enfermagem (COFEN), referentes ao perÃ­odo de ' + periodo + ', que:</p>'
-        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>1.</b> As informaÃ§Ãµes contÃ¡beis foram elaboradas em conformidade com as disposiÃ§Ãµes da Lei nÂº 4.320/1964, as diretrizes do MCASP e as NBC TSP.</p>'
-        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>2.</b> As demonstraÃ§Ãµes contÃ¡beis consolidadas refletem, de forma fidedigna, a posiÃ§Ã£o patrimonial e financeira do COFEN e o desempenho da execuÃ§Ã£o orÃ§amentÃ¡ria no perÃ­odo.</p>'
-        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>3.</b> Os registros contÃ¡beis estÃ£o amparados em documentaÃ§Ã£o de suporte idÃ´nea e devidamente auditada internamente.</p>'
-        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>4.</b> As prÃ¡ticas de gestÃ£o de riscos e controles internos foram implementados e mantidos operantes durante todo o perÃ­odo analisado.</p>'
-        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;"><b>5.</b> Esta declaraÃ§Ã£o Ã© firmada com base nas informaÃ§Ãµes extraÃ­das dos sistemas corporativos e validadas pelos responsÃ¡veis tÃ©cnicos.</p>'
-        '<div style="margin-top: 50px; text-align: center;">'
+        + html_itens_declaracao
+        + '<div style="margin-top: 50px; text-align: center;">'
         '<p style="margin: 0; font-size: 14px; font-weight: bold; color: #003366;">' + nome_contador + '</p>'
         '<p style="margin: 5px 0 0 0; font-size: 12px; color: #555;">CRC: ' + crc_formatado + '</p>'
         '<p style="margin: 5px 0 0 0; font-size: 12px; color: #555;">CPF: ' + cpf_formatado + '</p>'
