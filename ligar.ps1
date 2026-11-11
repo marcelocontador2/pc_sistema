@@ -1,15 +1,22 @@
-$ErrorActionPreference = "Continue"
+﻿$ErrorActionPreference = "Continue"
 $base = "C:\Users\Marcelo Medeiros\pc_sistema"
 
 Write-Host "=== 1. PostgreSQL ===" -ForegroundColor Cyan
-$svc = Get-Service postgresql-x64-18 -ErrorAction SilentlyContinue
-if (-not $svc) { Write-Host "Servico postgresql-x64-18 nao encontrado." -ForegroundColor Red; exit 1 }
-if ($svc.Status -ne "Running") {
-    Write-Host "Iniciando postgresql-x64-18..."
-    try { Start-Service postgresql-x64-18 } catch { Write-Host "Falha ao iniciar (precisa de Admin)." -ForegroundColor Red; exit 1 }
-    Start-Sleep -Seconds 3
+# Verifica primeiro se a porta ja esta ativa (pode ter sido iniciado via pg_ctl)
+$p = netstat -ano | findstr ":5433" | findstr "LISTENING"
+if ($p) {
+    Write-Host "PostgreSQL ja esta rodando na porta 5433." -ForegroundColor Green
+} else {
+    Write-Host "PG nao detectado. Tentando iniciar via Servico..."
+    try { 
+        Start-Service postgresql-x64-18 -ErrorAction Stop
+        Start-Sleep -Seconds 3
+    } catch { 
+        Write-Host "Sem permissao de Admin. Tentando iniciar via pg_ctl..."
+        & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D "C:\Program Files\PostgreSQL\18\data" -l "C:\temp\pg_auto.log" start
+        Start-Sleep -Seconds 3
+    }
 }
-Write-Host "PostgreSQL: $((Get-Service postgresql-x64-18).Status)" -ForegroundColor Green
 
 Write-Host "=== 2. Detectar porta do PG (via netstat) ===" -ForegroundColor Cyan
 $linha5433 = netstat -ano | findstr ":5433" | findstr "LISTENING"
@@ -46,4 +53,5 @@ try {
 Write-Host ""
 Write-Host "=== SISTEMA LIGADO ===" -ForegroundColor Green
 Write-Host "Abra: http://localhost:9994" -ForegroundColor Green
+
 
