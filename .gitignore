@@ -52,3 +52,6 @@ pc_backend/????
 "pc_backend/\342\210\222"
 pc_backend/\\\\342*
 pc_backend/???*
+
+# Excecao: shim SQLite->PostgreSQL (necessario para o sistema)
+!pc_backend/sqlite_compat.py
