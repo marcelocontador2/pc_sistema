@@ -1165,15 +1165,24 @@ async def salvar_panorama(periodo: str, request: Request):
         return {"erro": True, "mensagem": str(e)}
 
 @app.get("/historico_panorama")
-async def listar_panorama():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo, data_geracao FROM historico_panorama ORDER BY id DESC")
-    rows = cursor.fetchall()
+def listar_panorama():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_panorama ORDER BY id DESC")
+    rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
 @app.get("/historico_panorama/{id}")
 async def get_historico_panorama_id(id: int):
     import sqlite3, json, os
@@ -1525,12 +1534,24 @@ async def api_analise_orcamentaria_bo(periodo: str):
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 @app.get("/historico_analise_orcamentaria")
-async def get_historico_analise_orcamentaria():
+def get_historico_analise_orcamentaria():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_orcamentaria ORDER BY id DESC")
-    rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_orcamentaria ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
 @app.get("/historico_analise_orcamentaria/{id}")
 async def get_analise_orcamentaria_id(id: int):
     conn = sqlite3.connect(DB_PATH)
@@ -1641,34 +1662,23 @@ async def salvar_composicao_rd(periodo: str, periodo_anterior: str):
 
 
 @app.get("/historico_composicao_receitas_despesas")
-async def historico_composicao_receitas_despesas():
-    import psycopg2
-    from fastapi.responses import JSONResponse
-    try:
-        PG_CONFIG = {
-            "host": "localhost", "port": 5433,
-            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
-        }
-        conn = psycopg2.connect(**PG_CONFIG)
-        cur = conn.cursor()
-        cur.execute("""CREATE TABLE IF NOT EXISTS historico_composicao_receitas_despesas (
-            id SERIAL PRIMARY KEY,
-            periodo TEXT,
-            periodo_anterior TEXT,
-            data_geracao TEXT,
-            resultado_json TEXT
-        )""")
-        cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_composicao_receitas_despesas ORDER BY id DESC")
-        rows = cur.fetchall()
-        conn.close()
-        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "resultado_json": r[3]} for r in rows]
-    except Exception as e:
-        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
-
-
-    except Exception as e:
-        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
-
+def historico_composicao_receitas_despesas():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_composicao_rd ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_composicao_receitas_despesas/{id}")
 async def get_composicao_id(id: int):
@@ -1762,11 +1772,24 @@ async def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str):
     conn.commit(); conn.close()
     return {"mensagem": "Salvo"}
 @app.get("/historico_analise_financeira_bf")
-async def get_hist_bf():
-    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_financeira_bf ORDER BY id DESC")
-    rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+def get_historico_analise_financeira_bf():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_financeira_bf ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
 @app.get("/historico_analise_financeira_bf/{id}")
 async def get_bf_id(id: int):
     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
@@ -2075,17 +2098,23 @@ async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
     return {"ok": True, "mensagem": "Analise DFC salva com sucesso!"}
 
 @app.get("/historico_analise_dfc")
-async def get_hist_dfc():
-    import sqlite3
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_analise_dfc (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_dfc ORDER BY id DESC")
-    rows = cursor.fetchall()
+def get_historico_analise_dfc():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_dfc ORDER BY id DESC")
+    rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_analise_dfc/{id}")
 async def get_dfc_id(id: int):
@@ -2492,16 +2521,24 @@ async def salvar_analise_patrimonial(periodo: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 @app.get("/historico_analise_patrimonial")
-async def listar_historico_patrimonial():
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_patrimonial ORDER BY id DESC")
-    rows = cursor.fetchall()
+def get_historico_analise_patrimonial():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_patrimonial ORDER BY id DESC")
+    rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
-async def listar_historico_patrimonial():
-    return []
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
 @app.get("/historico_analise_patrimonial/{id}")
 async def buscar_historico_patrimonial(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -3566,6 +3603,10 @@ def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", e
             url = f"http://127.0.0.1:9994/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
+            # --- CORRECAO DE ACENTOS ---
+            page.evaluate("document.fonts.ready")
+            page.wait_for_timeout(1000)
+            # --- FIM DA CORRECAO ---
             pdf_bytes = page.pdf(format="A4", print_background=True)
             context.close()
             browser.close()
@@ -3605,6 +3646,10 @@ def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMES
             url = f"http://127.0.0.1:9994/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
+            # --- CORRECAO DE ACENTOS ---
+            page.evaluate("document.fonts.ready")
+            page.wait_for_timeout(1000)
+            # --- FIM DA CORRECAO ---
             pdf_bytes = page.pdf(format="A4", print_background=True)
             context.close()
             browser.close()
@@ -3624,20 +3669,24 @@ def serve_analise_custo_pessoal():
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return HTMLResponse(content="<h1>Arquivo analise_custo_pessoal.html não encontrado!</h1>", status_code=404)
 @app.get("/historico_custo_pessoal")
-async def listar_historico_custo_pessoal():
-    import sqlite3, os
-    from fastapi.responses import JSONResponse
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
+def listar_historico_custo_pessoal():
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    try:
-        cur.execute("SELECT id, periodo, data_geracao FROM historico_custo_pessoal ORDER BY id DESC")
-        rows = cur.fetchall()
-        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
-    except Exception as e:
-        return JSONResponse(content={"erro": str(e)}, status_code=500)
-    finally:
-        conn.close()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_custo_pessoal ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
 @app.get("/api/configuracoes/custo_pessoal")
 def api_configuracoes_custo_pessoal_get():
     import sqlite3, os
@@ -3689,17 +3738,22 @@ def serve_analise_centro_custos():
 
 @app.get("/historico_centro_custos")
 def get_historico_centro_custos():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_centro_custos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
-    conn.commit()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_centro_custos ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_centro_custos ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_centro_custos/{id}")
 def get_historico_centro_custos_id(id: int):
@@ -4304,17 +4358,22 @@ def api_comparativo_receitas(periodo: str):
 
 @app.get("/historico_comparativo_receitas")
 def get_historico_comparativo_receitas():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_receitas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
-    conn.commit()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_comparativo_receitas ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_receitas ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_comparativo_receitas/{id}")
 def get_historico_comparativo_receitas_id(id: int):
@@ -4689,14 +4748,22 @@ def api_comparativo_despesas_v2(periodo: str):
     }
 @app.get("/historico_comparativo_despesas")
 def get_historico_comparativo_despesas():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path); cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_despesas (id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
-    conn.commit()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_comparativo_despesas ORDER BY id DESC")
-    rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_comparativo_despesas/{id}")
 def get_historico_comparativo_despesas_id(id: int):
@@ -5668,17 +5735,23 @@ async def salvar_analise_bp(periodo: str):
     return {"ok": True, "mensagem": "Analise BP salva com sucesso!"}
 
 @app.get("/historico_analise_bp")
-async def get_hist_bp():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_analise_bp (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_bp ORDER BY id DESC")
-    rows = cursor.fetchall()
+def get_historico_analise_bp():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_bp ORDER BY id DESC")
+    rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_analise_bp/{id}")
 async def get_bp_id(id: int):
@@ -5840,18 +5913,23 @@ async def salvar_liquidez_rota(periodo: str):
 
 
 @app.get("/historico_liquidez")
-async def listar_historico_liquidez():
-    import sqlite3 as _sq
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = _sq.connect(db_path)
+def listar_historico_liquidez():
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_liquidez (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_liquidez ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_liquidez ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
-
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_liquidez/{id}")
 async def get_liquidez_id(id: int):
@@ -6712,6 +6790,10 @@ def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", e
             url = f"http://127.0.0.1:9994/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
+            # --- CORRECAO DE ACENTOS ---
+            page.evaluate("document.fonts.ready")
+            page.wait_for_timeout(1000)
+            # --- FIM DA CORRECAO ---
             pdf_bytes = page.pdf(format="A4", print_background=True)
             context.close()
             browser.close()
@@ -6751,6 +6833,10 @@ def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMES
             url = f"http://127.0.0.1:9994/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
+            # --- CORRECAO DE ACENTOS ---
+            page.evaluate("document.fonts.ready")
+            page.wait_for_timeout(1000)
+            # --- FIM DA CORRECAO ---
             pdf_bytes = page.pdf(format="A4", print_background=True)
             context.close()
             browser.close()
@@ -6770,20 +6856,24 @@ def serve_analise_custo_pessoal():
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return HTMLResponse(content="<h1>Arquivo analise_custo_pessoal.html não encontrado!</h1>", status_code=404)
 @app.get("/historico_custo_pessoal")
-async def listar_historico_custo_pessoal():
-    import sqlite3, os
-    from fastapi.responses import JSONResponse
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
+def listar_historico_custo_pessoal():
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    try:
-        cur.execute("SELECT id, periodo, data_geracao FROM historico_custo_pessoal ORDER BY id DESC")
-        rows = cur.fetchall()
-        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
-    except Exception as e:
-        return JSONResponse(content={"erro": str(e)}, status_code=500)
-    finally:
-        conn.close()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_custo_pessoal ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
 @app.get("/api/configuracoes/custo_pessoal")
 def api_configuracoes_custo_pessoal_get():
     import sqlite3, os
@@ -6835,17 +6925,22 @@ def serve_analise_centro_custos():
 
 @app.get("/historico_centro_custos")
 def get_historico_centro_custos():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_centro_custos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
-    conn.commit()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_centro_custos ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_centro_custos ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_centro_custos/{id}")
 def get_historico_centro_custos_id(id: int):
@@ -7450,17 +7545,22 @@ def api_comparativo_receitas(periodo: str):
 
 @app.get("/historico_comparativo_receitas")
 def get_historico_comparativo_receitas():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_receitas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
-    conn.commit()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_comparativo_receitas ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_receitas ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_comparativo_receitas/{id}")
 def get_historico_comparativo_receitas_id(id: int):
@@ -7835,14 +7935,22 @@ def api_comparativo_despesas_v2(periodo: str):
     }
 @app.get("/historico_comparativo_despesas")
 def get_historico_comparativo_despesas():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path); cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_despesas (id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
-    conn.commit()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_comparativo_despesas ORDER BY id DESC")
-    rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_comparativo_despesas/{id}")
 def get_historico_comparativo_despesas_id(id: int):
@@ -8637,17 +8745,23 @@ async def salvar_analise_bp(periodo: str):
     return {"ok": True, "mensagem": "Analise BP salva com sucesso!"}
 
 @app.get("/historico_analise_bp")
-async def get_hist_bp():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_analise_bp (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_bp ORDER BY id DESC")
-    rows = cursor.fetchall()
+def get_historico_analise_bp():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_bp ORDER BY id DESC")
+    rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_analise_bp/{id}")
 async def get_bp_id(id: int):
@@ -8809,18 +8923,23 @@ async def salvar_liquidez_rota(periodo: str):
 
 
 @app.get("/historico_liquidez")
-async def listar_historico_liquidez():
-    import sqlite3 as _sq
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = _sq.connect(db_path)
+def listar_historico_liquidez():
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_liquidez (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_liquidez ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_liquidez ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
-
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/historico_liquidez/{id}")
 async def get_liquidez_id(id: int):
@@ -10222,30 +10341,23 @@ async def salvar_analise_dmpl(periodo: str):
 
 
 @app.get("/historico_analise_dmpl")
-async def historico_analise_dmpl():
-    import psycopg2
-    from fastapi.responses import JSONResponse
+def get_historico_analise_dmpl():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_dmpl ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
     
-    try:
-        PG_CONFIG = {
-            "host": "localhost", "port": 5433,
-            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
-        }
-        conn = psycopg2.connect(**PG_CONFIG)
-        cur = conn.cursor()
-        cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_dmpl (
-            id SERIAL PRIMARY KEY,
-            periodo TEXT,
-            data_geracao TEXT,
-            resultado_json TEXT
-        )""")
-        cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_dmpl ORDER BY id DESC")
-        rows = cur.fetchall()
-        conn.close()
-        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "resultado_json": r[3]} for r in rows]
-    except Exception:
-        return []
-
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
 
 @app.get("/excluir_analise_dmpl/{id}")
 async def excluir_analise_dmpl(id: int):
