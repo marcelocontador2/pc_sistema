@@ -248,7 +248,7 @@ def _ler_csv(filepath, tipo=""):
     for enc in ["utf-8-sig", "utf-8", "latin-1"]:
         try:
             with open(filepath, "r", encoding=enc) as f:
-                content = _corrigir_encoding(f.read())
+                content = f.read()
             break
         except UnicodeDecodeError:
             continue
@@ -379,7 +379,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
         for enc in ["latin-1", "utf-8-sig"]:
             try:
                 with open(csv_path, "r", encoding=enc) as f:
-                    content = _corrigir_encoding(f.read())
+                    content = f.read()
                 break
             except:
                 continue
@@ -3557,7 +3557,7 @@ app.include_router(bf_router)
 def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_completo.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        html_content = _corrigir_encoding(f.read())
+        html_content = f.read()
     pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
     # Substitui o texto descritivo
     html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
@@ -3568,7 +3568,7 @@ def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
 def serve_custo_pessoal_pdf_resumo(entidade: str = "COFEN"):
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_resumo.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        html_content = _corrigir_encoding(f.read())
+        html_content = f.read()
     pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
     # Substitui o texto descritivo
     html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
@@ -6744,7 +6744,7 @@ app.include_router(bf_router)
 def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_completo.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        html_content = _corrigir_encoding(f.read())
+        html_content = f.read()
     pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
     # Substitui o texto descritivo
     html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
@@ -6755,7 +6755,7 @@ def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
 def serve_custo_pessoal_pdf_resumo(entidade: str = "COFEN"):
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_resumo.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        html_content = _corrigir_encoding(f.read())
+        html_content = f.read()
     pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
     # Substitui o texto descritivo
     html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
