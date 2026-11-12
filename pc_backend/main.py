@@ -1327,14 +1327,25 @@ async def salvar_integridade_matriz(periodo: str, request: Request):
 
     return {"ok": True, "mensagem": "Matriz e justificativas salvas com sucesso!"}
 @app.get("/historico_integridade_matriz")
-async def listar_integridade_matriz():
+def listar_integridade_matriz():
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo, data_geracao FROM historico_integridade_matriz ORDER BY id DESC")
+    cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_integridade_matriz ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
 @app.get("/historico_integridade_matriz/{id}")
 async def buscar_integridade_matriz(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
