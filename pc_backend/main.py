@@ -4,11 +4,9 @@ import sqlite_compat
 from fastapi.staticfiles import StaticFiles
 from app.routers import dfc
 from fastapi import Request, Request, FastAPI, Request, Form
-from historico_integridade import router as historico_router
 from fastapi import FastAPI, UploadFile, File
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
 from fastapi.staticfiles import StaticFiles
-from historico_integridade import router as historico_router
 from fastapi.staticfiles import StaticFiles
 import sqlite3
 import shutil
@@ -966,11 +964,7 @@ async def ler_relatorio_csv(tipo: str):
         return {"erro": str(e)}
     return {"tipo": tipo, "arquivo": os.path.basename(arquivo), "dados": dados}
 # --- CONEXAO DA MATRIZ DE INTEGRIDADE ---
-from rota_integridade import router as integridade_router_novo
-from matriz_integridade import router as matriz_router
 app.include_router(dfc.router)
-app.include_router(integridade_router_novo)
-app.include_router(matriz_router)
 # =======================================================
 # ROTINAS DE LIQUIDEZ (CALCULO, SALVAR, HISTORICO, PDF)
 # =======================================================
@@ -1178,7 +1172,7 @@ async def listar_panorama():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_panorama ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 @app.get("/historico_panorama/{id}")
 async def get_historico_panorama_id(id: int):
     import sqlite3, json, os
@@ -1248,7 +1242,7 @@ async def listar_conferencia():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_conferencia ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 @app.get("/historico_conferencia/{id}")
 async def buscar_conferencia(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -1328,7 +1322,7 @@ async def listar_integridade_matriz():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_integridade_matriz ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 @app.get("/historico_integridade_matriz/{id}")
 async def buscar_integridade_matriz(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -1513,7 +1507,7 @@ async def get_historico_analise_orcamentaria():
     cur = conn.cursor()
     cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_orcamentaria ORDER BY id DESC")
     rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 @app.get("/historico_analise_orcamentaria/{id}")
 async def get_analise_orcamentaria_id(id: int):
     conn = sqlite3.connect(DB_PATH)
@@ -1603,7 +1597,7 @@ async def get_hist_composicao():
     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
     cur.execute("SELECT id, periodo, data_geracao FROM historico_composicao_rd ORDER BY id DESC")
     rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 @app.get("/historico_composicao_receitas_despesas/{id}")
 async def get_composicao_id(id: int):
     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
@@ -1680,7 +1674,7 @@ async def get_hist_bf():
     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
     cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_financeira_bf ORDER BY id DESC")
     rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 @app.get("/historico_analise_financeira_bf/{id}")
 async def get_bf_id(id: int):
     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
@@ -1999,7 +1993,7 @@ async def get_hist_dfc():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_dfc ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_analise_dfc/{id}")
 async def get_dfc_id(id: int):
@@ -2382,176 +2376,10 @@ async def serve_analise_patrimonial():
 
 
 
-@app.get("/api/analise_dmpl/{periodo}")
-async def api_analise_dmpl(periodo: str):
-    import os, csv
-    from fastapi.responses import JSONResponse
-    
-    # Converte 2026-TRIMESTRE-3 para DMPL_2026_TRIMESTRE_3.csv
-    nome_arquivo = f"DMPL_{periodo.replace('-', '_')}.csv"
-    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", nome_arquivo)
-    
-    if not os.path.exists(caminho):
-        return JSONResponse(content={"erro": True, "mensagem": f"Arquivo {nome_arquivo} nao encontrado."}, status_code=404)
-        
-    try:
-        dados = []
-        try:
-            f = open(caminho, "r", encoding="utf-8-sig")
-        except UnicodeDecodeError:
-            f = open(caminho, "r", encoding="latin-1")
-            
-        with f:
-            leitor = csv.reader(f, delimiter=';')
-            for linha in leitor:
-                if not linha: continue
-                # Pula as linhas de cabecalho do COFEN
-                if "COFEN" in linha[0].upper() or "CNPJ" in linha[0].upper() or "Perí­odo" in linha[0]:
-                    continue
-                # Junta as colunas em um formato de array
-                dados.append(linha)
-                
-        # Retorna no formato que a tela espera
-        # (Vamos ajustar a tela para ler esse formato depois)
-        return {"dados": dados}
-    except Exception as e:
-        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
 
 
 
 
-@app.post("/salvar_analise_dmpl/{periodo}")
-async def salvar_analise_dmpl(periodo: str):
-    import os, csv, sqlite3, json
-    from fastapi.responses import JSONResponse
-    from datetime import datetime
-    
-    nome_arquivo = f"DMPL_{periodo.replace('-', '_')}.csv"
-    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", nome_arquivo)
-    
-    if not os.path.exists(caminho):
-        return JSONResponse(content={"erro": True, "mensagem": "Arquivo nao encontrado."}, status_code=404)
-        
-    try:
-        dados = []
-        with open(caminho, "r", encoding="utf-8-sig") as f:
-            leitor = csv.reader(f, delimiter=';')
-            for linha in leitor:
-                if not linha: continue
-                if "COFEN" in linha[0].upper() or "CNPJ" in linha[0].upper() or "Perí­odo" in linha[0]:
-                    continue
-                dados.append(linha)
-                
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        
-        # Cria a tabela se nao existir
-        cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_dmpl (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            periodo TEXT, 
-            data_geracao TEXT, 
-            resultado_json TEXT
-        )""")
-        
-        data_agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        dados_json = json.dumps({"dados": dados}, ensure_ascii=False)
-        
-        cur.execute("INSERT INTO historico_analise_dmpl (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
-                    (periodo, data_agora, dados_json))
-        conn.commit()
-        conn.close()
-        
-        return {"ok": True, "mensagem": "Historico salvo com sucesso!"}
-    except Exception as e:
-        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
-
-
-@app.get("/historico_analise_dmpl")
-async def historico_analise_dmpl():
-    import sqlite3 as _sq, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = _sq.connect(db_path)
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dmpl ORDER BY id DESC")
-        rows = cur.fetchall()
-        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
-    except Exception:
-        return []
-    finally:
-        conn.close()
-
-
-@app.get("/analise_dmpl")
-async def serve_analise_dmpl():
-    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_dmpl.html")
-    return FileResponse(caminho)
-# @app.get("/api/analise_patrimonial/{periodo}")  # MIGRADO para app/routers/dvp.py
-async def api_analise_patrimonial(periodo: str):
-    import os, csv
-    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
-    p_limpo = periodo.replace("-", "_")
-    caminho = os.path.join(pasta, f"DVP_{p_limpo}.csv")
-    if not os.path.exists(caminho):
-        return {"erro": "faltando", "pecas": ["DVP"]}
-    def limpar(v):
-        if not v: return 0.0
-        v = str(v).replace("R$", "").strip()
-        if v in ["-", "0,00", ""]: return 0.0
-        if "," in v and "." in v: v = v.replace(".", "").replace(",", ".")
-        elif "," in v: v = v.replace(",", ".")
-        try: return float(v)
-        except: return 0.0
-    dados = {
-        "variacoes_ativas": {"atual": 0.0, "anterior": 0.0},
-        "transf_recebidas": {"atual": 0.0, "anterior": 0.0},
-        "reversao_provisoes": {"atual": 0.0, "anterior": 0.0},
-        "variacoes_diminutivas": {"atual": 0.0, "anterior": 0.0},
-        "pessoal_encargos": {"atual": 0.0, "anterior": 0.0},
-        "servicos_terceiros": {"atual": 0.0, "anterior": 0.0},
-        "transf_concedidas": {"atual": 0.0, "anterior": 0.0},
-        "superavit_patrimonial": {"atual": 0.0, "anterior": 0.0},
-        "margem_patrimonial": {"atual": 0.0, "anterior": 0.0}
-    }
-    try:
-        with open(caminho, 'r', encoding='latin-1') as f:
-            leitor = csv.reader(f, delimiter=';')
-            for row in leitor:
-                if len(row) < 8: continue
-                col_a = row[0].strip().upper()
-                col_d = row[4].strip().upper()
-                if col_a == "VARIAí‡íƒO PATRIMONIAL AUMENTATIVA":
-                    dados["variacoes_ativas"]["atual"] = limpar(row[2])
-                    dados["variacoes_ativas"]["anterior"] = limpar(row[3])
-                elif col_a == "TRANSFERíŠNCIAS E DELEGAí‡í•ES RECEBIDAS":
-                    dados["transf_recebidas"]["atual"] = limpar(row[2])
-                    dados["transf_recebidas"]["anterior"] = limpar(row[3])
-                elif col_a == "REVERSíƒO DE PROVISí•ES E AJUSTES DE PERDAS":
-                    dados["reversao_provisoes"]["atual"] = limpar(row[2])
-                    dados["reversao_provisoes"]["anterior"] = limpar(row[3])
-                if col_d == "VARIAí‡íƒO PATRIMONIAL DIMINUTIVA":
-                    dados["variacoes_diminutivas"]["atual"] = limpar(row[6])
-                    dados["variacoes_diminutivas"]["anterior"] = limpar(row[7])
-                elif col_d == "PESSOAL E ENCARGOS":
-                    dados["pessoal_encargos"]["atual"] = limpar(row[6])
-                    dados["pessoal_encargos"]["anterior"] = limpar(row[7])
-                elif col_d == "SERVIí‡OS TERCEIROS - PJ":
-                    dados["servicos_terceiros"]["atual"] = limpar(row[6])
-                    dados["servicos_terceiros"]["anterior"] = limpar(row[7])
-                elif col_d == "TRANSFERíŠNCIAS E DELEGAí‡í•ES CONCEDIDAS":
-                    dados["transf_concedidas"]["atual"] = limpar(row[6])
-                    dados["transf_concedidas"]["anterior"] = limpar(row[7])
-        # Calcula Superávit e Margem
-        dados["superavit_patrimonial"]["atual"] = dados["variacoes_ativas"]["atual"] - dados["variacoes_diminutivas"]["atual"]
-        dados["superavit_patrimonial"]["anterior"] = dados["variacoes_ativas"]["anterior"] - dados["variacoes_diminutivas"]["anterior"]
-        if dados["variacoes_ativas"]["atual"] > 0:
-            dados["margem_patrimonial"]["atual"] = (dados["superavit_patrimonial"]["atual"] / dados["variacoes_ativas"]["atual"]) * 100
-        if dados["variacoes_ativas"]["anterior"] > 0:
-            dados["margem_patrimonial"]["anterior"] = (dados["superavit_patrimonial"]["anterior"] / dados["variacoes_ativas"]["anterior"]) * 100
-        return {"erro": False, "dados": dados}
-    except Exception as e:
-        return {"erro": "falha", "mensagem": str(e)}
 @app.get("/salvar_analise_patrimonial/{periodo}")
 async def salvar_analise_patrimonial(periodo: str):
     try:
@@ -2579,7 +2407,7 @@ async def listar_historico_patrimonial():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_patrimonial ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 async def listar_historico_patrimonial():
     return []
 @app.get("/historico_analise_patrimonial/{id}")
@@ -3280,7 +3108,7 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_custo_pessoal ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 @app.get("/historico_custo_pessoal/{id}")
 async def buscar_historico_custo_pessoal(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -3654,7 +3482,7 @@ async def listar_historico_custo_pessoal():
     try:
         cur.execute("SELECT id, periodo, data_geracao FROM historico_custo_pessoal ORDER BY id DESC")
         rows = cur.fetchall()
-        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
     except Exception as e:
         return JSONResponse(content={"erro": str(e)}, status_code=500)
     finally:
@@ -3720,7 +3548,7 @@ def get_historico_centro_custos():
     cur.execute("SELECT id, periodo, data_geracao FROM historico_centro_custos ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_centro_custos/{id}")
 def get_historico_centro_custos_id(id: int):
@@ -4335,7 +4163,7 @@ def get_historico_comparativo_receitas():
     cur.execute("SELECT id, periodo, data_geracao FROM historico_comparativo_receitas ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_comparativo_receitas/{id}")
 def get_historico_comparativo_receitas_id(id: int):
@@ -4717,7 +4545,7 @@ def get_historico_comparativo_despesas():
     conn.commit()
     cur.execute("SELECT id, periodo, data_geracao FROM historico_comparativo_despesas ORDER BY id DESC")
     rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_comparativo_despesas/{id}")
 def get_historico_comparativo_despesas_id(id: int):
@@ -5525,7 +5353,7 @@ async def get_hist_consolidado():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_relatorio_consolidado ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.delete("/excluir_relatorio_consolidado/{id}")
 async def excluir_relatorio_consolidado(id: int):
@@ -5699,7 +5527,7 @@ async def get_hist_bp():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_bp ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_analise_bp/{id}")
 async def get_bp_id(id: int):
@@ -5871,7 +5699,7 @@ async def listar_historico_liquidez():
     cur.execute("SELECT id, periodo, data_geracao FROM historico_liquidez ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 
 @app.get("/historico_liquidez/{id}")
@@ -6426,7 +6254,7 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_custo_pessoal ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 @app.get("/historico_custo_pessoal/{id}")
 async def buscar_historico_custo_pessoal(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -6800,7 +6628,7 @@ async def listar_historico_custo_pessoal():
     try:
         cur.execute("SELECT id, periodo, data_geracao FROM historico_custo_pessoal ORDER BY id DESC")
         rows = cur.fetchall()
-        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
     except Exception as e:
         return JSONResponse(content={"erro": str(e)}, status_code=500)
     finally:
@@ -6866,7 +6694,7 @@ def get_historico_centro_custos():
     cur.execute("SELECT id, periodo, data_geracao FROM historico_centro_custos ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_centro_custos/{id}")
 def get_historico_centro_custos_id(id: int):
@@ -7481,7 +7309,7 @@ def get_historico_comparativo_receitas():
     cur.execute("SELECT id, periodo, data_geracao FROM historico_comparativo_receitas ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_comparativo_receitas/{id}")
 def get_historico_comparativo_receitas_id(id: int):
@@ -7863,7 +7691,7 @@ def get_historico_comparativo_despesas():
     conn.commit()
     cur.execute("SELECT id, periodo, data_geracao FROM historico_comparativo_despesas ORDER BY id DESC")
     rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_comparativo_despesas/{id}")
 def get_historico_comparativo_despesas_id(id: int):
@@ -8494,7 +8322,7 @@ async def get_hist_consolidado():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_relatorio_consolidado ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.delete("/excluir_relatorio_consolidado/{id}")
 async def excluir_relatorio_consolidado(id: int):
@@ -8668,7 +8496,7 @@ async def get_hist_bp():
     cursor.execute("SELECT id, periodo, data_geracao FROM historico_analise_bp ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 @app.get("/historico_analise_bp/{id}")
 async def get_bp_id(id: int):
@@ -8840,7 +8668,7 @@ async def listar_historico_liquidez():
     cur.execute("SELECT id, periodo, data_geracao FROM historico_liquidez ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 
 @app.get("/historico_liquidez/{id}")
@@ -9460,140 +9288,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
 
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": "inline; filename=relatorio_consolidado_" + str(id) + ".pdf"})
 
-@app.get("/gerar_pdf_analise_dmpl/{id}")
-def gerar_pdf_analise_dmpl(id: int):
-    import sqlite3 as _sq, json as _js
-    from fpdf import FPDF
-    from fpdf.enums import XPos, YPos
-    from fastapi.responses import Response
 
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = _sq.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_dmpl WHERE id = ?", (id,))
-    row = cur.fetchone()
-    conn.close()
-    
-    if not row:
-        return Response(content="Historico nao encontrado.", status_code=404, media_type="text/plain")
-
-    periodo, data_geracao, res_json = row
-    dados = _js.loads(res_json)
-    
-    linhas = dados.get("dados", [])
-    inicio_dados = 6 # Pula o cabecalho do COFEN
-    linhas_validas = [l for l in linhas[inicio_dados:] if len(l) >= 3]
-
-    pdf = FPDF(orientation="L", unit="mm", format="A4")
-    pdf.add_page()
-    pdf.set_margins(5, 5, 5)
-    pdf.set_auto_page_break(auto=False)
-
-    # CABECALHO PRINCIPAL
-    pdf.set_fill_color(0, 45, 90)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(287, 10, "DMPL - Demonstração das Mutaçíµes do Patrimí´nio Lí­quido", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
-    
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.ln(1)
-    pdf.cell(0, 4, f"Perí­odo: {periodo} | Data de Geração: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    pdf.ln(3)
-
-    # CABECALHO DA TABELA
-    headers = [
-        ("Especificação", 72, "L"),
-        ("Patrimí´nio Social", 26, "R"),
-        ("Adiant. Capital", 26, "R"),
-        ("Reservas Capital", 26, "R"),
-        ("Ajustes Avaliação", 26, "R"),
-        ("Reservas Lucros", 26, "R"),
-        ("Demais Reservas", 26, "R"),
-        ("Result. Acumulados", 26, "R"),
-        ("Total", 33, "R")
-    ]
-    
-    # AUTO AJUSTE PARA CABER EM 1 PAGINA
-    # A pagina paisagem tem 210mm de altura. Descontando margens e cabecalho, sobram ~165mm para a tabela.
-    altura_disponivel = 165 
-    qtd_linhas = len(linhas_validas) + 1 # +1 pelo cabecalho da tabela
-    altura_linha = altura_disponivel / qtd_linhas
-    
-    # Limita a altura para nao ficar gigante nem minuscula
-    altura_linha = min(8, max(2.5, altura_linha))
-    tam_fonte = 6 if altura_linha >= 4 else 5
-
-    pdf.set_font("Helvetica", "B", 6)
-    pdf.set_fill_color(0, 86, 179)
-    pdf.set_text_color(255, 255, 255)
-    
-    for h_txt, h_w, h_align in headers:
-        pdf.cell(h_w, altura_linha + 1, h_txt, border=1, align="C", fill=True)
-    pdf.ln()
-
-    # DADOS DA TABELA
-    pdf.set_text_color(0, 0, 0)
-    
-    for linha in linhas_validas:
-        while len(linha) < 9:
-            linha.append("")
-            
-        is_total = "Total" in linha[0] or "Saldo" in linha[0] or "Saldos finais" in linha[0].lower()
-        is_header = linha[0].strip() != "" and all(not str(c).strip() for c in linha[1:])
-        
-        if is_header:
-            pdf.set_font("Helvetica", "B", tam_fonte)
-            pdf.set_fill_color(230, 236, 245)
-            pdf.cell(287, altura_linha, linha[0], border=1, fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_font("Helvetica", "", tam_fonte)
-            pdf.set_fill_color(255, 255, 255)
-        else:
-            pdf.set_font("Helvetica", "B" if is_total else "", tam_fonte)
-            
-            fill = True if is_total else False
-            if is_total:
-                pdf.set_fill_color(245, 247, 250)
-                
-            for j in range(9):
-                w = headers[j][1]
-                align = "L" if j == 0 else "R"
-                txt = str(linha[j]).strip()
-                if len(txt) > 50 and j == 0:
-                    txt = txt[:47] + "..."
-                pdf.cell(w, altura_linha, txt, border=1, align=align, fill=fill)
-            pdf.ln()
-
-    pdf_bytes = bytes(pdf.output())
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=dmpl_{id}.pdf"},
-    )
-
-
-# ========================================================
-# Mí“DULO DE NOTAS EXPLICATIVAS (padrão Relatí³rio Consolidado)
-# ========================================================
-
-# --- Tabelas do banco (criadas no primeiro uso) ---
-def _init_notas_tables():
-    import sqlite3, os
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_notas_explicativas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS observacoes_notas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, relatorio_id INTEGER, item TEXT, texto TEXT, data_criacao TEXT)""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS conclusao_notas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, relatorio_id INTEGER, texto TEXT, data_criacao TEXT)""")
-    conn.commit()
-    conn.close()
-
-_init_notas_tables()
-
-# --- Rota para abrir a tela ---
 @app.get("/notas_explicativas")
 async def serve_notas_explicativas():
     from fastapi.responses import FileResponse
@@ -9779,7 +9474,7 @@ async def historico_notas_explicativas():
     cur.execute("SELECT id, periodo, data_geracao FROM historico_notas_explicativas ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
+    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
 
 # --- API: buscar histí³rico por id ---
 @app.get("/historico_notas_explicativas/{id}")
@@ -10285,4 +9980,243 @@ async def excluir_nota(relatorio_id: int, indice: int):
     conn.close()
     return {"ok": True}
 
+
+
+
+# ============================================================
+# ROTAS DA DMPL (NOVAS - LIMPAS)
+# ============================================================
+
+@app.get("/analise_dmpl")
+async def tela_analise_dmpl():
+    from fastapi.responses import FileResponse
+    import os
+    path_html = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_dmpl.html")
+    return FileResponse(path_html)
+
+@app.get("/api/analise_dmpl/{periodo}")
+async def api_analise_dmpl(periodo: str):
+    import os, csv
+    from fastapi.responses import JSONResponse
+    
+    nome_arquivo = f"DMPL_{periodo.replace('-', '_')}.csv"
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", nome_arquivo)
+    
+    if not os.path.exists(caminho):
+        return JSONResponse(content={"erro": True, "mensagem": "Arquivo nao encontrado."}, status_code=404)
+    
+    try:
+        dados = []
+        with open(caminho, "r", encoding="utf-8-sig") as f:
+            leitor = csv.reader(f, delimiter=';')
+            for linha in leitor:
+                if not linha: continue
+                if "COFEN" in linha[0].upper() or "CNPJ" in linha[0].upper() or "Período" in linha[0]:
+                    continue
+                dados.append(linha)
+        return {"dados": dados}
+    except Exception as e:
+        return JSONResponse(content={"erro": True, "mensagem": f"Erro ao ler CSV: {str(e)}"}, status_code=500)
+
+
+@app.post("/salvar_analise_dmpl/{periodo}")
+async def salvar_analise_dmpl(periodo: str):
+    import os, csv, json
+    import psycopg2
+    from fastapi.responses import JSONResponse
+    from datetime import datetime
+    
+    nome_arquivo = f"DMPL_{periodo.replace('-', '_')}.csv"
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", nome_arquivo)
+    
+    if not os.path.exists(caminho):
+        return JSONResponse(content={"erro": True, "mensagem": "Arquivo nao encontrado."}, status_code=404)
+    
+    try:
+        dados = []
+        with open(caminho, "r", encoding="utf-8-sig") as f:
+            leitor = csv.reader(f, delimiter=';')
+            for linha in leitor:
+                if not linha: continue
+                if "COFEN" in linha[0].upper() or "CNPJ" in linha[0].upper() or "Período" in linha[0]:
+                    continue
+                dados.append(linha)
+        
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        
+        cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_dmpl (
+            id SERIAL PRIMARY KEY,
+            periodo TEXT,
+            data_geracao TEXT,
+            resultado_json TEXT
+        )""")
+        
+        data_agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        dados_json = json.dumps({"dados": dados}, ensure_ascii=False)
+        
+        cur.execute(
+            "INSERT INTO historico_analise_dmpl (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+            (periodo, data_agora, dados_json)
+        )
+        conn.commit()
+        conn.close()
+        return {"ok": True, "mensagem": "Historico salvo com sucesso!"}
+    except Exception as e:
+        return JSONResponse(content={"erro": True, "mensagem": f"Erro ao salvar: {str(e)}"}, status_code=500)
+
+
+@app.get("/historico_analise_dmpl")
+async def historico_analise_dmpl():
+    import psycopg2
+    from fastapi.responses import JSONResponse
+    
+    try:
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_dmpl (
+            id SERIAL PRIMARY KEY,
+            periodo TEXT,
+            data_geracao TEXT,
+            resultado_json TEXT
+        )""")
+        cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_dmpl ORDER BY id DESC")
+        rows = cur.fetchall()
+        conn.close()
+        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "resultado_json": r[3]} for r in rows]
+    except Exception:
+        return []
+
+
+@app.get("/excluir_analise_dmpl/{id}")
+async def excluir_analise_dmpl(id: int):
+    import psycopg2
+    from fastapi.responses import JSONResponse
+    
+    try:
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("DELETE FROM historico_analise_dmpl WHERE id = %s", (id,))
+        conn.commit()
+        conn.close()
+        return {"ok": True, "mensagem": "Excluido com sucesso!"}
+    except Exception as e:
+        return JSONResponse(content={"erro": True, "mensagem": f"Erro ao excluir: {str(e)}"}, status_code=500)
+
+
+@app.get("/gerar_pdf_analise_dmpl/{id}")
+async def gerar_pdf_analise_dmpl(id: int):
+    import psycopg2
+    from fastapi.responses import Response
+    from fpdf import FPDF
+    import json
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import io
+    import os
+    from datetime import datetime
+
+    try:
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT periodo, resultado_json FROM historico_analise_dmpl WHERE id = %s", (id,))
+        row = cur.fetchone()
+        conn.close()
+        
+        if not row:
+            return Response(content="Historico nao encontrado.", status_code=404)
+        
+        periodo, res_json = row
+        dados = json.loads(res_json)
+        linhas = dados.get("dados", [])
+        
+        # 1. Prepara os dados para o grafico (pega os valores totais, ignorando zerados)
+        labels_grafico = []
+        valores_grafico = []
+        
+        for linha in linhas:
+            if not isinstance(linha, list) or len(linha) < 9: continue
+            nome = (linha[0] or "").strip()
+            valor_str = (linha[8] or "").strip()
+            
+            if not nome or nome in ("COFEN/BR", "Conselho Federal de Enfermagem") or nome.startswith("CNPJ:") or nome.startswith("Demonstra") or nome.startswith("Brasília"):
+                continue
+                
+            valor_limpo = valor_str.replace('.', '').replace(',', '.')
+            valor = float(valor_limpo) if valor_limpo else 0.0
+            
+            if valor != 0:
+                labels_grafico.append(nome[:20] + ('...' if len(nome) > 20 else ''))
+                valores_grafico.append(valor)
+        
+        # 2. Gera o grafico com matplotlib
+        plt.figure(figsize=(10, 4))
+        barras = plt.bar(labels_grafico, valores_grafico, color='#003366')
+        plt.title('Evolução das Principais Contas (R$)')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        
+        # Salva o grafico em memoria
+        img_buffer = io.BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=100)
+        img_buffer.seek(0)
+        plt.close()
+        
+        # 3. Monta o PDF
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Cabecalho
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(0, 10, f"DMPL - {periodo}", ln=True, align="C")
+        pdf.ln(5)
+        
+        # Tabela
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(140, 7, "Especificacao", border=1, align="L")
+        pdf.cell(40, 7, "Valor Total (R$)", border=1, align="R")
+        pdf.ln()
+        
+        pdf.set_font("Arial", "", 8)
+        for linha in linhas:
+            if not isinstance(linha, list) or len(linha) < 9: continue
+            nome = (linha[0] or "").strip()
+            valor = (linha[8] or "").strip()
+            
+            if not nome or nome in ("COFEN/BR", "Conselho Federal de Enfermagem") or nome.startswith("CNPJ:") or nome.startswith("Demonstra") or nome.startswith("Brasília"):
+                continue
+            
+            if len(nome) > 60: nome = nome[:57] + "..."
+            
+            pdf.cell(140, 6, nome, border=1, align="L")
+            pdf.cell(40, 6, valor, border=1, align="R")
+            pdf.ln()
+            
+        pdf.ln(10)
+        
+        # Insere o grafico abaixo da tabela
+        if labels_grafico:
+            pdf.image(img_buffer, x=15, w=180)
+        
+        pdf_bytes = bytes(pdf.output())
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=dmpl_{id}.pdf"})
+    except Exception as e:
+        return Response(content=f"Erro ao gerar PDF: {str(e)}", status_code=500)
 
