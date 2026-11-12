@@ -41,6 +41,7 @@
         <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn btn-salvar" onclick="exibirSelecionado()">Exibir</button>
         
     </div>
 
@@ -230,6 +231,57 @@
                 });
         }
 
+        async function carregarHistoricoSelecionado(elemento) {
+            const checkbox = elemento.querySelector('.check-hist');
+            
+            // Marca o checkbox e desmarca os outros
+            document.querySelectorAll('.check-hist').forEach(cb => cb.checked = false);
+            checkbox.checked = true;
+            
+            const id = checkbox.value;
+            
+            try {
+                const r = await fetch('/historico_analise_bp/' + id);
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const dados = await r.json();
+                
+                // Se os dados estiverem dentro de "dados", usa, senao usa o proprio objeto
+                const d = dados.dados?.dados || dados.dados || dados;
+                
+                // Desenha a tabela e o grafico na tela
+                render(d);
+                
+                // Atualiza o botao Salvar com o periodo do historico
+                const btnSalvar = document.getElementById('btn-salvar');
+                if (btnSalvar && dados.periodo) {
+                    btnSalvar.setAttribute('data-periodo', dados.periodo);
+                }
+                
+            } catch (e) {
+                console.error("Erro ao carregar historico:", e);
+                alert("Erro ao carregar o historico. Verifique o console (F12).");
+            }
+        }
+
+        async function exibirHistorico(id) {
+            try {
+                const r = await fetch('/historico_analise_bp/' + id);
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const dados = await r.json();
+                const d = dados.dados?.dados || dados.dados || dados;
+                render(d);
+                
+                // Marca o checkbox visualmente
+                document.querySelectorAll('.check-hist').forEach(cb => cb.checked = false);
+                const cb = document.querySelector(`.check-hist[value="${id}"]`);
+                if(cb) cb.checked = true;
+                
+            } catch (e) {
+                alert("Erro ao carregar o historico.");
+                console.error(e);
+            }
+        }
+
         function excluirSelecionado() {
             const selecionados = document.querySelectorAll(".check-hist:checked");
             if (selecionados.length === 0) { alert("Selecione um item no historico."); return; }
@@ -238,6 +290,21 @@
                 fetch('/excluir_analise_bp/' + sel.value, { method: 'DELETE' }).then(r => r.json())
             );
             Promise.all(promessas).then(() => { alert("Excluido(s) com sucesso!"); carregarHistorico(); });
+        }
+
+        async function exibirSelecionado() {
+            const sel = document.querySelector('.check-hist:checked');
+            if (!sel) { alert("Selecione um item no historico."); return; }
+            
+            try {
+                const r = await fetch('/historico_analise_bp/' + sel.value);
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const dados = await r.json();
+                const d = dados.dados?.dados || dados.dados || dados;
+                render(d);
+            } catch (e) {
+                alert("Erro ao carregar o historico.");
+            }
         }
 
         function gerarPDF() {

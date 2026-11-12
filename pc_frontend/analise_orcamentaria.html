@@ -37,11 +37,15 @@
     
     
         function gerarPDFHistorico() {
-            const sel = document.querySelector('input[name="historico"]:checked');
+            // CORRECAO: Busca a classe correta '.check-hist' em vez do nome errado 'historico'
+            const sel = document.querySelector('.check-hist:checked');
             if (!sel) {
                 alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
                 return;
             }
+            // CORRECAO: URL usando o padrao de rota definido no backend /{id}
+            window.open('/gerar_pdf_analise_orcamentaria/' + sel.value, '_blank');
+        }
             const url = `/gerar_pdf_analise_orcamentaria?historico_id=${sel.value}`;
             const a = document.createElement('a');
             a.href = url;
@@ -80,7 +84,7 @@ tr:nth-child(even){background:#f8fbff}
 <a href="/" class="btn" style="background:#ff7f00">&#8592; Voltar</a>
 <button class="btn" style="background:#28a745" onclick="exibirSelecionado()">Exibir</button>
 <button class="btn" style="background:#dc3545" onclick="excluirSelecionado()">Excluir</button>
-<button class="btn" style="background:#0056b3" onclick="gerarPDFHistorico()">Gerar PDF</button>
+<button class="btn" style="background:#0056b3" onclick="gerarPDF()">Gerar PDF</button>
 </div>
 <div class="hdr-sub">Execução Orçamentária</div>
 <div class="hdr-tit">Análise Orçamentária Comparativa</div>
@@ -229,11 +233,11 @@ function excluirSelecionado(){
   Promise.all([...sel].map(c=>fetch('/excluir_analise_orcamentaria/'+c.value,{method:'DELETE'}).then(r=>r.ok).catch(()=>false)))
     .then(rs=>{if(rs.some(x=>x)){alert('Excluído!');carregarHistorico();}});
 }
-function gerarPDF(){
-  const ck=document.querySelector('.check-hist:checked');
-  if(!ck){alert('Marque um item no histórico.');return;}
-  window.open('/gerar_pdf_analise_orcamentaria/'+ck.value,'_blank');
-}
+function gerarPDF() {
+        const ck = document.querySelector('.check-hist:checked');
+        if (!ck) { alert('Marque um item no histórico.'); return; }
+        window.open('/gerar_pdf_analise_orcamentaria/' + ck.value, '_blank');
+    }
 document.addEventListener('DOMContentLoaded',carregarHistorico);
 function exibirSelecionado() {
             const check = document.querySelector(".check-hist:checked");
