@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - pc_sistema</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { background: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; border-top: 5px solid #003366; }
+        h1 { color: #003366; text-align: center; margin-bottom: 30px; font-size: 24px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; color: #555; font-weight: bold; font-size: 14px; }
+        input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        input:focus { border-color: #003366; outline: none; }
+        button { width: 100%; padding: 12px; background: #003366; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        button:hover { background: #002244; }
+        .erro { color: #dc3545; text-align: center; margin-bottom: 15px; font-size: 14px; display: none; }
+        .logo { text-align: center; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="logo">
+            <img src="/logo-cofen.png" alt="Cofen" style="max-height: 80px; margin-bottom: 15px;">
+            <h1>Login - pc_sistema</h1>
+        </div>
+        <div id="mensagem-erro" class="erro"></div>
+        
+        <div class="form-group">
+            <label>E-mail</label>
+            <input type="email" id="email" placeholder="admin@cofen.gov.br">
+        </div>
+        
+        <div class="form-group">
+            <label>Senha</label>
+            <input type="password" id="senha" placeholder="Sua senha">
+        </div>
+        
+        <button onclick="fazerLogin()" id="btn-login">Entrar</button>
+    </div>
+
+    <script>
+        // Se ja estiver logado, redireciona
+        if (localStorage.getItem('usuario_logado')) {
+            window.location.href = '/';
+        }
+
+        async function fazerLogin() {
+            const email = document.getElementById('email').value;
+            const senha = document.getElementById('senha').value;
+            const btn = document.getElementById('btn-login');
+            const msgErro = document.getElementById('mensagem-erro');
+            
+            msgErro.style.display = 'none';
+            
+            if (!email || !senha) {
+                msgErro.textContent = 'Preencha e-mail e senha.';
+                msgErro.style.display = 'block';
+                return;
+            }
+            
+            btn.textContent = 'Entrando...';
+            btn.disabled = true;
+            
+            try {
+                const r = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email, senha})
+                });
+                const data = await r.json();
+                
+                if (data.ok) {
+                    // Salva os dados do usuario no navegador
+                    localStorage.setItem('usuario_logado', JSON.stringify(data.usuario));
+                    // Redireciona para o menu principal
+                    window.location.href = '/';
+                } else {
+                    msgErro.textContent = data.mensagem || 'E-mail ou senha incorretos.';
+                    msgErro.style.display = 'block';
+                }
+            } catch (e) {
+                msgErro.textContent = 'Erro de conexao com o servidor.';
+                msgErro.style.display = 'block';
+            } finally {
+                btn.textContent = 'Entrar';
+                btn.disabled = false;
+            }
+        }
+        
+        // Permite logar apertando Enter
+        document.getElementById('senha').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') fazerLogin();
+        });
+    </script>
+</body>
+</html>

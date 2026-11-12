@@ -197,7 +197,11 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
 <main class="main-content">
   <header class="header">
     <h2 id="header-title" style="color: #0072BA; font-size: 18px; font-weight: bold; margin: 0;">SGPC - SISTEMA DE GESTÃO DE PRESTAÇÃO DE CONTAS</h2>
-    <div style="display:flex;align-items:center;gap:10px"><span>Marcelo Medeiros</span><div class="user-avatar">MM</div></div>
+    <div style="display:flex;align-items:center;gap:15px;">
+            <span id="nome-usuario-logado" style="font-weight: 500;">Carregando...</span>
+            <div class="user-avatar" id="avatar-usuario">--</div>
+            <button onclick="fazerLogout()" style="padding: 8px 15px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">🚪 Sair</button>
+        </div>
   </header>
   
 <div id="tela-dashboard-welcome" class="content-area active" style="padding: 30px;">
@@ -820,6 +824,33 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
+
+
+
+
+
+<script>
+    function fazerLogout() {
+        localStorage.removeItem('usuario_logado');
+        window.location.href = '/login';
+    }
+    
+    // Carrega o nome do usuario dinamicamente
+    const userStr = localStorage.getItem('usuario_logado');
+    if (userStr) {
+        try {
+            const user = JSON.parse(userStr);
+            if (user && user.nome) {
+                document.getElementById('nome-usuario-logado').innerText = user.nome;
+                // Pega as iniciais (ex: Marcelo Medeiros -> MM)
+                const iniciais = user.nome.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                document.getElementById('avatar-usuario').innerText = iniciais;
+            }
+        } catch (e) {
+            console.error("Erro ao ler dados do usuario", e);
+        }
+    }
+</script>
 </body>
 
 </html>
