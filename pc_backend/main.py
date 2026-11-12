@@ -3,7 +3,7 @@ import sqlite_compat
 
 from fastapi.staticfiles import StaticFiles
 from app.routers import dfc
-from fastapi import Request, Request, FastAPI, Request
+from fastapi import Request, Request, FastAPI, Request, Form
 from historico_integridade import router as historico_router
 from fastapi import FastAPI, UploadFile, File
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
@@ -5117,31 +5117,58 @@ async def download_pdf_csv(tipo: str, ano: int = Query(2026), periodo: str = Que
 # ROTAS DE CONFIGURACOES (CADASTRO DA ENTIDADE)
 # ============================================================
 
+
+@app.get('/api/entidades')
+async def listar_entidades():
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pc_storage', 'banco_dados.db')
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, razao_social, nome_fantasia, cnpj FROM configuracoes_entidade ORDER BY id")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.delete('/api/entidades/{id}')
+async def deletar_entidade(id: int):
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pc_storage', 'banco_dados.db')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM configuracoes_entidade WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "mensagem": "Entidade excluída com sucesso"}
+
 @app.get('/api/configuracoes/entidade')
-async def obter_entidade():
+async def obter_entidade(id: int = None):
     import sqlite3, os
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row # Permite acessar colunas pelo nome
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Cria a tabela se nao existir
     cursor.execute("""CREATE TABLE IF NOT EXISTS configuracoes_entidade (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
+        cep TEXT, logradouro TEXT, numero TEXT, complemento TEXT, bairro TEXT, cidade TEXT, uf TEXT,
         email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT,
         contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT, logo_path TEXT
     )""")
     conn.commit()
 
-    cursor.execute("SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
+    if id:
+        cursor.execute("SELECT * FROM configuracoes_entidade WHERE id = ?", (id,))
+    else:
+        cursor.execute("SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
     row = cursor.fetchone()
     conn.close()
 
     if not row:
-        return {"razao_social": "", "nome_fantasia": "", "cnpj": "", "endereco": "", "email": "", "telefone": "", "contador_nome": "", "contador_crc": "", "contador_uf": "", "contador_cpf": "", "contador_email": "", "logo_path": ""}
+        return {"id": None, "razao_social": "", "nome_fantasia": "", "cnpj": "", "endereco": "", "cep": "", "logradouro": "", "numero": "", "complemento": "", "bairro": "", "cidade": "", "uf": "", "email": "", "telefone": "", "contador_nome": "", "contador_crc": "", "contador_uf": "", "contador_cpf": "", "contador_email": "", "logo_path": ""}
 
-    # Acessa pelo nome da coluna (evita erro de indice desalinhado)
     def get_col(nome):
         try:
             return row[nome] or ""
@@ -5149,10 +5176,18 @@ async def obter_entidade():
             return ""
 
     return {
+        "id": get_col("id"),
         "razao_social": get_col("razao_social"),
         "nome_fantasia": get_col("nome_fantasia"),
         "cnpj": get_col("cnpj"),
         "endereco": get_col("endereco"),
+        "cep": get_col("cep"),
+        "logradouro": get_col("logradouro"),
+        "numero": get_col("numero"),
+        "complemento": get_col("complemento"),
+        "bairro": get_col("bairro"),
+        "cidade": get_col("cidade"),
+        "uf": get_col("uf"),
         "email": get_col("email"),
         "telefone": get_col("telefone"),
         "contador_nome": get_col("contador_nome"),
@@ -5162,7 +5197,6 @@ async def obter_entidade():
         "contador_email": get_col("contador_email"),
         "logo_path": get_col("logo_path")
     }
-
 @app.post('/api/configuracoes/entidade')
 async def salvar_entidade(request: Request):
     import sqlite3
@@ -5177,17 +5211,24 @@ async def salvar_entidade(request: Request):
     cursor.execute('''CREATE TABLE IF NOT EXISTS configuracoes_entidade (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
+        cep TEXT, logradouro TEXT, numero TEXT, complemento TEXT, bairro TEXT, cidade TEXT, uf TEXT,
         email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT,
         contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT)''')
     data_agora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    cursor.execute('DELETE FROM configuracoes_entidade')
-    cursor.execute('''INSERT INTO configuracoes_entidade
-        (razao_social, nome_fantasia, cnpj, endereco, email, telefone, contador_nome, contador_crc, contador_uf, contador_cpf, contador_email, data_atualizacao, logo_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+    entidade_id = body.get('id')
+    
+    campos = [
         body.get('razao_social', ''),
         body.get('nome_fantasia', ''),
         body.get('cnpj', ''),
         body.get('endereco', ''),
+        body.get('cep', ''),
+        body.get('logradouro', ''),
+        body.get('numero', ''),
+        body.get('complemento', ''),
+        body.get('bairro', ''),
+        body.get('cidade', ''),
+        body.get('uf', ''),
         body.get('email', ''),
         body.get('telefone', ''),
         body.get('contador_nome', ''),
@@ -5196,7 +5237,43 @@ async def salvar_entidade(request: Request):
         body.get('contador_cpf', ''),
         body.get('contador_email', ''),
         data_agora,
-        body.get('logo_path', '')))
+        body.get('logo_path', '')
+    ]
+    
+    if entidade_id:
+        # UPDATE - ordem exata das colunas
+        cursor.execute("""UPDATE configuracoes_entidade SET
+            razao_social=?, nome_fantasia=?, cnpj=?, endereco=?, cep=?, logradouro=?, numero=?, complemento=?, bairro=?, cidade=?, uf=?,
+            email=?, telefone=?, contador_nome=?, contador_crc=?, contador_uf=?, contador_cpf=?, contador_email=?, data_atualizacao=?, logo_path=?
+            WHERE id=?""", (
+            body.get('razao_social', ''),
+            body.get('nome_fantasia', ''),
+            body.get('cnpj', ''),
+            body.get('endereco', ''),
+            body.get('cep', ''),
+            body.get('logradouro', ''),
+            body.get('numero', ''),
+            body.get('complemento', ''),
+            body.get('bairro', ''),
+            body.get('cidade', ''),
+            body.get('uf', ''),
+            body.get('email', ''),
+            body.get('telefone', ''),
+            body.get('contador_nome', ''),
+            body.get('contador_crc', ''),
+            body.get('contador_uf', ''),
+            body.get('contador_cpf', ''),
+            body.get('contador_email', ''),
+            data_agora,
+            body.get('logo_path', ''),
+            entidade_id
+        ))
+    else:
+        # INSERT
+        cursor.execute("""INSERT INTO configuracoes_entidade
+            (razao_social, nome_fantasia, cnpj, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf,
+             email, telefone, contador_nome, contador_crc, contador_uf, contador_cpf, contador_email, data_atualizacao, logo_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", campos)
     conn.commit()
     conn.close()
     return {'ok': True, 'mensagem': 'Configuracoes salvas com sucesso!'}
@@ -5225,7 +5302,7 @@ async def migrar_logo():
 
 
 @app.post("/api/configuracoes/logo")
-async def upload_logo(file: UploadFile = File(...)):
+async def upload_logo(file: UploadFile = File(...), entidade_id: str = Form(None)):
     import os, uuid, sqlite3
     from fastapi import HTTPException
 
@@ -5237,10 +5314,10 @@ async def upload_logo(file: UploadFile = File(...)):
     os.makedirs(pasta_logos, exist_ok=True)
 
     nome_arquivo = f"logo_{uuid.uuid4().hex[:8]}.{ext}"
-    caminho = os.path.join(pasta_logos, nome_arquivo)
+    caminho_completo = os.path.join(pasta_logos, nome_arquivo)
 
-    with open(caminho, "wb") as f:
-        f.write(await file.read())
+    with open(caminho_completo, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
@@ -5254,17 +5331,17 @@ async def upload_logo(file: UploadFile = File(...)):
     )""")
     conn.commit()
 
-    try:
-        cursor.execute("ALTER TABLE configuracoes_entidade ADD COLUMN logo_path TEXT DEFAULT ''")
-        conn.commit()
-    except Exception:
-        pass
-
-    cursor.execute("SELECT COUNT(*) FROM configuracoes_entidade")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO configuracoes_entidade (razao_social, logo_path) VALUES ('', ?)", (nome_arquivo,))
+    if entidade_id:
+        # Atualiza apenas a entidade especifica
+        cursor.execute("UPDATE configuracoes_entidade SET logo_path = ? WHERE id = ?", (nome_arquivo, entidade_id))
     else:
-        cursor.execute("UPDATE configuracoes_entidade SET logo_path = ?", (nome_arquivo,))
+        # Fallback: se nao veio o ID, atualiza a primeira (comportamento antigo)
+        cursor.execute("SELECT COUNT(*) FROM configuracoes_entidade")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO configuracoes_entidade (razao_social, logo_path) VALUES ('', ?)", (nome_arquivo,))
+        else:
+            cursor.execute("UPDATE configuracoes_entidade SET logo_path = ?", (nome_arquivo,))
+
     conn.commit()
     conn.close()
 
@@ -8069,30 +8146,32 @@ async def download_pdf_csv(tipo: str, ano: int = Query(2026), periodo: str = Que
 # ============================================================
 
 @app.get('/api/configuracoes/entidade')
-async def obter_entidade():
+async def obter_entidade(id: int = None):
     import sqlite3, os
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row # Permite acessar colunas pelo nome
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Cria a tabela se nao existir
     cursor.execute("""CREATE TABLE IF NOT EXISTS configuracoes_entidade (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
+        cep TEXT, logradouro TEXT, numero TEXT, complemento TEXT, bairro TEXT, cidade TEXT, uf TEXT,
         email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT,
         contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT, logo_path TEXT
     )""")
     conn.commit()
 
-    cursor.execute("SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
+    if id:
+        cursor.execute("SELECT * FROM configuracoes_entidade WHERE id = ?", (id,))
+    else:
+        cursor.execute("SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
     row = cursor.fetchone()
     conn.close()
 
     if not row:
-        return {"razao_social": "", "nome_fantasia": "", "cnpj": "", "endereco": "", "email": "", "telefone": "", "contador_nome": "", "contador_crc": "", "contador_uf": "", "contador_cpf": "", "contador_email": "", "logo_path": ""}
+        return {"id": None, "razao_social": "", "nome_fantasia": "", "cnpj": "", "endereco": "", "cep": "", "logradouro": "", "numero": "", "complemento": "", "bairro": "", "cidade": "", "uf": "", "email": "", "telefone": "", "contador_nome": "", "contador_crc": "", "contador_uf": "", "contador_cpf": "", "contador_email": "", "logo_path": ""}
 
-    # Acessa pelo nome da coluna (evita erro de indice desalinhado)
     def get_col(nome):
         try:
             return row[nome] or ""
@@ -8100,10 +8179,18 @@ async def obter_entidade():
             return ""
 
     return {
+        "id": get_col("id"),
         "razao_social": get_col("razao_social"),
         "nome_fantasia": get_col("nome_fantasia"),
         "cnpj": get_col("cnpj"),
         "endereco": get_col("endereco"),
+        "cep": get_col("cep"),
+        "logradouro": get_col("logradouro"),
+        "numero": get_col("numero"),
+        "complemento": get_col("complemento"),
+        "bairro": get_col("bairro"),
+        "cidade": get_col("cidade"),
+        "uf": get_col("uf"),
         "email": get_col("email"),
         "telefone": get_col("telefone"),
         "contador_nome": get_col("contador_nome"),
@@ -8113,7 +8200,6 @@ async def obter_entidade():
         "contador_email": get_col("contador_email"),
         "logo_path": get_col("logo_path")
     }
-
 @app.post('/api/configuracoes/entidade')
 async def salvar_entidade(request: Request):
     import sqlite3
@@ -8128,17 +8214,26 @@ async def salvar_entidade(request: Request):
     cursor.execute('''CREATE TABLE IF NOT EXISTS configuracoes_entidade (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         razao_social TEXT, nome_fantasia TEXT, cnpj TEXT, endereco TEXT,
+        cep TEXT, logradouro TEXT, numero TEXT, complemento TEXT, bairro TEXT, cidade TEXT, uf TEXT,
         email TEXT, telefone TEXT, contador_nome TEXT, contador_crc TEXT,
         contador_uf TEXT, contador_cpf TEXT, contador_email TEXT, data_atualizacao TEXT)''')
     data_agora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     cursor.execute('DELETE FROM configuracoes_entidade')
     cursor.execute('''INSERT INTO configuracoes_entidade
-        (razao_social, nome_fantasia, cnpj, endereco, email, telefone, contador_nome, contador_crc, contador_uf, contador_cpf, contador_email, data_atualizacao, logo_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+        (razao_social, nome_fantasia, cnpj, endereco, cep, logradouro, numero, complemento, bairro, cidade, uf,
+         email, telefone, contador_nome, contador_crc, contador_uf, contador_cpf, contador_email, data_atualizacao, logo_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
         body.get('razao_social', ''),
         body.get('nome_fantasia', ''),
         body.get('cnpj', ''),
         body.get('endereco', ''),
+        body.get('cep', ''),
+        body.get('logradouro', ''),
+        body.get('numero', ''),
+        body.get('complemento', ''),
+        body.get('bairro', ''),
+        body.get('cidade', ''),
+        body.get('uf', ''),
         body.get('email', ''),
         body.get('telefone', ''),
         body.get('contador_nome', ''),
