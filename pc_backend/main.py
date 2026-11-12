@@ -1,9 +1,10 @@
+import json
 # PATCH PG - troca sqlite3 por PostgreSQL (ver sqlite_compat.py)
 import sqlite_compat
 
 from fastapi.staticfiles import StaticFiles
 from app.routers import dfc
-from fastapi import Request, Request, FastAPI, Request, Form
+from fastapi import Response, Request, Request, FastAPI, Request, Form
 from fastapi import FastAPI, UploadFile, File
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
 from fastapi.staticfiles import StaticFiles
@@ -1235,14 +1236,25 @@ async def salvar_conferencia(periodo: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 @app.get("/historico_conferencia")
-async def listar_conferencia():
+def listar_conferencia():
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo, data_geracao FROM historico_conferencia ORDER BY id DESC")
+    cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_conferencia ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+    
+    resultado = []
+    for r in rows:
+        resultado.append({
+            "id": r[0], 
+            "periodo": r[1], 
+            "data_geracao": r[2], 
+            "dados": r[3]
+        })
+        
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
 @app.get("/historico_conferencia/{id}")
 async def buscar_conferencia(id: int):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -1539,72 +1551,141 @@ async def salvar_analise_orcamentaria(periodo: str):
 @app.get("/api/composicao_receitas_despesas/{periodo}")
 async def api_composicao_rd(periodo: str):
     try:
-        # === REGRA DE INTEGRIDADE ===
-        from matriz_integridade import _get_csv
-        caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
-        if not caminho_check or not os.path.exists(caminho_check):
-            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
-        from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+        from matriz_integridade import _get_csv, _ler_linhas, _limpar_valor
+        import os
+
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho or not os.path.exists(caminho):
-            return {"erro": True, "mensagem": f"BO {periodo} nao importado."}
+            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
+
         linhas = _ler_linhas(caminho)
+
         def buscar(termo, col=6):
             termo_up = termo.strip().upper()
-            # 1o: correspondencia exata
             for p in linhas:
                 if p and len(p) > col and p[0].strip().upper() == termo_up:
                     return abs(_limpar_valor(p[col]))
-            # 2o: contains (fallback)
             for p in linhas:
                 if p and len(p) > col and termo_up in p[0].strip().upper():
                     return abs(_limpar_valor(p[col]))
             return 0.0
+
         receitas = {
             "Receitas Correntes": buscar("RECEITAS CORRENTE"),
             "Receitas Patrimoniais": buscar("RECEITAS PATRIMONIAIS"),
-            "Transferencias Correntes": buscar("TRANSFERíŠNCIAS CORRENTES"),
+            "Transferencias Correntes": buscar("TRANSFERÊNCIAS CORRENTES"),
             "Outras Receitas Correntes": buscar("OUTRAS RECEITAS CORRENTES"),
             "Receitas de Capital": buscar("RECEITAS DE CAPITAL"),
         }
+
         despesas = {
             "Pessoal e Encargos": buscar("PESSOAL E ENCARGOS SOCIAIS", 4),
             "Outras Despesas Correntes": buscar("OUTRAS DESPESAS CORRENTES", 4),
-            "Investimentos": buscar("INVESTIMENTOS - APLICAí‡í•ES DIRETAS", 4),
-            "Inversoes Financeiras": buscar("INVERSí•ES FINANCEIRAS  APLICAí‡í•ES DIRETAS", 4),
+            "Investimentos": buscar("INVESTIMENTOS - APLICAÇÕES DIRETAS", 4),
+            "Inversoes Financeiras": buscar("INVERSÕES FINANCEIRAS", 4),
         }
+
         return {"erro": False, "receitas": receitas, "despesas": despesas}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
+
+
 @app.post("/salvar_composicao_receitas_despesas/{periodo}/{periodo_anterior}")
 async def salvar_composicao_rd(periodo: str, periodo_anterior: str):
+    import psycopg2
+    import json
+    from datetime import datetime
+    from fastapi.responses import JSONResponse
+
     atual = await api_composicao_rd(periodo)
-    if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
+    if atual.get("erro"): raise HTTPException(status_code=400, detail=atual.get("mensagem", "Erro no periodo atual"))
     anterior = await api_composicao_rd(periodo_anterior)
     dados = {"periodo": periodo, "periodo_anterior": periodo_anterior,
              "atual": atual, "anterior": anterior if not anterior.get("erro") else {}}
-    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_composicao_rd (
+    
+    try:
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS historico_composicao_receitas_despesas (
+            id SERIAL PRIMARY KEY,
+            periodo TEXT,
+            periodo_anterior TEXT,
+            data_geracao TEXT,
+            resultado_json TEXT
+        )""")
+        data_agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cur.execute(
+            "INSERT INTO historico_composicao_receitas_despesas (periodo, periodo_anterior, data_geracao, resultado_json) VALUES (%s, %s, %s, %s)",
+            (periodo, periodo_anterior, data_agora, json.dumps(dados, ensure_ascii=False))
+        )
+        conn.commit()
+        conn.close()
+        return {"mensagem": "Salvo"}
+    except Exception as e:
+        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
 
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    cur.execute("INSERT INTO historico_composicao_rd (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
-                (f"{periodo} vs {periodo_anterior}", data_agora, json.dumps(dados)))
-    conn.commit(); conn.close()
-    return {"mensagem": "Salvo"}
+
 @app.get("/historico_composicao_receitas_despesas")
-async def get_hist_composicao():
-    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao FROM historico_composicao_rd ORDER BY id DESC")
-    rows = cur.fetchall(); conn.close()
-    return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3]} for r in rows]
+async def historico_composicao_receitas_despesas():
+    import psycopg2
+    from fastapi.responses import JSONResponse
+    try:
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS historico_composicao_receitas_despesas (
+            id SERIAL PRIMARY KEY,
+            periodo TEXT,
+            periodo_anterior TEXT,
+            data_geracao TEXT,
+            resultado_json TEXT
+        )""")
+        cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_composicao_receitas_despesas ORDER BY id DESC")
+        rows = cur.fetchall()
+        conn.close()
+        return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "resultado_json": r[3]} for r in rows]
+    except Exception as e:
+        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
+
+
+    except Exception as e:
+        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
+
+
 @app.get("/historico_composicao_receitas_despesas/{id}")
 async def get_composicao_id(id: int):
-    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-    cur.execute("SELECT periodo, resultado_json FROM historico_composicao_rd WHERE id=?", (id,))
-    row = cur.fetchone(); conn.close()
-    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-    return json.loads(row[1])
+    import psycopg2
+    import json
+    from fastapi.responses import JSONResponse
+
+    try:
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT periodo, resultado_json FROM historico_composicao_receitas_despesas WHERE id = %s", (id,))
+        row = cur.fetchone()
+        conn.close()
+
+        if not row:
+            return JSONResponse(content={"erro": True, "mensagem": "Nao encontrado"}, status_code=404)
+
+        periodo, res_json = row
+        dados = json.loads(res_json)
+        return dados
+    except Exception as e:
+        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
+
+
 @app.delete("/excluir_composicao_receitas_despesas/{id}")
 async def excluir_composicao(id: int):
     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
@@ -2756,124 +2837,183 @@ async def gerar_pdf_analise_patrimonial(id: int):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
 @app.get("/gerar_pdf_composicao_receitas_despesas/{id}")
-async def gerar_pdf_composicao_receitas_despesas(id: int):
+def gerar_pdf_composicao_receitas_despesas(id: int):
+    def fmt_moeda(valor):
+        # Formata o valor no padrão brasileiro completo: 1.234.567,89
+        try:
+            v = float(valor)
+            s = f"{v:,.2f}"
+            return s.replace(",", "X").replace(".", ",").replace("X", ".")
+        except:
+            return "0,00"
+        try:
+            v = float(valor)
+            s = f"{v:,.2f}"
+            return s.replace(",", "X").replace(".", ",").replace("X", ".")
+        except:
+            return "0,00"
+    def fmt_br(valor, pos=None):
+        try:
+            s = f"{valor:,.2f}"
+            return s.replace(",", "X").replace(".", ",").replace("X", ".")
+        except:
+            return "0,00"
+
+
+
+    from fastapi.responses import Response
+    from fpdf import FPDF
+    import psycopg2
+    import json
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FuncFormatter
+    import io
+    from datetime import datetime
+
+    
+
     try:
-        from fastapi.responses import Response
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        import matplotlib.ticker as ticker
-        import io, tempfile, os, json, sqlite3
-        # 1. Busca o periodo e os dados no banco
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT periodo, resultado_json FROM historico_composicao_rd WHERE id = ?", (id,))
-        row = cursor.fetchone()
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT periodo, periodo_anterior, data_geracao, resultado_json FROM historico_composicao_receitas_despesas WHERE id = %s", (id,))
+        row = cur.fetchone()
         conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
-        periodo, d_json = row
-        d = json.loads(d_json)
-        # Estrutura esperada: { atual: { receitas: {...}, despesas: {...} }, anterior: { receitas: {...}, despesas: {...} } }
-        a = d.get("atual", {})
-        b = d.get("anterior", {})
-        # 2. Prepara os dados para o gráfico (Receitas)
-        labels = list(a.get("receitas", {}).keys())
-        data_a = [a.get("receitas", {}).get(k, 0) for k in labels]
-        data_b = [b.get("receitas", {}).get(k, 0) for k in labels]
-        fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
-        x = range(len(labels))
-        ax.bar([i - 0.2 for i in x], data_a, width=0.4, label="Atual", color="#003366")
-        ax.bar([i + 0.2 for i in x], data_b, width=0.4, label="Anterior", color="#4a90e2")
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels, fontsize=8, rotation=15)
-        ax.legend(loc="upper right", fontsize=8, frameon=False)
-        formatter = ticker.FuncFormatter(lambda x, pos: f"{x*1e-6:,.1f} Mi")
-        ax.yaxis.set_major_formatter(formatter)
-        ax.tick_params(axis="y", labelsize=8)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.grid(axis="y", linestyle="--", alpha=0.5)
+
+        if not row:
+            return Response(content="Historico nao encontrado.", status_code=404)
+
+        periodo, periodo_anterior, data_geracao, res_json = row
+        dados = json.loads(res_json)
+        atual = dados.get("atual", {})
+        anterior = dados.get("anterior", {})
+
+        # Grafico
+        receitas = atual.get("receitas", {})
+        despesas = atual.get("despesas", {})
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+        if receitas:
+            labels = list(receitas.keys())
+            valores = list(receitas.values())
+            ax1.bar(labels, valores, color='#003366')
+            ax1.set_title('Receitas (R$)', fontsize=10, fontweight='bold')
+            ax1.tick_params(axis='x', rotation=45, labelsize=7)
+            ax1.yaxis.set_major_formatter(FuncFormatter(fmt_br))
+            ax1.grid(axis='y', linestyle='--', alpha=0.3)
+        if despesas:
+            labels = list(despesas.keys())
+            valores = list(despesas.values())
+            ax2.bar(labels, valores, color='#dc3545')
+            ax2.set_title('Despesas (R$)', fontsize=10, fontweight='bold')
+            ax2.tick_params(axis='x', rotation=45, labelsize=7)
+            ax2.yaxis.set_major_formatter(FuncFormatter(fmt_br))
+            ax2.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
-        img_path = os.path.join(tempfile.gettempdir(), f"grafico_comp_{id}.png")
-        plt.savefig(img_path, bbox_inches="tight"); plt.close()
-        # 3. Monta o PDF
-        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        img_buffer = io.BytesIO()
+        plt.savefig(img_buffer, format='png', dpi=120, bbox_inches='tight')
+        img_buffer.seek(0)
+        plt.close()
+
+        # PDF
+        pdf = FPDF()
         pdf.add_page()
-        font_path = "C:/Windows/Fonts/arial.ttf"
-        font_bold = "C:/Windows/Fonts/arialbd.ttf"
-        if os.path.exists(font_path):
-            pdf.add_font("Arial", "", font_path)
-            pdf.add_font("Arial", "B", font_bold)
-            f_family = "Arial"
-        else:
-            f_family = "helvetica"
-        pdf.set_font(f_family, "B", 16)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 10, "Composicao de Receitas e Despesas", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.set_font(f_family, "", 10)
-        pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 5, f"Periodo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.ln(5)
-        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        # --- Tabela de Receitas ---
-        pdf.set_font(f_family, "B", 10)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 6, "RECEITAS (R$ mil)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        
+        # Cabecalho azul
         pdf.set_fill_color(0, 51, 102)
         pdf.set_text_color(255, 255, 255)
-        pdf.set_font(f_family, "B", 9)
-        pdf.cell(80, 7, "Conta", border=1, fill=True, align="L")
-        pdf.cell(45, 7, "Periodo Atual", border=1, fill=True, align="C")
-        pdf.cell(45, 7, "Periodo Anterior", border=1, fill=True, align="C")
-        pdf.cell(30, 7, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(0, 15, "COMPOSIÇÃO DE RECEITAS E DESPESAS", ln=True, align="C", fill=True)
+        pdf.ln(2)
+        
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font(f_family, "", 8)
-        for k, va in a.get("receitas", {}).items():
-            vb = b.get("receitas", {}).get(k, 0)
-            var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
-            pdf.cell(80, 6, k, border=1, align="L")
-            pdf.cell(45, 6, fmt(va), border=1, align="R")
-            pdf.cell(45, 6, fmt(vb), border=1, align="R")
-            if var >= 0: pdf.set_text_color(0, 128, 0)
-            else: pdf.set_text_color(220, 53, 69)
-            pdf.cell(30, 6, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_text_color(0, 0, 0)
-        pdf.ln(5)
-        # --- Tabela de Despesas ---
-        pdf.set_font(f_family, "B", 10)
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(0, 8, f"Período Atual: {periodo}  |  Período Anterior: {periodo_anterior}", ln=True, align="C")
+        pdf.cell(0, 8, f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
+        pdf.ln(10)
+
+        def calc_var(v_atual, v_ant):
+            if v_ant == 0: return "-"
+            var = ((v_atual - v_ant) / abs(v_ant)) * 100
+            sinal = "+" if var >= 0 else ""
+            return f"{sinal}{var:.2f}%"
+
+        # Tabela de Receitas
+        pdf.set_font("Arial", "B", 12)
         pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 6, "DESPESAS (R$ mil)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_fill_color(0, 51, 102)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font(f_family, "B", 9)
-        pdf.cell(80, 7, "Conta", border=1, fill=True, align="L")
-        pdf.cell(45, 7, "Periodo Atual", border=1, fill=True, align="C")
-        pdf.cell(45, 7, "Periodo Anterior", border=1, fill=True, align="C")
-        pdf.cell(30, 7, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(0, 10, "RECEITAS (R$)", ln=True, align="L")
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font(f_family, "", 8)
-        for k, va in a.get("despesas", {}).items():
-            vb = b.get("despesas", {}).get(k, 0)
-            var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
-            pdf.cell(80, 6, k, border=1, align="L")
-            pdf.cell(45, 6, fmt(va), border=1, align="R")
-            pdf.cell(45, 6, fmt(vb), border=1, align="R")
-            if var >= 0: pdf.set_text_color(0, 128, 0)
-            else: pdf.set_text_color(220, 53, 69)
-            pdf.cell(30, 6, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_text_color(0, 0, 0)
-        # 4. Adiciona o gráfico no final
+        
+        pdf.set_fill_color(0, 0, 0)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 8)
+        pdf.cell(10, 8, "", border=0)
+        pdf.cell(60, 8, "Conta", border=1, align="L", fill=True)
+        pdf.cell(45, 8, "Período Atual", border=1, align="R", fill=True)
+        pdf.cell(45, 8, "Período Anterior", border=1, align="R", fill=True)
+        pdf.cell(30, 8, "Var. (%)", border=1, align="R", fill=True)
+        pdf.ln()
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", "", 7)
+        rec_atual = atual.get("receitas", {})
+        rec_ant = anterior.get("receitas", {})
+        for k, v in rec_atual.items():
+            v_ant = rec_ant.get(k, 0)
+            var = calc_var(v, v_ant)
+            pdf.cell(10, 7, "", border=0)
+            pdf.cell(60, 7, k, border=1, align="L")
+            pdf.cell(45, 7, fmt_moeda(v), border=1, align="R")
+            pdf.cell(45, 7, fmt_moeda(v_ant), border=1, align="R")
+            pdf.cell(30, 7, var, border=1, align="R")
+            pdf.ln()
+        
         pdf.ln(8)
-        pdf.image(img_path, x=40, y=pdf.get_y(), w=160)
+
+        # Tabela de Despesas
+        pdf.set_font("Arial", "B", 12)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 10, "DESPESAS (R$)", ln=True, align="L")
+        pdf.set_text_color(0, 0, 0)
+        
+        pdf.set_fill_color(0, 0, 0)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 8)
+        pdf.cell(10, 8, "", border=0)
+        pdf.cell(60, 8, "Conta", border=1, align="L", fill=True)
+        pdf.cell(45, 8, "Período Atual", border=1, align="R", fill=True)
+        pdf.cell(45, 8, "Período Anterior", border=1, align="R", fill=True)
+        pdf.cell(30, 8, "Var. (%)", border=1, align="R", fill=True)
+        pdf.ln()
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", "", 7)
+        desp_atual = atual.get("despesas", {})
+        desp_ant = anterior.get("despesas", {})
+        for k, v in desp_atual.items():
+            v_ant = desp_ant.get(k, 0)
+            var = calc_var(v, v_ant)
+            pdf.cell(10, 7, "", border=0)
+            pdf.cell(60, 7, k, border=1, align="L")
+            pdf.cell(45, 7, fmt_moeda(v), border=1, align="R")
+            pdf.cell(45, 7, fmt_moeda(v_ant), border=1, align="R")
+            pdf.cell(30, 7, var, border=1, align="R")
+            pdf.ln()
+        
+        pdf.ln(10)
+        pdf.image(img_buffer, x=10, w=170)
+        
         pdf_bytes = bytes(pdf.output())
-        return Response(content=pdf_bytes, media_type="application/pdf", headers={
-            "Content-Disposition": f"inline; filename=composicao_{id}.pdf"
-        })
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=composicao_{id}.pdf"})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return Response(content=f"Erro ao gerar PDF: {str(e)}", status_code=500)
+
+
 @app.get("/gerar_pdf_base_legal")
 async def gerar_pdf_base_legal(periodo: str):
     try:
@@ -10213,7 +10353,7 @@ async def gerar_pdf_analise_dmpl(id: int):
         
         # Insere o grafico abaixo da tabela
         if labels_grafico:
-            pdf.image(img_buffer, x=15, w=180)
+            pdf.image(img_buffer, x=10, w=170)
         
         pdf_bytes = bytes(pdf.output())
         return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=dmpl_{id}.pdf"})
