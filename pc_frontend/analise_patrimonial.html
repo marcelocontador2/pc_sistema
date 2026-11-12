@@ -211,25 +211,83 @@
                 .then(d => { alert('Relatório salvo!'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; carregarHistorico(); })
                 .catch(e => { alert('Erro ao salvar.'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; });
         }
-        function exibirSelecionado() {
-            const check = document.querySelector(".check-historico:checked");
-            if (!check) { alert("Selecione um item no histórico."); return; }
-            const tb = document.querySelector('#tab tbody');
-            tb.innerHTML = '<tr><td colspan="4" style="text-align:center">Carregando histórico...</td></tr>';
-            document.getElementById('concl').style.display = 'none';
-            fetch('/historico_analise_patrimonial/' + check.value)
-                .then(r => r.json())
-                .then(resp => {
-                    if (resp.dados) {
-                        const sel = document.getElementById('periodo');
-                        sel.innerHTML = '<option value="' + resp.periodo + '">' + resp.periodo + '</option>';
-                        sel.value = resp.periodo;
-                        desenharTela(resp.dados, resp.periodo);
-                        document.getElementById('btn-salvar').style.display = 'inline-block';
-                    }
-                })
-                .catch(e => alert("Erro ao carregar o histórico."));
+        async function exibirSelecionado() {
+    const check = document.querySelector(".check-historico:checked");
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    
+    try {
+        const r = await fetch('/historico_analise_patrimonial/' + check.value);
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const resp = await r.json();
+        
+        const d = resp.dados?.dados || resp.dados || resp;
+        const periodo = resp.periodo || '2026-TRIMESTRE-3';
+
+        // 1. Preencher a Tabela de forma generica e segura
+        let html = '';
+        let labels = [];
+        let dadosAtual = [];
+        let dadosAnterior = [];
+
+        for (const [key, val] of Object.entries(d)) {
+            if (val && typeof val === 'object' && val.atual !== undefined) {
+                // Formata o nome da chave
+                const nome = key.replace(/_/g, ' ').toUpperCase();
+                
+                // Pega os valores com seguranca
+                const vAtual = Number(val.atual || 0);
+                const vAnterior = Number(val.anterior || 0);
+                
+                // Calcula a variacao
+                const variacao = vAnterior !== 0 ? ((vAtual - vAnterior) / Math.abs(vAnterior)) * 100 : 0;
+                const corVar = variacao >= 0 ? '#28a745' : '#dc3545';
+                const sinal = variacao >= 0 ? '+' : '';
+
+                html += `<tr>
+                    <td>${nome}</td>
+                    <td style="text-align:right;">${vAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td style="text-align:right;">${vAnterior.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td style="text-align:right; color:${corVar}; font-weight:bold;">${sinal}${variacao.toFixed(2)}%</td>
+                </tr>`;
+
+                // Guarda para o grafico (vamos pegar apenas os 4 primeiros para nao poluir)
+                if (labels.length < 4) {
+                    labels.push(nome);
+                    dadosAtual.push(vAtual);
+                    dadosAnterior.push(vAnterior);
+                }
+            }
         }
+
+        const tb = document.querySelector('#tab tbody');
+        if (tb) tb.innerHTML = html || '<tr><td colspan="4" style="text-align:center">Nenhum dado encontrado.</td></tr>';
+
+        // 2. Desenhar o Grafico do zero
+        const canvas = document.getElementById('graf');
+        if (canvas && labels.length > 0) {
+            if (window.chart) window.chart.destroy();
+            window.chart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Atual', data: dadosAtual, backgroundColor: '#003366', borderRadius: 4 },
+                        { label: 'Anterior', data: dadosAnterior, backgroundColor: '#5b9bd5', borderRadius: 4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+    } catch (e) {
+        alert("Erro ao carregar o histórico: " + e.message);
+    }
+}
+
+
+
+
+
         function excluirSelecionado() {
             const selecionados = document.querySelectorAll(".check-historico:checked");
             if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
