@@ -10359,6 +10359,27 @@ def get_historico_analise_dmpl():
         
     return Response(content=json.dumps(resultado), media_type="application/json")
 
+@app.get("/historico_analise_dmpl/{id}")
+def get_historico_analise_dmpl_id(id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_dmpl WHERE id = ?", (id,))
+    row = cur.fetchone()
+    conn.close()
+    
+    if not row:
+        return Response(content=json.dumps({"erro": "Registro não encontrado"}), media_type="application/json", status_code=404)
+        
+    resultado = {
+        "id": row[0],
+        "periodo": row[1],
+        "data_geracao": row[2],
+        "dados": row[3]
+    }
+    
+    return Response(content=json.dumps(resultado), media_type="application/json")
+
+
 @app.get("/excluir_analise_dmpl/{id}")
 async def excluir_analise_dmpl(id: int):
     import psycopg2
