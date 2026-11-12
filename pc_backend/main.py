@@ -98,6 +98,14 @@ def get_dashboard_despesas():
         return FileResponse(caminho)
     return {"erro": True, "mensagem": "Arquivo dashboard_despesas.html nao encontrado"}
 
+
+@app.get("/entidades")
+async def tela_entidades():
+    from fastapi.responses import FileResponse
+    import os
+    path_html = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "entidades.html")
+    return FileResponse(path_html)
+
 @app.get("/configuracoes", response_class=HTMLResponse)
 async def serve_configuracoes():
     import os
@@ -138,6 +146,14 @@ if os.path.exists(frontend_path):
     app.mount("/pc_frontend", StaticFiles(directory=frontend_path), name="pc_frontend")
     print(f"âœ… Arquivos estáticos montados em: {frontend_path}")
 from fastapi.responses import HTMLResponse
+
+
+@app.get("/usuarios")
+async def tela_usuarios():
+    from fastapi.responses import FileResponse
+    import os
+    path_html = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "usuarios.html")
+    return FileResponse(path_html)
 
 @app.get("/login")
 async def tela_login():
@@ -5192,6 +5208,80 @@ async def login(body: dict):
             }
         else:
             return {"ok": False, "mensagem": "E-mail ou senha incorretos."}
+    except Exception as e:
+        return {"ok": False, "mensagem": f"Erro no banco: {str(e)}"}
+
+
+@app.get("/api/usuarios")
+async def listar_usuarios():
+    import psycopg2
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.entidade_id, e.nome_fantasia
+            FROM usuarios u
+            LEFT JOIN configuracoes_entidade e ON u.entidade_id = e.id
+            ORDER BY u.id
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        usuarios = []
+        for r in rows:
+            usuarios.append({
+                "id": r[0], "nome": r[1], "email": r[2], "perfil": r[3],
+                "ativo": r[4], "entidade_id": r[5], "entidade_nome": r[6] or "Sem entidade"
+            })
+        return {"ok": True, "usuarios": usuarios}
+    except Exception as e:
+        return {"ok": False, "mensagem": f"Erro ao listar usuarios: {str(e)}"}
+
+@app.post("/api/usuarios")
+async def salvar_usuario(body: dict):
+    import psycopg2, hashlib
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+
+    nome = body.get('nome', '').strip()
+    email = body.get('email', '').strip()
+    senha = body.get('senha', '')
+    perfil = body.get('perfil', 'user')
+    entidade_id = body.get('entidade_id')
+    usuario_id = body.get('id')
+
+    if not nome or not email:
+        return {"ok": False, "mensagem": "Nome e e-mail sao obrigatorios."}
+
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        
+        if usuario_id:
+            # UPDATE
+            if senha:
+                salt = "sigos_salt_2026_"
+                senha_hash = hashlib.sha256((salt + senha).encode('utf-8')).hexdigest()
+                cursor.execute("UPDATE usuarios SET nome=%s, email=%s, senha_hash=%s, perfil=%s, entidade_id=%s WHERE id=%s", (nome, email, senha_hash, perfil, entidade_id, usuario_id))
+            else:
+                cursor.execute("UPDATE usuarios SET nome=%s, email=%s, perfil=%s, entidade_id=%s WHERE id=%s", (nome, email, perfil, entidade_id, usuario_id))
+        else:
+            # INSERT
+            if not senha:
+                return {"ok": False, "mensagem": "Senha e obrigatoria para novos usuarios."}
+            salt = "sigos_salt_2026_"
+            senha_hash = hashlib.sha256((salt + senha).encode('utf-8')).hexdigest()
+            cursor.execute("INSERT INTO usuarios (nome, email, senha_hash, perfil, entidade_id) VALUES (%s, %s, %s, %s, %s)", (nome, email, senha_hash, perfil, entidade_id))
+        
+        conn.commit()
+        conn.close()
+        return {"ok": True, "mensagem": "Usuario salvo com sucesso!"}
     except Exception as e:
         return {"ok": False, "mensagem": f"Erro no banco: {str(e)}"}
 
