@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Usuários - pc_sistema</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { background: #f4f6f9; padding: 30px; color: #333; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .header-page { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { color: #003366; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; text-decoration: none; display: inline-block; }
+        .btn-voltar { background: #f0ad4e; }
+        .btn-salvar { background: #28a745; }
+        .btn-cancelar { background: #6c757d; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #003366; color: white; font-weight: bold; }
+        tr:hover { background: #f8f9fa; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group.full { grid-column: span 2; }
+        label { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 5px; }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .msg { padding: 10px; border-radius: 4px; margin-bottom: 15px; display: none; }
+        .msg-sucesso { background: #d4edda; color: #155724; }
+        .msg-erro { background: #f8d7da; color: #721c24; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-page">
+            <h1>Gerenciar Usuários</h1>
+            <a href="/" class="btn btn-voltar">← Voltar ao Menu</a>
+        </div>
+
+        <div id="msg" class="msg"></div>
+
+        <!-- Lista de Usuários -->
+        <div class="card" id="card-lista">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="color: #003366; margin: 0;">Usuários Cadastrados</h3>
+                <button class="btn btn-salvar" onclick="abrirFormulario()">➕ Novo Usuário</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>E-mail</th>
+                        <th>Entidade</th>
+                        <th>Perfil</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-usuarios">
+                    <tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Formulário (oculto por padrão) -->
+        <div class="card hidden" id="card-form">
+            <h3 style="color: #003366; margin-bottom: 15px;" id="titulo-form">Novo Usuário</h3>
+            <input type="hidden" id="user-id">
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label>Nome Completo</label>
+                    <input type="text" id="user-nome" placeholder="Ex: João Silva">
+                </div>
+                <div class="form-group">
+                    <label>E-mail</label>
+                    <input type="email" id="user-email" placeholder="joao@cofen.gov.br">
+                </div>
+                <div class="form-group">
+                    <label>Senha (deixe em branco para manter)</label>
+                    <input type="password" id="user-senha" placeholder="********">
+                </div>
+                <div class="form-group">
+                    <label>Entidade Vinculada</label>
+                    <select id="user-entidade"></select>
+                </div>
+                <div class="form-group">
+                    <label>Perfil</label>
+                    <select id="user-perfil">
+                        <option value="user">Usuário Comum</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-cancelar" onclick="fecharFormulario()">Cancelar</button>
+                <button class="btn btn-salvar" onclick="salvarUsuario()">Salvar Usuário</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Proteção de rota
+        if (!localStorage.getItem('usuario_logado')) {
+            window.location.href = '/login';
+        }
+
+        let entidadesLista = [];
+
+        function mostrarMsg(texto, tipo) {
+            const msg = document.getElementById('msg');
+            msg.textContent = texto;
+            msg.className = 'msg ' + (tipo === 'ok' ? 'msg-sucesso' : 'msg-erro');
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 4000);
+        }
+
+        async function carregarEntidades() {
+            try {
+                const r = await fetch('/api/entidades');
+                entidadesLista = await r.json();
+                const select = document.getElementById('user-entidade');
+                select.innerHTML = '<option value="">(Nenhuma)</option>';
+                entidadesLista.forEach(e => {
+                    select.innerHTML += `<option value="${e.id}">${e.nome_fantasia || e.razao_social} (ID: ${e.id})</option>`;
+                });
+            } catch (e) {
+                console.error('Erro ao carregar entidades', e);
+            }
+        }
+
+        async function carregarUsuarios() {
+            const tbody = document.getElementById('tbody-usuarios');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
+            
+            try {
+                const r = await fetch('/api/usuarios');
+                const data = await r.json();
+                
+                if (!data.ok) throw new Error(data.mensagem);
+                
+                if (data.usuarios.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum usuário cadastrado.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = '';
+                data.usuarios.forEach(u => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${u.id}</td>
+                            <td>${u.nome}</td>
+                            <td>${u.email}</td>
+                            <td>${u.entidade_nome}</td>
+                            <td>${u.perfil === 'admin' ? 'Admin' : 'Usuário'}</td>
+                            <td>
+                                <button class="btn" style="padding: 5px 10px; font-size: 12px; background: #007bff;" onclick='editarUsuario(${JSON.stringify(u)})'>Editar</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Erro: ${e.message}</td></tr>`;
+            }
+        }
+
+        function abrirFormulario() {
+            document.getElementById('card-lista').classList.add('hidden');
+            document.getElementById('card-form').classList.remove('hidden');
+            document.getElementById('titulo-form').innerText = 'Novo Usuário';
+            document.getElementById('user-id').value = '';
+            document.getElementById('user-nome').value = '';
+            document.getElementById('user-email').value = '';
+            document.getElementById('user-senha').value = '';
+            document.getElementById('user-perfil').value = 'user';
+            document.getElementById('user-entidade').value = '';
+        }
+
+        function fecharFormulario() {
+            document.getElementById('card-form').classList.add('hidden');
+            document.getElementById('card-lista').classList.remove('hidden');
+        }
+
+        function editarUsuario(u) {
+            document.getElementById('card-lista').classList.add('hidden');
+            document.getElementById('card-form').classList.remove('hidden');
+            document.getElementById('titulo-form').innerText = 'Editar Usuário';
+            document.getElementById('user-id').value = u.id;
+            document.getElementById('user-nome').value = u.nome;
+            document.getElementById('user-email').value = u.email;
+            document.getElementById('user-senha').value = '';
+            document.getElementById('user-perfil').value = u.perfil;
+            document.getElementById('user-entidade').value = u.entidade_id || '';
+        }
+
+        async function salvarUsuario() {
+            const id = document.getElementById('user-id').value;
+            const nome = document.getElementById('user-nome').value;
+            const email = document.getElementById('user-email').value;
+            const senha = document.getElementById('user-senha').value;
+            const perfil = document.getElementById('user-perfil').value;
+            const entidade_id = document.getElementById('user-entidade').value || null;
+
+            if (!nome || !email) {
+                mostrarMsg('Nome e e-mail são obrigatórios.', 'erro');
+                return;
+            }
+            if (!id && !senha) {
+                mostrarMsg('Senha é obrigatória para novos usuários.', 'erro');
+                return;
+            }
+
+            const payload = { nome, email, senha, perfil, entidade_id };
+            if (id) payload.id = id;
+
+            try {
+                const r = await fetch('/api/usuarios', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await r.json();
+
+                if (data.ok) {
+                    mostrarMsg(data.mensagem, 'ok');
+                    fecharFormulario();
+                    carregarUsuarios();
+                } else {
+                    mostrarMsg(data.mensagem, 'erro');
+                }
+            } catch (e) {
+                mostrarMsg('Erro de conexão: ' + e.message, 'erro');
+            }
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarEntidades();
+            carregarUsuarios();
+        });
+    </script>
+</body>
+</html>
