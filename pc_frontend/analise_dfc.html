@@ -41,6 +41,7 @@
         <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn btn-salvar" onclick="exibirSelecionado()">Exibir</button>
     </div>
 
     <div class="filtros">
@@ -268,6 +269,30 @@
                 }
                 carregarHistorico();
             });
+        }
+
+        async function exibirSelecionado() {
+            const sel = document.querySelector('.check-hist:checked');
+            if (!sel) {
+                alert("Selecione um item no historico.");
+                return;
+            }
+
+            try {
+                const r = await fetch('/historico_analise_dfc/' + sel.value);
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const dados = await r.json();
+                const d = dados.dados?.dados || dados.dados || dados;
+
+                if (typeof render === 'function') {
+                    render(d);
+                } else {
+                    alert("Funcao de renderizacao nao encontrada.");
+                }
+            } catch (e) {
+                alert("Erro ao carregar o historico: " + e.message);
+                console.error(e);
+            }
         }
 
         function gerarPDF() {
