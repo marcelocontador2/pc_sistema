@@ -2,87 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><title>Composição de Receitas e Despesas</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js">
-function ajustarOpcoes(selTipo, selVal){
-  const tipo = document.getElementById(selTipo).value;
-  const val = document.getElementById(selVal);
-  val.innerHTML = '';
-  if(tipo === 'MES'){
-    const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    meses.forEach((m,i)=>val.innerHTML += '<option value="'+(i+1)+'">'+m+'</option>');
-  } else if(tipo === 'TRIMESTRE'){
-    val.innerHTML = '<option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3">3º Trimestre</option><option value="4">4º Trimestre</option>';
-  } else {
-    val.innerHTML = '<option value="">Anual</option>';
-  }
-}
-document.addEventListener('DOMContentLoaded', function(){
-  document.getElementById('tipo_atual').addEventListener('change', function(){ ajustarOpcoes('tipo_atual','val_atual'); });
-  ajustarOpcoes('tipo_atual','val_atual');
-});
-function exibirSelecionado() {
-    const check = document.querySelector('.check-hist:checked');
-    if (!check) { alert("Selecione um item no histórico."); return; }
-    const idProcurado = check.value;
 
-    // Busca o historico com ID (rota que retorna o JSON com atual e anterior)
-    fetch('/historico_composicao_receitas_despesas/' + idProcurado)
-        .then(r => {
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            return r.json();
-        })
-        .then(dados => {
-            console.log('DEBUG exibirSelecionado: dados recebidos =', dados);
-            console.log('DEBUG exibirSelecionado: dados.atual =', dados ? dados.atual : 'dados é null');
-            if (!dados) { alert("Dados vazios."); return; }
-
-            // A API retorna { periodo, periodo_anterior, atual: { receitas, despesas }, anterior: {...} }
-            // O objeto raiz JA E o "dados", entao acessamos diretamente .atual e .anterior
-            const atual = dados.atual || {};
-            const anterior = dados.anterior || {};
-
-            // Renderiza as tabelas
-            if (typeof renderTabela === 'function') {
-                renderTabela('tab-receitas', atual.receitas, anterior.receitas);
-                renderTabela('tab-despesas', atual.despesas, anterior.despesas);
-            }
-
-            // Renderiza o grafico
-            if (typeof renderChart === 'function') {
-                renderChart({receitas: atual.receitas}, {receitas: anterior.receitas});
-            }
-        })
-        .catch(e => {
-            alert("Erro ao carregar o histórico: " + e.message);
-            console.error(e);
-        });
-}
-
-
-
-
-        function renderChart(a, b) {
-            if(chart) chart.destroy();
-            const ctx = document.getElementById('graf').getContext('2d');
-            const labels = Object.keys(a.receitas || {});
-            const dataA = labels.map(k => a.receitas[k] || 0);
-            const dataB = labels.map(k => b.receitas[k] || 0);
-            chart = new Chart(ctx, {
-                type: 'bar',
-                data: { labels: labels, datasets: [
-                    { label: 'Período Atual', data: dataA, backgroundColor: '#003366', borderRadius: 4 },
-                    { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 }
-                ]},
-                options: { responsive: true, maintainAspectRatio: false,
-                    plugins: { title: { display: true, text: 'Composição de Receitas (R$ mil)', font: { size: 14, weight: 'bold' }, color: '#003366' }, legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
-                }
-            });
-        }
-
-        
-    
-    </script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
 .btn{padding:8px 18px;border:none;border-radius:4px;color:#fff;font-weight:bold;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px}
@@ -171,231 +91,192 @@ h3.secao{color:#003366;margin:15px 0 8px 0;font-size:16px}
 </div>
 </div>
 </div>
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
 <script>
-let chart=null;
-function mp(a, t, v){ if(t==='EXERCICIO') return a; return a+'-'+t+'-'+v; }
-function carregar(){
-const ano = document.getElementById('ano_atual').value;
-  const tipo = document.getElementById('tipo_atual').value;
-  const val = document.getElementById('val_atual').value;
-  const pA = mp(ano, tipo, val);
-  const pB = mp(String(parseInt(ano)-1), tipo, val);
-  Promise.all([
-    fetch('/api/composicao_receitas_despesas/'+pA).then(r=>r.json()),
-    fetch('/api/composicao_receitas_despesas/'+pB).then(r=>r.json())
-  ]).then(([a,b])=>{
-        // === CARD: demonstrativos faltando ===
-        const conclEl = document.getElementById("concl");
-        if (conclEl) { conclEl.style.display = "none"; conclEl.innerHTML = ""; }
-        const pecasFaltando = [];
-        if (a && a.erro === "faltando" && a.pecas) pecasFaltando.push(...a.pecas);
-        if (b && b.erro === "faltando" && b.pecas) pecasFaltando.push(...b.pecas);
-        if (pecasFaltando.length > 0) {
-            const divErro = document.getElementById("concl") || document.querySelector(".concl") || document.body;
-            divErro.style.display = "block";
-            let htmlErro = '<div style="background:#fff3cd;border-left:5px solid #ffc107;padding:20px;border-radius:8px;">';
-            htmlErro += '<h3 style="color:#856404;margin:0 0 10px 0;">⚠️ Demonstrativos Faltando</h3>';
-            htmlErro += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados:</p><ul style="color:#856404;">';
-            [...new Set(pecasFaltando)].forEach(p => { htmlErro += '<li>' + p + '</li>'; });
-            htmlErro += '</ul><p style="color:#856404;margin-top:10px;">Acesse <strong>Importar Relatórios</strong> para enviar os arquivos pendentes.</p></div>';
-            divErro.innerHTML = htmlErro;
-            const tbErro = document.querySelector("#tab tbody");
-            if (tbErro) tbErro.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#856404;">Aguardando importação.</td></tr>';
-            if (typeof chart !== 'undefined' && chart) { chart.destroy(); chart = null; }
+
+// ========== FUNCOES DA COMPOSICAO ==========
+let chart = null;
+
+
+function carregar() {
+    const ano = document.getElementById('ano_atual').value;
+    const tipo = document.getElementById('tipo_atual').value;
+    const val = document.getElementById('val_atual').value;
+    
+    const pAtual = ano + '-' + tipo + '-' + val;
+    const pAnterior = String(parseInt(ano) - 1) + '-' + tipo + '-' + val;
+    
+    // Limpa as tabelas
+    document.querySelector('#tab-receitas tbody').innerHTML = '<tr><td colspan="4" style="text-align:center;">Buscando dados...</td></tr>';
+    document.querySelector('#tab-despesas tbody').innerHTML = '<tr><td colspan="4" style="text-align:center;">Buscando dados...</td></tr>';
+    
+    Promise.all([
+        fetch('/api/composicao_receitas_despesas/' + pAtual).then(r => r.json()),
+        fetch('/api/composicao_receitas_despesas/' + pAnterior).then(r => r.json())
+    ]).then(([a, b]) => {
+        // Verifica se o backend retornou erro ou lista vazia
+        if (a.erro || !a.receitas || Object.keys(a.receitas).length === 0) {
+            alert("Aviso: Não há dados importados para o período atual (" + pAtual + "). Verifique se os relatórios foram importados.");
+            document.querySelector('#tab-receitas tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; color:#856404;">Nenhum dado para o período.</td></tr>';
+            document.querySelector('#tab-despesas tbody').innerHTML = '<tr><td colspan="4" style="text-align:center; color:#856404;">Nenhum dado para o período.</td></tr>';
             return;
         }
-    if(a.erro){alert('Atual: '+a.mensagem);return;}
-    if(b.erro){alert('Anterior: '+b.mensagem);return;}
-    renderTabela('tab-receitas', a.receitas, b.receitas);
-    renderTabela('tab-despesas', a.despesas, b.despesas);
-    renderChart(a, b);
-  }).catch(e=>alert('Erro: '+e.message));
-}
-function fmtV(v){ return (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function pctVar(va, vb){ if(!vb||vb===0) return '-'; return (((va-vb)/Math.abs(vb))*100).toFixed(2).replace('.',',')+'%'; }
-
-function pct(a, b) {
-    if (!b || b === 0) return '-';
-    const v = ((a - b) / Math.abs(b)) * 100;
-    return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-}
-
-function renderTabela(id, at, ant){
-  const tb = document.querySelector('#'+id+' tbody');
-  if (!tb) return;
-  let html = '';
-  Object.keys(at).forEach(function(k) {
-    const va = at[k] || 0, vb = ant[k] || 0;
-    // Usa a funcao pct (que existe no arquivo) em vez de pctVar
-    const v = pct(va, vb);
-    const cls = v.startsWith('-') ? 'neg' : 'pos';
-    // Usa fmtV (que existe) para formatar os valores
-    html += '<tr><td>' + k + '</td><td>' + fmtV(va) + '</td><td>' + fmtV(vb) + '</td><td class="' + cls + '">' + v + '</td></tr>';
-  });
-  tb.innerHTML = html;
-}
-
-function salvarComposicao(){
-  const ano = document.getElementById('ano_atual').value;
-  const tipo = document.getElementById('tipo_atual').value;
-  const val = document.getElementById('val_atual').value;
-  const pA = mp(ano, tipo, val);
-  const pB = mp(String(parseInt(ano)-1), tipo, val);
-  fetch('/salvar_composicao_receitas_despesas/'+pA+'/'+pB, { method: 'POST' })
-    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(()=>{ alert('Relatorio salvo com sucesso!'); carregarHistorico(); })
-    .catch(e=>alert('Erro ao salvar: '+e.message));
-}
-function carregarHistorico(){
-  const el = document.getElementById('historico-lista');
-  fetch('/historico_composicao_receitas_despesas')
-    .then(r=>r.json())
-    .then(d=>{
-      if(!d || d.length===0){ el.innerHTML='<li>Nenhum histórico.</li>'; return; }
-      let html = '';
-      d.forEach(i=>{ html += '<li><label><input type="checkbox" class="check-hist" value="'+i.id+'"> <strong>'+i.periodo+'</strong><br><small>'+i.data_geracao+'</small></label></li>'; });
-      el.innerHTML = html;
-    })
-    .catch(()=>{ el.innerHTML='<li>Erro ao carregar.</li>'; });
-}
-function excluirSelecionado(){
-  const sel = document.querySelectorAll('.check-hist:checked');
-  if(sel.length===0){ alert('Selecione um item.'); return; }
-  if(!confirm('Excluir '+sel.length+'?')) return;
-  Promise.all([...sel].map(c=>fetch('/excluir_composicao_receitas_despesas/'+c.value,{method:'DELETE'}).then(r=>r.ok).catch(()=>false)))
-    .then(rs=>{ if(rs.some(x=>x)){ alert('Excluído!'); carregarHistorico(); } });
-}
-function gerarPDF(){
-  const ck = document.querySelector('.check-hist:checked');
-  if(!ck){ alert('Marque um item.'); return; }
-  window.open('/gerar_pdf_composicao_receitas_despesas/'+ck.value, '_blank');
-}
-function ajustarOpcoes(selTipo, selVal){
-  const tipo = document.getElementById(selTipo).value;
-  const val = document.getElementById(selVal);
-  val.innerHTML = '';
-  if(tipo === 'MES'){
-    const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    meses.forEach((m,i)=>{ val.innerHTML += '<option value="'+(i+1)+'">'+m+'</option>'; });
-  } else if(tipo === 'TRIMESTRE'){
-    val.innerHTML = '<option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3">3º Trimestre</option><option value="4">4º Trimestre</option>';
-  } else {
-    val.innerHTML = '<option value="">Anual</option>';
-  }
-}
-document.addEventListener('DOMContentLoaded', function(){
-  carregarHistorico();
-  const t = document.getElementById('tipo_atual');
-  if(t){ t.addEventListener('change', function(){ ajustarOpcoes('tipo_atual','val_atual'); }); }
-  ajustarOpcoes('tipo_atual','val_atual');
-});
-function exibirSelecionado() {
-            const check = document.querySelector(".check-hist:checked");
-            if (!check) { alert("Selecione um item no histórico."); return; }
-            fetch('/historico_composicao_receitas_despesas/' + check.value)
-                .then(r => r.json())
-                .then(resp => {
-                    if (resp.dados) {
-                        // Estrutura do JSON salvo:
-                        // { atual: { receitas: {...}, despesas: {...} }, anterior: { receitas: {...}, despesas: {...} } }
-                        const d = resp.dados;
-                        // Renderiza Tabelas
-                        renderTabela('tab-receitas', d.atual.receitas, d.anterior.receitas);
-                        renderTabela('tab-despesas', d.atual.despesas, d.anterior.despesas);
-                        // Renderiza Gráfico (a função renderChart espera {receitas: {...}})
-                        renderChart({receitas: d.atual.receitas}, {receitas: d.anterior.receitas});
-                    }
-                })
-                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
+        if (b.erro || !b.receitas || Object.keys(b.receitas).length === 0) {
+            alert("Aviso: Não há dados importados para o período anterior (" + pAnterior + "). Verifique se os relatórios foram importados.");
+            return;
         }
-        function renderChart(a, b) {
-            if(chart) chart.destroy();
-            const ctx = document.getElementById('graf').getContext('2d');
-            const labels = Object.keys(a.receitas || {});
-            const dataA = labels.map(k => a.receitas[k] || 0);
-            const dataB = labels.map(k => b.receitas[k] || 0);
-            chart = new Chart(ctx, {
-                type: 'bar',
-                data: { labels: labels, datasets: [
-                    { label: 'Período Atual', data: dataA, backgroundColor: '#003366', borderRadius: 4 },
-                    { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 }
-                ]},
-                options: { responsive: true, maintainAspectRatio: false,
-                    plugins: { title: { display: true, text: 'Composição de Receitas (R$ mil)', font: { size: 14, weight: 'bold' }, color: '#003366' }, legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
-                }
-            });
-        }
-</script>
+        
+        renderTabela('tab-receitas', a.receitas, b.receitas);
+        renderTabela('tab-despesas', a.despesas, b.despesas);
+        renderChart(a, b);
+    }).catch(e => {
+        alert("Erro ao verificar dados: " + e.message);
+        console.error(e);
+    });
+}
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Procura o botão de Gerar PDF
-            const botoes = Array.from(document.querySelectorAll('button, a, div'));
-            const btnPdf = botoes.find(b => b.innerText.trim().toUpperCase() === 'GERAR PDF');
-            
-            if (btnPdf) {
-                // Garante o visual azul
-                btnPdf.style.background = '#3182ce';
-                btnPdf.style.color = 'white';
-                btnPdf.style.padding = '8px 16px';
-                btnPdf.style.border = 'none';
-                btnPdf.style.borderRadius = '4px';
-                btnPdf.style.fontWeight = 'bold';
-                btnPdf.style.cursor = 'pointer';
-                
-                // Remove clique antigo quebrado
-                btnPdf.removeAttribute('onclick');
-                
-                // Adiciona a nova regra
-                btnPdf.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const sel = document.querySelector('input[type="checkbox"]:checked') || 
-                                document.querySelector('input[type="radio"]:checked');
-                    
-                    if (!sel) {
-                        alert("Atenção: Selecione um item do Histórico Salvo (marque a caixinha) antes de gerar o PDF.");
-                        return;
-                    }
-                    
-                    let id = sel.value;
-                    if (!id || id === "on") {
-                        id = sel.id.replace('check-', '').replace('hist-', '');
-                        if (!id) id = sel.getAttribute('data-id');
-                    }
-                    
-                    const url = `/gerar_pdf_composicao_receitas_despesas/${id}`;
-                    console.log("[DEBUG] Abrindo PDF Composição:", url);
-                    
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.target = '_blank';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                });
+function fmtV(v) { return (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function pct(va, vb) { if (!vb || vb === 0) return '-'; const v = ((va - vb) / Math.abs(vb)) * 100; return (v >= 0 ? '+' : '') + v.toFixed(2).replace('.', ',') + '%'; }
+
+function renderTabela(id, at, ant) {
+    const tb = document.querySelector('#' + id + ' tbody');
+    if (!tb) return;
+    let html = '';
+    Object.keys(at).forEach(function(k) {
+        const va = at[k] || 0, vb = ant[k] || 0;
+        const v = pct(va, vb);
+        const cls = v.startsWith('-') ? 'neg' : 'pos';
+        html += '<tr><td>' + k + '</td><td>' + fmtV(va) + '</td><td>' + fmtV(vb) + '</td><td class="' + cls + '">' + v + '</td></tr>';
+    });
+    tb.innerHTML = html;
+}
+
+function renderChart(atual, anterior) {
+    const canvas = document.getElementById('graf');
+    if (!canvas) return;
+
+    // Verifica se o Chart.js carregou. Se nao, espera um pouco e tenta de novo.
+    if (typeof Chart === 'undefined') {
+        console.warn("Chart.js ainda nao carregou. Tentando novamente em 500ms...");
+        setTimeout(function() { renderChart(atual, anterior); }, 500);
+        return;
+    }
+
+    if (chart) { chart.destroy(); chart = null; }
+    const labels = Object.keys(atual.receitas || {});
+    const dataA = labels.map(k => atual.receitas[k] || 0);
+    const dataB = labels.map(k => (anterior.receitas || {})[k] || 0);
+    
+    try {
+        chart = new Chart(canvas, {
+            type: 'bar',
+            data: { labels: labels, datasets: [
+                { label: 'Período Atual', data: dataA, backgroundColor: '#003366', borderRadius: 4 },
+                { label: 'Período Anterior', data: dataB, backgroundColor: '#4a90e2', borderRadius: 4 }
+            ]},
+            options: { responsive: true, maintainAspectRatio: false,
+                plugins: { title: { display: true, text: 'Composição de Receitas (R$ mil)', font: { size: 14, weight: 'bold' }, color: '#003366' }, legend: { position: 'bottom' } },
+                scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } } }
             }
         });
-    </script>
+    } catch (e) {
+        console.error("Erro ao renderizar o grafico:", e);
+    }
+}
 
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const btn = document.getElementById('btn-exibir-composicao');
-        if (btn) {
-            btn.addEventListener('click', function() {
-                if (typeof exibirSelecionado === 'function') {
-                    exibirSelecionado();
-                } else {
-                    console.error('Funcao exibirSelecionado nao encontrada!');
-                }
+function carregarHistorico() {
+    fetch('/historico_composicao_receitas_despesas')
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('historico-lista');
+            if (!el) return;
+            if (!data || data.length === 0) { el.innerHTML = '<li>Nenhum histórico.</li>'; return; }
+            let html = '';
+            data.forEach(item => {
+                html += `<li><label><input type="checkbox" class="check-hist" value="${item.id}" style="margin-right:5px;"><strong>${item.periodo}</strong><br><small style="color:#666;">${item.data_geracao}</small></label></li>`;
             });
-            console.log('Event listener do botao Exibir configurado.');
-        } else {
-            console.error('Botao Exibir nao encontrado para configurar o listener.');
-        }
-    });
-</script>
+            el.innerHTML = html;
+        })
+        .catch(e => { console.error("Erro no historico:", e); const el = document.getElementById('historico-lista'); if (el) el.innerHTML = '<li>Erro ao carregar.</li>'; });
+}
 
+function exibirSelecionado() {
+    const check = document.querySelector('.check-hist:checked');
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    
+    fetch('/historico_composicao_receitas_despesas/' + check.value)
+        .then(r => { 
+            if (!r.ok) throw new Error("Erro HTTP " + r.status); 
+            return r.json(); 
+        })
+        .then(dados => {
+            const atual = dados.atual || {};
+            const anterior = dados.anterior || {};
+            
+            // 1. Renderiza as Tabelas (se der erro aqui, avisa)
+            try {
+                if (atual.receitas && anterior.receitas) renderTabela('tab-receitas', atual.receitas, anterior.receitas);
+                if (atual.despesas && anterior.despesas) renderTabela('tab-despesas', atual.despesas, anterior.despesas);
+            } catch (e) {
+                console.error("Erro ao renderizar tabelas:", e);
+            }
+            
+            // 2. Renderiza o Grafico (se der erro, só avisa no console, NAO trava a tela)
+            try {
+                renderChart(atual, anterior);
+            } catch (e) {
+                console.warn("O grafico nao pode ser carregado agora:", e.message);
+            }
+        })
+        .catch(e => { 
+            alert("Erro ao carregar histórico: " + e.message); 
+            console.error(e); 
+        });
+}
+
+function salvarComposicao() {
+    const ano = document.getElementById('ano_atual').value;
+    const tipo = document.getElementById('tipo_atual').value;
+    const val = document.getElementById('val_atual').value;
+    const pAtual = ano + '-' + tipo + '-' + val;
+    const pAnterior = String(parseInt(ano) - 1) + '-' + tipo + '-' + val;
+    fetch('/salvar_composicao_receitas_despesas/' + pAtual + '/' + pAnterior, { method: 'POST' })
+        .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(res => { alert("Relatório salvo com sucesso!"); carregarHistorico(); })
+        .catch(e => { alert("Erro ao salvar: " + e.message); console.error(e); });
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    carregarHistorico();
+    const btnExibir = document.getElementById('btn-exibir-composicao');
+    if (btnExibir) btnExibir.addEventListener('click', exibirSelecionado);
+    const btnSalvar = document.querySelector('button[onclick="salvarComposicao()"]');
+    if (btnSalvar) { btnSalvar.removeAttribute('onclick'); btnSalvar.addEventListener('click', salvarComposicao); }
+});
+
+
+function gerarPDFHistorico() {
+    const check = document.querySelector('.check-hist:checked');
+    if (!check) { 
+        alert("Selecione um item no histórico para gerar o PDF."); 
+        return; 
+    }
+    // Abre a rota de PDF em uma nova aba (o backend vai gerar e devolver o arquivo)
+    window.open('/gerar_pdf_composicao_receitas_despesas/' + check.value, '_blank');
+}
+
+</script>
 </body></html>
