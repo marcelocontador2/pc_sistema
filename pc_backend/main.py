@@ -1037,28 +1037,39 @@ def _calc_panorama(periodo):
         "ativo_total": ativo_total,
         "passivo_total": passivo_total
     }
-# @app.get("/api/panorama/{periodo}")  # MIGRADO
+# @app.get("/api/panorama/{periodo}")
 async def api_panorama(periodo: str):
     try:
-        import sqlite3, json, os
+        import psycopg2
+        import json
+        from fastapi.responses import JSONResponse
         from matriz_integridade import _limpar_valor
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
 
         def buscar_no_banco(tipo):
             nome = f"{tipo}_{periodo.replace('-', '_')}.csv"
-            cursor.execute("SELECT dados_json FROM arquivos_importados WHERE nome_arquivo = ?", (nome,))
-            row = cursor.fetchone()
-            return json.loads(row[0]) if row else []
+            cur.execute("SELECT dados_json FROM arquivos_importados WHERE nome_arquivo = %s", (nome,))
+            row = cur.fetchone()
+            if row and row[0]:
+                try:
+                    return json.loads(row[0])
+                except:
+                    return []
+            return []
 
         demonstrativos = {
             "BALANCO_PATRIMONIAL": "Balanço Patrimonial",
             "BALANCO_ORCAMENTARIO": "Balanço Orçamentário",
             "BALANCO_FINANCEIRO": "Balanço Financeiro",
             "DFC": "Demonstração do Fluxo de Caixa",
-            "DVP": "Demonstração das Variaçíµes Patrimoniais",
-            "DMPL": "Demonstração das Mutaçíµes do PL",
+            "DVP": "Demonstração das Variações Patrimoniais",
+            "DMPL": "Demonstração das Mutações do PL",
         }
         faltando = []
         for tipo, nome in demonstrativos.items():
@@ -1071,7 +1082,9 @@ async def api_panorama(periodo: str):
         l_bp = buscar_no_banco("BALANCO_PATRIMONIAL")
         l_bo = buscar_no_banco("BALANCO_ORCAMENTARIO")
         l_dvp = buscar_no_banco("DVP")
+        l_fin = buscar_no_banco("BALANCO_FINANCEIRO")
 
+        # Funcao de busca (igual ao original)
         def buscar(linhas, termos):
             for p in linhas:
                 for termo in termos:
@@ -1088,46 +1101,17 @@ async def api_panorama(periodo: str):
                                     pass
             return 0.0
 
-        def buscar_exato(linhas, termo_exato):
-            for p in linhas:
-                for col_espec in [0, 3]:
-                    if len(p) > col_espec and str(p[col_espec]).strip().upper() == termo_exato.upper():
-                        col_valor = col_espec + 1
-                        if len(p) > col_valor:
-                            try:
-                                v = abs(_limpar_valor(p[col_valor]))
-                                if v > 0:
-                                    return v
-                            except:
-                                pass
-            return 0.0
+        caixa = buscar(l_bp, ["CAIXA E EQUIVALENTES", "DISPONIBILIDADES", "CAIXA"])
+        ativo_total = buscar(l_bp, ["ATIVO TOTAL", "TOTAL DO ATIVO", "TOTAL ATIVO"])
+        passivo_total = buscar(l_bp, ["PASSIVO TOTAL", "TOTAL DO PASSIVO", "TOTAL PASSIVO"])
+        pl = buscar(l_bp, ["PATRIMONIO LIQUIDO", "TOTAL DO PATRIMONIO LIQUIDO", "PATRIMONIO SOCIAL"])
 
-        passivo_total = buscar_exato(l_bp, "TOTAL DO PASSIVO")
-        if passivo_total == 0.0:
-            passivo_total = buscar(l_bp, ["TOTAL DO PASSIVO", "PASSIVO TOTAL"])
+        receita = buscar(l_bo, ["RECEITAS REALIZADAS", "TOTAL DAS RECEITAS", "RECEITA TOTAL"])
+        despesa = buscar(l_bo, ["DESPESAS EMPENHADAS", "TOTAL DAS DESPESAS", "DESPESA TOTAL"])
+        superavit_orc = receita - despesa
 
-        pl = buscar_exato(l_bp, "TOTAL DO PATRIMí”NIO LíQUIDO")
-        if pl == 0.0:
-            pl = buscar_exato(l_bp, "TOTAL DO PATRIMONIO LIQUIDO")
-        if pl == 0.0:
-            pl = buscar(l_bp, ["TOTAL DO PATRIMí”NIO LíQUIDO", "TOTAL DO PATRIMONIO LIQUIDO"])
-
-        ativo_total = buscar_exato(l_bp, "TOTAL")
-        if ativo_total == 0.0:
-            ativo_total = buscar(l_bp, ["TOTAL DO ATIVO", "ATIVO TOTAL"])
-        if ativo_total == 0.0:
-            ativo_total = passivo_total + pl
-
-        caixa_bp = buscar(l_bp, ["CAIXA E EQUIVALENTES", "CAIXA E EQUIVALENTE"])
-        superavit_financeiro = buscar(l_bp, ["SUPERíVIT FINANCEIRO", "SUPERAVIT FINANCEIRO"])
-
-        receita_realizada = buscar(l_bo, ["TOTAL DAS RECEITAS", "RECEITAS REALIZADAS", "RECEITA REALIZADA", "TOTAL DA RECEITA", "RECEITAS"])
-        despesa_empenhada = buscar(l_bo, ["TOTAL DAS DESPESAS", "DESPESAS EMPENHADAS", "DESPESA EMPENHADA", "TOTAL DA DESPESA", "DESPESAS"])
-        superavit_orcamentario = receita_realizada - despesa_empenhada
-
-        total_vpa = buscar(l_dvp, ["Total das Variaçíµes Ativas", "TOTAL DAS VARIACOES ATIVAS", "VARIAí‡í•ES ATIVAS"])
-        total_vpd = buscar(l_dvp, ["Total das Variaçíµes Passivas", "TOTAL DAS VARIACOES PASSIVAS", "VARIAí‡í•ES PASSIVAS"])
-        superavit_patrimonial = total_vpa - total_vpd
+        superavit_patrimonial = buscar(l_dvp, ["SUPERAVIT PATRIMONIAL", "RESULTADO PATRIMONIAL", "SUPERAVIT/DEFICIT PATRIMONIAL"])
+        superavit_financeiro = buscar(l_fin, ["SUPERAVIT FINANCEIRO", "RESULTADO FINANCEIRO", "SALDO FINANCEIRO"])
 
         conn.close()
 
@@ -1135,15 +1119,19 @@ async def api_panorama(periodo: str):
             "ativo_total": ativo_total,
             "passivo_total": passivo_total,
             "patrimonio_liquido": pl,
-            "caixa_bp": caixa_bp,
-            "receita_realizada": receita_realizada,
-            "despesa_empenhada": despesa_empenhada,
-            "superavit_orcamentario": superavit_orcamentario,
+            "caixa_bp": caixa,
+            "receita_realizada": receita,
+            "despesa_empenhada": despesa,
+            "superavit_orcamentario": superavit_orc,
             "superavit_patrimonial": superavit_patrimonial,
             "superavit_financeiro": superavit_financeiro,
         }
     except Exception as e:
-        return {"erro": "falha", "mensagem": str(e)}
+        import traceback
+        traceback.print_exc()
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
+
 @app.post("/salvar_panorama/{periodo}")
 async def salvar_panorama(periodo: str, request: Request):
     import sqlite3, json, os, datetime
@@ -1663,22 +1651,33 @@ async def salvar_composicao_rd(periodo: str, periodo_anterior: str):
 
 @app.get("/historico_composicao_receitas_despesas")
 def historico_composicao_receitas_despesas():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_composicao_rd ORDER BY id DESC")
-    rows = cur.fetchall()
-    conn.close()
-    
-    resultado = []
-    for r in rows:
-        resultado.append({
-            "id": r[0], 
-            "periodo": r[1], 
-            "data_geracao": r[2], 
-            "dados": r[3]
-        })
+    import psycopg2
+    import json
+    from fastapi.responses import JSONResponse
+
+    try:
+        PG_CONFIG = {
+            "host": "localhost", "port": 5433,
+            "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+        }
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_composicao_receitas_despesas ORDER BY id DESC")
+        rows = cur.fetchall()
+        conn.close()
         
-    return Response(content=json.dumps(resultado), media_type="application/json")
+        resultado = []
+        for r in rows:
+            resultado.append({
+                "id": r[0], 
+                "periodo": r[1], 
+                "data_geracao": r[2], 
+                "dados": r[3]
+            })
+            
+        return JSONResponse(content=resultado)
+    except Exception as e:
+        return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
 
 @app.get("/historico_composicao_receitas_despesas/{id}")
 async def get_composicao_id(id: int):
@@ -1705,7 +1704,6 @@ async def get_composicao_id(id: int):
         return dados
     except Exception as e:
         return JSONResponse(content={"erro": True, "mensagem": str(e)}, status_code=500)
-
 
 @app.delete("/excluir_composicao_receitas_despesas/{id}")
 async def excluir_composicao(id: int):
