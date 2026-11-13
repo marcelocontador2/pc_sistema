@@ -26,7 +26,47 @@
                         });
                 }
             });
-        </script>
+        
+async function verificarMatriz() {
+    const ano = document.getElementById('ano').value;
+    const tipo = document.getElementById('tipo').value;
+    const trimestre = document.getElementById('trimestre').value;
+    const periodo = `${ano}-${tipo}-${trimestre}`;
+
+    const container = document.getElementById('matriz-container');
+    if (container) container.innerHTML = '<div class="loading">Buscando dados...</div>';
+
+    try {
+        const res = await fetch(`/api/integridade_matriz/${periodo}?_t=${Date.now()}`);
+        const data = await res.json();
+
+        if (data.erro) {
+            alert("Aviso: " + data.mensagem);
+            if (container) container.innerHTML = '';
+            return;
+        }
+
+        // Renderiza a matriz
+        if (container) {
+            let html = '<table class="data-table"><thead><tr><th>Descrição</th><th>Valor</th><th>Consistente?</th><th>Observação</th></tr></thead><tbody>';
+            (data.matriz || []).forEach(m => {
+                html += `<tr>
+                    <td>${m.descricao}</td>
+                    <td class="text-right">${formatarMoeda(m.valor_bp || m.valor_bo || m.valor_bf || m.valor_dvp || 0)}</td>
+                    <td>${m.consistente ? '✅' : '❌'}</td>
+                    <td>${m.observacao || ''}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+    } catch (err) {
+        console.error(err);
+        if (container) container.innerHTML = '<div class="loading">Erro ao buscar dados.</div>';
+    }
+}
+
+</script>
         
     <meta charset="UTF-8">
     <title>Integridade entre Demonstrações</title>
@@ -75,6 +115,7 @@
         <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+            <button id="btn-salvar" class="btn btn-success" onclick="salvarMatriz()" style="margin-left: 10px; background-color: #198754; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">Confirmar e Salvar</button>
     </div>
     <div class="filtros-bar">
         <div class="form-group"><label>Ano:</label><select id="ano"><option value="2026">2026</option><option value="2025">2025</option></select></div>
@@ -94,130 +135,289 @@
         </div>
     </div>
     <script>
-        function ajustarPeriodo() {
-            const tipo = document.getElementById('tipo_periodo').value;
-            document.getElementById('group-mes').style.display = (tipo === 'MES') ? 'flex' : 'none';
-            document.getElementById('group-trimestre').style.display = (tipo === 'TRIMESTRE') ? 'flex' : 'none';
+    let dadosAtuais = null;
+
+    function formatarMoeda(valor) {
+        if (valor === null || valor === undefined || valor === '-' || valor === '') return '-';
+        // Se já for string formatada, retorna
+        if (typeof valor === 'string' && valor.includes('R$')) return valor;
+        return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function getHistoricoSelecionado() {
+        const checkboxes = document.querySelectorAll('#lista-historico input[type="checkbox"]');
+        for (let cb of checkboxes) {
+            if (cb.checked) return cb.value;
         }
-        function verificarEGerar() {
-            const ano = document.getElementById('ano').value;
-            const tipo = document.getElementById('tipo_periodo').value;
-            let valor = (tipo === 'MES') ? document.getElementById('mes').value : (tipo === 'TRIMESTRE') ? document.getElementById('trimestre').value : "1";
-            const periodo = ano + '-' + tipo + '-' + valor;
-            const cards = document.getElementById('integridade-cards');
-            cards.innerHTML = '<p>Verificando...</p>';
-            const btnSalvar = document.getElementById('btn-confirmar');
-            btnSalvar.style.display = 'none';
-            fetch('/api/integridade_matriz/' + periodo)
-                .then(r => r.json())
-                .then(data => {
-                                        if (data.erro === "faltando") {
-                        let htmlAmarelo = '<div style="background:#fff3cd;border-left:5px solid #ffc107;padding:20px;border-radius:8px;">';
-                        htmlAmarelo += '<h3 style="color:#856404;margin:0 0 10px 0;">\u26a0\ufe0f Demonstrativos Faltando</h3>';
-                        htmlAmarelo += '<p style="color:#856404;">Os seguintes demonstrativos n\u00e3o foram importados para este per\u00edodo:</p><ul style="color:#856404;">';
-                        [...new Set(data.pecas || [])].forEach(p => { htmlAmarelo += '<li>' + p + '</li>'; });
-                        htmlAmarelo += '</ul><p style="color:#856404;margin-top:10px;">Acesse <strong>Importar Relat\u00f3rios</strong> para enviar os arquivos pendentes.</p></div>';
-                        cards.innerHTML = htmlAmarelo;
-                        return;
-                    }
-                    if (data.erro) {
-                        cards.innerHTML = '<p style="color:red;">Erro: ' + (data.mensagem || 'falha') + '</p>';
-                        return;
-                    }
-                    if (data.matriz && Array.isArray(data.matriz)) {
-                        renderizarTabela(data.matriz);
-            const btnSalvar = document.getElementById('btn-confirmar');
-            if (btnSalvar) { btnSalvar.style.display = 'inline-block'; btnSalvar.innerText = 'Atualizar Justificativas'; btnSalvar.setAttribute('data-periodo', data.periodo || '2026-TRIMESTRE-3'); }
-                        btnSalvar.style.display = 'inline-block';
-                        btnSalvar.disabled = false;
-                        btnSalvar.setAttribute('data-periodo', periodo);
-                    } else {
-                        cards.innerHTML = '<p style="color:red;">Formato invalido: ' + JSON.stringify(Object.keys(data)) + '</p>';
-                    }
-                })
-                .catch(err => cards.innerHTML = '<p style="color:red;">Erro: ' + err.message + '</p>');
-        }
-        function renderizarTabela(matriz) {
-    window.ultimaMatriz = matriz;
-            let html = '<table class="matriz-tabela"><thead><tr>';
-            html += '<th>NOMENCLATURA</th><th>BALANCETE</th><th>BP</th><th>BF</th><th>BO</th><th>DFC</th><th>DVP</th><th>DMPL</th><th>CONFERÊNCIA</th>';
-            html += '</tr></thead><tbody>';
-            matriz.forEach(row => {
-                const isPendencia = /^\(\d+\)$/.test(row.conf);
-                const statusClass = row.conf === 'OK' ? 'status-ok' : (isPendencia ? 'status-erro' : '');
-                html += `<tr>
-                    <td style="text-align: left; font-weight: bold;">${row.item}</td>
-                    <td>${row.balancete}</td><td>${row.bp}</td><td>${row.bf}</td><td>${row.bo}</td><td>${row.dfc}</td><td>${row.dvp}</td><td>${row.dmpl}</td>
-                    <td class="${statusClass}">${
-            (row.conf && row.conf.includes('(')) || row.item.toUpperCase().includes('INCORPORAÇÃO DE ATIVOS')
-                ? `<button class="btn-justificar" data-linha="${row.item}" onclick="abrirModalJust('${row.item}', this)" style="color:${(row.conf && row.conf.includes('(')) ? 'red' : '#0056b3'}; border:none; background:none; cursor:pointer; font-weight:bold; font-size:12px; padding:0; ${(row.conf === 'OK') ? 'text-decoration:underline;' : ''}">${(row.conf === 'OK') ? 'Justificar' : row.conf}</button>`
-                : row.conf
-        }</td>
-                </tr>`;
+        return null;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        carregarHistorico();
+    });
+
+    function carregarHistorico() {
+        const list = document.getElementById('lista-historico');
+        if (!list) return;
+        list.innerHTML = '<li class="loading">Carregando histórico...</li>';
+        
+        fetch(`/historico_integridade_matriz?_t=${Date.now()}`)
+            .then(res => res.json())
+            .then(data => {
+                list.innerHTML = '';
+                if (Array.isArray(data) && data.length > 0) {
+                    data.forEach(h => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <input type="checkbox" value="${h.id}">
+                            <span>Período: ${h.periodo} | Gerado em: ${h.data_geracao || 'N/A'}</span>
+                        `;
+                        list.appendChild(li);
+                    });
+                } else {
+                    list.innerHTML = '<li>Nenhum histórico salvo.</li>';
+                }
+            })
+            .catch(err => {
+                list.innerHTML = '<li>Erro ao carregar histórico.</li>';
+                console.error(err);
             });
-            html += '</tbody></table>';
-            document.getElementById('integridade-cards').innerHTML = html;
+    }
+
+    // Converte qualquer formato (novo ou antigo) para o formato exato da tabela azul
+    function normalizarMatriz(matriz) {
+        if (!matriz || matriz.length === 0) return [];
+        
+        return matriz.map(m => {
+            // Limpa a string de conf
+            let conf = m.conf || "OK";
+            if (typeof conf === 'string') {
+                // Remove TODOS os parênteses e espaços
+                let limpo = conf.replace(/[()\s]/g, '');
+                // Se for um número, coloca apenas UM par de parênteses
+                if (limpo && !isNaN(parseInt(limpo))) {
+                    conf = `(${limpo})`;
+                } else {
+                    conf = limpo || "OK";
+                }
+            }
+
+            return {
+                item: m.item || m.descricao || m.nomenclatura || '',
+                balancete: m.balancete || m.valor_balancete || m.valor || '-',
+                bp: m.bp || m.valor_bp || '-',
+                bf: m.bf || m.valor_bf || '-',
+                bo: m.bo || m.valor_bo || '-',
+                dfc: m.dfc || m.valor_dfc || '-',
+                dvp: m.dvp || m.valor_dvp || '-',
+                dmpl: m.dmpl || m.valor_dmpl || '-',
+                conf: conf
+            };
+        });
+    }
+
+    async function verificarEGerar() {
+        const ano = document.getElementById('ano').value;
+        const tipo = document.getElementById('tipo_periodo').value;
+        const trimestre = document.getElementById('trimestre').value;
+        const periodo = `${ano}-${tipo}-${trimestre}`;
+
+        const container = document.getElementById('integridade-cards');
+        if (container) container.innerHTML = '<div class="loading" style="padding: 20px; color: #004b8d; font-weight: bold;">Buscando dados no banco (PostgreSQL)...</div>';
+
+        try {
+            // Busca os dados (o backend agora prioriza o histórico salvo)
+            const res = await fetch(`/api/integridade_matriz/${periodo}?_t=${Date.now()}`);
+            const data = await res.json();
+
+            if (data.erro) {
+                throw new Error(data.mensagem || "Erro desconhecido no backend.");
+            }
+
+            // Renderiza a matriz na tela
+            dadosAtuais = data;
+            renderizarMatriz(data, container);
+            
+            // Atualiza a lista lateral de históricos
+            carregarHistorico();
+
+        } catch (err) {
+            console.error(err);
+            if (container) container.innerHTML = `<div style="color: red; padding: 20px; background: #ffe6e6; border: 1px solid red;">
+                <strong>Erro ao carregar matriz:</strong> ${err.message}
+            </div>`;
         }
-                async function salvarMatriz() {
-            const btn = document.getElementById("btn-confirmar");
-            const periodo = btn.getAttribute("data-periodo");
-            btn.innerText = "Salvando..."; btn.disabled = true;
-            try {
-                await fetch("/salvar_integridade_matriz/" + periodo, { 
+    }
+
+    function renderizarMatriz(data, container) {
+        if (!container) return;
+        
+        let matriz = data.matriz || [];
+        matriz = normalizarMatriz(matriz);
+
+        if (matriz.length === 0) {
+            container.innerHTML = '<div class="loading">Nenhum dado encontrado.</div>';
+            return;
+        }
+
+        let periodoExibicao = data.periodo;
+        if (!periodoExibicao) {
+            const ano = document.getElementById('ano')?.value || '';
+            const tipo = document.getElementById('tipo_periodo')?.value || '';
+            const trimestre = document.getElementById('trimestre')?.value || '';
+            periodoExibicao = `${ano}-${tipo}-${trimestre}`;
+        }
+
+        let html = `
+        <div style="background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="text-align: center; color: #003366; font-size: 24px; margin-bottom: 5px;">Matriz de Integridade - ${periodoExibicao}</h3>
+            <p style="text-align: center; color: #666; font-size: 14px; margin-bottom: 20px; font-style: italic;">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+            
+            <table style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px;">
+                <thead>
+                    <tr style="background-color: #004b8d; color: white; text-align: center;">
+                        <th style="padding: 10px; border: 1px solid #ccc;">NOMENCLATURA</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">BALANCETE</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">BP</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">BF</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">BO</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">DFC</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">DVP</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">DMPL</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">CONF.</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        matriz.forEach(m => {
+            let confFormatado = m.conf;
+            let corConf = '#006400'; // Verde
+            
+            // Se a conf for um número entre parênteses, pinta de vermelho
+            if (confFormatado && confFormatado.startsWith('(') && confFormatado.endsWith(')')) {
+                corConf = '#cc0000'; // Vermelho
+            } else if (confFormatado && confFormatado !== 'OK' && confFormatado !== '-') {
+                // Se for número solto ou outra coisa, pinta de vermelho
+                corConf = '#cc0000';
+            }
+
+            html += `
+                <tr style="text-align: center; border-bottom: 1px solid #eee;">
+                    <td style="padding: 8px; border: 1px solid #ccc; text-align: left; font-weight: bold; color: #333;">${m.item || ''}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${formatarMoeda(m.balancete)}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${formatarMoeda(m.bp)}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${formatarMoeda(m.bf)}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${formatarMoeda(m.bo)}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${formatarMoeda(m.dfc)}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${formatarMoeda(m.dvp)}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${formatarMoeda(m.dmpl)}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc; font-weight: bold; color: ${corConf};">${confFormatado}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+
+    async function exibirSelecionado() {
+        const id = getHistoricoSelecionado();
+        if (!id) { alert("Selecione um histórico na lista."); return; }
+
+        try {
+            const res = await fetch(`/historico_integridade_matriz/${id}`);
+            const data = await res.json();
+
+            if (data.erro) { alert("Erro: " + data.mensagem); return; }
+
+            let payload = data.dados ? data.dados : data;
+            if (typeof payload === 'string') {
+                try { payload = JSON.parse(payload); } catch(e) {}
+            }
+
+            dadosAtuais = payload;
+            const container = document.getElementById('integridade-cards');
+            renderizarMatriz(payload, container);
+        } catch (err) {
+            alert("Erro ao carregar histórico: " + err);
+        }
+    }
+
+    function gerarPDF() {
+        const id = getHistoricoSelecionado();
+        if (!id) { alert("Selecione um histórico na lista."); return; }
+        window.open(`/gerar_pdf_integridade/${id}`, '_blank');
+    }
+
+    async function salvarMatriz() {
+        const ano = document.getElementById('ano').value;
+        const tipo = document.getElementById('tipo_periodo').value;
+        const trimestre = document.getElementById('trimestre').value;
+        const periodo = `${ano}-${tipo}-${trimestre}`;
+
+        if (!dadosAtuais || !dadosAtuais.matriz) {
+            alert("Nenhuma matriz carregada para salvar. Clique em 'Verificar Matriz' primeiro.");
+            return;
+        }
+
+        if (!confirm("Deseja realmente salvar esta matriz no histórico?")) return;
+
+        try {
+            const res = await fetch(`/api/integridade_matriz/${periodo}/salvar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    justificativas: window.justificativasSalvas || {},
-                    matriz: window.ultimaMatriz || []
+                body: JSON.stringify({
+                    matriz: dadosAtuais.matriz,
+                    justificativas: dadosAtuais.justificativas || {}
                 })
             });
-                alert("Matriz e justificativas salvas com sucesso!");
-            carregarHistorico();
+            
+            const data = await res.json();
+            if (data.erro) {
+                alert("Erro ao salvar: " + data.mensagem);
+            } else {
+                alert("Matriz salva com sucesso no PostgreSQL!");
+                await carregarHistorico(); // Atualiza a lista lateral
+            }
+        } catch (err) {
+            alert("Erro de conexão ao salvar: " + err.message);
+        }
+    }
+
+    function excluirSelecionado() {
+        const id = getHistoricoSelecionado();
+        if (!id) { alert("Selecione um histórico na lista lateral para excluir."); return; }
+        if (!confirm("Tem certeza que deseja excluir o histórico selecionado?")) return;
+
+        fetch("/excluir_multiplos_integridade_matriz", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: [parseInt(id)] })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                // Limpa a tela e atualiza a lista lateral
+                document.getElementById('integridade-cards').innerHTML = '';
                 carregarHistorico();
-                btn.style.display = "none";
-            } catch (e) { alert("Erro ao salvar."); }
-            finally { btn.innerText = "Confirmar e Salvar"; btn.disabled = false; }
-        }
-        function carregarHistorico() {
-            fetch('/historico_integridade_matriz').then(r => r.json()).then(data => {
-                let html = '';
-                if(data.length === 0) html = '<li>Nenhum histórico.</li>';
-                data.forEach(item => {
-                    html += `<li style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="checkbox" class="check-historico" value="${item.id}" style="width: 16px; height: 16px; cursor: pointer;">
-                            <div><div style="font-weight: bold; color: #0056b3;">${item.periodo}</div><div style="font-size: 12px; color: #888;">Gerado em: ${item.data_geracao}</div></div>
-                        </div></li>`;
-                });
-                document.getElementById('lista-historico').innerHTML = html;
-            });
-        }
-        function exibirSelecionado() {
-            const check = document.querySelector(".check-historico:checked");
-            if (!check) { alert("Selecione um item no histórico."); return; }
-            fetch('/historico_integridade_matriz/' + check.value).then(r => r.json()).then(data => {
-                if (data.matriz) renderizarTabela(data.matriz);
-            });
-        }
-        function excluirSelecionado() {
-            const selecionados = document.querySelectorAll(".check-historico:checked");
-            if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
-            if (!confirm(`Excluir ${selecionados.length} itens?`)) return;
-            let promessas = [];
-            selecionados.forEach(check => {
-                promessas.push(fetch("/excluir_integridade_matriz/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false));
-            });
-            Promise.all(promessas).then(resultados => {
-                if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); }
-            });
-        }
-        function gerarPDF() {
-            const check = document.querySelector(".check-historico:checked");
-            if (!check) { alert("Marque um relatório no histórico!"); return; }
-            window.open('/gerar_pdf_integridade_matriz/' + check.value, '_blank');
-        }
-        document.addEventListener("DOMContentLoaded", () => { ajustarPeriodo(); carregarHistorico(); });
-    </script>
+            } else {
+                alert("Erro ao excluir: " + (data.mensagem || "Erro desconhecido"));
+            }
+        })
+        .catch(err => alert("Erro de conexão ao excluir: " + err));
+    }
+
+    function fecharModalJust() {
+        const modal = document.getElementById('modalJustificativa');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function salvarJustificativa() {
+        alert("Justificativa salva (função em desenvolvimento).");
+        fecharModalJust();
+    }
+</script>
 
 <!-- MODAL DE JUSTIFICATIVA -->
 <div id="modalJustificativa" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
@@ -264,6 +464,46 @@ function salvarJustificativa() {
 
     fecharModalJust();
 }
+
+async function verificarMatriz() {
+    const ano = document.getElementById('ano').value;
+    const tipo = document.getElementById('tipo').value;
+    const trimestre = document.getElementById('trimestre').value;
+    const periodo = `${ano}-${tipo}-${trimestre}`;
+
+    const container = document.getElementById('matriz-container');
+    if (container) container.innerHTML = '<div class="loading">Buscando dados...</div>';
+
+    try {
+        const res = await fetch(`/api/integridade_matriz/${periodo}?_t=${Date.now()}`);
+        const data = await res.json();
+
+        if (data.erro) {
+            alert("Aviso: " + data.mensagem);
+            if (container) container.innerHTML = '';
+            return;
+        }
+
+        // Renderiza a matriz
+        if (container) {
+            let html = '<table class="data-table"><thead><tr><th>Descrição</th><th>Valor</th><th>Consistente?</th><th>Observação</th></tr></thead><tbody>';
+            (data.matriz || []).forEach(m => {
+                html += `<tr>
+                    <td>${m.descricao}</td>
+                    <td class="text-right">${formatarMoeda(m.valor_bp || m.valor_bo || m.valor_bf || m.valor_dvp || 0)}</td>
+                    <td>${m.consistente ? '✅' : '❌'}</td>
+                    <td>${m.observacao || ''}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+    } catch (err) {
+        console.error(err);
+        if (container) container.innerHTML = '<div class="loading">Erro ao buscar dados.</div>';
+    }
+}
+
 </script>
 
 </body>

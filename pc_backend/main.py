@@ -976,7 +976,7 @@ async def serve_panorama():
     return FileResponse(caminho)
 def _calc_panorama(periodo):
     import sqlite3, json, os
-    from matriz_integridade import _limpar_valor
+    from .matriz_integridade import _limpar_valor
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -1043,7 +1043,7 @@ async def api_panorama(periodo: str):
         import psycopg2
         import json
         from fastapi.responses import JSONResponse
-        from matriz_integridade import _limpar_valor
+        from .matriz_integridade import _limpar_valor
 
         PG_CONFIG = {
             "host": "localhost", "port": 5433,
@@ -1203,7 +1203,7 @@ async def excluir_panorama(id: int):
 @app.get("/api/conferencia/{periodo}")
 async def api_conferencia_calcular(periodo: str):
     try:
-        from matriz_integridade import _get_csv
+        from .matriz_integridade import _get_csv
         pecas_obrigatorias = ["BALANCETE", "BALANCO_PATRIMONIAL", "BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]
         faltando = [p for p in pecas_obrigatorias if not _get_csv(p, periodo)]
         if faltando:
@@ -1276,93 +1276,237 @@ async def excluir_conferencia(id: int):
 # =======================================================
 @app.get("/api/integridade_matriz/{periodo}")
 async def api_integridade_matriz_calcular(periodo: str):
+    import json
+    import psycopg2
+    
+    # Definição local para garantir que a variável exista no escopo
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
     try:
-        from matriz_integridade import gerar_matriz
-        dados = await gerar_matriz(periodo)
+        # Tenta primeiro buscar o último histórico salvo no PostgreSQL
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("SELECT resultado_json FROM historico_integridade_matriz ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if row:
+            # Se encontrou histórico, retorna exatamente o JSON salvo
+            return json.loads(row[0])
+            
+        # Se não encontrou, tenta calcular via CSVs (fallback)
+        from .matriz_integridade import gerar_matriz
+        dados = gerar_matriz(periodo)
         return dados
     except Exception as e:
-        return {"erro": "falha", "mensagem": str(e)}
-@app.post("/salvar_integridade_matriz/{periodo}")
+        return {"erro": True, "mensagem": str(e)}
+
+@app.post("/api/integridade_matriz/{periodo}/salvar")
 async def salvar_integridade_matriz(periodo: str, request: Request):
-    import sqlite3
     import json
     from datetime import datetime
-
+    import psycopg2
+    
+    # Definição local para garantir que a variável exista no escopo
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
     try:
         body = await request.json()
-        justificativas = body.get("justificativas", {})
         matriz = body.get("matriz", [])
-    except Exception:
-        justificativas = {}
-        matriz = []
+        justificativas = body.get("justificativas", {})
+        
+        dados_matriz = {
+            "periodo": periodo,
+            "matriz": matriz,
+            "justificativas": justificativas
+        }
+        
+        data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        
+        # Garante que a tabela exista no Postgres
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+                id SERIAL PRIMARY KEY, 
+                periodo TEXT, 
+                data_geracao TEXT, 
+                resultado_json TEXT
+            )
+        """)
+        
+        cursor.execute(
+            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+    
+    try:
+        body = await request.json()
+        matriz = body.get("matriz", [])
+        justificativas = body.get("justificativas", {})
+        
+        dados_matriz = {
+            "periodo": periodo,
+            "matriz": matriz,
+            "justificativas": justificativas
+        }
+        
+        data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        
+        # Garante que a tabela exista no Postgres
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+                id SERIAL PRIMARY KEY, 
+                periodo TEXT, 
+                data_geracao TEXT, 
+                resultado_json TEXT
+            )
+        """)
+        
+        cursor.execute(
+            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+        
+        dados_matriz = {
+            "periodo": periodo,
+            "matriz": matriz,
+            "justificativas": justificativas
+        }
+        
+        data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        
+        # Cria a tabela se não existir no Postgres
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+                id SERIAL PRIMARY KEY, 
+                periodo TEXT, 
+                data_geracao TEXT, 
+                resultado_json TEXT
+            )
+        """)
+        
+        cursor.execute(
+            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
 
-    if not matriz:
-        return {"ok": False, "mensagem": "Matriz vazia. Clique em 'Verificar Matriz' antes de salvar."}
-
-    # Monta o JSON final com a matriz e as justificativas
-    dados_matriz = {
-        "matriz": matriz,
-        "justificativas": justificativas
-    }
-
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    cursor.execute("""CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-
-    data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute(
-        "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
-        (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {"ok": True, "mensagem": "Matriz e justificativas salvas com sucesso!"}
 @app.get("/historico_integridade_matriz")
 def listar_integridade_matriz():
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_integridade_matriz ORDER BY id DESC")
-    rows = cursor.fetchall()
-    conn.close()
+    import json
+    import psycopg2
     
-    resultado = []
-    for r in rows:
-        resultado.append({
-            "id": r[0], 
-            "periodo": r[1], 
-            "data_geracao": r[2], 
-            "dados": r[3]
-        })
-        
-    return Response(content=json.dumps(resultado), media_type="application/json")
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_integridade_matriz ORDER BY id DESC")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        resultado = []
+        for r in rows:
+            resultado.append({
+                "id": r[0],
+                "periodo": r[1],
+                "data_geracao": r[2],
+                "dados": r[3]
+            })
+        return Response(content=json.dumps(resultado), media_type="application/json")
+    except Exception as e:
+        return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
+        return Response(content=json.dumps(resultado), media_type="application/json")
+    except Exception as e:
+        return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
 
 @app.get("/historico_integridade_matriz/{id}")
 async def buscar_integridade_matriz(id: int):
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-    return json.loads(row[0])
-@app.delete("/excluir_integridade_matriz/{id}")
-async def excluir_integridade_matriz(id: int):
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM historico_integridade_matriz WHERE id = ?", (id,))
-    conn.commit()
-    conn.close()
-    return {"mensagem": "Excluido"}
-# PDF da Conferencia (Tabela historico_conferencia)
+    import json
+    import psycopg2
+    
+    # Definição local para garantir que a variável exista
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = %s", (id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not row: 
+            raise HTTPException(status_code=404, detail="Não encontrado")
+            
+        return json.loads(row[0])
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+
+@app.post("/excluir_multiplos_integridade_matriz")
+async def excluir_integridade_matriz(request: Request):
+    try:
+        body = await request.json()
+        ids = body.get("ids", [])
+        if not ids:
+            return {"ok": False, "mensagem": "Nenhum ID fornecido."}
+            
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        
+        # Formata os IDs para o IN do SQL
+        placeholders = ','.join(['%s'] * len(ids))
+        cursor.execute(f"DELETE FROM historico_integridade_matriz WHERE id IN ({placeholders})", tuple(ids))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"ok": True, "mensagem": "Excluído com sucesso!"}
+    except Exception as e:
+        return {"ok": False, "mensagem": str(e)}
+
 @app.get("/gerar_pdf_conferencia/{id}")
 async def gerar_pdf_conferencia(id: int):
     try:
@@ -1487,11 +1631,11 @@ async def gerar_pdf_integridade_matriz(id: int):
 async def api_analise_orcamentaria_bo(periodo: str):
     try:
         # === REGRA DE INTEGRIDADE ===
-        from matriz_integridade import _get_csv
+        from .matriz_integridade import _get_csv
         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho_check or not os.path.exists(caminho_check):
             return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
-        from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+        from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho or not os.path.exists(caminho):
             return {"erro": True, "mensagem": f"BO do perí­odo {periodo} não foi importado."}
@@ -1571,7 +1715,7 @@ async def salvar_analise_orcamentaria(periodo: str):
 @app.get("/api/composicao_receitas_despesas/{periodo}")
 async def api_composicao_rd(periodo: str):
     try:
-        from matriz_integridade import _get_csv, _ler_linhas, _limpar_valor
+        from .matriz_integridade import _get_csv, _ler_linhas, _limpar_valor
         import os
 
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
@@ -1719,11 +1863,11 @@ async def serve_composicao():
 async def api_analise_financeira_bf(periodo: str):
     try:
         # === REGRA DE INTEGRIDADE ===
-        from matriz_integridade import _get_csv
+        from .matriz_integridade import _get_csv
         caminho_check = _get_csv("BALANCO_FINANCEIRO", periodo)
         if not caminho_check or not os.path.exists(caminho_check):
             return {"erro": "faltando", "pecas": ["Balanço Financeiro"]}
-        from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+        from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
         caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
         if not caminho or not os.path.exists(caminho):
             return {"erro": True, "mensagem": f"BF {periodo} nao importado."}
@@ -3124,7 +3268,7 @@ async def gerar_pdf_base_legal(periodo: str):
         raise HTTPException(status_code=500, detail=str(e))
 @app.get("/api/custo_pessoal/{periodo}")
 async def api_custo_pessoal(periodo: str, entidade: str = None):
-    from matriz_integridade import _get_csv, _ler_linhas, _limpar_valor
+    from .matriz_integridade import _get_csv, _ler_linhas, _limpar_valor
     import re, os
     import sqlite3 as _sqlite3
     # Ler configuracao global
@@ -3381,7 +3525,7 @@ async def serve_liquidez():
     return FileResponse(caminho)
 def _calc_liquidez(periodo):
     """Calcula indices de liquidez/estrutura para exercicio ATUAL e ANTERIOR."""
-    from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+    from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
     caminho_bp = _get_csv("BALANCO_PATRIMONIAL", periodo)
     if not caminho_bp:
         return None
@@ -6372,7 +6516,7 @@ async def gerar_pdf_base_legal(periodo: str):
         raise HTTPException(status_code=500, detail=str(e))
 @app.get("/api/custo_pessoal/{periodo}")
 async def api_custo_pessoal(periodo: str, entidade: str = None):
-    from matriz_integridade import _get_csv, _ler_linhas, _limpar_valor
+    from .matriz_integridade import _get_csv, _ler_linhas, _limpar_valor
     import re, os
     import sqlite3 as _sqlite3
     # Ler configuracao global
@@ -6629,7 +6773,7 @@ async def serve_liquidez():
     return FileResponse(caminho)
 def _calc_liquidez(periodo):
     """Calcula indices de liquidez/estrutura para exercicio ATUAL e ANTERIOR."""
-    from matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+    from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
     caminho_bp = _get_csv("BALANCO_PATRIMONIAL", periodo)
     if not caminho_bp:
         return None
