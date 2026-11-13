@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function carregar() {
     const ano = document.getElementById('ano') ? document.getElementById('ano').value : '2026';
     const tipo = document.getElementById('tipo') ? document.getElementById('tipo').value : 'TRIMESTRE';
-    const periodo = document.getElementById('periodo') ? document.getElementById('periodo').value : '3';
+    const periodo = document.getElementById('val') ? document.getElementById('val').value : '3';
     
     const periodoFormatado = `${ano}-${tipo.toUpperCase()}-${periodo}`;
     const tbody = document.querySelector('#tab tbody');
@@ -109,15 +109,30 @@ function carregar() {
         .catch(error => {
             console.error("Falha na verificacao:", error);
             
+            // Monta uma mensagem amigavel
+            let mensagemAmigavel = "Não há dados importados para o período " + periodoFormatado + ".";
+            if (error.message && error.message.includes("404")) {
+                mensagemAmigavel = "Não há dados importados para o período " + periodoFormatado + ". Verifique se o arquivo CSV foi enviado.";
+            } else if (error.message) {
+                mensagemAmigavel = error.message;
+            }
+
             // Mostra a div de aviso vermelha
+            const aviso = document.getElementById('aviso-erro');
             if(aviso) {
                 aviso.style.display = 'block';
-                aviso.innerHTML = "⚠️ <strong>Aviso:</strong> " + error.message + " (Período: " + periodoFormatado + ")";
+                aviso.innerHTML = "⚠️ <strong>Aviso:</strong> " + mensagemAmigavel;
             }
-            
+
             // Limpa a tabela
             if(tbody) {
                 tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#777;">Nenhum dado para o período.</td></tr>';
+            }
+            
+            // Limpa o grafico
+            if (window._chartDMPL) {
+                window._chartDMPL.destroy();
+                window._chartDMPL = null;
             }
         });
 }
