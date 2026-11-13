@@ -10360,29 +10360,83 @@ def gerar_pdf_relatorio_consolidado(id: int):
                 
                 elif nome_interno == "Comparativo de Despesas":
                     atual = mod_dados.get("atual", {})
+                    anterior = mod_dados.get("anterior", {})
+                    
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo consolidado de despesas.</p>")
-                    html_parts.append("<h3>Resumo</h3><table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
+                    
+                    # ---- 1. TABELA DE INDICADORES ----
+                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
                     html_parts.append(f"<tr><td>Despesa Orçada</td><td class='text-right'>{fmt(atual.get('orcado_total'))}</td></tr>")
                     html_parts.append(f"<tr><td>Despesa Empenhada</td><td class='text-right'>{fmt(atual.get('empenhado_total'))}</td></tr>")
                     html_parts.append(f"<tr><td>Despesa Liquidada</td><td class='text-right'>{fmt(atual.get('liquidado_total'))}</td></tr>")
                     html_parts.append(f"<tr><td>% Execução</td><td class='text-right'>{atual.get('percentual_total', 0):.2f}%</td></tr>")
                     html_parts.append("</tbody></table>")
-                    html_parts.append("<h3>Composição por Grupo</h3><table><thead><tr><th>GRUPO</th><th>ORÇADO</th><th>EMPENHADO</th><th>LIQUIDADO</th><th>%</th></tr></thead><tbody>")
+                    
+                    # ---- 2. COMPOSIÇÃO POR GRUPO ----
+                    html_parts.append("<h3>Composição por Grupo</h3>")
+                    html_parts.append("<table><thead><tr><th>GRUPO</th><th>ORÇADO</th><th>EMPENHADO</th><th>LIQUIDADO</th><th>%</th></tr></thead><tbody>")
                     for g in atual.get("grupos", []):
-                        html_parts.append(f"<tr><td>{g.get('nome','')}</td><td class='text-right'>{fmt(g.get('orcado'))}</td><td class='text-right'>{fmt(g.get('empenhado'))}</td><td class='text-right'>{fmt(g.get('liquidado'))}</td><td class='text-right'>{g.get('percentual',0):.2f}%</td></tr>")
+                        html_parts.append(f"<tr><td>{g.get('nome','')}</td>")
+                        html_parts.append(f"<td class='text-right'>{fmt(g.get('orcado'))}</td>")
+                        html_parts.append(f"<td class='text-right'>{fmt(g.get('empenhado'))}</td>")
+                        html_parts.append(f"<td class='text-right'>{fmt(g.get('liquidado'))}</td>")
+                        html_parts.append(f"<td class='text-right'>{g.get('percentual', 0):.2f}%</td></tr>")
                     html_parts.append("</tbody></table>")
-                    html_parts.append(f"<p class='texto-dinamico'>A despesa empenhada foi de {fmt(atual.get('empenhado_total'))}, correspondendo a {atual.get('percentual_total', 0):.2f}% da despesa orçada de {fmt(atual.get('orcado_total'))}.</p>")
-                    labels = [g.get('nome') for g in atual.get('grupos', [])]
-                    vals = [g.get('empenhado') for g in atual.get('grupos', [])]
-                    html_parts.append("<div class='grafico'><canvas id='chartDespesas'></canvas></div>")
-                    html_parts.append("<script>")
-                    html_parts.append("new Chart(document.getElementById('chartDespesas'), {")
-                    html_parts.append("type: 'doughnut',")
-                    html_parts.append(f"data: {{ labels: {json.dumps(labels)}, datasets: [{{ data: {json.dumps(vals)}, backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#28a745', '#007bff'] }}] }}")
-                    html_parts.append("});")
-                    html_parts.append("</script>")
+                    
+                    # ---- 3. TEXTOS DINÂMICOS ----
+                    textos = []
+                    orc_tot = atual.get("orcado_total", 0) or 0
+                    emp_tot = atual.get("empenhado_total", 0) or 0
+                    liq_tot = atual.get("liquidado_total", 0) or 0
+                    pct_tot = atual.get("percentual_total", 0) or 0
+                    if orc_tot > 0:
+                        if pct_tot >= 100:
+                            textos.append(f"<li>A despesa empenhada de {fmt(emp_tot)} superou a orçada de {fmt(orc_tot)} em {pct_tot - 100:.2f}% (execução de {pct_tot:.2f}%).</li>")
+                        else:
+                            textos.append(f"<li>A despesa empenhada de {fmt(emp_tot)} ficou abaixo da orçada de {fmt(orc_tot)}, com execução de {pct_tot:.2f}%.</li>")
+                    else:
+                        textos.append(f"<li>Não há despesa orçada cadastrada para o período; a despesa empenhada foi de {fmt(emp_tot)}.</li>")
+                    
+                    if liq_tot and liq_tot != emp_tot:
+                        pct_liq = (liq_tot / emp_tot * 100) if emp_tot > 0 else 0
+                        textos.append(f"<li>Do total empenhado, {fmt(liq_tot)} foram liquidados ({pct_liq:.2f}% do empenhado).</li>")
+                    
+                    for g in atual.get("grupos", []):
+                        nome = g.get('nome', '')
+                        orc = g.get('orcado', 0) or 0
+                        emp = g.get('empenhado', 0) or 0
+                        pct_g = g.get('percentual', 0) or 0
+                        if orc > 0 and emp > 0:
+                            if pct_g >= 100:
+                                textos.append(f"<li>{nome}: empenhado de {fmt(emp)} ({pct_g:.2f}% do orçado de {fmt(orc)}).</li>")
+                            else:
+                                textos.append(f"<li>{nome}: empenhado de {fmt(emp)}, abaixo do orçado de {fmt(orc)} ({pct_g:.2f}%).</li>")
+                        elif emp > 0:
+                            textos.append(f"<li>{nome}: empenhado de {fmt(emp)} sem previsão orçada.</li>")
+                    
+                    if textos:
+                        html_parts.append("<h3>Análise de Execução</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                    else:
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os períodos.</p>")
+                    
+                    # ---- 4. GRÁFICO DE BARRAS (Orçado x Empenhado por grupo) ----
+                    grupos = atual.get("grupos", [])
+                    if grupos:
+                        labels = [g.get('nome','') for g in grupos]
+                        vals_orc = [g.get('orcado', 0) or 0 for g in grupos]
+                        vals_emp = [g.get('empenhado', 0) or 0 for g in grupos]
+                        html_parts.append("<div class='grafico' style='max-width: 500px; height: 220px; margin: 10px auto;'><canvas id='chartDespesasBarras' style='width:100%; height:100%;'></canvas></div>")
+                        html_parts.append("<script>")
+                        html_parts.append("new Chart(document.getElementById('chartDespesasBarras'), {")
+                        html_parts.append("type: 'bar',")
+                        html_parts.append(f"data: {{ labels: {json.dumps(labels, ensure_ascii=False)}, datasets: [")
+                        html_parts.append(f"{{ label: 'Orçado', data: {json.dumps(vals_orc)}, backgroundColor: '#6c757d' }},")
+                        html_parts.append(f"{{ label: 'Empenhado', data: {json.dumps(vals_emp)}, backgroundColor: '#dc3545' }}")
+                        html_parts.append("] },")
+                        html_parts.append("options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { x: { ticks: { font: { size: 7 } } }, y: { ticks: { font: { size: 7 } } } } }")
+                        html_parts.append("});")
+                        html_parts.append("</script>")
                 
-                # 10. ÍNDICES DE LIQUIDEZ
                 elif nome_interno == "Índices de Liquidez":
                     liq = mod_dados.get("liquidez", {})
                     est = mod_dados.get("estrutura", {})
