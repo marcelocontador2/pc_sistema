@@ -89,7 +89,7 @@ def processar_bo(caminho_csv, ano, periodo_acumulado):
     cursor = conn.cursor()
     periodo_id = get_periodo_id(cursor, ano, periodo_acumulado)
     if not periodo_id:
-        print(f"PerÃ­odo {ano}/{periodo_acumulado} nÃ£o encontrado. Pulando {os.path.basename(caminho_csv)}")
+        print(f"Período {ano}/{periodo_acumulado} não encontrado. Pulando {os.path.basename(caminho_csv)}")
         return
     with open(caminho_csv, "rb") as f:
         file_hash = hashlib.sha256(f.read()).hexdigest()
@@ -196,7 +196,7 @@ def processar_dmpl(caminho_csv, ano):
     cursor = conn.cursor()
     periodo_id = get_periodo_id(cursor, ano, "Jan-Set")
     if not periodo_id:
-        print(f"PerÃ­odo {ano} nÃ£o encontrado. Pulando {os.path.basename(caminho_csv)}")
+        print(f"Período {ano} não encontrado. Pulando {os.path.basename(caminho_csv)}")
         return
     with open(caminho_csv, "rb") as f:
         file_hash = hashlib.sha256(f.read()).hexdigest()
@@ -228,7 +228,7 @@ if __name__ == "__main__":
         if "comparativo" in nome and nome.startswith("balancopatrimonial"):
             processar_bp_comparativo(caminho)
         elif nome.startswith("balancopatrimonial"):
-            processar_bp_comparativo(caminho)  # O BP normal tambÃ©m pode ser comparativo
+            processar_bp_comparativo(caminho)  # O BP normal também pode ser comparativo
         elif nome.startswith("balancoorcamentario"):
             processar_bo(caminho, ano, periodo_acumulado)
         elif nome.startswith("balancofinanceiro"):

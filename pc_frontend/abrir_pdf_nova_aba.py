@@ -1,4 +1,4 @@
-﻿c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
+c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
 
 # Substitui a navegação na mesma aba por abertura em nova aba
 antigo = "window.location.href = '/gerar_pdf_comparativo_receitas?periodo_atual=' + encodeURIComponent(periodo);"

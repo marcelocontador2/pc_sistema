@@ -368,7 +368,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 meses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
                 periodo_formatado = f"{meses[int(valor_p)]}/{ano}"
             elif tipo_p == "TRIMESTRE":
-                periodo_formatado = f"{valor_p}Âº Tri/{ano}"
+                periodo_formatado = f"{valor_p}º Tri/{ano}"
             else:
                 periodo_formatado = f"Exercí­cio {ano}"
         csv_path = _get_csv_por_tipo(tipo, periodo)
@@ -385,11 +385,11 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 continue
 
         # Corrige caracteres corrompidos (ex: ç -> ç, ã -> ã)
-        content = content.replace("íƒÂ§", "ç").replace("íƒÂ£", "ã").replace("íƒÂ¡", "á")
+        content = content.replace("íƒ§", "ç").replace("íƒ£", "ã").replace("íƒÂ¡", "á")
         content = content.replace("íƒÂ©", "é").replace("íƒ", "í­").replace("íƒÂ³", "í³")
-        content = content.replace("íƒÂº", "íº").replace("íƒÂ¢", "í¢").replace("íƒÂª", "íª")
-        content = content.replace("íƒÂ´", "í´").replace("íƒÂª", "íª").replace("íƒÂ§", "ç")
-        content = content.replace("íƒÆ’", "íƒ").replace("íƒâ€°", "í‰").replace("íƒâ€œ", "í“")
+        content = content.replace("íƒº", "íº").replace("íƒ¢", "í¢").replace("íƒª", "íª")
+        content = content.replace("íƒÂ´", "í´").replace("íƒª", "íª").replace("íƒ§", "ç")
+        content = content.replace("íƒÆ’", "íƒ").replace("íƒâ€°", "í‰").replace("íƒ“", "í“")
         pdf = FPDF(orientation="L", unit="mm", format="A4")
         fonte_padrao = "Helvetica"
         # Registra fonte Arial (regular, bold e italic)
@@ -3381,7 +3381,7 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
     custo_anterior = sum(d["pessoal"] + d["outras"] + d["terc"] - d["sent"] for d in dados_anteriores)
     rcl_atual = dados_atual["receitas_realizadas"] - dados_atual["cota_parte"]
     rcl_anterior = sum(d["receitas_realizadas"] - d["cota_parte"] for d in dados_anteriores)
-    # Lí³gica de Faixas de Controle (Art. 6Âº da Resolução Cofen 814/2026)
+    # Lí³gica de Faixas de Controle (Art. 6º da Resolução Cofen 814/2026)
     pct_custo_total = ((custo_atual + custo_anterior) / (rcl_atual + rcl_anterior)) * 100 if (rcl_atual + rcl_anterior) > 0 else 0
     is_coren = (entidade.upper() == "COREN")
 
@@ -6621,7 +6621,7 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
     custo_anterior = sum(d["pessoal"] + d["outras"] + d["terc"] - d["sent"] for d in dados_anteriores)
     rcl_atual = dados_atual["receitas_realizadas"] - dados_atual["cota_parte"]
     rcl_anterior = sum(d["receitas_realizadas"] - d["cota_parte"] for d in dados_anteriores)
-    # Lí³gica de Faixas de Controle (Art. 6Âº da Resolução Cofen 814/2026)
+    # Lí³gica de Faixas de Controle (Art. 6º da Resolução Cofen 814/2026)
     pct_custo_total = ((custo_atual + custo_anterior) / (rcl_atual + rcl_anterior)) * 100 if (rcl_atual + rcl_anterior) > 0 else 0
     is_coren = (entidade.upper() == "COREN")
 
@@ -10596,7 +10596,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     
     # Nota 4 - Imobilizado
     notas.append({"titulo": "NOTA 4 — IMOBILIZADO, INTANGíVEL E INCORPORAÇÃO DE ATIVOS",
-        "texto": "O Imobilizado é de R$ 129.453.937,95 (+4,44%) e o Intangí­vel, de R$ 832.266,06. No perí­odo foram incorporados ativos no total de R$ 16.271.957,08, conforme o relatí³rio, assim discriminados:<br><br>â€¢ Outras máquinas, aparelhos e equipamentos: R$ 65.962,97<br>â€¢ Mobiliário em geral: R$ 240.628,83<br>â€¢ Edifí­cio Futura Sede Cofen: R$ 6.682.639,01<br>â€¢ Bens não ativáveis: R$ 21.081,55<br>â€¢ PLATEC — Cofen, investimentos: R$ 9.261.645,32<br><br><i>Observação: a soma aritmética das parcelas acima resulta em R$ 16.271.957,68, diferença de R$ 0,60 em relação ao total informado. A discriminação será revisada antes da divulgação definitiva.</i><br><br>Os estoques somam R$ 185.551,08 (R$ 69.447,74 no perí­odo anterior)."})
+        "texto": "O Imobilizado é de R$ 129.453.937,95 (+4,44%) e o Intangí­vel, de R$ 832.266,06. No perí­odo foram incorporados ativos no total de R$ 16.271.957,08, conforme o relatí³rio, assim discriminados:<br><br>• Outras máquinas, aparelhos e equipamentos: R$ 65.962,97<br>• Mobiliário em geral: R$ 240.628,83<br>• Edifí­cio Futura Sede Cofen: R$ 6.682.639,01<br>• Bens não ativáveis: R$ 21.081,55<br>• PLATEC — Cofen, investimentos: R$ 9.261.645,32<br><br><i>Observação: a soma aritmética das parcelas acima resulta em R$ 16.271.957,68, diferença de R$ 0,60 em relação ao total informado. A discriminação será revisada antes da divulgação definitiva.</i><br><br>Os estoques somam R$ 185.551,08 (R$ 69.447,74 no perí­odo anterior)."})
     
     # Nota 5 - Passivos
     pc_at = vl("passivo_circulante", "atual")
@@ -10657,7 +10657,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     
     # Nota 15 - Integridade (NOVO)
     notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇÃO",
-        "texto": "A matriz de integridade cruzou Balancete, BP, BF, BO, DFC, DVP e DMPL. A conformidade foi confirmada para os grupos patrimoniais, VPA, VPD, receitas correntes, caixa e equivalentes, despesas correntes e de capital pagas e incorporação de ativos.<br><br>Quatro itens apresentaram divergíªncia, decorrentes de estornos de restos a pagar que o sistema contábil (Implanta) não tratou adequadamente; o chamado correspondente foi aberto junto ao fornecedor:<br><br>â€¢ Valores restituí­veis — dispíªndios: R$ 222.353,33<br>â€¢ RP não processados — a liquidar: R$ 134.400,00<br>â€¢ RP não proc. — despesas correntes canceladas: R$ 58.302,51<br>â€¢ RP não processados pagos: R$ 7.220,00<br><br>As diferenças referem-se ao tratamento de estornos de restos a pagar e não afetam o resultado patrimonial nem o saldo de caixa. Ficam pendentes de regularização e serão reavaliadas apí³s resposta do chamado."})
+        "texto": "A matriz de integridade cruzou Balancete, BP, BF, BO, DFC, DVP e DMPL. A conformidade foi confirmada para os grupos patrimoniais, VPA, VPD, receitas correntes, caixa e equivalentes, despesas correntes e de capital pagas e incorporação de ativos.<br><br>Quatro itens apresentaram divergíªncia, decorrentes de estornos de restos a pagar que o sistema contábil (Implanta) não tratou adequadamente; o chamado correspondente foi aberto junto ao fornecedor:<br><br>• Valores restituí­veis — dispíªndios: R$ 222.353,33<br>• RP não processados — a liquidar: R$ 134.400,00<br>• RP não proc. — despesas correntes canceladas: R$ 58.302,51<br>• RP não processados pagos: R$ 7.220,00<br><br>As diferenças referem-se ao tratamento de estornos de restos a pagar e não afetam o resultado patrimonial nem o saldo de caixa. Ficam pendentes de regularização e serão reavaliadas apí³s resposta do chamado."})
     
     return {"erro": False, "periodo": periodo, "notas": notas}
 

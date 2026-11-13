@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 def auditar(arquivo):
     print(f"\n{'='*60}")

@@ -1,4 +1,4 @@
-﻿c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
+c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
 
 # 1. Ajusta a função verificar() para chamar a API v2 (dados reais com comparativo)
 c = c.replace(

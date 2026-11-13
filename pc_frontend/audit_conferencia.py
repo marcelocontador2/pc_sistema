@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 print("=" * 70)
 print("AUDITORIA DE HISTÓRICO: DMPL (FUNCIONA) vs CONFERÊNCIA (QUEBRADO)")

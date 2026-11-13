@@ -1,4 +1,4 @@
-﻿c = open('relatorio_comparativo_receitas.html', encoding='utf-8-sig').read()
+c = open('relatorio_comparativo_receitas.html', encoding='utf-8-sig').read()
 
 # 1. Aumentar legendas do gráfico de ranking (eixo Y e X)
 # No Chart.js, o tamanho dos ticks é controlado por 'font: { size: X }'

@@ -1,4 +1,4 @@
-﻿c = open('relatorio_centro_custos_v2.html', encoding='utf-8-sig').read()
+c = open('relatorio_centro_custos_v2.html', encoding='utf-8-sig').read()
 
 # 1. Adiciona o botão "Salvar Relatório" no final da última página (conclusão)
 if "Salvar Relatório" not in c:

@@ -1,4 +1,4 @@
-﻿import shutil
+import shutil
 
 # 1. Backup do arquivo atual
 shutil.copy("analise_dmpl.html", "analise_dmpl.html.bak_estrutura_dvp")

@@ -1,4 +1,4 @@
-﻿c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
+c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
 
 # Substitui a função exibirSelecionado por uma versão que busca os dados do período do histórico
 antiga = """        async function exibirSelecionado() {

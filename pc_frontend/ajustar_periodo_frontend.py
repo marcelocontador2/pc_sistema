@@ -1,4 +1,4 @@
-﻿c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
+c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
 
 c = c.replace(
     "const periodoAnterior = params.get('periodo_anterior') || '2026-TRIMESTRE-2';",

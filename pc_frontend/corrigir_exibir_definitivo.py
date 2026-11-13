@@ -1,4 +1,4 @@
-﻿c = open('panorama.html', encoding='utf-8-sig').read()
+c = open('panorama.html', encoding='utf-8-sig').read()
 
 # Texto exato da função antiga (copiado do seu Select-String)
 antiga = """        function exibirSelecionado() {

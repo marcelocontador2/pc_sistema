@@ -1,4 +1,4 @@
-﻿import re
+import re
 import os
 
 # 1. Le o conteudo do arquivo JS

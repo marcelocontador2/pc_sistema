@@ -1,4 +1,4 @@
-﻿c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
+c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
 
 c = c.replace(
     "window.open('/relatorio_comparativo_receitas?periodo_atual=' + encodeURIComponent(check.parentElement.querySelector('strong').innerText), '_blank');",

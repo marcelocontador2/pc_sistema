@@ -1,4 +1,4 @@
-﻿"""Drop-in replacement for sqlite3 module that uses PostgreSQL."""
+"""Drop-in replacement for sqlite3 module that uses PostgreSQL."""
 import re
 import sys
 import psycopg2

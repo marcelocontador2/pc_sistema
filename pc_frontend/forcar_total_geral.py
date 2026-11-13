@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 c = open('dashboard_despesas.html', encoding='utf-8').read()
 

@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 arq = "relatorio_consolidado_template.html"
 with open(arq, "r", encoding="utf-8") as f:

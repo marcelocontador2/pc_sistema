@@ -1,4 +1,4 @@
-﻿import re
+import re
 import shutil
 
 path = "analise_dmpl.html"

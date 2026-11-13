@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 path = "composicao_receitas_despesas.html"
 with open(path, "r", encoding="utf-8") as f:

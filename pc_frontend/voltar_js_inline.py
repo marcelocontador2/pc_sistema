@@ -1,4 +1,4 @@
-﻿import re
+import re
 import os
 
 path = "composicao_receitas_despesas.html"

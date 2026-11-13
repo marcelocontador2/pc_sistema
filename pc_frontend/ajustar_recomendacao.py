@@ -1,4 +1,4 @@
-﻿c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
+c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
 
 c = c.replace(
     "Revisar os contratos e processos dos 3 maiores centros de custo, dado o alto grau de concentração.",

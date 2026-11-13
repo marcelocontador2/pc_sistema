@@ -1,4 +1,4 @@
-﻿c = open('analise_centro_custos.html', encoding='utf-8-sig').read()
+c = open('analise_centro_custos.html', encoding='utf-8-sig').read()
 
 # Substitui o link do botão "Gerar PDF" para apontar para o relatório v2
 c = c.replace(

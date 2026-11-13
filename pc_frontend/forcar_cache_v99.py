@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 path = "analise_dmpl.html"
 with open(path, "r", encoding="utf-8") as f:

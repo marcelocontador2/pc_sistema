@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 with open("analise_patrimonial.html", "r", encoding="utf-8") as f:
     s = f.read()

@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 c = open('relatorio_final.html', encoding='utf-8-sig').read()
 

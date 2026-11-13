@@ -1,4 +1,4 @@
-﻿c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
+c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
 
 # 1. Adiciona a regra CSS para alinhar as colunas (sem tocar no JavaScript)
 css_alinhamento = """

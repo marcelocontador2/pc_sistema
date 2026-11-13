@@ -1,4 +1,4 @@
-﻿with open("analise_dmpl.html", "r", encoding="utf-8") as f:
+with open("analise_dmpl.html", "r", encoding="utf-8") as f:
     s = f.read()
 
 print("=== ESTRUTURA DO SCRIPT NO DMPL (QUE FUNCIONA) ===")

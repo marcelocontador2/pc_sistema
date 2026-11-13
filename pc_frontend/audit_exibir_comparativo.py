@@ -1,4 +1,4 @@
-﻿import re
+import re
 import os
 
 arquivos = ["analise_bp.html", "analise_dmpl.html", "analise_patrimonial.html", "composicao_receitas_despesas.html"]

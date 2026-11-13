@@ -1,4 +1,4 @@
-﻿c = open('index.html', encoding='utf-8-sig').read()
+c = open('index.html', encoding='utf-8-sig').read()
 
 # Verifica se o link do menu já existe pela URL
 if 'href="/analise_comparativo_despesas"' not in c:

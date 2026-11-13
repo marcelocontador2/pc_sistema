@@ -1,4 +1,4 @@
-﻿// ===== 2. ANÁLISE BP =====
+// ===== 2. ANÁLISE BP =====
 H += tit(2, 'Análise do Balanço Patrimonial');
 H += '<div class="desc">DEBUG: Estrutura recebida do backend.</div>';
 

@@ -1,4 +1,4 @@
-﻿import shutil, datetime
+import shutil, datetime
 
 arquivo = 'analise_comparativo_receitas.html'
 shutil.copy2(arquivo, f"{arquivo}.bak_fix_{datetime.datetime.now().strftime('%H%M%S')}")

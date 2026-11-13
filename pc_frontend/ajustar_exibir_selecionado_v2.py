@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
 

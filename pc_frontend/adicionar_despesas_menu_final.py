@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 c = open('index.html', encoding='utf-8-sig').read()
 

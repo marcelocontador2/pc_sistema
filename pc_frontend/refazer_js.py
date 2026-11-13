@@ -1,4 +1,4 @@
-﻿import re, shutil, datetime
+import re, shutil, datetime
 
 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 shutil.copy2("analise_comparativo_despesas.html", f"analise_comparativo_despesas.html.bak_{ts}")

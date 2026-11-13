@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 arquivo = 'analise_comparativo_despesas.html'
 c = open(arquivo, encoding='utf-8').read()

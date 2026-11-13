@@ -1,4 +1,4 @@
-﻿c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
+c = open('analise_comparativo_receitas.html', encoding='utf-8-sig').read()
 
 # Substitui a função gerarPDF para chamar a rota de geração de PDF (download)
 antigo = """        function gerarPDF() {

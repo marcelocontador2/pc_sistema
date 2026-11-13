@@ -1,4 +1,4 @@
-﻿c = open('index.html', encoding='utf-8-sig').read()
+c = open('index.html', encoding='utf-8-sig').read()
 
 # Verifica se o link já existe
 if "Comparativo de Despesas" not in c:

@@ -1,4 +1,4 @@
-﻿import shutil
+import shutil
 
 arquivos = ["custo_pessoal_pdf_resumo.html", "custo_pessoal_pdf_completo.html"]
 

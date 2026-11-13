@@ -1,4 +1,4 @@
-﻿c = open('relatorio_final.html', encoding='utf-8-sig').read()
+c = open('relatorio_final.html', encoding='utf-8-sig').read()
 
 script_ajuste = """
     <script>

@@ -1,4 +1,4 @@
-﻿import re
+import re
 import shutil
 
 # O arquivo do HTML do PDF do panorama (pode ter outro nome, vamos procurar)

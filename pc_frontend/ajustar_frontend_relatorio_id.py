@@ -1,4 +1,4 @@
-﻿c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
+c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
 
 # Ajusta a inicialização do fetch para ler o ID da URL
 c = c.replace(

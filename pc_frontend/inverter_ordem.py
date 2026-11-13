@@ -1,4 +1,4 @@
-﻿c = open('dashboard_despesas.html', encoding='utf-8').read()
+c = open('dashboard_despesas.html', encoding='utf-8').read()
 
 antigo_bloco = """                // Bloco 1: Despesas de Capital (Topo)
                 html += gerarBloco(

@@ -1,4 +1,4 @@
-﻿c = open('relatorio_final.html', encoding='utf-8-sig').read()
+c = open('relatorio_final.html', encoding='utf-8-sig').read()
 
 # 1. Substitui o bloco do gráfico de tendência para incluir a tabela abaixo
 trend_page_old = '''    <!-- GRÁFICO DE TENDÊNCIA -->

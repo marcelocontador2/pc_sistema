@@ -1,4 +1,4 @@
-﻿c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
+c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
 
 # Verifica se a página de conclusão já existe
 if "Conclusão e Recomendações" not in c:

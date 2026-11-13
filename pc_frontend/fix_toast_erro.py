@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 path = "dmpl_functions.js"
 with open(path, "r", encoding="utf-8") as f:

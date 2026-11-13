@@ -1,4 +1,4 @@
-﻿js_completo = '''function carregarHistorico() {
+js_completo = '''function carregarHistorico() {
     fetch('/historico_analise_dmpl')
         .then(r => r.json())
         .then(data => {

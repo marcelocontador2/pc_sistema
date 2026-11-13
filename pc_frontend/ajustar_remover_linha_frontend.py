@@ -1,4 +1,4 @@
-﻿c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
+c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
 
 # Filtra os centros no JavaScript para não exibir "Centro de Custo" ou "Centro de Custo x Conta"
 c = c.replace(

@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 # 1. Ver como o DMPL monta o checkbox (que funciona)
 with open("analise_dmpl.html", "r", encoding="utf-8") as f:

@@ -1,4 +1,4 @@
-﻿import re, shutil
+import re, shutil
 
 path = "configuracoes.html"
 with open(path, "r", encoding="utf-8") as f:

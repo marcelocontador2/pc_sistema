@@ -1,4 +1,4 @@
-﻿c = open('relatorio_centro_custos_v2.html', encoding='utf-8-sig').read()
+c = open('relatorio_centro_custos_v2.html', encoding='utf-8-sig').read()
 
 # 1. Remove qualquer botão antigo (se existir)
 import re

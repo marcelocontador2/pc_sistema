@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 def extrair_estrutura(path):
     with open(path, "r", encoding="utf-8") as f:

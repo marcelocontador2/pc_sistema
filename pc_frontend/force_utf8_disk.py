@@ -1,4 +1,4 @@
-﻿arquivos = ["custo_pessoal_pdf_resumo.html", "custo_pessoal_pdf_completo.html"]
+arquivos = ["custo_pessoal_pdf_resumo.html", "custo_pessoal_pdf_completo.html"]
 
 for arquivo in arquivos:
     print(f"\n=== TESTANDO {arquivo} ===")

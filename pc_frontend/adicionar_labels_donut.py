@@ -1,4 +1,4 @@
-﻿c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
+c = open('relatorio_centro_custos.html', encoding='utf-8-sig').read()
 
 # 1. Adiciona o plugin datalabels no head (junto com o Chart.js)
 if "chartjs-plugin-datalabels" not in c:

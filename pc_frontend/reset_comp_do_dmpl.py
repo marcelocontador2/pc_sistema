@@ -1,4 +1,4 @@
-﻿import shutil
+import shutil
 
 # 1. Backup do arquivo atual
 shutil.copy("composicao_receitas_despesas.html", "composicao_receitas_despesas.html.bak_reset_final")

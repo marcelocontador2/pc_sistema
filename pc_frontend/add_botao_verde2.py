@@ -1,4 +1,4 @@
-﻿import shutil
+import shutil
 
 path = "analise_bp.html"
 with open(path, "r", encoding="utf-8") as f:

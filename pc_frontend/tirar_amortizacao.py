@@ -1,4 +1,4 @@
-﻿c = open('dashboard_despesas.html', encoding='utf-8').read()
+c = open('dashboard_despesas.html', encoding='utf-8').read()
 
 termo_antigo = "2. Despesas de Capital (Investimentos + Inversões + Amortização)"
 termo_novo = "2. Despesas de Capital (Investimentos + Inversões)"

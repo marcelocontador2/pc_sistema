@@ -1,4 +1,4 @@
-﻿c = open('relatorio_final.html', encoding='utf-8-sig').read()
+c = open('relatorio_final.html', encoding='utf-8-sig').read()
 
 # 1. Ajusta a classe .page para não cortar o conteúdo (permite rolagem interna se necessário)
 c = c.replace(
