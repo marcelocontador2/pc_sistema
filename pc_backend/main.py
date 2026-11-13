@@ -9377,28 +9377,6 @@ async def excluir_panorama_multiplos(request: Request):
         return {"erro": True, "mensagem": str(e)}
 
 
-@app.get("/api/relatorio_consolidado/{periodo}")
-async def api_relatorio_consolidado_novo(periodo: str):
-    import sqlite3, os, json
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    modulos = {
-        "analise_bp": "historico_analise_bp",
-        "analise_dfc": "historico_analise_dfc",
-        "analise_patrimonial": "historico_analise_patrimonial",
-        "analise_orcamentaria": "historico_analise_orcamentaria",
-        "analise_financeira_bf": "historico_analise_financeira_bf",
-        "comparativo_receitas": "historico_comparativo_receitas",
-        "comparativo_despesas": "historico_comparativo_despesas",
-        "panorama": "historico_panorama",
-        "liquidez": "historico_liquidez",
-        "integridade": "historico_integridade_matriz",
-        "conferencia": "historico_conferencia",
-        "custo_pessoal": "historico_custo_pessoal",
-        "centro_custos": "historico_centro_custos"
-    }
 
     nomes_amigaveis = {
         "analise_bp": "Análise BP",
@@ -10708,3 +10686,97 @@ async def gerar_pdf_analise_dmpl(id: int):
     except Exception as e:
         return Response(content=f"Erro ao gerar PDF: {str(e)}", status_code=500)
 
+
+
+
+@app.get("/api/relatorio_consolidado/{periodo}")
+async def api_relatorio_consolidado_novo(periodo: str):
+    import json
+    import psycopg2
+    
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
+    # Mapeamento dos módulos para as tabelas do PostgreSQL
+    modulos = {
+        "analise_bp": "historico_analise_bp",
+        "analise_dfc": "historico_analise_dfc",
+        "analise_patrimonial": "historico_analise_patrimonial",
+        "analise_orcamentaria": "historico_analise_orcamentaria",
+        "analise_financeira_bf": "historico_analise_financeira_bf",
+        "comparativo_receitas": "historico_comparativo_receitas",
+        "comparativo_despesas": "historico_comparativo_despesas",
+        "panorama": "historico_panorama",
+        "liquidez": "historico_liquidez",
+        "integridade": "historico_integridade_matriz",
+        "conferencia": "historico_conferencia",
+        "custo_pessoal": "historico_custo_pessoal",
+        "centro_custos": "historico_centro_custos"
+    }
+
+    nomes_amigaveis = {
+        "analise_bp": "Análise BP",
+        "analise_dfc": "Análise DFC",
+        "analise_patrimonial": "Análise Patrimonial (DVP)",
+        "analise_orcamentaria": "Análise Orçamentária (BO)",
+        "analise_financeira_bf": "Análise Financeira (BF)",
+        "comparativo_receitas": "Comparativo de Receitas",
+        "comparativo_despesas": "Comparativo de Despesas",
+        "panorama": "Panorama de Resultados",
+        "liquidez": "Índices de Liquidez",
+        "integridade": "Integridade entre Demonstrações",
+        "conferencia": "Conferência das Demonstrações",
+        "custo_pessoal": "Custo de Pessoal",
+        "centro_custos": "Análise por Centro de Custos"
+    }
+
+    encontrados = []
+    faltando = []
+
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+
+        for chave, tabela in modulos.items():
+            try:
+                # Verifica se a tabela existe e tem dados para o período
+                if chave == "analise_financeira_bf":
+                    cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo LIKE %s LIMIT 1", (f"%{periodo}%",))
+                else:
+                    cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo = %s LIMIT 1", (periodo,))
+                row = cursor.fetchone()
+                
+                if row:
+                    encontrados.append({
+                        "nome": nomes_amigaveis.get(chave, chave),
+                        "data_geracao": row[1] if len(row) > 1 else "Disponível",
+                        "id": row[0]
+                    })
+                else:
+                    faltando.append({
+                        "nome": nomes_amigaveis.get(chave, chave)
+                    })
+            except Exception as e:
+                # Se a tabela não existir ou der erro, adiciona aos faltantes
+                faltando.append({"nome": nomes_amigaveis.get(chave, chave)})
+
+        cursor.close()
+        conn.close()
+
+        # Monta o retorno no formato que o frontend espera
+        status = "ok" if len(faltando) == 0 else "faltando"
+        
+        return {
+            "status": status,
+            "encontrados": encontrados,
+            "faltando": faltando,
+            "periodo": periodo
+        }
+
+    except Exception as e:
+        return {
+            "status": "erro",
+            "mensagem": f"Erro de conexão com o PostgreSQL: {str(e)}"
+        }

@@ -124,7 +124,7 @@
                 const res = await fetch(`/api/relatorio_consolidado/${periodo}`);
                 const data = await res.json();
 
-                if (data.total_faltando === 0) {
+                if (data.faltando ? data.faltando.length : 0 === 0) {
                     statusArea.innerHTML = `<div class="status-box status-ok">
                         <strong>✓ Todos os ${data.total_modulos} módulos encontrados!</strong>
                         <p>Período ${periodo} está pronto para ser consolidado.</p>
@@ -136,7 +136,7 @@
                     dadosConsolidados = data;
                 } else {
                     statusArea.innerHTML = `<div class="status-box status-pendente">
-                        <strong>⚠ Faltam ${data.total_faltando} módulo(s) para consolidar.</strong>
+                        <strong>⚠ Faltam ${data.faltando ? data.faltando.length : 0} módulo(s) para consolidar.</strong>
                         <p>Realize os cálculos dos módulos pendentes antes de gerar o relatório.</p>
                     </div>`;
                     document.getElementById('btn-salvar').style.display = 'none';
