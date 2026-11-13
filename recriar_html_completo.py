@@ -1,0 +1,364 @@
+﻿import os
+
+html_content = '''<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Comparativo de Receitas</title>
+    <style>
+        :root {
+            --primary: #2b6cb0;
+            --bg: #f4f6f9;
+            --card-bg: #ffffff;
+            --text: #2d3748;
+            --text-light: #718096;
+            --green: #38a169;
+            --red: #e53e3e;
+        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
+        .container { max-width: 1200px; margin: 0 auto; background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        .header-title h1 { margin: 0 0 5px 0; font-size: 24px; color: #1a202c; }
+        .header-title p { margin: 0 0 20px 0; color: var(--text-light); font-size: 14px; }
+
+        .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; color: #fff; font-weight: bold; font-size: 14px; }
+        .btn-voltar { background: #ed8936; }
+        .btn-exibir { background: #38a169; }
+        .btn-excluir { background: #e53e3e; }
+        .btn-pdf { background: #3182ce; }
+        .btn-salvar { background: #38a169; }
+        .btn-verificar { background: #3182ce; }
+        .btn:hover { opacity: 0.9; }
+
+        .historico-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; margin-bottom: 20px; }
+        .historico-box h3 { font-size: 14px; color: #4a5568; margin-bottom: 10px; text-transform: uppercase; margin-top: 0;}
+        .historico-box ul { list-style: none; padding: 0; margin: 0; }
+        .historico-box li { padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+        .historico-box li:last-child { border-bottom: none; }
+
+        .filters { display: flex; gap: 10px; align-items: center; background: #f7fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .filters label { font-size: 14px; font-weight: 600; }
+        .filters select { padding: 6px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 14px; }
+
+        .section-title { font-size: 16px; font-weight: 700; margin: 30px 0 15px 0; color: #ffffff; background-color: var(--primary); text-align: center; padding: 10px; border-radius: 4px; }
+        
+        .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .card { background: #f8fafc; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-top: 4px solid var(--primary); }
+        .card-title { font-size: 13px; text-transform: uppercase; color: var(--text-light); font-weight: bold; margin-bottom: 10px; }
+        .card-value { font-size: 22px; font-weight: bold; margin-bottom: 5px; color: #1a202c; }
+        .card-sub { font-size: 12px; color: var(--text-light); }
+        
+        .val-positive { color: var(--green); }
+        .val-negative { color: var(--red); }
+        
+        table.data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        table.data-table th, table.data-table td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        table.data-table th { background: #edf2f7; font-weight: bold; color: #2d3748; font-size: 13px; text-transform: uppercase; }
+        .text-right { text-align: right; }
+        .total-row td { font-weight: bold; background: #f7fafc; }
+        
+        .loading { text-align: center; padding: 20px; font-size: 14px; color: var(--text-light); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-title">
+            <h1>Comparativo de Receitas</h1>
+            <p>Apuração consolidada 12 meses</p>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-voltar" onclick="window.location.href='/'">← Voltar</button>
+            <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+            <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+            <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+            <button class="btn btn-salvar" onclick="salvarAtual()">Confirmar e Salvar</button>
+        </div>
+
+        <div class="historico-box">
+            <h3>Histórico Salvo</h3>
+            <ul id="historico-lista">
+                <li class="loading">Carregando histórico...</li>
+            </ul>
+        </div>
+
+        <div class="filters">
+            <label>Ano:</label>
+            <select id="ano">
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+            </select>
+            
+            <label>Tipo:</label>
+            <select id="tipo">
+                <option value="TRIMESTRE" selected>Trimestral</option>
+                <option value="MENSAL">Mensal</option>
+            </select>
+
+            <label>Período:</label>
+            <select id="valor">
+                <option value="1">1º</option>
+                <option value="2">2º</option>
+                <option value="3" selected>3º</option>
+                <option value="4">4º</option>
+            </select>
+
+            <button class="btn btn-verificar" onclick="verificar()">Verificar</button>
+        </div>
+
+        <div class="section-title">RESUMO GERAL DAS RECEITAS</div>
+
+        <div class="cards-grid">
+            <div class="card">
+                <div class="card-title">Receita Realizada</div>
+                <div class="card-value" id="card-realizado">R$ 0,00</div>
+                <div class="card-sub" id="sub-realizado">Anterior: R$ 0,00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Receita Orçada</div>
+                <div class="card-value" id="card-orcado">R$ 0,00</div>
+                <div class="card-sub" id="sub-orcado">Anterior: R$ 0,00</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Execução Orçamentária</div>
+                <div class="card-value" id="card-percentual">0,00%</div>
+                <div class="card-sub" id="sub-percentual">—</div>
+            </div>
+        </div>
+
+        <div id="tabela-container">
+            <div class="loading">Clique em "Verificar" para carregar os dados.</div>
+        </div>
+    </div>
+
+    <script>
+        let dadosAtuais = null;
+
+        function formatarMoeda(valor) {
+            return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function getHistoricoSelecionado() {
+            const checkboxes = document.querySelectorAll('#historico-lista input[type="checkbox"]');
+            for (let cb of checkboxes) {
+                if (cb.checked) return cb.value;
+            }
+            return null;
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            carregarHistorico();
+            // Já carrega os dados do período atual ao abrir
+            verificar();
+        });
+
+        function carregarHistorico() {
+            fetch(`/historico_comparativo_receitas?_t=${Date.now()}`)
+                .then(res => res.json())
+                .then(data => {
+                    const list = document.getElementById('historico-lista');
+                    list.innerHTML = '';
+                    if (data && data.length > 0) {
+                        data.forEach(h => {
+                            const li = document.createElement('li');
+                            li.innerHTML = `
+                                <input type="checkbox" value="${h.id}">
+                                <span>Período: ${h.periodo} | Gerado em: ${h.data_geracao || h.criado_em || 'N/A'}</span>
+                            `;
+                            list.appendChild(li);
+                        });
+                    } else {
+                        list.innerHTML = '<li>Nenhum histórico salvo.</li>';
+                    }
+                })
+                .catch(err => console.error("Erro ao carregar histórico:", err));
+        }
+
+        function verificar() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo').value;
+            const valor = document.getElementById('valor').value;
+            const periodo = `${ano}-${tipo}-${valor}`;
+
+            const container = document.getElementById('tabela-container');
+            container.innerHTML = '<div class="loading">Buscando dados...</div>';
+
+            fetch(`/api/comparativo_receitas_v2/${periodo}?_t=${Date.now()}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erro) {
+                        alert("Aviso: " + data.mensagem);
+                        container.innerHTML = '';
+                        return;
+                    }
+                    dadosAtuais = data;
+                    atualizarCards(data);
+                    renderizarTabela(data);
+                })
+                .catch(err => {
+                    console.error(err);
+                    container.innerHTML = '<div class="loading">Erro ao buscar dados.</div>';
+                });
+        }
+
+        function atualizarCards(data) {
+            if (document.getElementById('card-realizado'))
+                document.getElementById('card-realizado').innerText = formatarMoeda(data.realizado_total);
+            
+            if (document.getElementById('card-orcado'))
+                document.getElementById('card-orcado').innerText = formatarMoeda(data.orcado_total);
+            
+            if (document.getElementById('card-percentual'))
+                document.getElementById('card-percentual').innerText = (data.percentual_total || 0).toFixed(2) + '%';
+
+            if (data.anterior) {
+                const subReal = document.getElementById('sub-realizado');
+                if (subReal) subReal.innerText = `Anterior: ${formatarMoeda(data.anterior.realizado_total)}`;
+                
+                const subOrc = document.getElementById('sub-orcado');
+                if (subOrc) subOrc.innerText = `Anterior: ${formatarMoeda(data.anterior.orcado_total)}`;
+                
+                const subPct = document.getElementById('sub-percentual');
+                if (subPct) {
+                    let diff = (data.percentual_total || 0) - (data.anterior.percentual_total || 0);
+                    subPct.innerText = `${diff > 0 ? '+' : ''}${diff.toFixed(2)} p.p.`;
+                }
+            }
+        }
+
+        function renderizarTabela(data) {
+            const container = document.getElementById('tabela-container');
+            if (!container) return;
+
+            const anteriorMap = {};
+            if (data.anterior && data.anterior.grupos) {
+                data.anterior.grupos.forEach(g => { anteriorMap[g.nome] = g; });
+            }
+
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>GRUPO DE RECEITA</th>
+                            <th class="text-right">PERÍODO ATUAL (R$)</th>
+                            <th class="text-right">PERÍODO ANTERIOR (R$)</th>
+                            <th class="text-right">VARIAÇÃO (R$)</th>
+                            <th class="text-right">VARIAÇÃO (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            (data.grupos || []).forEach(g => {
+                const atualVal = g.realizado || 0;
+                const ant = anteriorMap[g.nome];
+                const antVal = ant ? (ant.realizado || 0) : 0;
+                const variacaoVal = atualVal - antVal;
+                let variacaoPct = 0;
+                if (antVal !== 0) variacaoPct = (variacaoVal / antVal) * 100;
+
+                const classVar = variacaoVal < 0 ? 'val-negative' : (variacaoVal > 0 ? 'val-positive' : '');
+                const sinal = variacaoVal > 0 ? '+' : '';
+
+                html += `
+                    <tr>
+                        <td>${g.nome}</td>
+                        <td class="text-right">${formatarMoeda(atualVal)}</td>
+                        <td class="text-right">${formatarMoeda(antVal)}</td>
+                        <td class="text-right ${classVar}">${sinal}${formatarMoeda(variacaoVal)}</td>
+                        <td class="text-right ${classVar}">${sinal}${variacaoPct.toFixed(2)}%</td>
+                    </tr>
+                `;
+            });
+
+            const totalRealAtual = data.realizado_total || 0;
+            const totalRealAnterior = (data.anterior && data.anterior.realizado_total) ? data.anterior.realizado_total : 0;
+            const varTotal = totalRealAtual - totalRealAnterior;
+            let varTotalPct = 0;
+            if (totalRealAnterior !== 0) varTotalPct = (varTotal / totalRealAnterior) * 100;
+            const classTotal = varTotal < 0 ? 'val-negative' : (varTotal > 0 ? 'val-positive' : '');
+            const sinalTotal = varTotal > 0 ? '+' : '';
+
+            html += `
+                    <tr class="total-row">
+                        <td><strong>TOTAL</strong></td>
+                        <td class="text-right"><strong>${formatarMoeda(totalRealAtual)}</strong></td>
+                        <td class="text-right"><strong>${formatarMoeda(totalRealAnterior)}</strong></td>
+                        <td class="text-right ${classTotal}"><strong>${sinalTotal}${formatarMoeda(varTotal)}</strong></td>
+                        <td class="text-right ${classTotal}"><strong>${sinalTotal}${varTotalPct.toFixed(2)}%</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function exibirSelecionado() {
+            const id = getHistoricoSelecionado();
+            if (!id) { alert("Selecione um histórico na lista."); return; }
+            
+            fetch(`/historico_comparativo_receitas/${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erro) { alert("Erro: " + data.mensagem); return; }
+                    const payload = data.dados ? data.dados : data;
+                    dadosAtuais = payload;
+                    atualizarCards(dadosAtuais);
+                    renderizarTabela(dadosAtuais);
+                })
+                .catch(err => alert("Erro ao carregar histórico: " + err));
+        }
+
+        function gerarPDF() {
+            const id = getHistoricoSelecionado();
+            if (!id) { alert("Selecione um histórico na lista."); return; }
+            window.open(`/gerar_pdf_comparativo_receitas/${id}`, '_blank');
+        }
+
+        function salvarAtual() {
+            if (!dadosAtuais) { alert("Verifique os dados primeiro."); return; }
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo').value;
+            const valor = document.getElementById('valor').value;
+            const periodo = `${ano}-${tipo}-${valor}`;
+
+            fetch(`/api/comparativo_receitas_v2/${periodo}/salvar`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erro) alert("Erro: " + data.mensagem);
+                    else { alert("Salvo com sucesso!"); carregarHistorico(); }
+                })
+                .catch(err => alert("Erro ao salvar: " + err));
+        }
+
+        function excluirSelecionado() {
+            const id = getHistoricoSelecionado();
+            if (!id) { alert("Selecione um histórico na lista."); return; }
+            
+            if (!confirm("Tem certeza que deseja excluir o histórico selecionado?")) return;
+
+            fetch("/excluir_multiplos_comparativo_receitas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: [id] })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok) { carregarHistorico(); }
+                else { alert("Erro ao excluir."); }
+            })
+            .catch(err => alert("Erro ao excluir: " + err));
+        }
+    </script>
+</body>
+</html>'''
+
+path = "pc_frontend/analise_comparativo_receitas.html"
+with open(path, "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print("✅ Arquivo HTML completamente reconstruído e limpo!")
+print("Agora aperte Ctrl+F5 na tela.")
