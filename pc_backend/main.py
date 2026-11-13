@@ -4759,32 +4759,63 @@ def api_comparativo_despesas_v2(periodo: str):
     }
 @app.get("/historico_comparativo_despesas")
 def get_historico_comparativo_despesas():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
-    rows = cur.fetchall()
-    conn.close()
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
     
-    resultado = []
-    for r in rows:
-        resultado.append({
-            "id": r[0], 
-            "periodo": r[1], 
-            "data_geracao": r[2], 
-            "dados": r[3]
-        })
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
+        rows = cur.fetchall()
+        conn.close()
         
-    return Response(content=json.dumps(resultado), media_type="application/json")
+        resultado = []
+        for r in rows:
+            resultado.append({
+                "id": r["id"],
+                "periodo": r["periodo"],
+                "data_geracao": r["data_geracao"],
+                "dados": r["dados_json"]
+            })
+        return resultado
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar histórico de despesas: {e}")
+        return []
 
 @app.get("/historico_comparativo_despesas/{id}")
 def get_historico_comparativo_despesas_id(id: int):
-    import sqlite3, os, json
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path); cur = conn.cursor()
-    cur.execute("SELECT periodo, dados_json FROM historico_comparativo_despesas WHERE id = ?", (id,))
-    row = cur.fetchone(); conn.close()
-    if row: return {"ok": True, "periodo": row[0], "dados": json.loads(row[1])}
-    return {"ok": False}
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    import json
+    
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas WHERE id = %s", (id,))
+        row = cur.fetchone()
+        conn.close()
+        
+        if row:
+            return {
+                "id": row["id"],
+                "periodo": row["periodo"],
+                "data_geracao": row["data_geracao"],
+                "dados": row["dados_json"]
+            }
+        return {"erro": True, "mensagem": "Histórico não encontrado."}
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar histórico ID {id}: {e}")
+        return {"erro": True, "mensagem": str(e)}
 
 @app.post("/salvar_comparativo_despesas")
 async def salvar_comparativo_despesas(request: Request):
@@ -4802,16 +4833,33 @@ async def salvar_comparativo_despesas(request: Request):
 
 @app.post("/excluir_multiplos_comparativo_despesas")
 async def excluir_multiplos_comparativo_despesas(request: Request):
-    import sqlite3, os
-    dados = await request.json()
-    ids = dados.get("ids", [])
-    if not ids: return {"ok": False}
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path); cur = conn.cursor()
-    placeholders = ",".join(["?"] * len(ids))
-    cur.execute(f"DELETE FROM historico_comparativo_despesas WHERE id IN ({placeholders})", ids)
-    conn.commit(); excluidos = cur.rowcount; conn.close()
-    return {"ok": True, "excluidos": excluidos}
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
+    try:
+        body = await request.json()
+        ids = body.get("ids", [])
+        
+        if not ids:
+            return {"ok": False, "mensagem": "Nenhum ID fornecido."}
+        
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        placeholders = ",".join(["%s"] * len(ids))
+        cur.execute(f"DELETE FROM historico_comparativo_despesas WHERE id IN ({placeholders})", ids)
+        excluidos = cur.rowcount
+        conn.commit()
+        conn.close()
+        
+        return {"ok": True, "excluidos": excluidos}
+    except Exception as e:
+        print(f"[ERRO] Falha ao excluir históricos: {e}")
+        return {"ok": False, "mensagem": str(e)}
 
 @app.get("/analise_comparativo_despesas", response_class=HTMLResponse)
 def serve_analise_comparativo_despesas():
@@ -4872,6 +4920,7 @@ def gerar_pdf_conferencia(check_id: str):
     )
 
 
+@app.get("/gerar_pdf_comparativo_despesas/{historico_id}")
 @app.get("/gerar_pdf_comparativo_despesas")
 def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
     from playwright.sync_api import sync_playwright

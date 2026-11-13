@@ -1,0 +1,229 @@
+{
+  "erro": false,
+  "periodo": "2026-TRIMESTRE-3",
+  "periodo_anterior": "2025-TRIMESTRE-3",
+  "atual": {
+    "orcado_total": 319721745.52,
+    "empenhado_total": 255579957.84,
+    "liquidado_total": 255579957.84,
+    "percentual_total": 79.94,
+    "grupos": [
+      {
+        "nome": "PESSOAL E ENCARGOS SOCIAIS",
+        "orcado": 69452980.04,
+        "empenhado": 61242550.11,
+        "liquidado": 61242550.11,
+        "percentual": 88.18
+      },
+      {
+        "nome": "JUROS E ENCARGOS DA DÍVIDA",
+        "orcado": 0.0,
+        "empenhado": 0.0,
+        "liquidado": 0.0,
+        "percentual": 0.0
+      },
+      {
+        "nome": "OUTRAS DESPESAS CORRENTES",
+        "orcado": 224215909.49,
+        "empenhado": 174754814.65,
+        "liquidado": 174754814.65,
+        "percentual": 77.94
+      },
+      {
+        "nome": "INVESTIMENTOS",
+        "orcado": 17270216.98,
+        "empenhado": 10799954.07,
+        "liquidado": 10799954.07,
+        "percentual": 62.54
+      },
+      {
+        "nome": "INVERSÕES FINANCEIRAS",
+        "orcado": 8782639.01,
+        "empenhado": 8782639.01,
+        "liquidado": 8782639.01,
+        "percentual": 100.0
+      },
+      {
+        "nome": "AMORTIZAÇÃO DA DÍVIDA",
+        "orcado": 0.0,
+        "empenhado": 0.0,
+        "liquidado": 0.0,
+        "percentual": 0.0
+      }
+    ],
+    "detalhes": [
+      {
+        "nome": "Vencimentos e Salários",
+        "orcado": 29444000.0,
+        "empenhado": 26705454.55,
+        "percentual": 90.7
+      },
+      {
+        "nome": "PUBLICIDADE",
+        "orcado": 22375655.14,
+        "empenhado": 20187329.79,
+        "percentual": 90.22
+      },
+      {
+        "nome": "Propaganda e Publicidade",
+        "orcado": 22106281.94,
+        "empenhado": 19920000.0,
+        "percentual": 90.11
+      },
+      {
+        "nome": "SERVIÇOS DE APOIO DO ENSINO",
+        "orcado": 18015287.33,
+        "empenhado": 17046651.12,
+        "percentual": 94.62
+      },
+      {
+        "nome": "Educação Permanente",
+        "orcado": 18012897.55,
+        "empenhado": 17045633.2,
+        "percentual": 94.63
+      },
+      {
+        "nome": "Serviços Gráficos e Editoriais",
+        "orcado": 19004000.0,
+        "empenhado": 16029792.92,
+        "percentual": 84.35
+      },
+      {
+        "nome": "OUTRAS DESPESAS DE PESSOAL DECORRENTES DE CONTRATOS DE TERCEIRIZAÇÃO-ART. 18 § 1, LC 101/00",
+        "orcado": 16700000.0,
+        "empenhado": 15130520.75,
+        "percentual": 90.6
+      },
+      {
+        "nome": "Congresso Brasileiro dos Conselhos de Enfermagem - CBCENF",
+        "orcado": 16719267.24,
+        "empenhado": 14548948.8,
+        "percentual": 87.02
+      },
+      {
+        "nome": "Serviços Relacionados a Tecnologia da Informação",
+        "orcado": 27025224.07,
+        "empenhado": 14191954.38,
+        "percentual": 52.51
+      },
+      {
+        "nome": "OBRIGAÇÕES PATRONAIS",
+        "orcado": 13382750.0,
+        "empenhado": 12017750.0,
+        "percentual": 89.8
+      }
+    ]
+  },
+  "anterior": {
+    "orcado_total": 336453543.84,
+    "empenhado_total": 232776412.98,
+    "liquidado_total": 232776412.98,
+    "percentual_total": 69.19,
+    "grupos": [
+      {
+        "nome": "PESSOAL E ENCARGOS SOCIAIS",
+        "orcado": 96557535.69,
+        "empenhado": 79829638.0,
+        "liquidado": 79829638.0,
+        "percentual": 82.68
+      },
+      {
+        "nome": "JUROS E ENCARGOS DA DÍVIDA",
+        "orcado": 0.0,
+        "empenhado": 0.0,
+        "liquidado": 0.0,
+        "percentual": 0.0
+      },
+      {
+        "nome": "OUTRAS DESPESAS CORRENTES",
+        "orcado": 213333671.55,
+        "empenhado": 136311916.76,
+        "liquidado": 136311916.76,
+        "percentual": 63.9
+      },
+      {
+        "nome": "INVESTIMENTOS",
+        "orcado": 26562336.6,
+        "empenhado": 16634858.22,
+        "liquidado": 16634858.22,
+        "percentual": 62.63
+      },
+      {
+        "nome": "INVERSÕES FINANCEIRAS",
+        "orcado": 0.0,
+        "empenhado": 0.0,
+        "liquidado": 0.0,
+        "percentual": 0.0
+      },
+      {
+        "nome": "AMORTIZAÇÃO DA DÍVIDA",
+        "orcado": 0.0,
+        "empenhado": 0.0,
+        "liquidado": 0.0,
+        "percentual": 0.0
+      }
+    ],
+    "detalhes": [
+      {
+        "nome": "SENTENÇAS JUDICIAIS",
+        "orcado": 24515000.0,
+        "empenhado": 24515000.0,
+        "percentual": 100.0
+      },
+      {
+        "nome": "Sentenças / Decisões Judiciais Trabalhistas - Trânsito em Julgado - e Encargos",
+        "orcado": 24515000.0,
+        "empenhado": 24515000.0,
+        "percentual": 100.0
+      },
+      {
+        "nome": "Vencimentos e Salários",
+        "orcado": 29107261.69,
+        "empenhado": 24000000.0,
+        "percentual": 82.45
+      },
+      {
+        "nome": "Congresso Brasileiro dos Conselhos de Enfermagem - CBCENF",
+        "orcado": 16015945.0,
+        "empenhado": 15963888.5,
+        "percentual": 99.67
+      },
+      {
+        "nome": "Serviços Gráficos e Editoriais",
+        "orcado": 17195000.0,
+        "empenhado": 15905700.0,
+        "percentual": 92.5
+      },
+      {
+        "nome": "Serviços Relacionados a Tecnologia da Informação",
+        "orcado": 39124301.0,
+        "empenhado": 14670360.13,
+        "percentual": 37.5
+      },
+      {
+        "nome": "PASSAGENS E DESPESAS COM LOCOMOÇÃO",
+        "orcado": 13915000.0,
+        "empenhado": 13915000.0,
+        "percentual": 100.0
+      },
+      {
+        "nome": "Passagens Aéreas",
+        "orcado": 13800000.0,
+        "empenhado": 13800000.0,
+        "percentual": 100.0
+      },
+      {
+        "nome": "OBRIGAÇÕES PATRONAIS",
+        "orcado": 15805048.0,
+        "empenhado": 11723093.0,
+        "percentual": 74.17
+      },
+      {
+        "nome": "TRANSFERÊNCIAS INTRAGOVERNAMENTAIS",
+        "orcado": 18714000.0,
+        "empenhado": 10858277.77,
+        "percentual": 58.02
+      }
+    ]
+  }
+}

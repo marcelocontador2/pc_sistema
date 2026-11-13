@@ -1,55 +1,51 @@
-﻿import sqlite3
+﻿import urllib.request
 import json
+import re
 
-db_path = r"pc_storage\banco_dados.db"
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
-
-print("=== AUDITORIA COMPLETA ===")
-
-# 1. Verificar observacoes no banco
-print("\n1. OBSERVACOES NO BANCO:")
-cursor.execute("SELECT id, relatorio_id, item, texto FROM observacoes_consolidado")
-rows = cursor.fetchall()
-if not rows:
-    print("   [VAZIO] Nenhuma observacao no banco.")
-else:
-    for r in rows:
-        print(f"   ID: {r[0]} | Relatorio ID: {r[1]} | Item: {r[2]} | Texto: {r[3][:50]}...")
-
-# 2. Verificar se o backend tem a rota
-print("\n2. VERIFICANDO ROTA NO BACKEND:")
-import subprocess
-result = subprocess.run(["findstr", "/C:api/observacoes_consolidado", "pc_backend\\main.py"], capture_output=True, text=True)
-if result.stdout:
-    print("   [OK] Rota encontrada no main.py:")
-    print("   " + result.stdout.strip().replace("\n", "\n   "))
-else:
-    print("   [ERRO] Rota NAO encontrada no main.py!")
-
-# 3. Verificar se o frontend tem o modal
-print("\n3. VERIFICANDO MODAL NO FRONTEND:")
-with open(r"pc_frontend\relatorio_consolidado.html", "r", encoding="utf-8") as f:
-    html = f.read()
-if 'id="modal-obs"' in html:
-    print("   [OK] Modal encontrado no HTML.")
-else:
-    print("   [ERRO] Modal NAO encontrado no HTML!")
-
-if 'XMLHttpRequest' in html:
-    print("   [OK] XMLHttpRequest encontrado no HTML.")
-else:
-    print("   [ERRO] XMLHttpRequest NAO encontrado no HTML!")
-
-# 4. Verificar se o backend esta rodando
-print("\n4. VERIFICANDO SERVIDOR:")
-import urllib.request
+# 1. Testa a API
+print("=" * 60)
+print("TESTE 1: API de Despesas")
+print("=" * 60)
 try:
-    response = urllib.request.urlopen("http://127.0.0.1:9994/api/observacoes_consolidado/22", timeout=3)
-    data = response.read().decode()
-    print(f"   [OK] Servidor respondendo. Resposta: {data}")
+    url = "http://127.0.0.1:9994/api/comparativo_despesas_v2/2026-TRIMESTRE-3"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        data = json.loads(r.read().decode())
+    print(f"Status: 200")
+    print(f"Chaves: {list(data.keys())}")
+    print(f"Tem 'atual'? {'atual' in data}")
+    if 'atual' in data:
+        print(f"Grupos: {len(data['atual'].get('grupos', []))}")
+        print(f"Empenhado: {data['atual'].get('empenhado_total')}")
 except Exception as e:
-    print(f"   [ERRO] Servidor nao respondeu: {e}")
+    print(f"ERRO: {e}")
 
-conn.close()
-print("\n=== FIM DA AUDITORIA ===")
+# 2. Lê o HTML e verifica funções
+print("\n" + "=" * 60)
+print("TESTE 2: HTML - Funções e Botões")
+print("=" * 60)
+html = open('pc_frontend/analise_comparativo_despesas.html', 'r', encoding='utf-8').read()
+
+funcoes = ['verificar', 'exibirSelecionado', 'renderizarTabela', 'atualizarCards']
+for f in funcoes:
+    if f'function {f}(' in html:
+        print(f"✅ Função {f} existe")
+    else:
+        print(f"❌ Função {f} NÃO existe")
+
+# Verifica o botão Verificar
+if 'onclick="verificar()"' in html:
+    print("✅ Botão Verificar tem onclick=verificar()")
+else:
+    print("❌ Botão Verificar NÃO tem onclick=verificar()")
+    # Mostra como está o botão
+    idx = html.find('Verificar')
+    if idx != -1:
+        print(f"Trecho do botão: {html[max(0,idx-100):idx+50]}")
+
+# Mostra o bloco <script> (primeiros 1500 caracteres)
+idx = html.find('<script>')
+if idx != -1:
+    print("\n--- Primeiros 1500 caracteres do <script> ---")
+    print(html[idx:idx+1500])
+else:
+    print("❌ Bloco <script> NÃO encontrado")
