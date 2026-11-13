@@ -1,6 +1,0 @@
-﻿BACKUP - 20261022_112115
-Local: C:\Users\Marcelo Medeiros\pc_sistema\backups\backup_20261022_112115
-
-RESTAURAR:
-1) pg_restore -h localhost -p 5433 -U postgres -d pc_database -c --if-exists "C:\Users\Marcelo Medeiros\pc_sistema\backups\backup_20261022_112115\pc_database.dump"
-2) Expandir os 3 arquivos zip (pc_backend, pc_frontend, pc_storage).
