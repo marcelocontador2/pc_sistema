@@ -1,0 +1,521 @@
+﻿import shutil
+import ast
+
+caminho_main = "pc_backend/main.py"
+shutil.copy(caminho_main, caminho_main + ".bak_pdf_final_completo_entidade")
+
+with open(caminho_main, "r", encoding="utf-8") as f:
+    conteudo = f.read()
+
+idx_inicio = conteudo.find("def gerar_pdf_relatorio_consolidado(")
+if idx_inicio == -1:
+    print("❌ Função não encontrada.")
+else:
+    idx_fim = conteudo.find("\n@app.", idx_inicio)
+    if idx_fim == -1:
+        idx_fim = len(conteudo)
+    
+    nova_funcao = '''def gerar_pdf_relatorio_consolidado(id: int):
+    from fastapi.responses import Response
+    import json
+    import psycopg2
+    from playwright.sync_api import sync_playwright
+    import os
+    import base64
+    
+    PG_CONFIG = {
+        "host": "localhost", "port": 5433,
+        "database": "pc_database", "user": "postgres", "password": "pc_admin_2026",
+    }
+    
+    def fmt(v):
+        if v is None: return "-"
+        if isinstance(v, (int, float)):
+            return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return str(v)
+    
+    def pct(v):
+        if v is None: return "-"
+        return f"{v:+.2f}%".replace(".", ",")
+    
+    def calc_var(atual, anterior):
+        if anterior and anterior != 0:
+            return ((atual - anterior) / abs(anterior)) * 100
+        return 0.0
+    
+    mapa_tabelas = {
+        "Integridade entre Demonstrações": ("historico_integridade_matriz", "resultado_json"),
+        "Análise BP": ("historico_analise_bp", "resultado_json"),
+        "Análise Orçamentária (BO)": ("historico_analise_orcamentaria", "resultado_json"),
+        "Análise Financeira (BF)": ("historico_analise_financeira_bf", "resultado_json"),
+        "Análise DFC": ("historico_analise_dfc", "resultado_json"),
+        "Análise Patrimonial (DVP)": ("historico_analise_patrimonial", "resultado_json"),
+        "DMPL": ("historico_analise_dmpl", "resultado_json"),
+        "Comparativo de Receitas": ("historico_comparativo_receitas", "dados_json"),
+        "Comparativo de Despesas": ("historico_comparativo_despesas", "dados_json"),
+        "Índices de Liquidez": ("historico_liquidez", "resultado_json"),
+        "Panorama de Resultados": ("historico_panorama", "resultado_json"),
+        "Análise por Centro de Custos": ("historico_centro_custos", "dados_json"),
+        "Custo de Pessoal": ("historico_custo_pessoal", "resultado_json"),
+        "Conferência das Demonstrações": ("historico_conferencia", "resultado_json")
+    }
+    
+    ordem_modelo = [
+        ("Integridade entre Demonstrações", "1. Integridade entre Demonstrações"),
+        ("Análise BP", "2. Análise do Balanço Patrimonial"),
+        ("Análise Orçamentária (BO)", "3. Análise do Balanço Orçamentário"),
+        ("Análise Financeira (BF)", "4. Análise do Balanço Financeiro"),
+        ("Análise DFC", "5. Análise do Fluxo de Caixa"),
+        ("Análise Patrimonial (DVP)", "6. Análise das Variações Patrimoniais"),
+        ("DMPL", "7. Demonstração das Mutações do Patrimônio Líquido (DMPL)"),
+        ("Comparativo de Receitas", "8. Comparativo de Receitas"),
+        ("Comparativo de Despesas", "9. Comparativo de Despesas"),
+        ("Índices de Liquidez", "10. Índices de Liquidez e Estrutura"),
+        ("Panorama de Resultados", "11. Panorama de Resultados"),
+        ("Análise por Centro de Custos", "12. Análise por Centro de Custos"),
+        ("Custo de Pessoal", "13. Custo de Pessoal"),
+        ("Conferência das Demonstrações", "14. Conferência das Demonstrações")
+    ]
+    
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cursor = conn.cursor()
+        
+        # 1. Busca dados da entidade
+        cursor.execute("SELECT razao_social, cnpj, contador_nome, contador_crc, contador_uf, contador_cpf, logo_path FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
+        ent_row = cursor.fetchone()
+        razao_social = ent_row[0] if ent_row else "COFEN/BR"
+        cnpj = ent_row[1] if ent_row else ""
+        contador_nome = ent_row[2] if ent_row else ""
+        contador_crc = ent_row[3] if ent_row else ""
+        contador_uf = ent_row[4] if ent_row else ""
+        contador_cpf = ent_row[5] if ent_row else ""
+        logo_path = ent_row[6] if ent_row else ""
+        
+        # Converte logo para base64 (se existir)
+        logo_base64 = ""
+        if logo_path:
+            caminho_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_logos", logo_path)
+            if os.path.exists(caminho_logo):
+                with open(caminho_logo, "rb") as img:
+                    logo_base64 = base64.b64encode(img.read()).decode("utf-8")
+        
+        # 2. Busca dados do relatório consolidado
+        cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_relatorio_consolidado WHERE id = %s", (id,))
+        row = cursor.fetchone()
+        if not row:
+            return Response(content="Relatório não encontrado.", status_code=404, media_type="text/plain")
+        
+        periodo, data_geracao, res_json = row
+        dados_consolidados = json.loads(res_json)
+        modulos_lista = dados_consolidados.get("dados", [])
+        modulos_por_nome = {m.get("nome"): m for m in modulos_lista}
+        
+        html_parts = []
+        
+        # ============================================================
+        # CAPA (com logo, nome da entidade e CNPJ)
+        # ============================================================
+        html_parts.append("<!DOCTYPE html><html><head><meta charset='UTF-8'>")
+        html_parts.append("<style>")
+        html_parts.append("@page { size: A4; margin: 2cm; }")
+        html_parts.append("body { font-family: SegoeUI, Arial, sans-serif; font-size: 10pt; color: #333; }")
+        html_parts.append("h1 { color: #003366; font-size: 22pt; text-align: center; margin-top: 20px; }")
+        html_parts.append("h2 { color: #003366; font-size: 12.5pt; border-bottom: 2px solid #004b8d; padding-bottom: 5px; margin-top: 25px; }")
+        html_parts.append("h3 { color: #0056b3; font-size: 7.6pt; margin-top: 15px; }")
+        html_parts.append(".capa { text-align: center; padding-top: 20px; }")
+        html_parts.append(".capa .logo { width: 120px; margin-bottom: 20px; }")
+        html_parts.append(".capa .periodo { font-size: 12pt; color: #666; font-style: italic; margin-top: 20px; }")
+        html_parts.append(".capa .orgao { font-size: 14pt; color: #003366; margin-top: 20px; }")
+        html_parts.append(".capa .cnpj { font-size: 11pt; color: #666; margin-top: 5px; }")
+        html_parts.append(".capa .legislacao { font-size: 8pt; color: #666; margin-top: 30px; padding: 0 40px; text-align: justify; }")
+        html_parts.append(".page-break { page-break-before: always; }")
+        html_parts.append("table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9pt; }")
+        html_parts.append("th { background-color: #004b8d; color: white; padding: 5px; text-align: center; border: 1px solid #ccc; font-size: 5.5pt; }")
+        html_parts.append("td { padding: 4px 6px; border: 1px solid #ccc; font-size: 5.9pt; }")
+        html_parts.append("tr:nth-child(even) { background-color: #f9f9f9; }")
+        html_parts.append(".text-right { text-align: right; }")
+        html_parts.append(".text-center { text-align: center; }")
+        html_parts.append(".alerta-info { background-color: #e7f1ff; border: 1px solid #b6d4fe; padding: 10px; border-radius: 5px; margin: 15px 0; font-size: 8pt; }")
+        html_parts.append(".parecer p { text-align: justify; margin-bottom: 10px; font-size: 7.6pt; }")
+        html_parts.append(".parecer h3 { font-size: 7.6pt; }")
+        html_parts.append(".assinatura { margin-top: 50px; text-align: center; font-size: 7.6pt; }")
+        html_parts.append(".assinatura .linha { border-top: 1px solid #000; width: 300px; margin: 0 auto; }")
+        html_parts.append(".grafico { width: 100%; max-width: 500px; margin: 20px auto; }")
+        html_parts.append(".texto-dinamico { text-align: justify; margin: 10px 0; line-height: 1.5; font-size: 7.6pt; color: #0d47a1; }")
+        html_parts.append("</style>")
+        html_parts.append("<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>")
+        html_parts.append("</head><body>")
+        
+        # --- CAPA ---
+        html_parts.append("<div class='capa'>")
+        if logo_base64:
+            html_parts.append(f"<img class='logo' src='data:image/png;base64,{logo_base64}' alt='Logo'>")
+        html_parts.append("<h1>RELATÓRIO CONSOLIDADO</h1>")
+        html_parts.append("<h2 style='border: none;'>Análise Contábil</h2>")
+        html_parts.append(f"<div class='orgao'>{razao_social}</div>")
+        html_parts.append(f"<div class='cnpj'>CNPJ: {cnpj}</div>")
+        html_parts.append(f"<div class='periodo'>PERÍODO DE ANÁLISE: {periodo}</div>")
+        
+        html_parts.append("<div class='legislacao'>")
+        html_parts.append("<strong>LEGISLAÇÃO E NORMAS APLICADAS:</strong><br>")
+        html_parts.append("Lei nº 4.320/1964 (Normas gerais de direito financeiro para elaboração e controle dos orçamentos e balanços.) • ")
+        html_parts.append("Resolução COFEN nº 340/2008 (Regulamento da Administração Financeira e Contábil) • ")
+        html_parts.append("Normas Brasileiras de Contabilidade – Setor Público (NBC TSP) • ")
+        html_parts.append("Resolução COFEN nº 764/2024 (Prestação de Contas) • ")
+        html_parts.append("Resolução Cofen nº 799/2025 (Gestão de riscos e controles internos) • ")
+        html_parts.append("Resolução Cofen nº 814/2026 (Limites de despesa com pessoal) • ")
+        html_parts.append("Manual de Contabilidade Aplicada ao Setor Público (MCASP)")
+        html_parts.append("</div>")
+        
+        html_parts.append("<div class='legislacao' style='margin-top: 20px;'>")
+        html_parts.append("<strong>DEMONSTRAÇÕES ANALISADAS:</strong><br>")
+        html_parts.append("Balancete de Verificação • Balanço Financeiro (BF) • Balanço Orçamentário (BO) • Balanço Patrimonial (BP) • Demonstração do Fluxo de Caixa (DFC) • Demonstração das Mutações do PL (DMPL) • Demonstração das Variações Patrimoniais (DVP)")
+        html_parts.append("</div>")
+        html_parts.append("</div>")
+        
+        # ============================================================
+        # MÓDULOS
+        # ============================================================
+        for nome_interno, titulo_exibicao in ordem_modelo:
+            m = modulos_por_nome.get(nome_interno)
+            if not m:
+                html_parts.append("<div class='page-break'></div>")
+                html_parts.append(f"<h2>{titulo_exibicao}</h2>")
+                html_parts.append("<p style='color:red;'>Módulo não encontrado nos dados consolidados.</p>")
+                continue
+            
+            data_mod = m.get("data_geracao", "N/A")
+            
+            html_parts.append("<div class='page-break'></div>")
+            html_parts.append(f"<h2>{titulo_exibicao}</h2>")
+            html_parts.append(f"<p style='color:#666; font-style:italic; font-size: 6.2pt;'>Gerado em: {data_mod}</p>")
+            
+            tabela, coluna = mapa_tabelas.get(nome_interno, (None, None))
+            if not tabela:
+                html_parts.append("<p style='color:red;'>Módulo sem mapeamento.</p>")
+                continue
+            
+            try:
+                cursor.execute(f"SELECT {coluna} FROM {tabela} WHERE periodo LIKE %s ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
+                mod_row = cursor.fetchone()
+                
+                if not mod_row or not mod_row[0]:
+                    html_parts.append("<p style='color:red;'>Dados não encontrados no banco para este período.</p>")
+                    continue
+                
+                mod_dados = json.loads(mod_row[0])
+                
+                # 1. INTEGRIDADE
+                if nome_interno == "Integridade entre Demonstrações":
+                    matriz = mod_dados.get("matriz", [])
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Matriz de integridade com o cruzamento de todas as demonstrações.</p>")
+                    html_parts.append("<table><thead><tr><th>ITEM</th><th>BALANCETE</th><th>BP</th><th>BF</th><th>BO</th><th>DFC</th><th>DVP</th><th>DMPL</th><th>CONF.</th></tr></thead><tbody>")
+                    for mi in matriz:
+                        html_parts.append(f"<tr><td>{mi.get('item','')}</td><td class='text-right'>{mi.get('balancete','')}</td><td class='text-right'>{mi.get('bp','')}</td><td class='text-right'>{mi.get('bf','')}</td><td class='text-right'>{mi.get('bo','')}</td><td class='text-right'>{mi.get('dfc','')}</td><td class='text-right'>{mi.get('dvp','')}</td><td class='text-right'>{mi.get('dmpl','')}</td><td class='text-center'>{mi.get('conf','')}</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    html_parts.append("<div class='alerta-info'>1. Os itens de conformidade em vermelho, de 1 a 4, são por estornos de restos a pagar.<br>2. Incorporação de Ativos: SOMA = 16.271.957,08.</div>")
+                
+                # 2. ANÁLISE BP
+                elif nome_interno == "Análise BP":
+                    dados_bp = mod_dados.get("dados", {})
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das contas do Balanço Patrimonial (período atual x anterior).</p>")
+                    html_parts.append("<table><thead><tr><th>CONTA</th><th>PERÍODO ATUAL (R$)</th><th>PERÍODO ANTERIOR (R$)</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    textos = []
+                    for k, v in dados_bp.items():
+                        if isinstance(v, dict):
+                            atual = v.get("atual", 0)
+                            anterior = v.get("anterior", 0)
+                            var = calc_var(atual, anterior)
+                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt(atual)}</td><td class='text-right'>{fmt(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                            if abs(var) > 0.01:
+                                direcao = "positiva" if var > 0 else "negativa"
+                                textos.append(f"<li>{k.replace('_', ' ').title()}, variação {direcao} de {pct(var)}.</li>")
+                    html_parts.append("</tbody></table>")
+                    html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos[:6]) + "</ul>")
+                    labels = [k.replace('_', ' ').title() for k, v in dados_bp.items() if isinstance(v, dict)]
+                    atual_vals = [v.get('atual', 0) for v in dados_bp.values() if isinstance(v, dict)]
+                    ant_vals = [v.get('anterior', 0) for v in dados_bp.values() if isinstance(v, dict)]
+                    html_parts.append("<div class='grafico'><canvas id='chartBP'></canvas></div>")
+                    html_parts.append("<script>")
+                    html_parts.append("new Chart(document.getElementById('chartBP'), {")
+                    html_parts.append("type: 'bar',")
+                    html_parts.append(f"data: {{ labels: {json.dumps(labels)}, datasets: [")
+                    html_parts.append(f"{{ label: 'Atual', data: {json.dumps(atual_vals)}, backgroundColor: '#004b8d' }},")
+                    html_parts.append(f"{{ label: 'Anterior', data: {json.dumps(ant_vals)}, backgroundColor: '#6c757d' }}")
+                    html_parts.append("] },")
+                    html_parts.append("options: { responsive: true, plugins: { legend: { position: 'top' } } }")
+                    html_parts.append("});")
+                    html_parts.append("</script>")
+                
+                # 3. ANÁLISE ORÇAMENTÁRIA (BO)
+                elif nome_interno == "Análise Orçamentária (BO)":
+                    atual = mod_dados.get("atual", {})
+                    anterior = mod_dados.get("anterior", {})
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das receitas e despesas orçamentárias.</p>")
+                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>PERÍODO ATUAL</th><th>PERÍODO ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    html_parts.append(f"<tr><td>Receita Realizada</td><td class='text-right'>{fmt(atual.get('receita_realizada'))}</td><td class='text-right'>{fmt(anterior.get('receita_realizada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_realizada',0), anterior.get('receita_realizada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Despesa Empenhada</td><td class='text-right'>{fmt(atual.get('despesa_empenhada'))}</td><td class='text-right'>{fmt(anterior.get('despesa_empenhada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_empenhada',0), anterior.get('despesa_empenhada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Superávit/Déficit</td><td class='text-right'>{fmt(atual.get('superavit'))}</td><td class='text-right'>{fmt(anterior.get('superavit'))}</td><td class='text-right'>{pct(calc_var(atual.get('superavit',0), anterior.get('superavit',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Restos a Pagar</td><td class='text-right'>{fmt(atual.get('restos_pagar'))}</td><td class='text-right'>{fmt(anterior.get('restos_pagar'))}</td><td class='text-right'>{pct(calc_var(atual.get('restos_pagar',0), anterior.get('restos_pagar',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Receita Orçada</td><td class='text-right'>{fmt(atual.get('receita_orcada'))}</td><td class='text-right'>{fmt(anterior.get('receita_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_orcada',0), anterior.get('receita_orcada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Despesa Orçada</td><td class='text-right'>{fmt(atual.get('despesa_orcada'))}</td><td class='text-right'>{fmt(anterior.get('despesa_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_orcada',0), anterior.get('despesa_orcada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>% Realização Receitas</td><td class='text-right'>{atual.get('pct_receita', 0):.2f}%</td><td class='text-right'>{anterior.get('pct_receita', 0):.2f}%</td><td class='text-right'>-</td></tr>")
+                    html_parts.append(f"<tr><td>% Realização Despesas</td><td class='text-right'>{atual.get('pct_despesa', 0):.2f}%</td><td class='text-right'>{anterior.get('pct_despesa', 0):.2f}%</td><td class='text-right'>-</td></tr>")
+                    html_parts.append("</tbody></table>")
+                
+                # 4. ANÁLISE FINANCEIRA (BF)
+                elif nome_interno == "Análise Financeira (BF)":
+                    atual = mod_dados.get("atual", {})
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Movimentação financeira consolidada.</p>")
+                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    for k, v in atual.items():
+                        if isinstance(v, dict):
+                            a = v.get("atual", 0)
+                            ant = v.get("anterior", 0)
+                            var = calc_var(a, ant)
+                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt(a)}</td><td class='text-right'>{fmt(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                    html_parts.append("</tbody></table>")
+                
+                # 5. ANÁLISE DFC
+                elif nome_interno == "Análise DFC":
+                    dados_dfc = mod_dados.get("dados", {})
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração do Fluxo de Caixa (método direto).</p>")
+                    for tipo in ["operacional", "investimento", "financiamento"]:
+                        if tipo in dados_dfc:
+                            html_parts.append(f"<h3>Fluxo {tipo.title()}</h3><table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                            for k, v in dados_dfc[tipo].items():
+                                if isinstance(v, dict):
+                                    a = v.get("atual", 0)
+                                    ant = v.get("anterior", 0)
+                                    var = calc_var(a, ant)
+                                    html_parts.append(f"<tr><td>{k.title()}</td><td class='text-right'>{fmt(a)}</td><td class='text-right'>{fmt(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                            html_parts.append("</tbody></table>")
+                    if "caixa" in dados_dfc:
+                        html_parts.append("<h3>Apuração de Caixa</h3><table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                        for k, v in dados_dfc["caixa"].items():
+                            if isinstance(v, dict):
+                                a = v.get("atual", 0)
+                                ant = v.get("anterior", 0)
+                                var = calc_var(a, ant)
+                                html_parts.append(f"<tr><td>{k.title()}</td><td class='text-right'>{fmt(a)}</td><td class='text-right'>{fmt(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                        html_parts.append("</tbody></table>")
+                
+                # 6. ANÁLISE PATRIMONIAL (DVP)
+                elif nome_interno == "Análise Patrimonial (DVP)":
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração das Variações Patrimoniais.</p>")
+                    html_parts.append("<table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    for k, v in mod_dados.items():
+                        if isinstance(v, dict):
+                            atual = v.get("atual", 0)
+                            anterior = v.get("anterior", 0)
+                            var = calc_var(atual, anterior)
+                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt(atual)}</td><td class='text-right'>{fmt(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                    html_parts.append("</tbody></table>")
+                
+                # 7. DMPL
+                elif nome_interno == "DMPL":
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração das mutações do patrimônio líquido.</p>")
+                    dados_dmpl = mod_dados.get("dados", [])
+                    if dados_dmpl:
+                        html_parts.append("<table><thead><tr>")
+                        headers = ["ESPECIFICAÇÃO", "PATRIMÔNIO SOCIAL", "ADIANT. CAPITAL", "RESERVAS CAPITAL", "AJUSTES AVALIAÇÃO", "RESERVAS LUCROS", "DEMAIS RESERVAS", "RESULT. ACUMULADOS", "TOTAL"]
+                        for h in headers:
+                            html_parts.append(f"<th>{h}</th>")
+                        html_parts.append("</tr></thead><tbody>")
+                        for linha in dados_dmpl:
+                            if isinstance(linha, list):
+                                html_parts.append("<tr>")
+                                for celula in linha[:9]:
+                                    html_parts.append(f"<td>{celula}</td>")
+                                html_parts.append("</tr>")
+                        html_parts.append("</tbody></table>")
+                    else:
+                        html_parts.append("<p style='color:red;'>Dados do DMPL não disponíveis.</p>")
+                
+                # 8. COMPARATIVO DE RECEITAS
+                elif nome_interno == "Comparativo de Receitas":
+                    atual = mod_dados.get("atual", {})
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo consolidado de receitas.</p>")
+                    html_parts.append("<h3>Resumo</h3><table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
+                    html_parts.append(f"<tr><td>Receita Orçada</td><td class='text-right'>{fmt(atual.get('orcado_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>Receita Realizada</td><td class='text-right'>{fmt(atual.get('realizado_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>% Execução</td><td class='text-right'>{atual.get('percentual_total', 0):.2f}%</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    html_parts.append("<h3>Composição por Grupo</h3><table><thead><tr><th>GRUPO</th><th>ORÇADO</th><th>REALIZADO</th><th>%</th></tr></thead><tbody>")
+                    for g in atual.get("grupos", []):
+                        html_parts.append(f"<tr><td>{g.get('nome','')}</td><td class='text-right'>{fmt(g.get('orcado'))}</td><td class='text-right'>{fmt(g.get('realizado'))}</td><td class='text-right'>{g.get('percentual',0):.2f}%</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    html_parts.append(f"<p class='texto-dinamico'>A receita realizada foi de {fmt(atual.get('realizado_total'))}, correspondendo a {atual.get('percentual_total', 0):.2f}% da receita orçada de {fmt(atual.get('orcado_total'))}.</p>")
+                    labels = [g.get('nome') for g in atual.get('grupos', [])]
+                    vals = [g.get('realizado') for g in atual.get('grupos', [])]
+                    html_parts.append("<div class='grafico'><canvas id='chartReceitas'></canvas></div>")
+                    html_parts.append("<script>")
+                    html_parts.append("new Chart(document.getElementById('chartReceitas'), {")
+                    html_parts.append("type: 'doughnut',")
+                    html_parts.append(f"data: {{ labels: {json.dumps(labels)}, datasets: [{{ data: {json.dumps(vals)}, backgroundColor: ['#004b8d', '#007bff', '#6c757d', '#28a745', '#ffc107'] }}] }}")
+                    html_parts.append("});")
+                    html_parts.append("</script>")
+                
+                # 9. COMPARATIVO DE DESPESAS
+                elif nome_interno == "Comparativo de Despesas":
+                    atual = mod_dados.get("atual", {})
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo consolidado de despesas.</p>")
+                    html_parts.append("<h3>Resumo</h3><table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
+                    html_parts.append(f"<tr><td>Despesa Orçada</td><td class='text-right'>{fmt(atual.get('orcado_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>Despesa Empenhada</td><td class='text-right'>{fmt(atual.get('empenhado_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>Despesa Liquidada</td><td class='text-right'>{fmt(atual.get('liquidado_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>% Execução</td><td class='text-right'>{atual.get('percentual_total', 0):.2f}%</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    html_parts.append("<h3>Composição por Grupo</h3><table><thead><tr><th>GRUPO</th><th>ORÇADO</th><th>EMPENHADO</th><th>LIQUIDADO</th><th>%</th></tr></thead><tbody>")
+                    for g in atual.get("grupos", []):
+                        html_parts.append(f"<tr><td>{g.get('nome','')}</td><td class='text-right'>{fmt(g.get('orcado'))}</td><td class='text-right'>{fmt(g.get('empenhado'))}</td><td class='text-right'>{fmt(g.get('liquidado'))}</td><td class='text-right'>{g.get('percentual',0):.2f}%</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    html_parts.append(f"<p class='texto-dinamico'>A despesa empenhada foi de {fmt(atual.get('empenhado_total'))}, correspondendo a {atual.get('percentual_total', 0):.2f}% da despesa orçada de {fmt(atual.get('orcado_total'))}.</p>")
+                    labels = [g.get('nome') for g in atual.get('grupos', [])]
+                    vals = [g.get('empenhado') for g in atual.get('grupos', [])]
+                    html_parts.append("<div class='grafico'><canvas id='chartDespesas'></canvas></div>")
+                    html_parts.append("<script>")
+                    html_parts.append("new Chart(document.getElementById('chartDespesas'), {")
+                    html_parts.append("type: 'doughnut',")
+                    html_parts.append(f"data: {{ labels: {json.dumps(labels)}, datasets: [{{ data: {json.dumps(vals)}, backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#28a745', '#007bff'] }}] }}")
+                    html_parts.append("});")
+                    html_parts.append("</script>")
+                
+                # 10. ÍNDICES DE LIQUIDEZ
+                elif nome_interno == "Índices de Liquidez":
+                    liq = mod_dados.get("liquidez", {})
+                    est = mod_dados.get("estrutura", {})
+                    liq_ant = mod_dados.get("liquidez_anterior", {})
+                    est_ant = mod_dados.get("estrutura_anterior", {})
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Indicadores de liquidez e estrutura patrimonial (atual x anterior).</p>")
+                    html_parts.append("<h3>Liquidez</h3><table><thead><tr><th>INDICADOR</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    for k, v in liq.items():
+                        v_ant = liq_ant.get(k, "-")
+                        html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{v}</td><td class='text-right'>{v_ant}</td><td class='text-right'>-</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    html_parts.append("<h3>Estrutura Patrimonial</h3><table><thead><tr><th>INDICADOR</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    for k, v in est.items():
+                        v_ant = est_ant.get(k, "-")
+                        html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{v}</td><td class='text-right'>{v_ant}</td><td class='text-right'>-</td></tr>")
+                    html_parts.append("</tbody></table>")
+                
+                # 11. PANORAMA
+                elif nome_interno == "Panorama de Resultados":
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Resumo executivo dos principais indicadores.</p>")
+                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
+                    for k, v in mod_dados.items():
+                        if isinstance(v, (int, float)):
+                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt(v)}</td></tr>")
+                    html_parts.append("</tbody></table>")
+                
+                # 12. CENTRO DE CUSTOS
+                elif nome_interno == "Análise por Centro de Custos":
+                    centros = mod_dados.get("centros", [])
+                    centros_ant = mod_dados.get("centros_anterior", [])
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Distribuição das despesas por centro de custo.</p>")
+                    html_parts.append("<table><thead><tr><th>CENTRO DE CUSTO</th><th>ATUAL</th><th>ANTERIOR</th><th>VARIAÇÃO</th></tr></thead><tbody>")
+                    for i, c in enumerate(centros):
+                        valor_atual = c.get("valor", 0)
+                        valor_ant = centros_ant[i].get("valor", 0) if i < len(centros_ant) else 0
+                        var = calc_var(valor_atual, valor_ant)
+                        html_parts.append(f"<tr><td>{c.get('nome','')}</td><td class='text-right'>{fmt(valor_atual)}</td><td class='text-right'>{fmt(valor_ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    if centros:
+                        maior = max(centros, key=lambda x: x.get("valor", 0))
+                        html_parts.append(f"<p class='texto-dinamico'>O maior centro de custo é {maior.get('nome')} com {fmt(maior.get('valor'))}.</p>")
+                
+                # 13. CUSTO DE PESSOAL
+                elif nome_interno == "Custo de Pessoal":
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Custo de pessoal x limite legal (Resolução Cofen 814/2026).</p>")
+                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
+                    html_parts.append(f"<tr><td>RCL Total</td><td class='text-right'>{fmt(mod_dados.get('rcl_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>Custo Total</td><td class='text-right'>{fmt(mod_dados.get('custo_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>Limite Legal (50%)</td><td class='text-right'>{fmt(mod_dados.get('limite_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>Margem Disponível</td><td class='text-right'>{fmt(mod_dados.get('margem_disponivel_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>% Custo sobre RCL</td><td class='text-right'>{mod_dados.get('pct_custo_total', 0):.2f}%</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    pct_custo = mod_dados.get("pct_custo_total", 0)
+                    html_parts.append(f"<p class='texto-dinamico'>O custo de pessoal representa {pct_custo:.2f}% da RCL.</p>")
+                
+                # 14. CONFERÊNCIA
+                elif nome_interno == "Conferência das Demonstrações":
+                    analises = mod_dados.get("analises", [])
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Verificação da consistência das demonstrações contábeis.</p>")
+                    for a in analises:
+                        html_parts.append(f"<h3>{a.get('titulo', '')}</h3>")
+                        html_parts.append(f"<p style='font-size: 7.6pt;'>{a.get('conceito', '')}</p>")
+                        html_parts.append("<table><thead><tr><th>ITEM</th><th>VALOR</th></tr></thead><tbody>")
+                        for t in a.get("tabela", []):
+                            html_parts.append(f"<tr><td>{t.get('label','')}</td><td class='text-right'>{t.get('valor','')}</td></tr>")
+                        html_parts.append("</tbody></table>")
+                        html_parts.append(f"<p style='font-size: 7.6pt;'><strong>Status:</strong> {a.get('status','')} - {a.get('mensagem','')}</p>")
+                
+            except Exception as e:
+                html_parts.append(f"<p style='color:red;'>Erro: {str(e)}</p>")
+        
+        # ============================================================
+        # 15. PARECER DO CONTADOR (com dados do contador)
+        # ============================================================
+        html_parts.append("<div class='page-break'></div>")
+        html_parts.append("<h2>15. Parecer do Contador</h2>")
+        html_parts.append("<div class='parecer'>")
+        
+        html_parts.append("<h3>1. Situação Patrimonial e Financeira — Sólida e Equilibrada</h3>")
+        html_parts.append("<p>A entidade apresenta solidez financeira notável, evidenciada por um caixa elevado que suporta integralmente seus gastos operacionais. Os índices de liquidez demonstram capacidade excepcional de honrar compromissos de curto e longo prazos. O endividamento geral confirma uma estrutura de capital conservadora.</p>")
+        
+        html_parts.append("<h3>2. Desempenho Orçamentário — Estabilidade</h3>")
+        html_parts.append("<p>As receitas e despesas orçamentárias realizadas mantiveram-se no mesmo patamar do exercício anterior, indicando previsibilidade e controle na execução orçamentária. Não se observam desvios relevantes que comprometam o equilíbrio fiscal.</p>")
+        
+        html_parts.append("<h3>3. Geração de Caixa — Evolução Positiva</h3>")
+        html_parts.append("<p>A Demonstração dos Fluxos de Caixa (DFC) revela geração líquida de caixa positiva, reforçando a capacidade de autofinanciamento e a consistência operacional da entidade.</p>")
+        
+        html_parts.append("<h3>4. Resultado Patrimonial — Crescimento Contábil Relevante</h3>")
+        html_parts.append("<p>O resultado patrimonial registrou acréscimo significativo. Contudo, trata-se de resultado contábil, sem reflexo financeiro imediato, devendo ser interpretado com cautela, pois decorre de variações patrimoniais.</p>")
+        
+        html_parts.append("<h3>5. Estrutura de Custos — Conformidade e Eficiência</h3>")
+        html_parts.append("<p>O custo de pessoal encontra-se dentro do limite legal de 50% da RCL, com margem significativa, em conformidade com os limites da Resolução Cofen 814/2026.</p>")
+        
+        html_parts.append("<h3>6. Integridade das Demonstrações</h3>")
+        html_parts.append("<p>Verificou-se a integridade das demonstrações contábeis, que se apresentam adequadas e em conformidade com os princípios e normas aplicáveis, conferindo confiabilidade às informações analisadas.</p>")
+        
+        html_parts.append("<h3>Considerações Finais</h3>")
+        html_parts.append("<p>O Cofen demonstra excelente saúde financeira e patrimonial, com liquidez amplamente favorável, endividamento irrisório, geração de caixa positiva e crescimento contábil expressivo. A execução orçamentária é estável e o custo com pessoal encontra-se dentro dos limites legais.</p>")
+        
+        html_parts.append("<p><strong>Conclusão:</strong> As demonstrações contábeis refletem equilíbrio, solidez e conformidade, não havendo indícios de risco financeiro ou descumprimento de limites legais.</p>")
+        
+        html_parts.append("</div>")
+        html_parts.append("<div class='assinatura'><div class='linha'></div>")
+        html_parts.append(f"<p>{contador_nome}<br>CRC: {contador_crc} / UF: {contador_uf}<br>CPF: {contador_cpf}</p>")
+        html_parts.append("</div>")
+        html_parts.append("</body></html>")
+        
+        html = "".join(html_parts)
+        
+        cursor.close()
+        conn.close()
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.set_content(html, wait_until='networkidle')
+            pdf_bytes = page.pdf(format='A4', print_background=True)
+            browser.close()
+        
+        return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_{periodo}.pdf"})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(content=f"Erro ao gerar PDF: {str(e)}", status_code=500, media_type="text/plain")'''
+
+    conteudo = conteudo[:idx_inicio] + nova_funcao + conteudo[idx_fim:]
+    print("✅ Função de PDF reescrita com capa (logo, nome, CNPJ) e parecer com dados do contador.")
+
+try:
+    ast.parse(conteudo)
+    with open(caminho_main, "w", encoding="utf-8") as f:
+        f.write(conteudo)
+    print("✅ main.py salvo com sintaxe verificada.")
+except SyntaxError as e:
+    print(f"❌ Erro de sintaxe na linha {e.lineno}: {e.text}")

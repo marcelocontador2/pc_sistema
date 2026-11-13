@@ -3,726 +3,301 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório Consolidado</title>
+    <title>Relatório Consolidado de Análise Contábil</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
-        body { background: #f4f6f9; padding: 20px; color: #333; }
-        
-        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
-        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
-        .btn-voltar { background: #ff7f00; color: white; text-decoration: none; }
-        .btn-verde { background: #28a745; color: white; }
-        .btn-vermelho { background: #dc3545; color: white; }
-        .btn-azul { background: #0056b3; color: white; }
-        .btn:hover { opacity: 0.9; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
-        
-        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
-        .filtros label { font-size: 12px; font-weight: bold; color: #555; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; color: #333; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; display: flex; gap: 20px; }
+        .sidebar { width: 280px; flex-shrink: 0; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; height: fit-content; }
+        .sidebar h3 { color: #003366; font-size: 16px; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .historico-lista { list-style: none; }
+        .historico-lista li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
+        .historico-lista input { margin-top: 3px; }
+        .main-content { flex-grow: 1; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 30px; }
+        h1 { color: #003366; font-size: 24px; margin-bottom: 20px; border-bottom: 2px solid #004b8d; padding-bottom: 10px; }
+        .barra-botoes { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; color: white; transition: 0.2s; }
+        .btn-voltar { background-color: #ff9800; }
+        .btn-exibir { background-color: #00b894; }
+        .btn-excluir { background-color: #e53935; }
+        .btn-pdf { background-color: #1976d2; }
+        .btn-salvar { background-color: #2e7d32; }
+        .btn-obs { background-color: #0d6efd; }
+        .btn-concl { background-color: #0d6efd; }
+        .btn-verificar { background-color: #004b8d; }
+        button:hover { opacity: 0.9; }
+        .filtros { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e9ecef; }
+        .filtros label { font-weight: bold; color: #555; font-size: 14px; }
         .filtros select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        
-        .layout { display: flex; gap: 20px; align-items: flex-start; }
-        
-        .sidebar { width: 280px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: fit-content; }
-        .sidebar h3 { font-size: 16px; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
-        .sidebar ul { list-style: none; padding: 0; }
-        .sidebar li { margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; font-size: 13px; }
-        .sidebar .check-historico { width: 16px; height: 16px; cursor: pointer; }
-        
-        .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .main-content h2 { color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        
-        .status-box { padding: 15px; border-radius: 6px; margin-bottom: 20px; }
-        .status-ok { background: #d4edda; border-left: 4px solid #28a745; color: #155724; }
-        .status-erro { background: #f8d7da; border-left: 4px solid #dc3545; color: #721c24; }
-        .status-pendente { background: #fff3cd; border-left: 4px solid #ffc107; color: #856404; }
-        
-        .modulo-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .modulo-ok { color: #28a745; font-weight: bold; }
+        .alerta { padding: 15px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
+        .alerta-amarelo { background-color: #fff3cd; border: 1px solid #ffecb5; color: #664d03; }
+        .alerta-verde { background-color: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; }
+        .alerta-erro { background-color: #f8d7da; border: 1px solid #f5c2c7; color: #842029; }
+        .modulo-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .modulo-ok { color: #198754; font-weight: bold; }
         .modulo-faltando { color: #dc3545; font-weight: bold; }
+        .loading { text-align: center; padding: 20px; color: #666; font-style: italic; }
     </style>
-</head>
+
+    <style>
+        .toast-producao {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #28a745;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+        .toast-producao .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    </head>
 <body>
-
-    <div class="top-bar">
-        <a href="/" class="btn btn-voltar">← Voltar</a>
-        <button id="btn-exibir" class="btn btn-verde">Exibir Selecionado</button>
-        <button id="btn-excluir" class="btn btn-vermelho">Excluir Selecionado</button>
-        <button id="btn-pdf" class="btn btn-azul">Gerar PDF</button><button id="btn-obs" class="btn btn-azul" onclick="abrirObservacoes()" style="margin-left: 10px;">Observações</button><button id="btn-concl" class="btn btn-azul" onclick="abrirConclusao()" style="margin-left: 10px;">Conclusão</button>
-        <button id="btn-word" class="btn btn-azul">Gerar Word</button>
-        <button id="btn-salvar" class="btn btn-verde" style="display:none;">Confirmar e Salvar</button>
-    </div>
-
-    <div class="filtros">
-        <div>
-            <label>Ano:</label>
-            <select id="ano"><option value="2026">2026</option><option value="2025">2025</option></select>
-        </div>
-        <div>
-            <label>Tipo:</label>
-            <select id="tipo_periodo">
-                <option value="TRIMESTRE">Trimestral</option>
-                <option value="MES">Mensal</option>
-            </select>
-        </div>
-        <div>
-            <label>Período:</label>
-            <select id="periodo_valor">
-                <option value="1">1º</option>
-                <option value="2">2º</option>
-                <option value="3">3º</option>
-                <option value="4">4º</option>
-            </select>
-        </div>
-        <button id="btn-verificar" class="btn btn-azul">Verificar Dados</button>
-    </div>
-
-    <div class="layout">
+    <div class="container">
+        <!-- BARRA LATERAL (HISTÓRICO) -->
         <div class="sidebar">
             <h3>Histórico Salvo</h3>
-            <ul id="lista-historico">
-                <li>Nenhum histórico.</li>
+            <ul id="lista-historico" class="historico-lista">
+                <li style="color: #666;">Nenhum histórico salvo.</li>
             </ul>
         </div>
 
+        <!-- CONTEÚDO PRINCIPAL -->
         <div class="main-content">
-            <h2>Relatório Consolidado de Análise Contábil</h2>
-            
-            <div id="status-area">
-                <p style="color: #666; text-align: center; padding: 40px;">Clique em "Verificar Dados" para carregar a base do período selecionado.</p>
+            <h1>Relatório Consolidado de Análise Contábil</h1>
+
+            <div class="barra-botoes">
+                <button class="btn-voltar" onclick="window.history.back()">← Voltar</button>
+                <button class="btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+                <button class="btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+                <button class="btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+                <button class="btn-salvar" onclick="salvarRelatorioConsolidado()">Confirmar e Salvar</button>
+                <button class="btn-obs" onclick="alert('Em desenvolvimento')">Observações</button>
+                <button class="btn-concl" onclick="alert('Em desenvolvimento')">Conclusão</button>
             </div>
-            
-            <div id="modulos-area"></div>
+
+            <div class="filtros">
+                <label>Ano:</label>
+                <select id="ano">
+                    <option value="2026" selected>2026</option>
+                    <option value="2025">2025</option>
+                </select>
+                <label>Tipo:</label>
+                <select id="tipo_periodo">
+                    <option value="TRIMESTRE" selected>Trimestral</option>
+                    <option value="SEMESTRE">Semestral</option>
+                    <option value="ANO">Anual</option>
+                </select>
+                <label>Período:</label>
+                <select id="trimestre">
+                    <option value="1">1º</option>
+                    <option value="2">2º</option>
+                    <option value="3" selected>3º</option>
+                    <option value="4">4º</option>
+                </select>
+                <button class="btn-verificar" onclick="verificarDados()">Verificar Dados</button>
+            </div>
+
+            <div id="mensagem-consolidado"></div>
+            <div id="status-modulos"></div>
         </div>
     </div>
 
     <script>
-        let dadosConsolidados = null;
-
-        function pegarPeriodo() {
+        // ============================================================
+        // FUNÇÃO 1: VERIFICAR DADOS (API)
+        // ============================================================
+        async function verificarDados() {
             const ano = document.getElementById('ano').value;
             const tipo = document.getElementById('tipo_periodo').value;
-            let valor = document.getElementById('periodo_valor').value;
-            valor = valor.replace('º', '').trim(); // Remove o º
-            return `${ano}-${tipo}-${valor}`;
-        }
+            const trimestre = document.getElementById('trimestre').value;
+            const periodo = ano + '-' + tipo + '-' + trimestre;
 
-        async function verificarDados() {
-            // Injeta ID global para o botão de Conclusão
-            if (typeof relatorioId !== 'undefined') window.idRelatorioAtual = relatorioId;
-            if (typeof id !== 'undefined') window.idRelatorioAtual = id;
-            if (typeof data !== 'undefined' && data.id) window.idRelatorioAtual = data.id;
-
-            const periodo = pegarPeriodo();
-            const statusArea = document.getElementById('status-area');
-            const modulosArea = document.getElementById('modulos-area');
+            const divMsg = document.getElementById('mensagem-consolidado');
+            const divStatus = document.getElementById('status-modulos');
             
-            statusArea.innerHTML = '<p style="text-align:center; color:#0056b3;">Verificando dados...</p>';
-            modulosArea.innerHTML = '';
+            divMsg.innerHTML = '<div class="loading">Buscando dados no PostgreSQL...</div>';
+            divStatus.innerHTML = '';
 
             try {
-                const res = await fetch(`/api/relatorio_consolidado/${periodo}`);
+                const res = await fetch('/api/relatorio_consolidado/' + periodo + '?_t=' + Date.now());
                 const data = await res.json();
 
-                if (data.faltando ? data.faltando.length : 0 === 0) {
-                    statusArea.innerHTML = `<div class="status-box status-ok">
-                        <strong>✓ Todos os ${data.total_modulos} módulos encontrados!</strong>
-                        <p>Período ${periodo} está pronto para ser consolidado.</p>
-                    </div>`;
-                    
-                    document.getElementById('btn-salvar').style.display = 'inline-block';
-                    document.getElementById('btn-salvar').disabled = false;
-                    document.getElementById('btn-salvar').setAttribute('data-periodo', periodo);
-                    dadosConsolidados = data;
+                if (data.status === 'erro') {
+                    divMsg.innerHTML = '<div class="alerta alerta-erro">Erro: ' + (data.mensagem || 'Erro desconhecido') + '</div>';
+                    return;
+                }
+
+                if (data.faltando && data.faltando.length > 0) {
+                    divMsg.innerHTML = '<div class="alerta alerta-amarelo"><strong>⚠ Faltam ' + data.faltando.length + ' módulo(s) para consolidar.</strong><br>Realize os cálculos dos módulos pendentes.</div>';
                 } else {
-                    statusArea.innerHTML = `<div class="status-box status-pendente">
-                        <strong>⚠ Faltam ${data.faltando ? data.faltando.length : 0} módulo(s) para consolidar.</strong>
-                        <p>Realize os cálculos dos módulos pendentes antes de gerar o relatório.</p>
-                    </div>`;
-                    document.getElementById('btn-salvar').style.display = 'none';
-                    dadosConsolidados = null;
+                    divMsg.innerHTML = '<div class="alerta alerta-verde"><strong>✅ Todos os módulos estão prontos para consolidar!</strong></div>';
                 }
 
                 let html = '<h3>Status dos Módulos:</h3>';
                 
-                if (Object.keys(data.encontrados).length > 0) {
-                    html += '<h4 style="color: #28a745; margin-top: 15px;">✓ Encontrados:</h4>';
-                    let contador = 0;
-                    for (const chave in data.encontrados) {
-                        contador++;
-                        const m = data.encontrados[chave];
-                        html += `<div class="modulo-item"><span>${contador}. ${m.nome}</span><span class="modulo-ok">✓ ${m.data_geracao}</span></div>`;
-                    }
-                }
-                
-                if (data.faltando.length > 0) {
-                    html += '<h4 style="color: #dc3545; margin-top: 15px;">✗ Faltando:</h4>';
-                    let contFaltando = 0;
-                    data.faltando.forEach(m => {
-                        contFaltando++;
-                        html += `<div class="modulo-item"><span>${contFaltando}. ${m.nome}</span><span class="modulo-faltando">✗ Faltando</span></div>`;
+                if (data.encontrados && data.encontrados.length > 0) {
+                    html += '<h4 style="color: #198754; margin: 10px 0;">✓ Encontrados:</h4>';
+                    data.encontrados.forEach(function(m, i) {
+                        html += '<div class="modulo-item"><span>' + (i+1) + '. ' + m.nome + '</span><span class="modulo-ok">✓ ' + (m.data_geracao || 'Disponível') + '</span></div>';
                     });
                 }
-                
-                modulosArea.innerHTML = html;
 
-            } catch (e) {
-                console.error(e);
-                statusArea.innerHTML = '<div class="status-box status-erro">Erro ao verificar dados. Verifique o console (F12).</div>';
+                if (data.faltando && data.faltando.length > 0) {
+                    html += '<h4 style="color: #dc3545; margin: 10px 0;">✗ Faltando:</h4>';
+                    data.faltando.forEach(function(m, i) {
+                        html += '<div class="modulo-item"><span>' + (i+1) + '. ' + m.nome + '</span><span class="modulo-faltando">✗ Faltando</span></div>';
+                    });
+                }
+
+                divStatus.innerHTML = html;
+
+            } catch (err) {
+                divMsg.innerHTML = '<div class="alerta alerta-erro">Erro de conexão: ' + err.message + '</div>';
             }
         }
 
-        async function salvarConsolidado() {
-            const btn = document.getElementById('btn-salvar');
-            const periodo = btn.getAttribute('data-periodo');
-            if (!periodo) { alert("Clique em 'Verificar Dados' antes."); return; }
-            
-            btn.innerText = "Salvando...";
-            btn.disabled = true;
-            
-            try {
-                const res = await fetch(`/salvar_relatorio_consolidado/${periodo}`, { method: 'POST' });
-                const data = await res.json();
-                
-                if (data.ok) {
-                    alert("Relatório consolidado salvo com sucesso!");
-                    carregarHistorico();
-                } else {
-                    alert("Erro ao salvar: " + (data.mensagem || "Falha no servidor"));
-                }
-            } catch (e) {
-                alert("Erro de conexão ao salvar.");
-            } finally {
-                btn.innerText = "Confirmar e Salvar";
-                btn.disabled = false;
-            }
-        }
+        // ============================================================
+        // FUNÇÃO 2: SALVAR RELATÓRIO CONSOLIDADO
+        // ============================================================
+        async function salvarRelatorioConsolidado() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo_periodo').value;
+            const trimestre = document.getElementById('trimestre').value;
+            const periodo = ano + '-' + tipo + '-' + trimestre;
 
-        function carregarHistorico() {
-            fetch('/historico_relatorio_consolidado')
-                .then(r => r.json())
-                .then(data => {
-                    let html = '';
-                    if (!data || data.length === 0) {
-                        html = '<li>Nenhum histórico.</li>';
-                    } else {
-                        data.forEach(item => {
-                            html += `<li style="margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                    <input type="checkbox" class="check-historico" value="${item.id}">
-                                    <div>
-                                        <b>Período:</b> ${item.periodo}<br>
-                                        <small>Gerado em: ${item.data_geracao}</small>
-                                    </div>
-                                </label>
-                            </li>`;
-                        });
-                    }
-                    document.getElementById('lista-historico').innerHTML = html;
-                })
-                .catch(e => console.error("Erro no histórico:", e));
-        }
+            if (!confirm("Deseja realmente salvar este relatório consolidado no histórico?")) return;
 
-        async function exibirSelecionado() {
-            const check = document.querySelector('.check-historico:checked');
-            if (!check) { alert("Selecione um item no histórico."); return; }
-            
             try {
-                const res = await fetch(`/historico_relatorio_consolidado/${check.value}`);
-                const data = await res.json();
-                if (data.erro) { alert("Erro ao carregar histórico."); return; }
-                
-                const statusArea = document.getElementById('status-area');
-                const modulosArea = document.getElementById('modulos-area');
-                
-                const periodo = data.periodo || "N/A";
-                const dataGeracao = data.data_geracao || "N/A";
-                
-                statusArea.innerHTML = `<div class="status-box status-ok">
-                    <strong>✓ Histórico carregado!</strong>
-                    <p>Período ${periodo} (salvo em ${dataGeracao})</p>
-                </div>`;
-                
-                let html = '<h3>Módulos Consolidados:</h3>';
-                
-                // Função que varre o objeto inteiro procurando chaves que tenham .nome
-                let encontrados = 0;
-                function buscarModulos(obj) {
-                    if (!obj || typeof obj !== 'object') return;
-                    
-                    for (const chave in obj) {
-                        const item = obj[chave];
-                        if (item && typeof item === 'object') {
-                            if (item.nome && item.data_geracao) {
-                                encontrados++;
-                                html += `<div class="modulo-item"><span>${encontrados}. ${item.nome}</span><span class="modulo-ok">✓ ${item.data_geracao}</span></div>`;
-                            } else {
-                                // Se não tem nome, pode ser um objeto "pai" (como o "dados"), entra nele
-                                buscarModulos(item);
-                            }
-                        }
-                    }
-                }
-                
-                buscarModulos(data);
-                
-                if (encontrados === 0) {
-                    html += '<p style="color:#666;">Nenhum módulo listado no histórico.</p>';
-                }
-                
-                modulosArea.innerHTML = html;
-            } catch(e) {
-                console.error("Erro ao exibir:", e);
-                alert("Erro de conexão ao exibir histórico.");
-            }
-        }
-
-        async function excluirSelecionado() {
-            const checks = document.querySelectorAll('.check-historico:checked');
-            if (checks.length === 0) { alert("Selecione pelo menos um item no histórico."); return; }
-            if (!confirm(`Excluir ${checks.length} item(ns) do histórico?`)) return;
-            
-            const ids = Array.from(checks).map(c => parseInt(c.value));
-            
-            try {
-                const res = await fetch("/excluir_multiplos_relatorio_consolidado", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ids: ids })
+                const res = await fetch('/salvar_relatorio_consolidado/' + periodo, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
                 });
+                
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                
                 const data = await res.json();
+                
                 if (data.ok) {
+                    alert("Relatório salvo com sucesso no PostgreSQL!");
                     carregarHistorico();
                 } else {
-                    alert("Erro ao excluir: " + (data.mensagem || "Falha no servidor"));
+                    alert("Erro ao salvar: " + (data.mensagem || "Erro desconhecido"));
                 }
-            } catch(e) {
-                alert("Erro de conexão ao excluir.");
+            } catch (err) {
+                alert("Erro de conexão ao salvar: " + err.message);
             }
+        }
+
+        // ============================================================
+        // FUNÇÃO 3: CARREGAR HISTÓRICO (SIDEBAR)
+        // ============================================================
+        async function carregarHistorico() {
+            try {
+                const res = await fetch('/historico_relatorio_consolidado?_t=' + Date.now());
+                const data = await res.json();
+                
+                const lista = document.getElementById('lista-historico');
+                if (!lista) return;
+                
+                if (Array.isArray(data) && data.length > 0) {
+                    lista.innerHTML = data.map(function(h) {
+                        return '<li><input type="checkbox" value="' + h.id + '"><span>Período: ' + h.periodo + '<br><small style="color: #999;">' + (h.data_geracao || 'N/A') + '</small></span></li>';
+                    }).join('');
+                } else {
+                    lista.innerHTML = '<li style="color: #666;">Nenhum histórico salvo.</li>';
+                }
+            } catch (err) {
+                document.getElementById('lista-historico').innerHTML = '<li style="color: red;">Erro ao carregar histórico.</li>';
+            }
+        }
+
+        // ============================================================
+        // FUNÇÕES AUXILIARES (EXIBIR, EXCLUIR, PDF)
+        // ============================================================
+        function exibirSelecionado() {
+            const checkbox = document.querySelector('#lista-historico input[type="checkbox"]:checked');
+            if (!checkbox) { alert("Selecione um histórico na lista lateral."); return; }
+            alert("Funcionalidade de exibição do relatório ID " + checkbox.value + " (a implementar).");
+        }
+
+        function excluirSelecionado() {
+            const checkbox = document.querySelector('#lista-historico input[type="checkbox"]:checked');
+            if (!checkbox) { alert("Selecione um histórico na lista lateral."); return; }
+            if (!confirm("Excluir o histórico selecionado?")) return;
+            
+            fetch('/excluir_relatorio_consolidado/' + checkbox.value, { method: 'DELETE' })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.ok) { carregarHistorico(); }
+                    else { alert("Erro: " + (data.mensagem || "Erro desconhecido")); }
+                })
+                .catch(function(err) { alert("Erro: " + err.message); });
         }
 
         function gerarPDF() {
-            const check = document.querySelector('.check-historico:checked');
-            if (!check) { alert("Selecione um item no histórico para gerar o PDF."); return; }
-            window.open(`/gerar_pdf_relatorio_consolidado/${check.value}`, '_blank');
-        }
+        const checkbox = document.querySelector('#lista-historico input[type="checkbox"]:checked');
+        if (!checkbox) { alert("Selecione um histórico na lista lateral."); return; }
+        
+        const id = checkbox.value;
+        const url = '/gerar_pdf_relatorio_consolidado/' + id;
+        
+        // Remove toast anterior, se existir
+        const toastAntigo = document.getElementById('toast-producao');
+        if (toastAntigo) toastAntigo.remove();
+        
+        // Cria o toast verde
+        const toast = document.createElement('div');
+        toast.id = 'toast-producao';
+        toast.className = 'toast-producao';
+        toast.innerHTML = '<div class="spinner"></div> Relatório em Produção...';
+        document.body.appendChild(toast);
+        
+        // Cria um link temporário para forçar o download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'relatorio_consolidado_' + id + '.pdf';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        
+        // Remove o link e o toast após um tempo
+        setTimeout(() => {
+            document.body.removeChild(link);
+            if (toast) toast.remove();
+        }, 6000);
+    }
 
-        function gerarWord() {
-            const check = document.querySelector('.check-historico:checked');
-            if (!check) { alert("Selecione um item no histórico para gerar o Word."); return; }
-            window.open(`/gerar_word_relatorio_consolidado/${check.value}`, '_blank');
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            document.getElementById('btn-verificar').addEventListener('click', verificarDados);
-            document.getElementById('btn-salvar').addEventListener('click', salvarConsolidado);
-            document.getElementById('btn-exibir').addEventListener('click', exibirSelecionado);
-            document.getElementById('btn-excluir').addEventListener('click', excluirSelecionado);
-            document.getElementById('btn-pdf').addEventListener('click', gerarPDF);
-            document.getElementById('btn-word').addEventListener('click', gerarWord);
-            
+        // ============================================================
+        // INICIALIZAÇÃO
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', function() {
             carregarHistorico();
         });
     </script>
-
-
-
-<script>
-// --- CORRECAO_BOTAO_WORD ---
-document.addEventListener('DOMContentLoaded', function() {
-    const botoes = Array.from(document.querySelectorAll('button, a, .btn'));
-    const btnWord = botoes.find(b => b.innerText.includes('Gerar Word'));
-    
-    if (btnWord) {
-        const novoBtn = btnWord.cloneNode(true);
-        btnWord.parentNode.replaceChild(novoBtn, btnWord);
-        
-        novoBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const check = document.querySelector('input[type="radio"]:checked') || document.querySelector('input[type="checkbox"]:checked');
-            if (check) {
-                const id = check.value;
-                window.open('/gerar_word_relatorio_consolidado/' + id, '_blank');
-            } else {
-                alert('Selecione um relatório primeiro.');
-            }
-        });
-    }
-});
-</script>
-
-<script>
-// ESCONDER_BOTAO_WORD
-document.addEventListener('DOMContentLoaded', function() {
-    const botoes = Array.from(document.querySelectorAll('button, a, .btn'));
-    const btnWord = botoes.find(b => b.innerText.includes('Gerar Word'));
-    if (btnWord) {
-        btnWord.style.display = 'none'; // Esconde o botão
-    }
-});
-</script>
-
-
-
-
-
-<!-- MODAL DE CONCLUSÃO -->
-<div id="modal-conclusao" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:20px; border-radius:8px; width:600px; max-width:90%; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-        <h3 style="margin-top:0; color:#003366;">Conclusão do Relatório</h3>
-        <textarea id="texto-conclusao" style="width:100%; height:150px; padding:10px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px; margin-bottom:15px; box-sizing:border-box;" placeholder="Digite aqui a conclusão..."></textarea>
-        <div style="text-align:right;">
-            <button onclick="fecharConclusao()" style="padding:8px 16px; background:#ccc; border:none; border-radius:4px; cursor:pointer; margin-right:10px;">Cancelar</button>
-            <button onclick="salvarConclusao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar Conclusão</button>
-        </div>
-    </div>
-</div>
-
-<script>
-// Variável global para armazenar o ID do relatório atual
-window.idRelatorioAtual = null;
-
-function abrirConclusao() {
-    // Busca o ID do relatório mais recente direto do banco via API
-    fetch('/historico_relatorio_consolidado')
-        .then(res => res.json())
-        .then(lista => {
-            if (!lista || lista.length === 0) {
-                alert("Nenhum relatório consolidado salvo foi encontrado no banco. Gere o relatório primeiro.");
-                return;
-            }
-            
-            // Pega o ID do primeiro item da lista (o mais recente)
-            const idRelatorio = lista[0].id;
-            
-            // Agora busca a conclusão desse ID
-            return fetch(`/api/conclusao_consolidado/${idRelatorio}`)
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('texto-conclusao').value = data.texto || '';
-                    document.getElementById('modal-conclusao').style.display = 'flex';
-                    // Salva o ID no input para usar na hora de salvar
-                    document.getElementById('modal-conclusao').setAttribute('data-id', idRelatorio);
-                });
-        })
-        .catch(err => {
-            console.error("Erro ao buscar histórico:", err);
-            alert("Erro de comunicação com o servidor.");
-        });
-}
-
-function fecharConclusao() {
-    document.getElementById('modal-conclusao').style.display = 'none';
-}
-
-function salvarConclusao() {
-    const texto = document.getElementById('texto-conclusao').value;
-    if (!texto.trim()) {
-        alert("Digite um texto para a conclusão.");
-        return;
-    }
-
-    // Pega o ID que foi salvo no atributo data-id do modal
-    const idRelatorio = document.getElementById('modal-conclusao').getAttribute('data-id');
-    if (!idRelatorio) {
-        alert("Erro: ID do relatório não encontrado.");
-        return;
-    }
-
-    fetch(`/api/conclusao_consolidado/${idRelatorio}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto: texto })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.erro) throw new Error(data.mensagem || "Erro ao salvar");
-        alert("Conclusão salva com sucesso!");
-        document.getElementById('modal-conclusao').style.display = 'none';
-    })
-    .catch(err => {
-        console.error(err);
-        alert("Erro ao salvar conclusão: " + err.message);
-    });
-}
-</script>
-
 </body>
-
-
-
-
-
-
-
-
 </html>
-
-<!-- Modal de Observacoes -->
-<div id="modal-obs" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
-    <div style="background:#fff; width:600px; max-width:90%; padding:20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.2); max-height:80vh; overflow-y:auto;">
-        <h3 style="margin-top:0; color:#003366;">Observações do Relatório</h3>
-        
-        <div id="form-obs">
-            <input type="hidden" id="obs-id" value="">
-            
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">Item (ex: 2, 3, 12):</label>
-            <input type="text" id="obs-item" style="width:100%; padding:8px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;" placeholder="Ex: 2 (Balanço Patrimonial)">
-            
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">Observação (máx 400 caracteres):</label>
-            <textarea id="obs-texto" maxlength="400" style="width:100%; height:100px; padding:8px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"></textarea>
-            
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button type="button" onclick="fecharObservacoes()" style="padding:8px 16px; background:#ccc; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
-                <button type="button" id="btn-salvar-obs" onclick="salvarObservacao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar</button>
-            </div>
-        </div>
-        
-        <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
-        <h4 style="margin-top:0; color:#003366;">Observações Cadastradas</h4>
-        <div id="lista-obs" style="max-height:250px; overflow-y:auto; font-size:12px;">
-            <p id="msg-carregando" style="color:#999;">Carregando...</p>
-        </div>
-    </div>
-</div>
-
-<script>
-// OBSERVACOES_SCRIPT
-var relatorioIdAtual = null;
-var obsData = [];
-
-function abrirObservacoes() {
-    var check = document.querySelector('input[type="radio"]:checked') || document.querySelector('input[type="checkbox"]:checked');
-    if (!check) {
-        alert('Selecione um relatório primeiro.');
-        return;
-    }
-    relatorioIdAtual = check.value;
-    document.getElementById('modal-obs').style.display = 'flex';
-    carregarObservacoes(relatorioIdAtual);
-}
-
-function fecharObservacoes() {
-    document.getElementById('modal-obs').style.display = 'none';
-    document.getElementById('obs-id').value = '';
-    document.getElementById('obs-item').value = '';
-    document.getElementById('obs-texto').value = '';
-    document.getElementById('btn-salvar-obs').innerText = 'Salvar';
-}
-
-function carregarObservacoes(id) {
-    var lista = document.getElementById('lista-obs');
-    lista.innerHTML = '<p id="msg-carregando" style="color:#999;">Carregando...</p>';
-    
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/api/observacoes_consolidado/' + id, true);
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            try {
-                obsData = JSON.parse(xhr.responseText);
-                console.log('DADOS RECEBIDOS:', obsData);
-                renderizarLista();
-            } catch (e) {
-                lista.innerHTML = '<p style="color:red;">Erro ao processar dados: ' + e.message + '</p>';
-            }
-        } else {
-            lista.innerHTML = '<p style="color:red;">Erro HTTP: ' + xhr.status + '</p>';
-        }
-    };
-    xhr.onerror = function() {
-        lista.innerHTML = '<p style="color:red;">Erro de rede.</p>';
-    };
-    xhr.send();
-}
-
-function renderizarLista() {
-    var lista = document.getElementById('lista-obs');
-    lista.innerHTML = '';
-    
-    if (!obsData || obsData.length === 0) {
-        lista.innerHTML = '<p style="color:#999;">Nenhuma observação cadastrada.</p>';
-        return;
-    }
-    
-    for (var i = 0; i < obsData.length; i++) {
-        var o = obsData[i];
-        var div = document.createElement('div');
-        div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:8px 0;';
-        
-        var divTexto = document.createElement('div');
-        divTexto.style.flex = '1';
-        divTexto.innerHTML = '<b>Item ' + o.item + ':</b> ' + o.texto;
-        
-        var divBotoes = document.createElement('div');
-        divBotoes.style.cssText = 'display:flex; gap:5px;';
-        
-        var btnEditar = document.createElement('button');
-        btnEditar.type = 'button';
-        btnEditar.innerText = 'Editar';
-        btnEditar.style.cssText = 'color:blue; background:none; border:none; cursor:pointer;';
-        btnEditar.onclick = (function(id) {
-            return function() { editarObservacao(id); };
-        })(o.id);
-        
-        var btnExcluir = document.createElement('button');
-        btnExcluir.type = 'button';
-        btnExcluir.innerText = 'Excluir';
-        btnExcluir.style.cssText = 'color:red; background:none; border:none; cursor:pointer;';
-        btnExcluir.onclick = (function(id) {
-            return function() { excluirObservacao(id); };
-        })(o.id);
-        
-        divBotoes.appendChild(btnEditar);
-        divBotoes.appendChild(btnExcluir);
-        div.appendChild(divTexto);
-        div.appendChild(divBotoes);
-        lista.appendChild(div);
-    }
-}
-
-function editarObservacao(id) {
-    for (var i = 0; i < obsData.length; i++) {
-        if (obsData[i].id === id) {
-            document.getElementById('obs-id').value = obsData[i].id;
-            document.getElementById('obs-item').value = obsData[i].item;
-            document.getElementById('obs-texto').value = obsData[i].texto;
-            document.getElementById('btn-salvar-obs').innerText = 'Atualizar';
-            return;
-        }
-    }
-    alert('Observação não encontrada.');
-}
-
-function salvarObservacao() {
-    var id = document.getElementById('obs-id').value;
-    var item = document.getElementById('obs-item').value.trim();
-    var texto = document.getElementById('obs-texto').value.trim();
-    if (!item || !texto) {
-        alert('Preencha o item e o texto.');
-        return;
-    }
-    
-    var url, method;
-    if (id) {
-        url = '/api/observacoes_consolidado/' + id;
-        method = 'PUT';
-    } else {
-        url = '/api/observacoes_consolidado/' + relatorioIdAtual;
-        method = 'POST';
-    }
-    
-    var xhr = new XMLHttpRequest();
-    xhr.open(method, url, true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            fecharObservacoes();
-            abrirObservacoes();
-        } else {
-            alert('Erro ao salvar: HTTP ' + xhr.status);
-        }
-    };
-    xhr.onerror = function() {
-        alert('Erro de rede ao salvar.');
-    };
-    xhr.send(JSON.stringify({item: item, texto: texto}));
-}
-
-function excluirObservacao(id) {
-    if (confirm('Excluir esta observação?')) {
-        var xhr = new XMLHttpRequest();
-        xhr.open('DELETE', '/api/observacoes_consolidado/' + id, true);
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                carregarObservacoes(relatorioIdAtual);
-            } else {
-                alert('Erro ao excluir: HTTP ' + xhr.status);
-            }
-        };
-        xhr.send();
-    }
-}
-</script>
-
-<!-- MODAL DE CONCLUSÃO -->
-<div id="modal-conclusao" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:20px; border-radius:8px; width:600px; max-width:90%; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-        <h3 style="margin-top:0; color:#003366;">Conclusão do Relatório</h3>
-        <textarea id="texto-conclusao" style="width:100%; height:150px; padding:10px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px; margin-bottom:15px; box-sizing:border-box;" placeholder="Digite aqui a conclusão..."></textarea>
-        <div style="text-align:right;">
-            <button onclick="fecharConclusao()" style="padding:8px 16px; background:#ccc; border:none; border-radius:4px; cursor:pointer; margin-right:10px;">Cancelar</button>
-            <button onclick="salvarConclusao()" style="padding:8px 16px; background:#003366; color:#fff; border:none; border-radius:4px; cursor:pointer;">Salvar Conclusão</button>
-        </div>
-    </div>
-</div>
-
-<script>
-// Variável global para armazenar o ID do relatório atual
-window.idRelatorioAtual = null;
-
-function abrirConclusao() {
-    // Busca o ID do relatório mais recente direto do banco via API
-    fetch('/historico_relatorio_consolidado')
-        .then(res => res.json())
-        .then(lista => {
-            if (!lista || lista.length === 0) {
-                alert("Nenhum relatório consolidado salvo foi encontrado no banco. Gere o relatório primeiro.");
-                return;
-            }
-            
-            // Pega o ID do primeiro item da lista (o mais recente)
-            const idRelatorio = lista[0].id;
-            
-            // Agora busca a conclusão desse ID
-            return fetch(`/api/conclusao_consolidado/${idRelatorio}`)
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('texto-conclusao').value = data.texto || '';
-                    document.getElementById('modal-conclusao').style.display = 'flex';
-                    // Salva o ID no input para usar na hora de salvar
-                    document.getElementById('modal-conclusao').setAttribute('data-id', idRelatorio);
-                });
-        })
-        .catch(err => {
-            console.error("Erro ao buscar histórico:", err);
-            alert("Erro de comunicação com o servidor.");
-        });
-}
-
-function fecharConclusao() {
-    document.getElementById('modal-conclusao').style.display = 'none';
-}
-
-function salvarConclusao() {
-    const texto = document.getElementById('texto-conclusao').value;
-    if (!texto.trim()) {
-        alert("Digite um texto para a conclusão.");
-        return;
-    }
-
-    // Pega o ID que foi salvo no atributo data-id do modal
-    const idRelatorio = document.getElementById('modal-conclusao').getAttribute('data-id');
-    if (!idRelatorio) {
-        alert("Erro: ID do relatório não encontrado.");
-        return;
-    }
-
-    fetch(`/api/conclusao_consolidado/${idRelatorio}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto: texto })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.erro) throw new Error(data.mensagem || "Erro ao salvar");
-        alert("Conclusão salva com sucesso!");
-        document.getElementById('modal-conclusao').style.display = 'none';
-    })
-    .catch(err => {
-        console.error(err);
-        alert("Erro ao salvar conclusão: " + err.message);
-    });
-}
-</script>
-
-</body>
