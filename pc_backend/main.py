@@ -9829,16 +9829,22 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     html_parts.append("<div class='alerta-info'>1. Os itens de conformidade em vermelho, de 1 a 4, são por estornos de restos a pagar.<br>2. Incorporação de Ativos: SOMA = 16.271.957,08.</div>")
                 
                 elif nome_interno == "Análise BP":
+                    def fmt_sem_rs(v):
+                        if v is None: return "-"
+                        if isinstance(v, (int, float)):
+                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        return str(v).replace("R$", "").strip()
+                    
                     dados_bp = mod_dados.get("dados", {})
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das contas do Balanço Patrimonial (período atual x anterior).</p>")
                     html_parts.append("<table><thead><tr><th>CONTA</th><th>PERÍODO ATUAL (R$)</th><th>PERÍODO ANTERIOR (R$)</th><th>VAR. (%)</th></tr></thead><tbody>")
                     textos = []
                     for k, v in dados_bp.items():
-                        if isinstance(v, dict):
+                        if isinstance(v, dict) and k.lower() != 'estoques':
                             atual = v.get("atual", 0)
                             anterior = v.get("anterior", 0)
                             var = calc_var(atual, anterior)
-                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt(atual)}</td><td class='text-right'>{fmt(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt_sem_rs(atual)}</td><td class='text-right'>{fmt_sem_rs(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
                             if abs(var) > 0.01:
                                 direcao = "positiva" if var > 0 else "negativa"
                                 textos.append(f"<li>{k.replace('_', ' ').title()}, variação {direcao} de {pct(var)}.</li>")
@@ -9861,16 +9867,22 @@ def gerar_pdf_relatorio_consolidado(id: int):
                 
                 # 3. ANÁLISE ORÇAMENTÁRIA (BO)
                 elif nome_interno == "Análise Orçamentária (BO)":
+                    def fmt_sem_rs(v):
+                        if v is None: return "-"
+                        if isinstance(v, (int, float)):
+                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        return str(v).replace("R$", "").strip()
+                    
                     atual = mod_dados.get("atual", {})
                     anterior = mod_dados.get("anterior", {})
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das receitas e despesas orçamentárias.</p>")
                     html_parts.append("<table><thead><tr><th>INDICADOR</th><th>PERÍODO ATUAL</th><th>PERÍODO ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
-                    html_parts.append(f"<tr><td>Receita Realizada</td><td class='text-right'>{fmt(atual.get('receita_realizada'))}</td><td class='text-right'>{fmt(anterior.get('receita_realizada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_realizada',0), anterior.get('receita_realizada',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>Despesa Empenhada</td><td class='text-right'>{fmt(atual.get('despesa_empenhada'))}</td><td class='text-right'>{fmt(anterior.get('despesa_empenhada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_empenhada',0), anterior.get('despesa_empenhada',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>Superávit/Déficit</td><td class='text-right'>{fmt(atual.get('superavit'))}</td><td class='text-right'>{fmt(anterior.get('superavit'))}</td><td class='text-right'>{pct(calc_var(atual.get('superavit',0), anterior.get('superavit',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>Restos a Pagar</td><td class='text-right'>{fmt(atual.get('restos_pagar'))}</td><td class='text-right'>{fmt(anterior.get('restos_pagar'))}</td><td class='text-right'>{pct(calc_var(atual.get('restos_pagar',0), anterior.get('restos_pagar',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>Receita Orçada</td><td class='text-right'>{fmt(atual.get('receita_orcada'))}</td><td class='text-right'>{fmt(anterior.get('receita_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_orcada',0), anterior.get('receita_orcada',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>Despesa Orçada</td><td class='text-right'>{fmt(atual.get('despesa_orcada'))}</td><td class='text-right'>{fmt(anterior.get('despesa_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_orcada',0), anterior.get('despesa_orcada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Receita Realizada</td><td class='text-right'>{fmt_sem_rs(atual.get('receita_realizada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('receita_realizada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_realizada',0), anterior.get('receita_realizada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Despesa Empenhada</td><td class='text-right'>{fmt_sem_rs(atual.get('despesa_empenhada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('despesa_empenhada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_empenhada',0), anterior.get('despesa_empenhada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Superávit/Déficit</td><td class='text-right'>{fmt_sem_rs(atual.get('superavit'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('superavit'))}</td><td class='text-right'>{pct(calc_var(atual.get('superavit',0), anterior.get('superavit',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Restos a Pagar</td><td class='text-right'>{fmt_sem_rs(atual.get('restos_pagar'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('restos_pagar'))}</td><td class='text-right'>{pct(calc_var(atual.get('restos_pagar',0), anterior.get('restos_pagar',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Receita Orçada</td><td class='text-right'>{fmt_sem_rs(atual.get('receita_orcada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('receita_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_orcada',0), anterior.get('receita_orcada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Despesa Orçada</td><td class='text-right'>{fmt_sem_rs(atual.get('despesa_orcada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('despesa_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_orcada',0), anterior.get('despesa_orcada',0)))}</td></tr>")
                     html_parts.append(f"<tr><td>% Realização Receitas</td><td class='text-right'>{atual.get('pct_receita', 0):.2f}%</td><td class='text-right'>{anterior.get('pct_receita', 0):.2f}%</td><td class='text-right'>-</td></tr>")
                     html_parts.append(f"<tr><td>% Realização Despesas</td><td class='text-right'>{atual.get('pct_despesa', 0):.2f}%</td><td class='text-right'>{anterior.get('pct_despesa', 0):.2f}%</td><td class='text-right'>-</td></tr>")
                     html_parts.append("</tbody></table>")
@@ -9889,7 +9901,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         var = calc_var(v_atual, v_ant)
                         if abs(var) > 0.01:
                             direcao = "positiva" if var > 0 else "negativa"
-                            textos.append(f"<li>{nome_ind}, variação {direcao} de {pct(var)} (de {fmt(v_ant)} para {fmt(v_atual)}).</li>")
+                            textos.append(f"<li>{nome_ind}, variação {direcao} de {pct(var)} (de {fmt_sem_rs(v_ant)} para {fmt_sem_rs(v_atual)}).</li>")
                     
                     if textos:
                         html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
@@ -9927,21 +9939,123 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     html_parts.append("</script>")
                 
                 elif nome_interno == "Análise Financeira (BF)":
-                    atual = mod_dados.get("atual", {})
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Movimentação financeira consolidada.</p>")
-                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
-                    for k, v in atual.items():
-                        if isinstance(v, dict):
-                            a = v.get("atual", 0)
-                            ant = v.get("anterior", 0)
-                            var = calc_var(a, ant)
-                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt(a)}</td><td class='text-right'>{fmt(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
-                    html_parts.append("</tbody></table>")
+                    def fmt_sem_rs(v):
+                        if v is None: return "-"
+                        if isinstance(v, (int, float)):
+                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        return str(v).replace("R$", "").strip()
+                    
+                    import csv
+                    import os
+                    
+                    base_dir = os.path.dirname(os.path.abspath(__file__))
+                    uploads_dir = os.path.join(base_dir, "..", "pc_storage", "uploads_raw")
+                    csv_bf = None
+                    
+                    for nome_arquivo in os.listdir(uploads_dir):
+                        if "BALANCO_FINANCEIRO" in nome_arquivo.upper() and periodo.replace("-", "_") in nome_arquivo.upper():
+                            csv_bf = os.path.join(uploads_dir, nome_arquivo)
+                            break
+                    
+                    if not csv_bf:
+                        html_parts.append("<p style='color:red;'>CSV do Balanço Financeiro não encontrado para este período.</p>")
+                    else:
+                        linhas = []
+                        with open(csv_bf, "r", encoding="latin-1") as f_csv:
+                            leitor = csv.reader(f_csv, delimiter=';')
+                            for linha in leitor:
+                                linhas.append(linha)
+                        
+                        def limpar_valor(v):
+                            if not v or not isinstance(v, str): return 0.0
+                            limpo = v.replace('.', '').replace(',', '.').strip()
+                            try: return float(limpo)
+                            except: return 0.0
+                        
+                        def buscar_valor_ingresso(linhas, termo):
+                            for linha in linhas:
+                                if not linha or len(linha) < 3: continue
+                                if termo.lower() in str(linha[0]).lower():
+                                    return limpar_valor(linha[1]), limpar_valor(linha[2])
+                            return 0.0, 0.0
+                        
+                        def buscar_valor_dispendio(linhas, termo):
+                            for linha in linhas:
+                                if not linha or len(linha) < 6: continue
+                                if termo.lower() in str(linha[3]).lower():
+                                    return limpar_valor(linha[4]), limpar_valor(linha[5])
+                            return 0.0, 0.0
+                        
+                        # Ingressos
+                        rec_orc_atual, rec_orc_ant = buscar_valor_ingresso(linhas, "Receita Orçamentária")
+                        rec_corrente_atual, rec_corrente_ant = buscar_valor_ingresso(linhas, "RECEITAS CORRENTE")
+                        rec_capital_atual, rec_capital_ant = buscar_valor_ingresso(linhas, "RECEITAS DE CAPITAL")
+                        rec_extra_atual, rec_extra_ant = buscar_valor_ingresso(linhas, "Recebimentos Extraorçamentários")
+                        saldo_ant_atual, saldo_ant_ant = buscar_valor_ingresso(linhas, "Saldo em espécie do Exercício Anterior")
+                        total_ing_atual, total_ing_ant = buscar_valor_ingresso(linhas, "Total:")
+                        
+                        # Dispêndios
+                        desp_orc_atual, desp_orc_ant = buscar_valor_dispendio(linhas, "Despesa Orçamentária")
+                        desp_corrente_atual, desp_corrente_ant = buscar_valor_dispendio(linhas, "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CORRENTE")
+                        desp_capital_atual, desp_capital_ant = buscar_valor_dispendio(linhas, "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CAPITAL")
+                        desp_extra_atual, desp_extra_ant = buscar_valor_dispendio(linhas, "Pagamentos Extraorçamentários")
+                        saldo_seg_atual, saldo_seg_ant = buscar_valor_dispendio(linhas, "Saldo em espécie para o Exercí")
+                        # Busca direta na linha "Total:" pelas colunas 4 e 5
+                        total_disp_atual = 0.0
+                        total_disp_ant = 0.0
+                        for linha in linhas:
+                            if linha and len(linha) >= 6 and "Total:" in str(linha[0]):
+                                total_disp_atual = limpar_valor(linha[4])
+                                total_disp_ant = limpar_valor(linha[5])
+                                break
+                        
+                        html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Movimentação financeira consolidada.</p>")
+                        html_parts.append("<table><thead><tr><th>INGRESSOS</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th><th>DISPÊNDIOS</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                        
+                        html_parts.append(f"<tr><td>Receita Orçamentária</td><td class='text-right'>{fmt_sem_rs(rec_orc_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_orc_ant)}</td><td class='text-right'>{pct(calc_var(rec_orc_atual, rec_orc_ant))}</td><td>Despesa Orçamentária</td><td class='text-right'>{fmt_sem_rs(desp_orc_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_orc_ant)}</td><td class='text-right'>{pct(calc_var(desp_orc_atual, desp_orc_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td>Receitas Correntes</td><td class='text-right'>{fmt_sem_rs(rec_corrente_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_corrente_ant)}</td><td class='text-right'>{pct(calc_var(rec_corrente_atual, rec_corrente_ant))}</td><td>Despesas Correntes</td><td class='text-right'>{fmt_sem_rs(desp_corrente_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_corrente_ant)}</td><td class='text-right'>{pct(calc_var(desp_corrente_atual, desp_corrente_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td>Receitas de Capital</td><td class='text-right'>{fmt_sem_rs(rec_capital_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_capital_ant)}</td><td class='text-right'>{pct(calc_var(rec_capital_atual, rec_capital_ant))}</td><td>Despesas de Capital</td><td class='text-right'>{fmt_sem_rs(desp_capital_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_capital_ant)}</td><td class='text-right'>{pct(calc_var(desp_capital_atual, desp_capital_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td>Recebimentos Extraorçamentários</td><td class='text-right'>{fmt_sem_rs(rec_extra_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_extra_ant)}</td><td class='text-right'>{pct(calc_var(rec_extra_atual, rec_extra_ant))}</td><td>Pagamentos Extraorçamentários</td><td class='text-right'>{fmt_sem_rs(desp_extra_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_extra_ant)}</td><td class='text-right'>{pct(calc_var(desp_extra_atual, desp_extra_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td>Saldo em Espécie do Exercício Anterior</td><td class='text-right'>{fmt_sem_rs(saldo_ant_atual)}</td><td class='text-right'>{fmt_sem_rs(saldo_ant_ant)}</td><td class='text-right'>{pct(calc_var(saldo_ant_atual, saldo_ant_ant))}</td><td>Saldo em Espécie para o Exercício Seguinte</td><td class='text-right'>{fmt_sem_rs(saldo_seg_atual)}</td><td class='text-right'>{fmt_sem_rs(saldo_seg_ant)}</td><td class='text-right'>{pct(calc_var(saldo_seg_atual, saldo_seg_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td><strong>Total Geral de Ingressos</strong></td><td class='text-right'><strong>{fmt_sem_rs(total_ing_atual)}</strong></td><td class='text-right'>{fmt_sem_rs(total_ing_ant)}</td><td class='text-right'>{pct(calc_var(total_ing_atual, total_ing_ant))}</td><td><strong>Total Geral de Dispêndios</strong></td><td class='text-right'><strong>{fmt_sem_rs(total_disp_atual)}</strong></td><td class='text-right'>{fmt_sem_rs(total_disp_ant)}</td><td class='text-right'>{pct(calc_var(total_disp_atual, total_disp_ant))}</td></tr>")
+                        html_parts.append("</tbody></table>")
+                        
+                        # Texto dinâmico
+                        html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>")
+                        html_parts.append(f"<li>Receita Orçamentária: {fmt_sem_rs(rec_orc_atual)} (variação {pct(calc_var(rec_orc_atual, rec_orc_ant))})</li>")
+                        html_parts.append(f"<li>Despesa Orçamentária: {fmt_sem_rs(desp_orc_atual)} (variação {pct(calc_var(desp_orc_atual, desp_orc_ant))})</li>")
+                        html_parts.append(f"<li>Recebimentos Extraorçamentários: {fmt_sem_rs(rec_extra_atual)} (variação {pct(calc_var(rec_extra_atual, rec_extra_ant))})</li>")
+                        html_parts.append(f"<li>Pagamentos Extraorçamentários: {fmt_sem_rs(desp_extra_atual)} (variação {pct(calc_var(desp_extra_atual, desp_extra_ant))})</li>")
+                        html_parts.append(f"<li>Saldo Final: {fmt_sem_rs(saldo_seg_atual)} (variação {pct(calc_var(saldo_seg_atual, saldo_seg_ant))})</li>")
+                        html_parts.append("</ul>")
+                        
+                        # Gráfico de barras
+                        labels = ["Rec. Orçamentária", "Desp. Orçamentária", "Receb. Extra", "Pag. Extra", "Saldo Anterior", "Saldo Seguinte"]
+                        vals = [rec_orc_atual, desp_orc_atual, rec_extra_atual, desp_extra_atual, saldo_ant_atual, saldo_seg_atual]
+                        html_parts.append("<div class='grafico'><canvas id='chartBF'></canvas></div>")
+                        html_parts.append("<script>")
+                        html_parts.append("new Chart(document.getElementById('chartBF'), {")
+                        html_parts.append("type: 'bar',")
+                        html_parts.append(f"data: {{ labels: {json.dumps(labels)}, datasets: [")
+                        html_parts.append(f"{{ label: 'Valor (R$)', data: {json.dumps(vals)}, backgroundColor: ['#004b8d', '#dc3545', '#28a745', '#fd7e14', '#6c757d', '#17a2b8'] }}")
+                        html_parts.append("] },")
+                        html_parts.append("options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }")
+                        html_parts.append("});")
+                        html_parts.append("</script>")
                 
-                # 5. ANÁLISE DFC
                 elif nome_interno == "Análise DFC":
+                    def fmt_sem_rs(v):
+                        if v is None: return "-"
+                        if isinstance(v, (int, float)):
+                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        return str(v).replace("R$", "").strip()
+                    
                     dados_dfc = mod_dados.get("dados", {})
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração do Fluxo de Caixa (método direto).</p>")
+                    
+                    # Textos dinâmicos de evolução
+                    textos = []
+                    
                     for tipo in ["operacional", "investimento", "financiamento"]:
                         if tipo in dados_dfc:
                             html_parts.append(f"<h3>Fluxo {tipo.title()}</h3><table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
@@ -9950,8 +10064,13 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                     a = v.get("atual", 0)
                                     ant = v.get("anterior", 0)
                                     var = calc_var(a, ant)
-                                    html_parts.append(f"<tr><td>{k.title()}</td><td class='text-right'>{fmt(a)}</td><td class='text-right'>{fmt(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                                    html_parts.append(f"<tr><td>{k.title()}</td><td class='text-right'>{fmt_sem_rs(a)}</td><td class='text-right'>{fmt_sem_rs(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                                    if abs(var) > 0.01:
+                                        direcao = "positiva" if var > 0 else "negativa"
+                                        textos.append(f"<li>Fluxo {tipo.title()} - {k.title()}: variação {direcao} de {pct(var)} (de {fmt_sem_rs(ant)} para {fmt_sem_rs(a)}).</li>")
                             html_parts.append("</tbody></table>")
+                    
+                    # Apuração de Caixa
                     if "caixa" in dados_dfc:
                         html_parts.append("<h3>Apuração de Caixa</h3><table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
                         for k, v in dados_dfc["caixa"].items():
@@ -9959,22 +10078,99 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                 a = v.get("atual", 0)
                                 ant = v.get("anterior", 0)
                                 var = calc_var(a, ant)
-                                html_parts.append(f"<tr><td>{k.title()}</td><td class='text-right'>{fmt(a)}</td><td class='text-right'>{fmt(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                                html_parts.append(f"<tr><td>{k.title()}</td><td class='text-right'>{fmt_sem_rs(a)}</td><td class='text-right'>{fmt_sem_rs(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                                if abs(var) > 0.01:
+                                    direcao = "positiva" if var > 0 else "negativa"
+                                    textos.append(f"<li>Apuração de Caixa - {k.title()}: variação {direcao} de {pct(var)} (de {fmt_sem_rs(ant)} para {fmt_sem_rs(a)}).</li>")
                         html_parts.append("</tbody></table>")
+                    
+                    # Textos de evolução
+                    if textos:
+                        html_parts.append("<h3>Evolução dos Fluxos de Caixa</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                    else:
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os períodos.</p>")
+                    
+                    # Gráfico de barras
+                    if "operacional" in dados_dfc:
+                        labels = ["Ingressos Op.", "Desembolsos Op.", "Líquido Op.", "Ingressos Inv.", "Desembolsos Inv.", "Líquido Inv."]
+                        vals = [
+                            dados_dfc.get("operacional", {}).get("ingressos", {}).get("atual", 0),
+                            dados_dfc.get("operacional", {}).get("desembolsos", {}).get("atual", 0),
+                            dados_dfc.get("operacional", {}).get("liquido", {}).get("atual", 0),
+                            dados_dfc.get("investimento", {}).get("ingressos", {}).get("atual", 0),
+                            dados_dfc.get("investimento", {}).get("desembolsos", {}).get("atual", 0),
+                            dados_dfc.get("investimento", {}).get("liquido", {}).get("atual", 0)
+                        ]
+                        html_parts.append("<div class='grafico' style='max-width: 400px; height: 200px; margin: 10px auto;'><canvas id='chartDFC' style='width: 100%; height: 100%;'></canvas></div>")
+                        html_parts.append("<script>")
+                        html_parts.append("new Chart(document.getElementById('chartDFC'), {")
+                        html_parts.append("type: 'bar',")
+                        html_parts.append(f"data: {{ labels: {json.dumps(labels)}, datasets: [")
+                        html_parts.append(f"{{ label: 'Valor (R$)', data: {json.dumps(vals)}, backgroundColor: ['#004b8d', '#dc3545', '#28a745', '#004b8d', '#dc3545', '#28a745'] }}")
+                        html_parts.append("] },")
+                        html_parts.append("options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }")
+                        html_parts.append("});")
+                        html_parts.append("</script>")
                 
-                # 6. ANÁLISE PATRIMONIAL (DVP)
                 elif nome_interno == "Análise Patrimonial (DVP)":
+                    def fmt_sem_rs(v):
+                        if v is None: return "-"
+                        if isinstance(v, (int, float)):
+                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        return str(v).replace("R$", "").strip()
+                    
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração das Variações Patrimoniais.</p>")
                     html_parts.append("<table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    
+                    textos = []
                     for k, v in mod_dados.items():
                         if isinstance(v, dict):
                             atual = v.get("atual", 0)
                             anterior = v.get("anterior", 0)
                             var = calc_var(atual, anterior)
-                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt(atual)}</td><td class='text-right'>{fmt(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                            
+                            # Caso especial para Margem Patrimonial (adiciona %)
+                            if k == "margem_patrimonial":
+                                html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{atual:.2f}%</td><td class='text-right'>{anterior:.2f}%</td><td class='text-right'>{pct(var)}</td></tr>")
+                                if abs(var) > 0.01:
+                                    direcao = "positiva" if var > 0 else "negativa"
+                                    textos.append(f"<li>Margem Patrimonial: variação {direcao} de {pct(var)} (de {anterior:.2f}% para {atual:.2f}%).</li>")
+                            else:
+                                html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt_sem_rs(atual)}</td><td class='text-right'>{fmt_sem_rs(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                                if abs(var) > 0.01:
+                                    direcao = "positiva" if var > 0 else "negativa"
+                                    textos.append(f"<li>{k.replace('_', ' ').title()}: variação {direcao} de {pct(var)} (de {fmt_sem_rs(anterior)} para {fmt_sem_rs(atual)}).</li>")
                     html_parts.append("</tbody></table>")
+                    
+                    # Textos de evolução
+                    if textos:
+                        html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                    else:
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os períodos.</p>")
+                    
+                    # Gráfico de barras
+                    labels = []
+                    atual_vals = []
+                    ant_vals = []
+                    for k, v in mod_dados.items():
+                        if isinstance(v, dict):
+                            labels.append(k.replace('_', ' ').title())
+                            atual_vals.append(v.get("atual", 0))
+                            ant_vals.append(v.get("anterior", 0))
+                    
+                    if labels:
+                        html_parts.append("<div class='grafico'><canvas id='chartDVP'></canvas></div>")
+                        html_parts.append("<script>")
+                        html_parts.append("new Chart(document.getElementById('chartDVP'), {")
+                        html_parts.append("type: 'bar',")
+                        html_parts.append(f"data: {{ labels: {json.dumps(labels)}, datasets: [")
+                        html_parts.append(f"{{ label: 'Atual', data: {json.dumps(atual_vals)}, backgroundColor: '#004b8d' }},")
+                        html_parts.append(f"{{ label: 'Anterior', data: {json.dumps(ant_vals)}, backgroundColor: '#6c757d' }}")
+                        html_parts.append("] },")
+                        html_parts.append("options: { responsive: true, plugins: { legend: { position: 'top' } } }")
+                        html_parts.append("});")
+                        html_parts.append("</script>")
                 
-                # 7. DMPL
                 elif nome_interno == "DMPL":
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração das mutações do patrimônio líquido.</p>")
                     dados_dmpl = mod_dados.get("dados", [])
