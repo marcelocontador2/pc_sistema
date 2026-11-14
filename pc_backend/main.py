@@ -5172,7 +5172,12 @@ def gerar_pdf_integridade_matriz(check_id: str):
         context = browser.new_context(bypass_csp=True)
         page = context.new_page()
         page.goto(url, wait_until="networkidle")
-        page.wait_for_timeout(2000)
+        # Espera o conteudo da conclusao ser renderizado (max 10s)
+        try:
+            page.wait_for_function("() => { const el = document.getElementById('conclusao-total'); return el && el.innerText.length > 50 && !el.innerText.includes('Carregando'); }", timeout=10000)
+        except:
+            page.wait_for_timeout(2000)  # fallback
+        page.wait_for_timeout(2000)  # espera extra para graficos
         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
         browser.close()
 
@@ -5312,7 +5317,11 @@ def gerar_pdf_panorama(historico_id: int):
         context = browser.new_context(bypass_csp=True)
         page = context.new_page()
         page.goto(url, wait_until="networkidle")
-        page.wait_for_timeout(3000) # Espera extra para gráficos renderizarem
+        try:
+            page.wait_for_function("() => { const el = document.getElementById('conclusao-total') || document.querySelector('[id*=conclusao]'); return el && el.innerText.length > 50; }", timeout=8000)
+        except:
+            pass
+        page.wait_for_timeout(2000)
         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
         browser.close()
 

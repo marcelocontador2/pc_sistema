@@ -738,30 +738,7 @@
     
 
 
-    <script id="carregar_conclusao_customizada">
-        (function() {
-            const originalFetch = window.fetch;
-            window.fetch = function(url, options) {
-                return originalFetch(url, options).then(res => res.clone().json()).then(data => {
-                    if (data.conclusao_personalizada) {
-                        // Assim que a página carregar, joga o texto personalizado na tela
-                        setTimeout(() => {
-                            const headers = document.querySelectorAll('h2, h3');
-                            for (let h of headers) {
-                                if (h.innerText.toUpperCase().includes('CONCLUSÃO') || h.innerText.toUpperCase().includes('RECOMENDAÇÕES')) {
-                                    const div = h.parentElement;
-                                    const texto = div.querySelector('p') || div.querySelector('div') || div;
-                                    texto.innerHTML = data.conclusao_personalizada.replace(/\n/g, '<br>');
-                                    break;
-                                }
-                            }
-                        }, 500);
-                    }
-                    return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
-                });
-            };
-        })();
-    </script>
+    <!-- Script 1 (JSON cru) REMOVIDO: o parse correto e feito pelo script 3 (js-carregar-conclusao-salva) -->
 
 
     <script>
@@ -890,26 +867,7 @@
                 };
 
                 // Injeta o texto personalizado na tela após o carregamento
-                window.addEventListener('load', () => {
-                    fetch(`/historico_centro_custos/${historicoId}`)
-                        .then(r => r.json())
-                        .then(data => {
-                            const dados = data.dados ? data.dados : data;
-                            if (dados.conclusao_personalizada) {
-                                // Encontra o título da conclusão e substitui o texto abaixo dele
-                                const allHeaders = document.querySelectorAll('h1, h2, h3');
-                                for (let h of allHeaders) {
-                                    const txt = h.innerText.toUpperCase();
-                                    if (txt.includes('CONCLUSÃO') || txt.includes('RECOMENDAÇÕES')) {
-                                        let parent = h.parentElement;
-                                        // Substitui o conteúdo do bloco inteiro, mantendo o título
-                                        parent.innerHTML = `<h2 style="color:#0a1c3a; font-size:16px; margin-bottom:10px;">${h.innerText}</h2><div style="white-space: pre-wrap; font-size:14px; line-height:1.6; text-align:justify;">${dados.conclusao_personalizada}</div>`;
-                                        break;
-                                    }
-                                }
-                            }
-                        });
-                });
+                // Script 2 (JSON cru) REMOVIDO: o parse correto e feito pelo script 3
             }
         })();
     </script>
