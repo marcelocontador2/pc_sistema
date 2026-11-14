@@ -1198,7 +1198,20 @@ async def api_panorama(periodo: str):
             return 0.0
 
         # --- CAIXA ---
-        caixa = pegar_valor(l_bp, "CAIXA E EQUIVALENTES", 1)
+        caixa = 0.0
+        for p in l_bp:
+            if not isinstance(p, (list, tuple)):
+                continue
+            for celula in p:
+                if "CAIXA E EQUIVALENTES" in str(celula).upper():
+                    if len(p) > 1:
+                        try:
+                            caixa = abs(_limpar_valor(p[1]))
+                        except:
+                            pass
+                    break
+            if caixa > 0:
+                break
         if caixa == 0:
             caixa = pegar_valor(l_bp, "DISPONIBILIDADES", 1)
 
@@ -10760,7 +10773,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     ativo_total = mod_dados.get("ativo_total") or mod_dados.get("ativo_total", 0)
                     passivo_total = mod_dados.get("passivo_total") or mod_dados.get("passivo_total", 0)
                     pl = mod_dados.get("patrimonio_liquido") or mod_dados.get("patrimonio_liquido", 0)
-                    caixa = mod_dados.get("caixa") or mod_dados.get("caixa", 0)
+                    caixa = mod_dados.get("caixa_bp") or mod_dados.get("caixa") or mod_dados.get("caixa", 0)
                     receita = mod_dados.get("receita_realizada") or mod_dados.get("receita_realizada", 0)
                     despesa = mod_dados.get("despesa_empenhada") or mod_dados.get("despesa_empenhada", 0)
                     sup_orc = mod_dados.get("superavit_orcamentario") or mod_dados.get("superavit_orcamentario", 0)
