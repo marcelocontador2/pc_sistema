@@ -977,67 +977,117 @@ async def serve_panorama():
 def _calc_panorama(periodo):
     import sqlite3, json, os
     from .matriz_integridade import _limpar_valor
+    
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    def buscar_no_banco(tipo):
+    
+    def limpar(v):
+        if v is None: return 0.0
+        if isinstance(v, (int, float)): return abs(float(v))
+        s = str(v).strip().replace("R$", "").replace(" ", "")
+        if not s or s == "-": return 0.0
+        try:
+            return abs(float(s.replace(".", "").replace(",", ".")))
+        except:
+            return 0.0
+    
+    def carregar_csv(tipo):
         nome = f"{tipo}_{periodo.replace('-', '_')}.csv"
-        cursor.execute("SELECT dados_json FROM arquivos_importados WHERE nome_arquivo = ?", (nome,))
-        row = cursor.fetchone()
-        return json.loads(row[0]) if row else []
-    l_bp = buscar_no_banco("BALANCO_PATRIMONIAL")
-    l_bo = buscar_no_banco("BALANCO_ORCAMENTARIO")
-    l_dvp = buscar_no_banco("DVP")
-    conn.close()
-    def buscar(linhas, termo, coluna):
-        # Procura o termo na coluna 0 (Ativo) ou 3 (Passivo)
-        # e pega o valor da coluna seguinte (1 para Ativo, 4 para Passivo)
-        termo_upper = termo.upper() if isinstance(termo, str) else termo[0].upper()
+        try:
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            cur.execute("SELECT dados_json FROM arquivos_importados WHERE nome_arquivo = ?", (nome,))
+            row = cur.fetchone()
+            conn.close()
+            if row and row[0]:
+                return json.loads(row[0])
+        except Exception as e:
+            print(f"Erro ao carregar {tipo}: {e}")
+        return []
+    
+    def buscar_valor(linhas, termo, coluna):
+        if not linhas:
+            return 0.0
+        termo_upper = termo.upper().strip()
         for p in linhas:
-            for col_espec in [0, 3]:
-                if len(p) > col_espec and termo_upper in str(p[col_espec]).upper():
-                    col_valor = col_espec + 1
-                    if len(p) > col_valor:
-                        try:
-                            v = abs(_limpar_valor(p[col_valor]))
-                            if v > 0:
-                                return v
-                        except:
-                            pass
+            if not isinstance(p, (list, tuple)):
+                continue
+            for celula in p:
+                if termo_upper in str(celula).upper():
+                    if len(p) > coluna:
+                        v = limpar(p[coluna])
+                        if v > 0:
+                            return v
         return 0.0
-    ativo_total = buscar(l_bp, "TOTAL", 1)
-    passivo_total = buscar(l_bp, ["TOTAL"], 3)
-    pl = 0.0
-    for p in l_bp:
-        if len(p) > 3 and "604.368.244,61" in p[3]:
-            pl = abs(_limpar_valor(p[3]))
-            break
-    superavit_financeiro = 0.0
-    for p in l_bp:
-        if "SUPERíVIT FINANCEIRO" in p[0].upper() and len(p) > 2:
-            superavit_financeiro = abs(_limpar_valor(p[2]))
-            break
-    receita_total = 0.0
-    despesa_total = 0.0
-    for p in l_bo:
-        if len(p) > 5:
-            val_c5 = abs(_limpar_valor(p[5]))
-            val_c4 = abs(_limpar_valor(p[4]))
-            if val_c5 > receita_total: receita_total = val_c5
-            if val_c4 > despesa_total: despesa_total = val_c4
-    superavit_orcamentario = receita_total - despesa_total
-    vpa = buscar(l_dvp, "TOTAL DAS VARIA", 2)
-    vpd = buscar(l_dvp, "TOTAL DAS VARIA", 4)
-    superavit_patrimonial = vpa - vpd
+    
+    l_bp = carregar_csv("BALANCO_PATRIMONIAL")
+    l_bo = carregar_csv("BALANCO_ORCAMENTARIO")
+    l_dvp = carregar_csv("DVP")
+    
+    caixa = buscar_valor(l_bp, "CAIXA E EQUIVALENTES", 1)
+    if caixa == 0:
+        caixa = buscar_valor(l_bp, "DISPONIBILIDADES", 1)
+    if caixa == 0:
+        caixa = buscar_valor(l_bp, "CAIXA", 1)
+    
+    ativo_circ = buscar_valor(l_bp, "ATIVO CIRCULANTE", 1)
+    ativo_nao_circ = buscar_valor(l_bp, "ATIVO NÃO CIRCULANTE", 1)
+    if ativo_nao_circ == 0:
+        ativo_nao_circ = buscar_valor(l_bp, "ATIVO NAO CIRCULANTE", 1)
+    ativo_total = ativo_circ + ativo_nao_circ
+    if ativo_total == 0:
+        ativo_total = buscar_valor(l_bp, "TOTAL DO ATIVO", 1)
+    
+    passivo_total = buscar_valor(l_bp, "TOTAL DO PASSIVO", 3)
+    
+    pl = buscar_valor(l_bp, "TOTAL DO PATRIMÔNIO LÍQUIDO", 3)
+    if pl == 0:
+        pl = buscar_valor(l_bp, "TOTAL DO PATRIMONIO LIQUIDO", 3)
+    
+    receita = buscar_valor(l_bo, "SUB-TOTAL DAS RECEITAS", 6)
+    if receita == 0:
+        receita = buscar_valor(l_bo, "SUB-TOTAL DAS RECEITAS", 1)
+    
+    despesa = buscar_valor(l_bo, "SUB-TOTAL DAS DESPESAS", 4)
+    if despesa == 0:
+        despesa = buscar_valor(l_bo, "SUB-TOTAL DAS DESPESAS", 1)
+    
+    superavit_orc = receita - despesa
+    
+    superavit_patr = 0.0
+    for p in l_dvp:
+        if not isinstance(p, (list, tuple)) or len(p) < 7:
+            continue
+        linha_str = " | ".join(str(c) for c in p).upper()
+        # IMPORTANTE: verificar SUPERAVIT primeiro (a mesma linha pode ter tanto deficit quanto superavit)
+        if "SUPERÁVIT DO EXERCÍCIO" in linha_str or "SUPERAVIT DO EXERCICIO" in linha_str:
+            v = limpar(p[6])
+            if v > 0:
+                superavit_patr = v
+                break
+        elif "DÉFICIT DO EXERCÍCIO" in linha_str or "DEFICIT DO EXERCICIO" in linha_str:
+            v = limpar(p[6])
+            if v > 0:
+                superavit_patr = -v
+                break
+    
+    superavit_fin = buscar_valor(l_bp, "SUPERÁVIT FINANCEIRO", 2)
+    if superavit_fin == 0:
+        superavit_fin = buscar_valor(l_bp, "SUPERAVIT FINANCEIRO", 2)
+    if superavit_fin == 0:
+        ativo_fin = buscar_valor(l_bp, "ATIVO FINANCEIRO", 1)
+        passivo_fin = buscar_valor(l_bp, "PASSIVO FINANCEIRO", 3)
+        superavit_fin = ativo_fin - passivo_fin
+    
     return {
-        "superavit_orcamentario": superavit_orcamentario,
-        "superavit_patrimonial": superavit_patrimonial,
-        "superavit_financeiro": superavit_financeiro,
+        "superavit_orcamentario": superavit_orc,
+        "superavit_patrimonial": superavit_patr,
+        "superavit_financeiro": superavit_fin,
         "patrimonio_liquido": pl,
         "ativo_total": ativo_total,
-        "passivo_total": passivo_total
+        "passivo_total": passivo_total,
     }
-# @app.get("/api/panorama/{periodo}")
+
+@app.get("/api/panorama/{periodo}")
 async def api_panorama(periodo: str):
     try:
         import psycopg2
@@ -1087,10 +1137,15 @@ async def api_panorama(periodo: str):
         # Funcao de busca (igual ao original)
         def buscar(linhas, termos):
             for p in linhas:
-                for termo in termos:
-                    termo_upper = termo.upper()
-                    for col_espec in [0, 3]:
-                        if len(p) > col_espec and termo_upper in str(p[col_espec]).upper():
+                if not isinstance(p, (list, tuple)) or len(p) < 2:
+                    continue
+                # Procura o termo em TODAS as colunas (nao so 0 e 3)
+                for col_espec in range(len(p)):
+                    celula = str(p[col_espec]).strip().upper()
+                    for termo in termos:
+                        termo_upper = termo.upper().strip()
+                        if termo_upper and termo_upper in celula:
+                            # Tenta pegar o valor na proxima coluna (col_espec + 1)
                             col_valor = col_espec + 1
                             if len(p) > col_valor:
                                 try:
@@ -1099,19 +1154,104 @@ async def api_panorama(periodo: str):
                                         return v
                                 except:
                                     pass
+                            # Se nao achou na +1, tenta na +2 (as vezes tem coluna vazia no meio)
+                            col_valor2 = col_espec + 2
+                            if len(p) > col_valor2:
+                                try:
+                                    v = abs(_limpar_valor(p[col_valor2]))
+                                    if v > 0:
+                                        return v
+                                except:
+                                    pass
             return 0.0
 
-        caixa = buscar(l_bp, ["CAIXA E EQUIVALENTES", "DISPONIBILIDADES", "CAIXA"])
-        ativo_total = buscar(l_bp, ["ATIVO TOTAL", "TOTAL DO ATIVO", "TOTAL ATIVO"])
-        passivo_total = buscar(l_bp, ["PASSIVO TOTAL", "TOTAL DO PASSIVO", "TOTAL PASSIVO"])
-        pl = buscar(l_bp, ["PATRIMONIO LIQUIDO", "TOTAL DO PATRIMONIO LIQUIDO", "PATRIMONIO SOCIAL"])
+        # --- FUNCOES AUXILIARES PARA BUSCAR VALORES EM COLUNAS ESPECIFICAS ---
+        def pegar_valor(linhas, termo_busca, coluna_valor):
+            """Procura o termo em qualquer coluna e retorna o valor da coluna especificada."""
+            for p in linhas:
+                if not isinstance(p, (list, tuple)):
+                    continue
+                for celula in p:
+                    if termo_busca.upper() in str(celula).upper():
+                        if len(p) > coluna_valor:
+                            try:
+                                v = abs(_limpar_valor(p[coluna_valor]))
+                                return v
+                            except:
+                                pass
+            return 0.0
 
-        receita = buscar(l_bo, ["RECEITAS REALIZADAS", "TOTAL DAS RECEITAS", "RECEITA TOTAL"])
-        despesa = buscar(l_bo, ["DESPESAS EMPENHADAS", "TOTAL DAS DESPESAS", "DESPESA TOTAL"])
+        def pegar_valor_ultima_coluna(linhas, termo_busca):
+            """Procura o termo e retorna o ultimo valor numerico > 0 da linha."""
+            for p in linhas:
+                if not isinstance(p, (list, tuple)):
+                    continue
+                for celula in p:
+                    if termo_busca.upper() in str(celula).upper():
+                        for v_cell in reversed(p):
+                            try:
+                                v = abs(_limpar_valor(v_cell))
+                                if v > 0:
+                                    return v
+                            except:
+                                pass
+            return 0.0
+
+        # --- CAIXA ---
+        caixa = pegar_valor(l_bp, "CAIXA E EQUIVALENTES", 1)
+        if caixa == 0:
+            caixa = pegar_valor(l_bp, "DISPONIBILIDADES", 1)
+
+        # --- ATIVO TOTAL (soma de ATIVO CIRCULANTE + ATIVO NAO CIRCULANTE) ---
+        ativo_circ = pegar_valor(l_bp, "ATIVO CIRCULANTE", 1)
+        ativo_nao_circ = pegar_valor(l_bp, "ATIVO NÃO CIRCULANTE", 1)
+        ativo_total = ativo_circ + ativo_nao_circ
+        if ativo_total == 0:
+            ativo_total = pegar_valor(l_bp, "TOTAL DO ATIVO", 1)
+
+        # --- PASSIVO TOTAL (TOTAL DO PASSIVO na coluna 3) ---
+        passivo_total = pegar_valor(l_bp, "TOTAL DO PASSIVO", 3)
+
+        # --- PATRIMONIO LIQUIDO (TOTAL DO PATRIMONIO LIQUIDO na coluna 3) ---
+        pl = pegar_valor(l_bp, "TOTAL DO PATRIMÔNIO LÍQUIDO", 3)
+        if pl == 0:
+            pl = pegar_valor(l_bp, "TOTAL DO PATRIMONIO LIQUIDO", 3)
+
+        # --- RECEITA REALIZADA (SUB-TOTAL DAS RECEITAS na coluna 6) ---
+        receita = pegar_valor(l_bo, "SUB-TOTAL DAS RECEITAS", 6)
+        if receita == 0:
+            receita = pegar_valor(l_bo, "SUB-TOTAL DAS RECEITAS", 1)
+
+        # --- DESPESA EMPENHADA (SUB-TOTAL DAS DESPESAS na coluna 4) ---
+        despesa = pegar_valor(l_bo, "SUB-TOTAL DAS DESPESAS", 4)
+        if despesa == 0:
+            despesa = pegar_valor(l_bo, "SUB-TOTAL DAS DESPESAS", 1)
+
+        # --- SUPERAVIT ORCAMENTARIO ---
         superavit_orc = receita - despesa
 
-        superavit_patrimonial = buscar(l_dvp, ["SUPERAVIT PATRIMONIAL", "RESULTADO PATRIMONIAL", "SUPERAVIT/DEFICIT PATRIMONIAL"])
-        superavit_financeiro = buscar(l_fin, ["SUPERAVIT FINANCEIRO", "RESULTADO FINANCEIRO", "SALDO FINANCEIRO"])
+        # --- SUPERAVIT PATRIMONIAL (DVP: Superavit do Exercicio na coluna 6) ---
+        superavit_patr = pegar_valor(l_dvp, "SUPERÁVIT DO EXERCÍCIO", 6)
+        if superavit_patr == 0:
+            superavit_patr = pegar_valor(l_dvp, "SUPERAVIT DO EXERCICIO", 6)
+        if superavit_patr == 0:
+            deficit = pegar_valor(l_dvp, "DÉFICIT DO EXERCÍCIO", 6)
+            if deficit > 0:
+                superavit_patr = -deficit
+
+        # --- SUPERAVIT FINANCEIRO (Ativo Financeiro - Passivo Financeiro) ---
+        ativo_fin = pegar_valor(l_bp, "ATIVO FINANCEIRO", 1)
+        passivo_fin = pegar_valor(l_bp, "PASSIVO FINANCEIRO", 3)
+        superavit_fin = ativo_fin - passivo_fin
+        if superavit_fin == 0:
+            superavit_fin = pegar_valor(l_bp, "SUPERÁVIT FINANCEIRO", 1)
+            if superavit_fin == 0:
+                superavit_fin = pegar_valor(l_bp, "SUPERAVIT FINANCEIRO", 1)
+
+        # REMOVIDO: as linhas abaixo sobrescreviam os valores corretos com zero
+        # superavit_patrimonial = buscar(l_dvp, ["SUPERAVIT PATRIMONIAL", ...])
+        # superavit_financeiro = buscar(l_fin, ["SUPERAVIT FINANCEIRO", ...])
+        # Agora usamos os valores ja calculados acima (superavit_patr e superavit_fin)
 
         conn.close()
 
@@ -1123,8 +1263,8 @@ async def api_panorama(periodo: str):
             "receita_realizada": receita,
             "despesa_empenhada": despesa,
             "superavit_orcamentario": superavit_orc,
-            "superavit_patrimonial": superavit_patrimonial,
-            "superavit_financeiro": superavit_financeiro,
+            "superavit_patrimonial": superavit_patr,
+            "superavit_financeiro": superavit_fin,
         }
     except Exception as e:
         import traceback
@@ -3743,7 +3883,7 @@ def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", e
             context = browser.new_context(bypass_csp=True)
             page = context.new_page()
             page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-            url = f"http://127.0.0.1:9994/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
+            url = f"http://127.0.0.1:994/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
             # --- CORRECAO DE ACENTOS ---
@@ -3786,7 +3926,7 @@ def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMES
             context = browser.new_context(bypass_csp=True)
             page = context.new_page()
             page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-            url = f"http://127.0.0.1:9994/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
+            url = f"http://127.0.0.1:994/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
             # --- CORRECAO DE ACENTOS ---
@@ -4718,9 +4858,9 @@ def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_
     import time, os
 
     if historico_id:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -5025,7 +5165,7 @@ def gerar_pdf_integridade_matriz(check_id: str):
     import time
 
     # Abre a tela de integridade com o ID passado
-    url = f"http://127.0.0.1:9994/integridade?check={check_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/integridade?check={check_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -5050,7 +5190,7 @@ def gerar_pdf_conferencia(check_id: str):
     import time
 
     # Abre a tela de conferíªncia com o ID passado
-    url = f"http://127.0.0.1:9994/conferencia_nova?check={check_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/conferencia_nova?check={check_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -5075,9 +5215,9 @@ def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_
     from fastapi.responses import Response
     import time, os
     if historico_id:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(bypass_csp=True)
@@ -5141,7 +5281,7 @@ def gerar_pdf_composicao_receitas_despesas(historico_id: int):
     import time
 
     # Abre a tela do relatí³rio passando o ID do histí³rico
-    url = f"http://127.0.0.1:9994/relatorio_composicao_receitas_despesas?historico_id={historico_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/relatorio_composicao_receitas_despesas?historico_id={historico_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -5165,7 +5305,7 @@ def gerar_pdf_panorama(historico_id: int):
     import time
 
     # Abre a tela do panorama passando o ID do histí³rico
-    url = f"http://127.0.0.1:9994/relatorio_panorama?historico_id={historico_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/relatorio_panorama?historico_id={historico_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -5196,7 +5336,7 @@ def gerar_pdf_centro_custos(historico_id: int):
     import time
 
     # Abre o relatí³rio v2 passando o ID do histí³rico
-    url = f"http://127.0.0.1:9994/relatorio_centro_custos?historico_id={historico_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/relatorio_centro_custos?historico_id={historico_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -6983,7 +7123,7 @@ def gerar_pdf_custo_pessoal(id: int = None, periodo: str = "2026-TRIMESTRE-3", e
             context = browser.new_context(bypass_csp=True)
             page = context.new_page()
             page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-            url = f"http://127.0.0.1:9994/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
+            url = f"http://127.0.0.1:994/custo_pessoal_pdf_resumo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
             # --- CORRECAO DE ACENTOS ---
@@ -7026,7 +7166,7 @@ def gerar_pdf_completo_custo_pessoal(id: int = None, periodo: str = "2026-TRIMES
             context = browser.new_context(bypass_csp=True)
             page = context.new_page()
             page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-            url = f"http://127.0.0.1:9994/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
+            url = f"http://127.0.0.1:994/custo_pessoal_pdf_completo?periodo={periodo}&entidade={entidade}&_t=" + str(int(time.time()))
             page.goto(url, wait_until="networkidle")
             page.wait_for_timeout(2000)
             # --- CORRECAO DE ACENTOS ---
@@ -7946,9 +8086,9 @@ def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_
     import time, os
 
     if historico_id:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -8205,7 +8345,7 @@ def gerar_pdf_integridade_matriz(check_id: str):
     import time
 
     # Abre a tela de integridade com o ID passado
-    url = f"http://127.0.0.1:9994/integridade?check={check_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/integridade?check={check_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -8230,7 +8370,7 @@ def gerar_pdf_conferencia(check_id: str):
     import time
 
     # Abre a tela de conferíªncia com o ID passado
-    url = f"http://127.0.0.1:9994/conferencia_nova?check={check_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/conferencia_nova?check={check_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -8254,9 +8394,9 @@ def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_
     from fastapi.responses import Response
     import time, os
     if historico_id:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:9994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
+        url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(bypass_csp=True)
@@ -8320,7 +8460,7 @@ def gerar_pdf_composicao_receitas_despesas(historico_id: int):
     import time
 
     # Abre a tela do relatí³rio passando o ID do histí³rico
-    url = f"http://127.0.0.1:9994/relatorio_composicao_receitas_despesas?historico_id={historico_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/relatorio_composicao_receitas_despesas?historico_id={historico_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -8344,7 +8484,7 @@ def gerar_pdf_panorama(historico_id: int):
     import time
 
     # Abre a tela do panorama passando o ID do histí³rico
-    url = f"http://127.0.0.1:9994/relatorio_panorama?historico_id={historico_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/relatorio_panorama?historico_id={historico_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -8375,7 +8515,7 @@ def gerar_pdf_centro_custos(historico_id: int):
     import time
 
     # Abre o relatí³rio v2 passando o ID do histí³rico
-    url = f"http://127.0.0.1:9994/relatorio_centro_custos?historico_id={historico_id}&_t={int(time.time())}"
+    url = f"http://127.0.0.1:994/relatorio_centro_custos?historico_id={historico_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -10442,28 +10582,241 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     est = mod_dados.get("estrutura", {})
                     liq_ant = mod_dados.get("liquidez_anterior", {})
                     est_ant = mod_dados.get("estrutura_anterior", {})
+                    val = mod_dados.get("valores", {})
+                    val_ant = mod_dados.get("valores_anterior", {})
+                    
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Indicadores de liquidez e estrutura patrimonial (atual x anterior).</p>")
-                    html_parts.append("<h3>Liquidez</h3><table><thead><tr><th>INDICADOR</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    
+                    def fmt_valor(v):
+                        if v is None: return "?"
+                        try:
+                            return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        except (TypeError, ValueError):
+                            return str(v)
+                    
+                    def br_para_float(v):
+                        if v is None: return None
+                        if isinstance(v, (int, float)): return float(v)
+                        s = str(v).strip().replace("R$", "").replace(" ", "")
+                        if not s or s == "-": return None
+                        try:
+                            return float(s.replace(".", "").replace(",", "."))
+                        except ValueError:
+                            return None
+                    
+                    def fmt_var(atual_v, anterior_v):
+                        a = br_para_float(atual_v)
+                        b = br_para_float(anterior_v)
+                        if a is None or b is None or b == 0:
+                            return None, None, None
+                        var = ((a - b) / abs(b)) * 100
+                        return a, b, var
+                    
+                    def formula_liq(k):
+                        c = val.get("caixa", 0)
+                        ac = val.get("ativo_circulante", 0)
+                        est_v = val.get("estoques", 0)
+                        rlp = val.get("realizavel_lp", 0)
+                        pc = val.get("passivo_circulante", 0)
+                        pnc = val.get("passivo_nao_circulante", 0)
+                        if k == "liquidez_imediata":
+                            return f"Disponível ({fmt_valor(c)}) / Passivo Circulante ({fmt_valor(pc)})"
+                        if k == "liquidez_corrente":
+                            return f"Ativo Circulante ({fmt_valor(ac)}) / Passivo Circulante ({fmt_valor(pc)})"
+                        if k == "liquidez_seca":
+                            return f"(Ativo Circulante ({fmt_valor(ac)}) - Estoques ({fmt_valor(est_v)})) / Passivo Circulante ({fmt_valor(pc)})"
+                        if k == "liquidez_geral":
+                            return f"(Ativo Circulante ({fmt_valor(ac)}) + Realizável LP ({fmt_valor(rlp)})) / (Passivo Circulante ({fmt_valor(pc)}) + Passivo Não Circulante ({fmt_valor(pnc)}))"
+                        return "-"
+                    
+                    def formula_est(k):
+                        at = val.get("ativo_total", 0)
+                        pt = val.get("passivo_total", 0)
+                        pc = val.get("passivo_circulante", 0)
+                        pnc = val.get("passivo_nao_circulante", 0)
+                        imob = val.get("imobilizado", 0)
+                        pl = val.get("patrimonio_liquido", 0)
+                        if k == "endividamento_geral":
+                            return f"(Passivo Circulante ({fmt_valor(pc)}) + Passivo Não Circulante ({fmt_valor(pnc)})) / Ativo Total ({fmt_valor(at)})"
+                        if k == "part_capital_terceiros":
+                            return f"Passivo Total ({fmt_valor(pt)}) / Ativo Total ({fmt_valor(at)})"
+                        if k == "imobilizacao_pl":
+                            return f"Ativo Imobilizado ({fmt_valor(imob)}) / Patrimônio Líquido ({fmt_valor(pl)})"
+                        return "-"
+                    
+                    textos = []
+                    labels_liq = []
+                    vals_liq_atual = []
+                    vals_liq_ant = []
+                    
+                    # ---- LIQUIDEZ ----
+                    html_parts.append("<h3>Liquidez</h3>")
+                    html_parts.append("<table style='table-layout: fixed; width: 100%;'><thead><tr>")
+                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>FÓRMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
+                    html_parts.append("</tr></thead><tbody>")
                     for k, v in liq.items():
                         v_ant = liq_ant.get(k, "-")
-                        html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{v}</td><td class='text-right'>{v_ant}</td><td class='text-right'>-</td></tr>")
+                        a, b, var = fmt_var(v, v_ant)
+                        var_str = f"{var:+.2f}%" if var is not None else "-"
+                        formula = formula_liq(k)
+                        nome_fmt = k.replace('_', ' ').title()
+                        html_parts.append(f"<tr><td>{nome_fmt}</td><td style='font-size: 5.0pt; text-align: left;'>{formula}</td><td class='text-right'>{v}</td><td class='text-right'>{v_ant}</td><td class='text-right'>{var_str}</td></tr>")
+                        if var is not None and abs(var) > 0.01:
+                            direcao = "aumento" if a > b else "redução"
+                            textos.append(f"<li>{nome_fmt}: {direcao} de {b:.2f} para {a:.2f} ({var:+.2f}%).</li>")
+                            labels_liq.append(nome_fmt)
+                            vals_liq_atual.append(a)
+                            vals_liq_ant.append(b)
                     html_parts.append("</tbody></table>")
-                    html_parts.append("<h3>Estrutura Patrimonial</h3><table><thead><tr><th>INDICADOR</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    
+                    # ---- ESTRUTURA ----
+                    html_parts.append("<h3>Estrutura Patrimonial</h3>")
+                    html_parts.append("<table style='table-layout: fixed; width: 100%;'><thead><tr>")
+                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>FÓRMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
+                    html_parts.append("</tr></thead><tbody>")
                     for k, v in est.items():
                         v_ant = est_ant.get(k, "-")
-                        html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{v}</td><td class='text-right'>{v_ant}</td><td class='text-right'>-</td></tr>")
+                        a, b, var = fmt_var(v, v_ant)
+                        var_str = f"{var:+.2f}%" if var is not None else "-"
+                        formula = formula_est(k)
+                        nome_fmt = k.replace('_', ' ').title()
+                        html_parts.append(f"<tr><td>{nome_fmt}</td><td style='font-size: 5.0pt; text-align: left;'>{formula}</td><td class='text-right'>{v}</td><td class='text-right'>{v_ant}</td><td class='text-right'>{var_str}</td></tr>")
+                        if var is not None and abs(var) > 0.01:
+                            direcao = "aumento" if a > b else "redução"
+                            textos.append(f"<li>{nome_fmt}: {direcao} de {b:.2f} para {a:.2f} ({var:+.2f}%).</li>")
                     html_parts.append("</tbody></table>")
+                    
+                    # ---- TEXTOS DINAMICOS ----
+                    if textos:
+                        html_parts.append("<h3>Evolução dos Indicadores</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                    else:
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os períodos.</p>")
+                    
+                    # ---- GRAFICO DE BARRAS ----
+                    if labels_liq:
+                        html_parts.append("<div class='grafico' style='max-width: 500px; height: 220px; margin: 10px auto;'><canvas id='chartLiquidez' style='width:100%; height:100%;'></canvas></div>")
+                        html_parts.append("<script>")
+                        html_parts.append("new Chart(document.getElementById('chartLiquidez'), {")
+                        html_parts.append("type: 'bar',")
+                        html_parts.append(f"data: {{ labels: {json.dumps(labels_liq, ensure_ascii=False)}, datasets: [")
+                        html_parts.append(f"{{ label: 'Atual', data: {json.dumps(vals_liq_atual)}, backgroundColor: '#004b8d' }},")
+                        html_parts.append(f"{{ label: 'Anterior', data: {json.dumps(vals_liq_ant)}, backgroundColor: '#6c757d' }}")
+                        html_parts.append("] },")
+                        html_parts.append("options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { x: { ticks: { font: { size: 7 } } }, y: { ticks: { font: { size: 7 } } } } }")
+                        html_parts.append("});")
+                        html_parts.append("</script>")
                 
-                # 11. PANORAMA
+                
+                
+                
                 elif nome_interno == "Panorama de Resultados":
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Resumo executivo dos principais indicadores.</p>")
-                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
-                    for k, v in mod_dados.items():
-                        if isinstance(v, (int, float)):
-                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt(v)}</td></tr>")
-                    html_parts.append("</tbody></table>")
+                    
+                    # Funcao para formatar valores
+                    def fmt_pano(v):
+                        if v is None: return "-"
+                        if isinstance(v, str):
+                            # Se ja eh string formatada, retorna
+                            return v
+                        try:
+                            return f"R$ {float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        except (ValueError, TypeError):
+                            return str(v)
+                    
+                    # Funcao para extrair valor numerico
+                    def num(v):
+                        if v is None: return 0
+                        if isinstance(v, (int, float)): return float(v)
+                        try:
+                            return float(str(v).replace("R$", "").replace(".", "").replace(",", ".").strip())
+                        except ValueError:
+                            return 0
+                    
+                    # Estilo base das pilulas
+                    html_parts.append("""
+                    <style>
+                        .pano-pill { display: inline-block; border-radius: 30px; padding: 10px 20px; margin: 5px; font-family: 'Segoe UI', Arial, sans-serif; box-shadow: 0 2px 6px rgba(0,0,0,0.15); min-width: 150px; vertical-align: top; }
+                        .pano-pill .label { font-size: 7pt; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; margin-bottom: 3px; }
+                        .pano-pill .value { font-size: 10pt; font-weight: bold; }
+                        .pano-pill.azul { background: #004b8d; color: #fff; }
+                        .pano-pill.verde { background: #28a745; color: #fff; }
+                        .pano-pill.vermelho { background: #dc3545; color: #fff; }
+                        .pano-pill.cinza { background: #6c757d; color: #fff; }
+                        .pano-row { margin: 10px 0; }
+                        .pano-titulo { font-size: 8pt; font-weight: bold; color: #003366; margin-top: 15px; margin-bottom: 5px; text-transform: uppercase; }
+                    </style>
+                    """)
+                    
+                    # Extrai os valores
+                    ativo_total = mod_dados.get("ativo_total") or mod_dados.get("ativo_total", 0)
+                    passivo_total = mod_dados.get("passivo_total") or mod_dados.get("passivo_total", 0)
+                    pl = mod_dados.get("patrimonio_liquido") or mod_dados.get("patrimonio_liquido", 0)
+                    caixa = mod_dados.get("caixa") or mod_dados.get("caixa", 0)
+                    receita = mod_dados.get("receita_realizada") or mod_dados.get("receita_realizada", 0)
+                    despesa = mod_dados.get("despesa_empenhada") or mod_dados.get("despesa_empenhada", 0)
+                    sup_orc = mod_dados.get("superavit_orcamentario") or mod_dados.get("superavit_orcamentario", 0)
+                    sup_patr = mod_dados.get("superavit_patrimonial") or mod_dados.get("superavit_patrimonial", 0)
+                    sup_fin = mod_dados.get("superavit_financeiro") or mod_dados.get("superavit_financeiro", 0)
+                    
+                    # Se veio no formato "dados" aninhado
+                    if isinstance(mod_dados.get("dados"), dict):
+                        d = mod_dados["dados"]
+                        ativo_total = d.get("ativo_total", ativo_total)
+                        passivo_total = d.get("passivo_total", passivo_total)
+                        pl = d.get("patrimonio_liquido", pl)
+                        caixa = d.get("caixa", caixa)
+                        receita = d.get("receita_realizada", receita)
+                        despesa = d.get("despesa_empenhada", despesa)
+                        sup_orc = d.get("superavit_orcamentario", sup_orc)
+                        sup_patr = d.get("superavit_patrimonial", sup_patr)
+                        sup_fin = d.get("superavit_financeiro", sup_fin)
+                    
+                    # Linha 1: Balanco Patrimonial
+                    html_parts.append("<div class='pano-titulo'>Balanço Patrimonial</div>")
+                    html_parts.append("<div class='pano-row'>")
+                    html_parts.append(f"<div class='pano-pill azul'><div class='label'>Ativo Total</div><div class='value'>{fmt_pano(ativo_total)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill cinza'><div class='label'>Passivo Total</div><div class='value'>{fmt_pano(passivo_total)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill verde'><div class='label'>Patrimônio Líquido</div><div class='value'>{fmt_pano(pl)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill azul'><div class='label'>Caixa</div><div class='value'>{fmt_pano(caixa)}</div></div>")
+                    html_parts.append("</div>")
+                    
+                    # Linha 2: Resultados
+                    html_parts.append("<div class='pano-titulo'>Resultados e Superávits</div>")
+                    html_parts.append("<div class='pano-row'>")
+                    html_parts.append(f"<div class='pano-pill azul'><div class='label'>Receita Realizada</div><div class='value'>{fmt_pano(receita)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill vermelho'><div class='label'>Despesa Empenhada</div><div class='value'>{fmt_pano(despesa)}</div></div>")
+                    html_parts.append("</div>")
+                    html_parts.append("<div class='pano-row'>")
+                    # Superavits com cor condicional
+                    def cor_superavit(v):
+                        n = num(v)
+                        return "verde" if n >= 0 else "vermelho"
+                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_orc)}'><div class='label'>Superávit Orçamentário</div><div class='value'>{fmt_pano(sup_orc)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_patr)}'><div class='label'>Superávit Patrimonial</div><div class='value'>{fmt_pano(sup_patr)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_fin)}'><div class='label'>Superávit Financeiro</div><div class='value'>{fmt_pano(sup_fin)}</div></div>")
+                    html_parts.append("</div>")
+                    
+                    # Texto dinamico explicativo
+                    textos = []
+                    if num(sup_orc) < 0:
+                        textos.append(f"<li>O resultado orçamentário apresentou déficit de {fmt_pano(abs(num(sup_orc)))}.</li>")
+                    elif num(sup_orc) > 0:
+                        textos.append(f"<li>O resultado orçamentário apresentou superávit de {fmt_pano(sup_orc)}.</li>")
+                    
+                    if num(sup_patr) > 0:
+                        textos.append(f"<li>O resultado patrimonial foi positivo em {fmt_pano(sup_patr)}.</li>")
+                    elif num(sup_patr) < 0:
+                        textos.append(f"<li>O resultado patrimonial foi negativo em {fmt_pano(abs(num(sup_patr)))}.</li>")
+                    
+                    if num(sup_fin) > 0:
+                        textos.append(f"<li>O superávit financeiro foi de {fmt_pano(sup_fin)}.</li>")
+                    elif num(sup_fin) < 0:
+                        textos.append(f"<li>O déficit financeiro foi de {fmt_pano(abs(num(sup_fin)))}.</li>")
+                    
+                    if textos:
+                        html_parts.append("<h3>Análise dos Resultados</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                 
-                # 12. CENTRO DE CUSTOS
+                
                 elif nome_interno == "Análise por Centro de Custos":
                     centros = mod_dados.get("centros", [])
                     centros_ant = mod_dados.get("centros_anterior", [])
