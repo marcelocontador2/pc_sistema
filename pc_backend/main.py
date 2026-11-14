@@ -9825,20 +9825,20 @@ def gerar_pdf_relatorio_consolidado(id: int):
     }
     
     ordem_modelo = [
-        ("Integridade entre Demonstrações", "1. Integridade entre Demonstrações"),
-        ("Análise BP", "2. Análise do Balanço Patrimonial"),
-        ("Análise Orçamentária (BO)", "3. Análise do Balanço Orçamentário"),
-        ("Análise Financeira (BF)", "4. Análise do Balanço Financeiro"),
-        ("Análise DFC", "5. Análise do Fluxo de Caixa"),
-        ("Análise Patrimonial (DVP)", "6. Análise das Variações Patrimoniais"),
-        ("Demonstração das Mutações do PL (DMPL)", "7. Demonstração das Mutações do Patrimônio Líquido (DMPL)"),
-        ("Comparativo de Receitas", "8. Comparativo de Receitas"),
-        ("Comparativo de Despesas", "9. Comparativo de Despesas"),
-        ("Índices de Liquidez", "10. Índices de Liquidez e Estrutura"),
-        ("Panorama de Resultados", "11. Panorama de Resultados"),
-        ("Análise por Centro de Custos", "12. Análise por Centro de Custos"),
-        ("Custo de Pessoal", "13. Custo de Pessoal"),
-        ("Conferência das Demonstrações", "14. Conferência das Demonstrações")
+        ("Conferência das Demonstrações", "1. Conferência das Demonstrações"),
+        ("Integridade entre Demonstrações", "2. Integridade entre Demonstrações"),
+        ("Análise BP", "3. Análise do Balanço Patrimonial"),
+        ("Análise Orçamentária (BO)", "4. Análise do Balanço Orçamentário"),
+        ("Análise Financeira (BF)", "5. Análise do Balanço Financeiro"),
+        ("Análise DFC", "6. Análise do Fluxo de Caixa"),
+        ("Análise Patrimonial (DVP)", "7. Análise das Variações Patrimoniais"),
+        ("Demonstração das Mutações do PL (DMPL)", "8. Demonstração das Mutações do Patrimônio Líquido (DMPL)"),
+        ("Comparativo de Receitas", "9. Comparativo de Receitas"),
+        ("Comparativo de Despesas", "10. Comparativo de Despesas"),
+        ("Índices de Liquidez", "11. Índices de Liquidez e Estrutura"),
+        ("Panorama de Resultados", "12. Panorama de Resultados"),
+        ("Análise por Centro de Custos", "13. Análise por Centro de Custos"),
+        ("Custo de Pessoal", "14. Custo de Pessoal"),
     ]
     
     try:
@@ -10715,22 +10715,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os períodos.</p>")
                     
                     # ---- GRAFICO DE BARRAS ----
-                    if labels_liq:
-                        html_parts.append("<div class='grafico' style='max-width: 500px; height: 220px; margin: 10px auto;'><canvas id='chartLiquidez' style='width:100%; height:100%;'></canvas></div>")
-                        html_parts.append("<script>")
-                        html_parts.append("new Chart(document.getElementById('chartLiquidez'), {")
-                        html_parts.append("type: 'bar',")
-                        html_parts.append(f"data: {{ labels: {json.dumps(labels_liq, ensure_ascii=False)}, datasets: [")
-                        html_parts.append(f"{{ label: 'Atual', data: {json.dumps(vals_liq_atual)}, backgroundColor: '#004b8d' }},")
-                        html_parts.append(f"{{ label: 'Anterior', data: {json.dumps(vals_liq_ant)}, backgroundColor: '#6c757d' }}")
-                        html_parts.append("] },")
-                        html_parts.append("options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { x: { ticks: { font: { size: 7 } } }, y: { ticks: { font: { size: 7 } } } } }")
-                        html_parts.append("});")
-                        html_parts.append("</script>")
-                
-                
-                
-                
+                    
                 elif nome_interno == "Panorama de Resultados":
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Resumo executivo dos principais indicadores.</p>")
                     
@@ -10842,32 +10827,182 @@ def gerar_pdf_relatorio_consolidado(id: int):
                 elif nome_interno == "Análise por Centro de Custos":
                     centros = mod_dados.get("centros", [])
                     centros_ant = mod_dados.get("centros_anterior", [])
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Distribuição das despesas por centro de custo.</p>")
+                    
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Distribuição das despesas (Atual vs. Anterior)</p>")
+                    
+                    # --- TABELA ---
                     html_parts.append("<table><thead><tr><th>CENTRO DE CUSTO</th><th>ATUAL</th><th>ANTERIOR</th><th>VARIAÇÃO</th></tr></thead><tbody>")
-                    for i, c in enumerate(centros):
-                        valor_atual = c.get("valor", 0)
-                        valor_ant = centros_ant[i].get("valor", 0) if i < len(centros_ant) else 0
-                        var = calc_var(valor_atual, valor_ant)
-                        html_parts.append(f"<tr><td>{c.get('nome','')}</td><td class='text-right'>{fmt(valor_atual)}</td><td class='text-right'>{fmt(valor_ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                    for c in centros:
+                        nome = c.get('nome', '')
+                        valor = c.get('valor', 0)
+                        ant = 0
+                        for ca in centros_ant:
+                            if ca.get('nome') == nome:
+                                ant = ca.get('valor', 0)
+                                break
+                        var = ((valor - ant) / ant * 100) if ant > 0 else 0
+                        cor_var = '#28a745' if var >= 0 else '#dc3545'
+                        html_parts.append(f"<tr><td>{nome}</td><td class='text-right'>{fmt(valor)}</td><td class='text-right'>{fmt(ant)}</td><td class='text-right' style='color:{cor_var}; font-weight:bold;'>{var:+.2f}%</td></tr>")
                     html_parts.append("</tbody></table>")
+                    
+                    # Texto do maior centro de custo
                     if centros:
-                        maior = max(centros, key=lambda x: x.get("valor", 0))
-                        html_parts.append(f"<p class='texto-dinamico'>O maior centro de custo é {maior.get('nome')} com {fmt(maior.get('valor'))}.</p>")
+                        maior = max(centros, key=lambda x: x.get('valor', 0))
+                        html_parts.append(f"<p class='texto-dinamico'>O maior centro de custo é <strong>{maior.get('nome')}</strong> com {fmt(maior.get('valor'))}.</p>")
+                    
+                    # --- GRÁFICO ESTILO MODELO ---
+                    if centros:
+                        centros_ordenados = sorted(centros, key=lambda x: x.get('valor', 0), reverse=True)
+                        labels = []
+                        vals_atual = []
+                        vals_ant = []
+                        
+                        for c in centros_ordenados:
+                            nome_completo = c.get('nome', '')
+                            # Abrevia o nome para exibição (ex: "AF 01 Fisc")
+                            partes = nome_completo.split(' - ')
+                            if len(partes) >= 2:
+                                # Pega a parte do meio e a última parte (abreviada)
+                                meio = partes[1].split(' ')[:2]  # Ex: "AF 01"
+                                nome_abrev = ' '.join(meio)
+                            else:
+                                nome_abrev = nome_completo[:15]
+                            
+                            labels.append(nome_abrev)
+                            vals_atual.append(c.get('valor', 0))
+                            
+                            ant_c = 0
+                            for ca in centros_ant:
+                                if ca.get('nome') == nome_completo:
+                                    ant_c = ca.get('valor', 0)
+                                    break
+                            vals_ant.append(ant_c)
+                        
+                        # Calcula as variações para mostrar em cima
+                        variacoes = []
+                        for i in range(len(vals_atual)):
+                            if vals_ant[i] > 0:
+                                variacoes.append(((vals_atual[i] - vals_ant[i]) / vals_ant[i]) * 100)
+                            else:
+                                variacoes.append(0)
+                        
+                        html_parts.append("<h3>Distribuição por Centro de Custo</h3>")
+                        html_parts.append("<div class='grafico' style='max-width: 750px; height: 350px; margin: 15px auto;'><canvas id='chartCentroCustos' style='width:100%; height:100%;'></canvas></div>")
+                        html_parts.append("<script>")
+                        html_parts.append("new Chart(document.getElementById('chartCentroCustos'), {")
+                        html_parts.append("type: 'bar',")
+                        html_parts.append(f"data: {{ labels: {json.dumps(labels, ensure_ascii=False)}, datasets: [")
+                        html_parts.append(f"{{ label: 'Atual', data: {json.dumps(vals_atual)}, backgroundColor: '#004b8d', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 }},")
+                        html_parts.append(f"{{ label: 'Anterior', data: {json.dumps(vals_ant)}, backgroundColor: '#adb5bd', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.8 }}")
+                        html_parts.append("] },")
+                        html_parts.append(f"""
+                        options: {{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            layout: {{ padding: {{ top: 30 }} }},
+                            plugins: {{
+                                legend: {{ position: 'top', labels: {{ font: {{ size: 9 }}, usePointStyle: true, pointStyle: 'rectRounded' }} }},
+                                tooltip: {{
+                                    backgroundColor: '#003366',
+                                    titleFont: {{ size: 10, weight: 'bold' }},
+                                    bodyFont: {{ size: 9 }},
+                                    padding: 10,
+                                    cornerRadius: 6,
+                                    callbacks: {{
+                                        label: function(ctx) {{
+                                            return ctx.dataset.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
+                                        }}
+                                    }}
+                                }}
+                            }},
+                            scales: {{
+                                x: {{
+                                    grid: {{ display: false }},
+                                    ticks: {{ font: {{ size: 7 }}, maxRotation: 0, minRotation: 0 }}
+                                }},
+                                y: {{
+                                    beginAtZero: true,
+                                    grid: {{ color: 'rgba(0,0,0,0.05)' }},
+                                    ticks: {{
+                                        font: {{ size: 8 }},
+                                        callback: function(value) {{
+                                            if (value >= 1000000) return 'R$ ' + (value/1000000).toFixed(0) + 'M';
+                                            if (value >= 1000) return 'R$ ' + (value/1000).toFixed(0) + 'K';
+                                            return 'R$ ' + value;
+                                        }}
+                                    }}
+                                }}
+                            }}
+                        }}
+                        """)
+                        html_parts.append("});")
+                        html_parts.append("</script>")
                 
-                # 13. CUSTO DE PESSOAL
                 elif nome_interno == "Custo de Pessoal":
+                    # Valores do JSON
+                    rcl_atual = mod_dados.get("rcl_atual", 0) or 0
+                    rcl_anterior = mod_dados.get("rcl_anterior", 0) or 0
+                    rcl_total = mod_dados.get("rcl_total", 0) or 0
+                    pessoal_atual = mod_dados.get("pessoal_atual", 0) or 0
+                    pessoal_anterior = mod_dados.get("pessoal_anterior", 0) or 0
+                    pessoal_total = mod_dados.get("pessoal_total", 0) or 0
+                    outras_atual = mod_dados.get("outras_atual", 0) or 0
+                    outras_anterior = mod_dados.get("outras_anterior", 0) or 0
+                    outras_total = mod_dados.get("outras_total", 0) or 0
+                    terc_atual = mod_dados.get("terc_atual", 0) or 0
+                    terc_anterior = mod_dados.get("terc_anterior", 0) or 0
+                    terc_total = mod_dados.get("terc_total", 0) or 0
+                    custo_atual = mod_dados.get("custo_atual", 0) or 0
+                    custo_anterior = mod_dados.get("custo_anterior", 0) or 0
+                    custo_total = mod_dados.get("custo_total", 0) or 0
+                    limite_total = mod_dados.get("limite_total", 0) or 0
+                    margem_total = mod_dados.get("margem_disponivel_total", 0) or 0
+                    pct_custo = mod_dados.get("pct_custo_total", 0) or 0
+                    faixa_controle = mod_dados.get("faixa_controle", "N/A") or "N/A"
+                    faixa_cor = mod_dados.get("faixa_cor", "success") or "success"
+                    
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Custo de pessoal x limite legal (Resolução Cofen 814/2026).</p>")
-                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
-                    html_parts.append(f"<tr><td>RCL Total</td><td class='text-right'>{fmt(mod_dados.get('rcl_total'))}</td></tr>")
-                    html_parts.append(f"<tr><td>Custo Total</td><td class='text-right'>{fmt(mod_dados.get('custo_total'))}</td></tr>")
-                    html_parts.append(f"<tr><td>Limite Legal (50%)</td><td class='text-right'>{fmt(mod_dados.get('limite_total'))}</td></tr>")
-                    html_parts.append(f"<tr><td>Margem Disponível</td><td class='text-right'>{fmt(mod_dados.get('margem_disponivel_total'))}</td></tr>")
-                    html_parts.append(f"<tr><td>% Custo sobre RCL</td><td class='text-right'>{mod_dados.get('pct_custo_total', 0):.2f}%</td></tr>")
+                    
+                    # --- TABELA 1: COMPOSIÇÃO DO CUSTO ---
+                    html_parts.append("<h3>Composição do Custo</h3>")
+                    html_parts.append("<table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>TOTAL</th></tr></thead><tbody>")
+                    html_parts.append(f"<tr><td>Pessoal e Encargos</td><td class='text-right'>{fmt(pessoal_atual)}</td><td class='text-right'>{fmt(pessoal_anterior)}</td><td class='text-right'>{fmt(pessoal_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>Outras Despesas Variáveis</td><td class='text-right'>{fmt(outras_atual)}</td><td class='text-right'>{fmt(outras_anterior)}</td><td class='text-right'>{fmt(outras_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>Terceirização</td><td class='text-right'>{fmt(terc_atual)}</td><td class='text-right'>{fmt(terc_anterior)}</td><td class='text-right'>{fmt(terc_total)}</td></tr>")
+                    html_parts.append(f"<tr style='font-weight:bold; background:#e9ecef;'><td>CUSTO TOTAL (Bruto)</td><td class='text-right'>{fmt(custo_atual)}</td><td class='text-right'>{fmt(custo_anterior)}</td><td class='text-right'>{fmt(custo_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>RCL Total (12 meses)</td><td class='text-right'>{fmt(rcl_atual)}</td><td class='text-right'>{fmt(rcl_anterior)}</td><td class='text-right'>{fmt(rcl_total)}</td></tr>")
                     html_parts.append("</tbody></table>")
-                    pct_custo = mod_dados.get("pct_custo_total", 0)
-                    html_parts.append(f"<p class='texto-dinamico'>O custo de pessoal representa {pct_custo:.2f}% da RCL.</p>")
+                    
+                    # --- TABELA 2: LIMITE E MARGEM ---
+                    html_parts.append("<h3>Limite e Margem</h3>")
+                    html_parts.append("<table><thead><tr><th>ITEM</th><th>VALOR</th></tr></thead><tbody>")
+                    html_parts.append(f"<tr><td>Limite Legal Aplicável</td><td class='text-right'>{fmt(limite_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>Margem Disponível</td><td class='text-right'>{fmt(margem_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>% Custo sobre RCL</td><td class='text-right' style='font-weight:bold;'>{pct_custo:.2f}%</td></tr>")
+                    html_parts.append(f"<tr><td>Faixa de Controle</td><td class='text-right' style='color:#{('28a745' if faixa_cor == 'success' else ('dc3545' if faixa_cor == 'danger' else 'ffc107'))}; font-weight:bold;'>{faixa_controle}</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    
+                    # --- TABELA 3: APURAÇÃO CONSOLIDADA ---
+                    html_parts.append("<h3>Apuração Consolidada 12 meses</h3>")
+                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR (R$)</th><th>% DA RCL</th></tr></thead><tbody>")
+                    html_parts.append(f"<tr><td>Receita Corrente Líquida (RCL)</td><td class='text-right'>{fmt(rcl_total)}</td><td class='text-right'>100,00%</td></tr>")
+                    html_parts.append(f"<tr><td>(-) Custo de Pessoal (Bruto)</td><td class='text-right'>{fmt(custo_total)}</td><td class='text-right'>{pct_custo:.2f}%</td></tr>")
+                    pct_margem = (margem_total / rcl_total * 100) if rcl_total > 0 else 0
+                    html_parts.append(f"<tr><td>(=) Margem Disponível (Limite - Custo)</td><td class='text-right'>{fmt(margem_total)}</td><td class='text-right'>{pct_margem:.2f}%</td></tr>")
+                    html_parts.append(f"<tr><td>Limite Resolução Cofen 814/2026 (50,00% da RCL)</td><td class='text-right'>{fmt(limite_total)}</td><td class='text-right'>50,00%</td></tr>")
+                    html_parts.append(f"<tr style='font-weight:bold;'><td>Situação (COFEN)</td><td class='text-right'></td><td class='text-right'>{pct_custo:.2f}%</td></tr>")
+                    html_parts.append("</tbody></table>")
+                    
+                    
+                    # --- TEXTO DINÂMICO FINAL ---
+                    if pct_custo <= 50:
+                        html_parts.append(f"<p class='texto-dinamico'><strong>Análise:</strong> O custo de pessoal representa {pct_custo:.2f}% da RCL, estando dentro do limite legal de 50% (margem disponível de {fmt(margem_total)}). Situação: {faixa_controle}.</p>")
+                    else:
+                        html_parts.append(f"<p class='texto-dinamico'><strong>Análise:</strong> O custo de pessoal representa {pct_custo:.2f}% da RCL, acima do limite legal de 50%. Excesso de {fmt(custo_total - limite_total)}. Situação: {faixa_controle}.</p>")
                 
-                # 14. CONFERÊNCIA
+                
+                
+                
                 elif nome_interno == "Conferência das Demonstrações":
                     analises = mod_dados.get("analises", [])
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Verificação da consistência das demonstrações contábeis.</p>")
