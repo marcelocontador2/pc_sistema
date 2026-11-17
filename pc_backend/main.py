@@ -62,6 +62,9 @@ from pc_backend.app.routers import despesas
 app.include_router(despesas.router)
 from pc_backend.app.routers import conferencia
 app.include_router(conferencia.router)
+from pc_backend.app.routers import integridade
+app.include_router(integridade.router)
+
 
 
 
@@ -884,40 +887,40 @@ async def criar_tabela_integridade():
     conn.commit()
     conn.close()
 # Rota que CHAMA a analise, pega o resultado e SALVA no banco
-@app.get("/historico_integridade")
-async def listar_historico():
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''
+# @app.get("/historico_integridade")
+# async def listar_historico():
+#     try:
+#         conn = sqlite3.connect(DB_PATH)
+#         cursor = conn.cursor()
+#         cursor.execute('''
 
-            SELECT id, periodo, data_geracao FROM historico_integridade
+#             SELECT id, periodo, data_geracao FROM historico_integridade
 
-            ORDER BY id DESC
+#             ORDER BY id DESC
 
-        ''')
-        rows = cursor.fetchall()
-        conn.close()
-        historico = []
-        for r in rows:
-            historico.append({"id": r[0], "periodo": r[1], "data_geracao": r[2]})
-        return historico
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-# Rota que abre um histí³rico especifico pelo ID
-@app.get("/historico_integridade/{id}")
-async def buscar_historico(id: int):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = ?''', (id,))
-        row = cursor.fetchone()
-        conn.close()
-        if not row:
-            raise HTTPException(status_code=404, detail="Historico nao encontrado")
-        return json.loads(row[0])
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+#         ''')
+#         rows = cursor.fetchall()
+#         conn.close()
+#         historico = []
+#         for r in rows:
+#             historico.append({"id": r[0], "periodo": r[1], "data_geracao": r[2]})
+#         return historico
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+# # Rota que abre um histí³rico especifico pelo ID
+# @app.get("/historico_integridade/{id}")
+# async def buscar_historico(id: int):
+#     try:
+#         conn = sqlite3.connect(DB_PATH)
+#         cursor = conn.cursor()
+#         cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = ?''', (id,))
+#         row = cursor.fetchone()
+#         conn.close()
+#         if not row:
+#             raise HTTPException(status_code=404, detail="Historico nao encontrado")
+#         return json.loads(row[0])
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 @app.get("/lista_periodos")
 async def lista_periodos():
     import glob, os
@@ -952,10 +955,10 @@ import os as _os
 #     from fastapi.responses import FileResponse
 #     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
 #     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
-@app.get("/integridade")
-async def serve_integridade():
-    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")
-    return FileResponse(caminho)
+# @app.get("/integridade")
+# async def serve_integridade():
+#     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")
+#     return FileResponse(caminho)
 @app.get("/api/ler_relatorio/{tipo}")
 async def ler_relatorio_csv(tipo: str):
     import os, glob, csv
@@ -1434,311 +1437,311 @@ async def excluir_panorama(id: int):
 # =======================================================
 # ROTAS ISOLADAS: INTEGRIDADE (Tabela historico_integridade_matriz)
 # =======================================================
-@app.get("/api/integridade_matriz/{periodo}")
-async def api_integridade_matriz_calcular(periodo: str):
-    import json
-    import psycopg2
+# @app.get("/api/integridade_matriz/{periodo}")
+# async def api_integridade_matriz_calcular(periodo: str):
+#     import json
+#     import psycopg2
     
-    # Definição local para garantir que a variável exista no escopo
-    from .config import PG_CONFIG
+#     # Definição local para garantir que a variável exista no escopo
+#     from .config import PG_CONFIG
     
-    try:
-        # Tenta primeiro buscar o último histórico salvo no PostgreSQL
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute("SELECT resultado_json FROM historico_integridade_matriz ORDER BY id DESC LIMIT 1")
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        if row:
-            # Se encontrou histórico, retorna exatamente o JSON salvo
-            return json.loads(row[0])
-            
-        # Se não encontrou, tenta calcular via CSVs (fallback)
-        from .matriz_integridade import gerar_matriz
-        dados = gerar_matriz(periodo)
-        return dados
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
-
-@app.post("/api/integridade_matriz/{periodo}/salvar")
-async def salvar_integridade_matriz(periodo: str, request: Request):
-    import json
-    from datetime import datetime
-    import psycopg2
-    
-    # Definição local para garantir que a variável exista no escopo
-    from .config import PG_CONFIG
-    
-    try:
-        body = await request.json()
-        matriz = body.get("matriz", [])
-        justificativas = body.get("justificativas", {})
-        
-        dados_matriz = {
-            "periodo": periodo,
-            "matriz": matriz,
-            "justificativas": justificativas
-        }
-        
-        data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        
-        # Garante que a tabela exista no Postgres
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
-                id SERIAL PRIMARY KEY, 
-                periodo TEXT, 
-                data_geracao TEXT, 
-                resultado_json TEXT
-            )
-        """)
-        
-        cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
-            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
-    
-    try:
-        body = await request.json()
-        matriz = body.get("matriz", [])
-        justificativas = body.get("justificativas", {})
-        
-        dados_matriz = {
-            "periodo": periodo,
-            "matriz": matriz,
-            "justificativas": justificativas
-        }
-        
-        data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        
-        # Garante que a tabela exista no Postgres
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
-                id SERIAL PRIMARY KEY, 
-                periodo TEXT, 
-                data_geracao TEXT, 
-                resultado_json TEXT
-            )
-        """)
-        
-        cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
-            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
-        
-        dados_matriz = {
-            "periodo": periodo,
-            "matriz": matriz,
-            "justificativas": justificativas
-        }
-        
-        data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        
-        # Cria a tabela se não existir no Postgres
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
-                id SERIAL PRIMARY KEY, 
-                periodo TEXT, 
-                data_geracao TEXT, 
-                resultado_json TEXT
-            )
-        """)
-        
-        cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
-            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
-
-@app.get("/historico_integridade_matriz")
-def listar_integridade_matriz():
-    import json
-    import psycopg2
-    
-    from .config import PG_CONFIG
-    
-    try:
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_integridade_matriz ORDER BY id DESC")
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
-
-        resultado = []
-        for r in rows:
-            resultado.append({
-                "id": r[0],
-                "periodo": r[1],
-                "data_geracao": r[2],
-                "dados": r[3]
-            })
-        return Response(content=json.dumps(resultado), media_type="application/json")
-    except Exception as e:
-        return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
-        return Response(content=json.dumps(resultado), media_type="application/json")
-    except Exception as e:
-        return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
-
-@app.get("/historico_integridade_matriz/{id}")
-async def buscar_integridade_matriz(id: int):
-    import json
-    import psycopg2
-    
-    # Definição local para garantir que a variável exista
-    from .config import PG_CONFIG
-    
-    try:
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = %s", (id,))
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        if not row: 
-            raise HTTPException(status_code=404, detail="Não encontrado")
-            
-        return json.loads(row[0])
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
-
-@app.post("/excluir_multiplos_integridade_matriz")
-async def excluir_integridade_matriz(request: Request):
-    try:
-        body = await request.json()
-        ids = body.get("ids", [])
-        if not ids:
-            return {"ok": False, "mensagem": "Nenhum ID fornecido."}
-            
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        
-        # Formata os IDs para o IN do SQL
-        placeholders = ','.join(['%s'] * len(ids))
-        cursor.execute(f"DELETE FROM historico_integridade_matriz WHERE id IN ({placeholders})", tuple(ids))
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return {"ok": True, "mensagem": "Excluído com sucesso!"}
-    except Exception as e:
-        return {"ok": False, "mensagem": str(e)}
-
-# @app.get("/gerar_pdf_conferencia/{id}")
-# async def gerar_pdf_conferencia(id: int):
 #     try:
-#         from fastapi.responses import Response
-#         from fpdf import FPDF
-#         from fpdf.enums import XPos, YPos
-#         import sqlite3, json, os
-#         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-#         conn = sqlite3.connect(db_path)
+#         # Tenta primeiro buscar o último histórico salvo no PostgreSQL
+#         conn = psycopg2.connect(**PG_CONFIG)
 #         cursor = conn.cursor()
-#         cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_conferencia WHERE id = ?", (id,))
+#         cursor.execute("SELECT resultado_json FROM historico_integridade_matriz ORDER BY id DESC LIMIT 1")
 #         row = cursor.fetchone()
+#         cursor.close()
 #         conn.close()
-#         if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
-#         periodo, data_geracao, json_str = row
-#         dados = json.loads(json_str)
-#         analises = dados.get("analises", [])
-#         pdf = FPDF(orientation='P', unit='mm', format='A4')
-#         pdf.add_page()
-#         pdf.set_font("helvetica", "B", 16)
-#         pdf.set_text_color(0, 51, 102)
-#         pdf.cell(0, 10, f"Conferencia das Demonstracoes - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-#         pdf.set_font("helvetica", "I", 10)
-#         pdf.set_text_color(100, 100, 100)
-#         pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-#         pdf.ln(10)
-#         for a in analises:
-#             cor = (0, 128, 0) if a["status"] == "OK" else (255, 0, 0)
-#             pdf.set_font("helvetica", "B", 12)
-#             pdf.set_text_color(51, 51, 51)
-#             pdf.cell(0, 8, a["titulo"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-#             pdf.set_font("helvetica", "", 9)
-#             pdf.set_text_color(80, 80, 80)
-#             pdf.multi_cell(0, 5, a["conceito"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-#             pdf.ln(2)
-#             for item in a["tabela"]:
-#                 pdf.cell(100, 6, item["label"], border=1)
-#                 pdf.cell(0, 6, item["valor"], border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-#             pdf.set_font("helvetica", "B", 9)
-#             pdf.set_text_color(*cor)
-#             pdf.multi_cell(0, 6, a["mensagem"], border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-#             pdf.ln(8)
-#         pdf_bytes = pdf.output()
-#         return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Conferencia_{periodo.replace('-', '_')}.pdf"})
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-# # PDF da Integridade (Tabela historico_integridade_matriz)
-# async def api_analise_orcamentaria_bo(periodo: str):
-#     try:
-#         # === REGRA DE INTEGRIDADE ===
-#         from .matriz_integridade import _get_csv
-#         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
-#         if not caminho_check or not os.path.exists(caminho_check):
-#             return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
-#         from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
-#         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
-#         if not caminho or not os.path.exists(caminho):
-#             return {"erro": True, "mensagem": f"BO do perí­odo {periodo} não foi importado."}
-#         linhas = _ler_linhas(caminho)
-#         def buscar(termo, col, apos=0):
-#             for i, p in enumerate(linhas):
-#                 if i < apos or not p: continue
-#                 if termo.upper() in p[0].strip().upper() and len(p) > col:
-#                     return abs(_limpar_valor(p[col]))
-#             return 0.0
-#         receita = buscar("SUB-TOTAL DAS RECEITAS", 6)
-#         receita_orc = buscar("SUB-TOTAL DAS RECEITAS", 5)
-#         empenhada = buscar("SUB-TOTAL DAS DESPESAS", 4)
-#         despesa_orc = buscar("SUB-TOTAL DAS DESPESAS", 3)
-#         idx_desp = next((i for i, p in enumerate(linhas) if p and "SUB-TOTAL DAS DESPESAS" in p[0].upper()), 0)
-#         restos = buscar("TOTAL:", 6, apos=idx_desp)
-#         return {
-#             "erro": False,
-#             "receita_realizada": receita,
-#             "despesa_empenhada": empenhada,
-#             "superavit": receita - empenhada,
-#             "restos_pagar": restos,
-#             "receita_orcada": receita_orc,
-#             "despesa_orcada": despesa_orc,
-#             "pct_receita": round(receita / receita_orc * 100, 2) if receita_orc else 0,
-#             "pct_despesa": round(empenhada / despesa_orc * 100, 2) if despesa_orc else 0,
-#         }
+        
+#         if row:
+#             # Se encontrou histórico, retorna exatamente o JSON salvo
+#             return json.loads(row[0])
+            
+#         # Se não encontrou, tenta calcular via CSVs (fallback)
+#         from .matriz_integridade import gerar_matriz
+#         dados = gerar_matriz(periodo)
+#         return dados
 #     except Exception as e:
 #         return {"erro": True, "mensagem": str(e)}
+
+# @app.post("/api/integridade_matriz/{periodo}/salvar")
+# async def salvar_integridade_matriz(periodo: str, request: Request):
+#     import json
+#     from datetime import datetime
+#     import psycopg2
+    
+#     # Definição local para garantir que a variável exista no escopo
+#     from .config import PG_CONFIG
+    
+#     try:
+#         body = await request.json()
+#         matriz = body.get("matriz", [])
+#         justificativas = body.get("justificativas", {})
+        
+#         dados_matriz = {
+#             "periodo": periodo,
+#             "matriz": matriz,
+#             "justificativas": justificativas
+#         }
+        
+#         data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+#         conn = psycopg2.connect(**PG_CONFIG)
+#         cursor = conn.cursor()
+        
+#         # Garante que a tabela exista no Postgres
+#         cursor.execute("""
+#             CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+#                 id SERIAL PRIMARY KEY, 
+#                 periodo TEXT, 
+#                 data_geracao TEXT, 
+#                 resultado_json TEXT
+#             )
+#         """)
+        
+#         cursor.execute(
+#             "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+#             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
+#         )
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+        
+#         return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
+    
+#     try:
+#         body = await request.json()
+#         matriz = body.get("matriz", [])
+#         justificativas = body.get("justificativas", {})
+        
+#         dados_matriz = {
+#             "periodo": periodo,
+#             "matriz": matriz,
+#             "justificativas": justificativas
+#         }
+        
+#         data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+#         conn = psycopg2.connect(**PG_CONFIG)
+#         cursor = conn.cursor()
+        
+#         # Garante que a tabela exista no Postgres
+#         cursor.execute("""
+#             CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+#                 id SERIAL PRIMARY KEY, 
+#                 periodo TEXT, 
+#                 data_geracao TEXT, 
+#                 resultado_json TEXT
+#             )
+#         """)
+        
+#         cursor.execute(
+#             "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+#             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
+#         )
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+        
+#         return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
+        
+#         dados_matriz = {
+#             "periodo": periodo,
+#             "matriz": matriz,
+#             "justificativas": justificativas
+#         }
+        
+#         data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+#         conn = psycopg2.connect(**PG_CONFIG)
+#         cursor = conn.cursor()
+        
+#         # Cria a tabela se não existir no Postgres
+#         cursor.execute("""
+#             CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
+#                 id SERIAL PRIMARY KEY, 
+#                 periodo TEXT, 
+#                 data_geracao TEXT, 
+#                 resultado_json TEXT
+#             )
+#         """)
+        
+#         cursor.execute(
+#             "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+#             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
+#         )
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+        
+#         return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
+
+# @app.get("/historico_integridade_matriz")
+# def listar_integridade_matriz():
+#     import json
+#     import psycopg2
+    
+#     from .config import PG_CONFIG
+    
+#     try:
+#         conn = psycopg2.connect(**PG_CONFIG)
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_integridade_matriz ORDER BY id DESC")
+#         rows = cursor.fetchall()
+#         cursor.close()
+#         conn.close()
+
+#         resultado = []
+#         for r in rows:
+#             resultado.append({
+#                 "id": r[0],
+#                 "periodo": r[1],
+#                 "data_geracao": r[2],
+#                 "dados": r[3]
+#             })
+#         return Response(content=json.dumps(resultado), media_type="application/json")
+#     except Exception as e:
+#         return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
+#         return Response(content=json.dumps(resultado), media_type="application/json")
+#     except Exception as e:
+#         return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
+
+# @app.get("/historico_integridade_matriz/{id}")
+# async def buscar_integridade_matriz(id: int):
+#     import json
+#     import psycopg2
+    
+#     # Definição local para garantir que a variável exista
+#     from .config import PG_CONFIG
+    
+#     try:
+#         conn = psycopg2.connect(**PG_CONFIG)
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = %s", (id,))
+#         row = cursor.fetchone()
+#         cursor.close()
+#         conn.close()
+        
+#         if not row: 
+#             raise HTTPException(status_code=404, detail="Não encontrado")
+            
+#         return json.loads(row[0])
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
+
+# @app.post("/excluir_multiplos_integridade_matriz")
+# async def excluir_integridade_matriz(request: Request):
+#     try:
+#         body = await request.json()
+#         ids = body.get("ids", [])
+#         if not ids:
+#             return {"ok": False, "mensagem": "Nenhum ID fornecido."}
+            
+#         conn = psycopg2.connect(**PG_CONFIG)
+#         cursor = conn.cursor()
+        
+#         # Formata os IDs para o IN do SQL
+#         placeholders = ','.join(['%s'] * len(ids))
+#         cursor.execute(f"DELETE FROM historico_integridade_matriz WHERE id IN ({placeholders})", tuple(ids))
+        
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+#         return {"ok": True, "mensagem": "Excluído com sucesso!"}
+#     except Exception as e:
+#         return {"ok": False, "mensagem": str(e)}
+
+# # @app.get("/gerar_pdf_conferencia/{id}")
+# # async def gerar_pdf_conferencia(id: int):
+# #     try:
+# #         from fastapi.responses import Response
+# #         from fpdf import FPDF
+# #         from fpdf.enums import XPos, YPos
+# #         import sqlite3, json, os
+# #         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+# #         conn = sqlite3.connect(db_path)
+# #         cursor = conn.cursor()
+# #         cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_conferencia WHERE id = ?", (id,))
+# #         row = cursor.fetchone()
+# #         conn.close()
+# #         if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+# #         periodo, data_geracao, json_str = row
+# #         dados = json.loads(json_str)
+# #         analises = dados.get("analises", [])
+# #         pdf = FPDF(orientation='P', unit='mm', format='A4')
+# #         pdf.add_page()
+# #         pdf.set_font("helvetica", "B", 16)
+# #         pdf.set_text_color(0, 51, 102)
+# #         pdf.cell(0, 10, f"Conferencia das Demonstracoes - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+# #         pdf.set_font("helvetica", "I", 10)
+# #         pdf.set_text_color(100, 100, 100)
+# #         pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+# #         pdf.ln(10)
+# #         for a in analises:
+# #             cor = (0, 128, 0) if a["status"] == "OK" else (255, 0, 0)
+# #             pdf.set_font("helvetica", "B", 12)
+# #             pdf.set_text_color(51, 51, 51)
+# #             pdf.cell(0, 8, a["titulo"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# #             pdf.set_font("helvetica", "", 9)
+# #             pdf.set_text_color(80, 80, 80)
+# #             pdf.multi_cell(0, 5, a["conceito"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# #             pdf.ln(2)
+# #             for item in a["tabela"]:
+# #                 pdf.cell(100, 6, item["label"], border=1)
+# #                 pdf.cell(0, 6, item["valor"], border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# #             pdf.set_font("helvetica", "B", 9)
+# #             pdf.set_text_color(*cor)
+# #             pdf.multi_cell(0, 6, a["mensagem"], border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# #             pdf.ln(8)
+# #         pdf_bytes = pdf.output()
+# #         return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Conferencia_{periodo.replace('-', '_')}.pdf"})
+# #     except Exception as e:
+# #         raise HTTPException(status_code=500, detail=str(e))
+# # # PDF da Integridade (Tabela historico_integridade_matriz)
+# # async def api_analise_orcamentaria_bo(periodo: str):
+# #     try:
+# #         # === REGRA DE INTEGRIDADE ===
+# #         from .matriz_integridade import _get_csv
+# #         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
+# #         if not caminho_check or not os.path.exists(caminho_check):
+# #             return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
+# #         from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+# #         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
+# #         if not caminho or not os.path.exists(caminho):
+# #             return {"erro": True, "mensagem": f"BO do perí­odo {periodo} não foi importado."}
+# #         linhas = _ler_linhas(caminho)
+# #         def buscar(termo, col, apos=0):
+# #             for i, p in enumerate(linhas):
+# #                 if i < apos or not p: continue
+# #                 if termo.upper() in p[0].strip().upper() and len(p) > col:
+# #                     return abs(_limpar_valor(p[col]))
+# #             return 0.0
+# #         receita = buscar("SUB-TOTAL DAS RECEITAS", 6)
+# #         receita_orc = buscar("SUB-TOTAL DAS RECEITAS", 5)
+# #         empenhada = buscar("SUB-TOTAL DAS DESPESAS", 4)
+# #         despesa_orc = buscar("SUB-TOTAL DAS DESPESAS", 3)
+# #         idx_desp = next((i for i, p in enumerate(linhas) if p and "SUB-TOTAL DAS DESPESAS" in p[0].upper()), 0)
+# #         restos = buscar("TOTAL:", 6, apos=idx_desp)
+# #         return {
+# #             "erro": False,
+# #             "receita_realizada": receita,
+# #             "despesa_empenhada": empenhada,
+# #             "superavit": receita - empenhada,
+# #             "restos_pagar": restos,
+# #             "receita_orcada": receita_orc,
+# #             "despesa_orcada": despesa_orc,
+# #             "pct_receita": round(receita / receita_orc * 100, 2) if receita_orc else 0,
+# #             "pct_despesa": round(empenhada / despesa_orc * 100, 2) if despesa_orc else 0,
+# #         }
+# #     except Exception as e:
+# #         return {"erro": True, "mensagem": str(e)}
 @app.get("/historico_analise_orcamentaria")
 def get_historico_analise_orcamentaria():
     conn = sqlite3.connect(DB_PATH)
@@ -4817,29 +4820,29 @@ def api_comparativo_receitas_v2(periodo: str):
 
 
 
-@app.get("/gerar_pdf_integridade_matriz/{check_id}")
-def gerar_pdf_integridade_matriz(check_id: str):
-    from playwright.sync_api import sync_playwright
-    from fastapi.responses import Response
-    import time
+# @app.get("/gerar_pdf_integridade_matriz/{check_id}")
+# def gerar_pdf_integridade_matriz(check_id: str):
+#     from playwright.sync_api import sync_playwright
+#     from fastapi.responses import Response
+#     import time
 
-    # Abre a tela de integridade com o ID passado
-    url = f"http://127.0.0.1:994/integridade?check={check_id}&_t={int(time.time())}"
+#     # Abre a tela de integridade com o ID passado
+#     url = f"http://127.0.0.1:994/integridade?check={check_id}&_t={int(time.time())}"
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(bypass_csp=True)
-        page = context.new_page()
-        page.goto(url, wait_until="networkidle")
-        page.wait_for_timeout(2000)
-        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
-        browser.close()
+#     with sync_playwright() as p:
+#         browser = p.chromium.launch()
+#         context = browser.new_context(bypass_csp=True)
+#         page = context.new_page()
+#         page.goto(url, wait_until="networkidle")
+#         page.wait_for_timeout(2000)
+#         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+#         browser.close()
 
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=integridade_{check_id}.pdf"}
-    )
+#     return Response(
+#         content=pdf_bytes,
+#         media_type="application/pdf",
+#         headers={"Content-Disposition": f"inline; filename=integridade_{check_id}.pdf"}
+#     )
 
 
 
