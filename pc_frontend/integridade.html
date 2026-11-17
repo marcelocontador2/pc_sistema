@@ -217,37 +217,49 @@ async function verificarMatriz() {
     }
 
     async function verificarEGerar() {
-        const ano = document.getElementById('ano').value;
-        const tipo = document.getElementById('tipo_periodo').value;
-        const trimestre = document.getElementById('trimestre').value;
-        const periodo = `${ano}-${tipo}-${trimestre}`;
+    const ano = document.getElementById('ano').value;
+    const tipo = document.getElementById('tipo_periodo').value;
+    const trimestre = document.getElementById('trimestre').value;
+    const periodo = `${ano}-${tipo}-${trimestre}`;
 
-        const container = document.getElementById('integridade-cards');
-        if (container) container.innerHTML = '<div class="loading" style="padding: 20px; color: #004b8d; font-weight: bold;">Buscando dados no banco (PostgreSQL)...</div>';
+    const container = document.getElementById('integridade-cards');
+    if (container) container.innerHTML = '<div class="loading">Gerando matriz...</div>';
 
-        try {
-            // Busca os dados (o backend agora prioriza o histórico salvo)
-            const res = await fetch(`/api/integridade_matriz/${periodo}?_t=${Date.now()}`);
-            const data = await res.json();
-
-            if (data.erro) {
-                throw new Error(data.mensagem || "Erro desconhecido no backend.");
-            }
-
-            // Renderiza a matriz na tela
-            dadosAtuais = data;
-            renderizarMatriz(data, container);
-            
-            // Atualiza a lista lateral de históricos
-            carregarHistorico();
-
-        } catch (err) {
-            console.error(err);
-            if (container) container.innerHTML = `<div style="color: red; padding: 20px; background: #ffe6e6; border: 1px solid red;">
-                <strong>Erro ao carregar matriz:</strong> ${err.message}
-            </div>`;
+    try {
+        // 1. Salva a matriz (gera o histórico no formato original)
+        const resSalvar = await fetch(`/api/integridade_matriz/${periodo}/salvar`, { method: 'POST' });
+        const dataSalvar = await resSalvar.json();
+        
+        if (dataSalvar.erro) {
+            alert("Erro ao gerar matriz: " + (dataSalvar.mensagem || "Erro desconhecido"));
+            if (container) container.innerHTML = '';
+            return;
         }
+
+        // 2. Recarrega a lista de históricos
+        await carregarHistorico();
+
+        // 3. Pega o primeiro histórico (mais recente) e exibe
+        const list = document.getElementById('lista-historico');
+        if (list && list.children.length > 0) {
+            // Desmarca todos
+            list.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            
+            // Marca o primeiro
+            const primeiroCheckbox = list.querySelector('input[type="checkbox"]');
+            if (primeiroCheckbox) {
+                primeiroCheckbox.checked = true;
+                // Exibe o histórico (renderiza o design original)
+                await exibirSelecionado();
+            }
+        } else {
+            if (container) container.innerHTML = '<div class="loading">Nenhum histórico gerado.</div>';
+        }
+    } catch (err) {
+        console.error(err);
+        if (container) container.innerHTML = '<div class="loading">Erro ao gerar matriz.</div>';
     }
+}
 
     function renderizarMatriz(data, container) {
         if (!container) return;
