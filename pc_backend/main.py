@@ -56,6 +56,15 @@ app = FastAPI(title="PC - Prestacao de Contas API")
 # =========================================================
 from pc_backend.app.routers.liquidez import router as liquidez_router
 app.include_router(liquidez_router)
+from pc_backend.app.routers import receitas
+app.include_router(receitas.router)
+from pc_backend.app.routers import despesas
+app.include_router(despesas.router)
+from pc_backend.app.routers import conferencia
+app.include_router(conferencia.router)
+
+
+
 
 
 # =========================================================
@@ -938,11 +947,11 @@ async def lista_periodos():
 # =======================================================
 from fastapi.responses import FileResponse
 import os as _os
-@app.get("/conferencia")
-async def serve_conferencia():
-    from fastapi.responses import FileResponse
-    caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
-    return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
+# @app.get("/conferencia")
+# async def serve_conferencia():
+#     from fastapi.responses import FileResponse
+#     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
+#     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
 @app.get("/integridade")
 async def serve_integridade():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")
@@ -1351,77 +1360,77 @@ async def excluir_panorama(id: int):
     conn.close()
     return {"mensagem": "Excluido"}
 
-@app.get("/api/conferencia/{periodo}")
-async def api_conferencia_calcular(periodo: str):
-    try:
-        from .matriz_integridade import _get_csv
-        pecas_obrigatorias = ["BALANCETE", "BALANCO_PATRIMONIAL", "BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]
-        faltando = [p for p in pecas_obrigatorias if not _get_csv(p, periodo)]
-        if faltando:
-            return {"erro": "faltando", "pecas": faltando}
-        from integridade import analise_integridade
-        dados = await analise_integridade(periodo)
-        return dados
-    except Exception as e:
-        return {"erro": "falha", "mensagem": str(e)}
-@app.get("/salvar_conferencia/{periodo}")
-async def salvar_conferencia(periodo: str):
-    try:
-        from integridade import analise_integridade
-        dados = await analise_integridade(periodo)
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""CREATE TABLE IF NOT EXISTS historico_conferencia (
+# @app.get("/api/conferencia/{periodo}")
+# async def api_conferencia_calcular(periodo: str):
+#     try:
+#         from .matriz_integridade import _get_csv
+#         pecas_obrigatorias = ["BALANCETE", "BALANCO_PATRIMONIAL", "BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]
+#         faltando = [p for p in pecas_obrigatorias if not _get_csv(p, periodo)]
+#         if faltando:
+#             return {"erro": "faltando", "pecas": faltando}
+#         from integridade import analise_integridade
+#         dados = await analise_integridade(periodo)
+#         return dados
+#     except Exception as e:
+#         return {"erro": "falha", "mensagem": str(e)}
+# @app.get("/salvar_conferencia/{periodo}")
+# async def salvar_conferencia(periodo: str):
+#     try:
+#         from integridade import analise_integridade
+#         dados = await analise_integridade(periodo)
+#         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#         conn = sqlite3.connect(db_path)
+#         cursor = conn.cursor()
+#         cursor.execute("""CREATE TABLE IF NOT EXISTS historico_conferencia (
 
-            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-        data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cursor.execute("INSERT INTO historico_conferencia (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
-                       (periodo, data_agora, json.dumps(dados)))
-        conn.commit()
-        conn.close()
-        return {"mensagem": "Conferencia salva!", "dados": dados}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-@app.get("/historico_conferencia")
-def listar_conferencia():
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_conferencia ORDER BY id DESC")
-    rows = cursor.fetchall()
-    conn.close()
+#             id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+#         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+#         cursor.execute("INSERT INTO historico_conferencia (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+#                        (periodo, data_agora, json.dumps(dados)))
+#         conn.commit()
+#         conn.close()
+#         return {"mensagem": "Conferencia salva!", "dados": dados}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+# @app.get("/historico_conferencia")
+# def listar_conferencia():
+#     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#     conn = sqlite3.connect(db_path)
+#     cursor = conn.cursor()
+#     cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_conferencia ORDER BY id DESC")
+#     rows = cursor.fetchall()
+#     conn.close()
     
-    resultado = []
-    for r in rows:
-        resultado.append({
-            "id": r[0], 
-            "periodo": r[1], 
-            "data_geracao": r[2], 
-            "dados": r[3]
-        })
+#     resultado = []
+#     for r in rows:
+#         resultado.append({
+#             "id": r[0], 
+#             "periodo": r[1], 
+#             "data_geracao": r[2], 
+#             "dados": r[3]
+#         })
         
-    return Response(content=json.dumps(resultado), media_type="application/json")
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
-@app.get("/historico_conferencia/{id}")
-async def buscar_conferencia(id: int):
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT resultado_json FROM historico_conferencia WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-    return json.loads(row[0])
-@app.delete("/excluir_conferencia/{id}")
-async def excluir_conferencia(id: int):
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM historico_conferencia WHERE id = ?", (id,))
-    conn.commit()
-    conn.close()
-    return {"mensagem": "Excluido"}
+# @app.get("/historico_conferencia/{id}")
+# async def buscar_conferencia(id: int):
+#     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#     conn = sqlite3.connect(db_path)
+#     cursor = conn.cursor()
+#     cursor.execute("SELECT resultado_json FROM historico_conferencia WHERE id = ?", (id,))
+#     row = cursor.fetchone()
+#     conn.close()
+#     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+#     return json.loads(row[0])
+# @app.delete("/excluir_conferencia/{id}")
+# async def excluir_conferencia(id: int):
+#     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#     conn = sqlite3.connect(db_path)
+#     cursor = conn.cursor()
+#     cursor.execute("DELETE FROM historico_conferencia WHERE id = ?", (id,))
+#     conn.commit()
+#     conn.close()
+#     return {"mensagem": "Excluido"}
 # =======================================================
 # ROTAS ISOLADAS: INTEGRIDADE (Tabela historico_integridade_matriz)
 # =======================================================
@@ -1646,90 +1655,90 @@ async def excluir_integridade_matriz(request: Request):
     except Exception as e:
         return {"ok": False, "mensagem": str(e)}
 
-@app.get("/gerar_pdf_conferencia/{id}")
-async def gerar_pdf_conferencia(id: int):
-    try:
-        from fastapi.responses import Response
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        import sqlite3, json, os
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_conferencia WHERE id = ?", (id,))
-        row = cursor.fetchone()
-        conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
-        periodo, data_geracao, json_str = row
-        dados = json.loads(json_str)
-        analises = dados.get("analises", [])
-        pdf = FPDF(orientation='P', unit='mm', format='A4')
-        pdf.add_page()
-        pdf.set_font("helvetica", "B", 16)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 10, f"Conferencia das Demonstracoes - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.set_font("helvetica", "I", 10)
-        pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.ln(10)
-        for a in analises:
-            cor = (0, 128, 0) if a["status"] == "OK" else (255, 0, 0)
-            pdf.set_font("helvetica", "B", 12)
-            pdf.set_text_color(51, 51, 51)
-            pdf.cell(0, 8, a["titulo"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_font("helvetica", "", 9)
-            pdf.set_text_color(80, 80, 80)
-            pdf.multi_cell(0, 5, a["conceito"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.ln(2)
-            for item in a["tabela"]:
-                pdf.cell(100, 6, item["label"], border=1)
-                pdf.cell(0, 6, item["valor"], border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_font("helvetica", "B", 9)
-            pdf.set_text_color(*cor)
-            pdf.multi_cell(0, 6, a["mensagem"], border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.ln(8)
-        pdf_bytes = pdf.output()
-        return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Conferencia_{periodo.replace('-', '_')}.pdf"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-# PDF da Integridade (Tabela historico_integridade_matriz)
-async def api_analise_orcamentaria_bo(periodo: str):
-    try:
-        # === REGRA DE INTEGRIDADE ===
-        from .matriz_integridade import _get_csv
-        caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
-        if not caminho_check or not os.path.exists(caminho_check):
-            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
-        from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
-        caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
-        if not caminho or not os.path.exists(caminho):
-            return {"erro": True, "mensagem": f"BO do perí­odo {periodo} não foi importado."}
-        linhas = _ler_linhas(caminho)
-        def buscar(termo, col, apos=0):
-            for i, p in enumerate(linhas):
-                if i < apos or not p: continue
-                if termo.upper() in p[0].strip().upper() and len(p) > col:
-                    return abs(_limpar_valor(p[col]))
-            return 0.0
-        receita = buscar("SUB-TOTAL DAS RECEITAS", 6)
-        receita_orc = buscar("SUB-TOTAL DAS RECEITAS", 5)
-        empenhada = buscar("SUB-TOTAL DAS DESPESAS", 4)
-        despesa_orc = buscar("SUB-TOTAL DAS DESPESAS", 3)
-        idx_desp = next((i for i, p in enumerate(linhas) if p and "SUB-TOTAL DAS DESPESAS" in p[0].upper()), 0)
-        restos = buscar("TOTAL:", 6, apos=idx_desp)
-        return {
-            "erro": False,
-            "receita_realizada": receita,
-            "despesa_empenhada": empenhada,
-            "superavit": receita - empenhada,
-            "restos_pagar": restos,
-            "receita_orcada": receita_orc,
-            "despesa_orcada": despesa_orc,
-            "pct_receita": round(receita / receita_orc * 100, 2) if receita_orc else 0,
-            "pct_despesa": round(empenhada / despesa_orc * 100, 2) if despesa_orc else 0,
-        }
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
+# @app.get("/gerar_pdf_conferencia/{id}")
+# async def gerar_pdf_conferencia(id: int):
+#     try:
+#         from fastapi.responses import Response
+#         from fpdf import FPDF
+#         from fpdf.enums import XPos, YPos
+#         import sqlite3, json, os
+#         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#         conn = sqlite3.connect(db_path)
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_conferencia WHERE id = ?", (id,))
+#         row = cursor.fetchone()
+#         conn.close()
+#         if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+#         periodo, data_geracao, json_str = row
+#         dados = json.loads(json_str)
+#         analises = dados.get("analises", [])
+#         pdf = FPDF(orientation='P', unit='mm', format='A4')
+#         pdf.add_page()
+#         pdf.set_font("helvetica", "B", 16)
+#         pdf.set_text_color(0, 51, 102)
+#         pdf.cell(0, 10, f"Conferencia das Demonstracoes - {periodo.replace('-', ' ').title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+#         pdf.set_font("helvetica", "I", 10)
+#         pdf.set_text_color(100, 100, 100)
+#         pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+#         pdf.ln(10)
+#         for a in analises:
+#             cor = (0, 128, 0) if a["status"] == "OK" else (255, 0, 0)
+#             pdf.set_font("helvetica", "B", 12)
+#             pdf.set_text_color(51, 51, 51)
+#             pdf.cell(0, 8, a["titulo"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#             pdf.set_font("helvetica", "", 9)
+#             pdf.set_text_color(80, 80, 80)
+#             pdf.multi_cell(0, 5, a["conceito"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#             pdf.ln(2)
+#             for item in a["tabela"]:
+#                 pdf.cell(100, 6, item["label"], border=1)
+#                 pdf.cell(0, 6, item["valor"], border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#             pdf.set_font("helvetica", "B", 9)
+#             pdf.set_text_color(*cor)
+#             pdf.multi_cell(0, 6, a["mensagem"], border=1, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#             pdf.ln(8)
+#         pdf_bytes = pdf.output()
+#         return Response(content=bytes(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Conferencia_{periodo.replace('-', '_')}.pdf"})
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+# # PDF da Integridade (Tabela historico_integridade_matriz)
+# async def api_analise_orcamentaria_bo(periodo: str):
+#     try:
+#         # === REGRA DE INTEGRIDADE ===
+#         from .matriz_integridade import _get_csv
+#         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
+#         if not caminho_check or not os.path.exists(caminho_check):
+#             return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
+#         from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+#         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
+#         if not caminho or not os.path.exists(caminho):
+#             return {"erro": True, "mensagem": f"BO do perí­odo {periodo} não foi importado."}
+#         linhas = _ler_linhas(caminho)
+#         def buscar(termo, col, apos=0):
+#             for i, p in enumerate(linhas):
+#                 if i < apos or not p: continue
+#                 if termo.upper() in p[0].strip().upper() and len(p) > col:
+#                     return abs(_limpar_valor(p[col]))
+#             return 0.0
+#         receita = buscar("SUB-TOTAL DAS RECEITAS", 6)
+#         receita_orc = buscar("SUB-TOTAL DAS RECEITAS", 5)
+#         empenhada = buscar("SUB-TOTAL DAS DESPESAS", 4)
+#         despesa_orc = buscar("SUB-TOTAL DAS DESPESAS", 3)
+#         idx_desp = next((i for i, p in enumerate(linhas) if p and "SUB-TOTAL DAS DESPESAS" in p[0].upper()), 0)
+#         restos = buscar("TOTAL:", 6, apos=idx_desp)
+#         return {
+#             "erro": False,
+#             "receita_realizada": receita,
+#             "despesa_empenhada": empenhada,
+#             "superavit": receita - empenhada,
+#             "restos_pagar": restos,
+#             "receita_orcada": receita_orc,
+#             "despesa_orcada": despesa_orc,
+#             "pct_receita": round(receita / receita_orc * 100, 2) if receita_orc else 0,
+#             "pct_despesa": round(empenhada / despesa_orc * 100, 2) if despesa_orc else 0,
+#         }
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
 @app.get("/historico_analise_orcamentaria")
 def get_historico_analise_orcamentaria():
     conn = sqlite3.connect(DB_PATH)
@@ -4540,66 +4549,66 @@ def serve_relatorio_final():
 
 
 # ========== ROTAS DO COMPARATIVO DE RECEITAS ==========
-@app.get("/api/comparativo_receitas/{periodo}")
-def api_comparativo_receitas(periodo: str):
-    import os, csv, io
-    upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
-    # Simulação: retorna dados fictí­cios de receitas (adapte para ler o CSV real, se houver)
-    receitas = [
-        {"nome": "Receita de Serviços", "valor": 120000000.0},
-        {"nome": "Receitas Financeiras", "valor": 25000000.0},
-        {"nome": "Outras Receitas", "valor": 12000000.0}
-    ]
-    return {"erro": False, "periodo": periodo, "receitas": receitas}
+# @app.get("/api/comparativo_receitas/{periodo}")
+# def api_comparativo_receitas(periodo: str):
+#     import os, csv, io
+#     upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+#     # Simulação: retorna dados fictí­cios de receitas (adapte para ler o CSV real, se houver)
+#     receitas = [
+#         {"nome": "Receita de Serviços", "valor": 120000000.0},
+#         {"nome": "Receitas Financeiras", "valor": 25000000.0},
+#         {"nome": "Outras Receitas", "valor": 12000000.0}
+#     ]
+#     return {"erro": False, "periodo": periodo, "receitas": receitas}
 
-@app.get("/historico_comparativo_receitas")
-def get_historico_comparativo_receitas():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_receitas ORDER BY id DESC")
-    rows = cur.fetchall()
-    conn.close()
+# @app.get("/historico_comparativo_receitas")
+# def get_historico_comparativo_receitas():
+#     conn = sqlite3.connect(DB_PATH)
+#     cur = conn.cursor()
+#     cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_receitas ORDER BY id DESC")
+#     rows = cur.fetchall()
+#     conn.close()
     
-    resultado = []
-    for r in rows:
-        resultado.append({
-            "id": r[0], 
-            "periodo": r[1], 
-            "data_geracao": r[2], 
-            "dados": r[3]
-        })
+#     resultado = []
+#     for r in rows:
+#         resultado.append({
+#             "id": r[0], 
+#             "periodo": r[1], 
+#             "data_geracao": r[2], 
+#             "dados": r[3]
+#         })
         
-    return Response(content=json.dumps(resultado), media_type="application/json")
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
-@app.get("/historico_comparativo_receitas/{id}")
-def get_historico_comparativo_receitas_id(id: int):
-    import sqlite3, os, json
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("SELECT periodo, dados_json FROM historico_comparativo_receitas WHERE id = ?", (id,))
-    row = cur.fetchone()
-    conn.close()
-    if row: return {"ok": True, "periodo": row[0], "dados": json.loads(row[1])}
-    return {"ok": False}
+# @app.get("/historico_comparativo_receitas/{id}")
+# def get_historico_comparativo_receitas_id(id: int):
+#     import sqlite3, os, json
+#     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#     conn = sqlite3.connect(db_path)
+#     cur = conn.cursor()
+#     cur.execute("SELECT periodo, dados_json FROM historico_comparativo_receitas WHERE id = ?", (id,))
+#     row = cur.fetchone()
+#     conn.close()
+#     if row: return {"ok": True, "periodo": row[0], "dados": json.loads(row[1])}
+#     return {"ok": False}
 
 @app.post("/salvar_comparativo_receitas")
 
-@app.post("/excluir_multiplos_comparativo_receitas")
-async def excluir_multiplos_comparativo_receitas(request: Request):
-    import sqlite3, os
-    dados = await request.json()
-    ids = dados.get("ids", [])
-    if not ids: return {"ok": False, "mensagem": "Nenhum ID."}
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    placeholders = ",".join(["?"] * len(ids))
-    cur.execute(f"DELETE FROM historico_comparativo_receitas WHERE id IN ({placeholders})", ids)
-    conn.commit()
-    excluidos = cur.rowcount
-    conn.close()
-    return {"ok": True, "excluidos": excluidos}
+# @app.post("/excluir_multiplos_comparativo_receitas")
+# async def excluir_multiplos_comparativo_receitas(request: Request):
+#     import sqlite3, os
+#     dados = await request.json()
+#     ids = dados.get("ids", [])
+#     if not ids: return {"ok": False, "mensagem": "Nenhum ID."}
+#     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#     conn = sqlite3.connect(db_path)
+#     cur = conn.cursor()
+#     placeholders = ",".join(["?"] * len(ids))
+#     cur.execute(f"DELETE FROM historico_comparativo_receitas WHERE id IN ({placeholders})", ids)
+#     conn.commit()
+#     excluidos = cur.rowcount
+#     conn.close()
+#     return {"ok": True, "excluidos": excluidos}
 
 @app.get("/analise_comparativo_receitas", response_class=HTMLResponse)
 def serve_analise_comparativo_receitas():
@@ -4751,60 +4760,60 @@ def api_comparativo_receitas_v2(periodo: str):
 
 
 
-@app.get("/historico_comparativo_despesas/{id}")
-def get_historico_comparativo_despesas_id(id: int):
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-    import json
+# @app.get("/historico_comparativo_despesas/{id}")
+# def get_historico_comparativo_despesas_id(id: int):
+#     import psycopg2
+#     from psycopg2.extras import RealDictCursor
+#     import json
     
-    from .config import PG_CONFIG
+#     from .config import PG_CONFIG
     
-    try:
-        conn = psycopg2.connect(**PG_CONFIG)
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas WHERE id = %s", (id,))
-        row = cur.fetchone()
-        conn.close()
+#     try:
+#         conn = psycopg2.connect(**PG_CONFIG)
+#         cur = conn.cursor(cursor_factory=RealDictCursor)
+#         cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas WHERE id = %s", (id,))
+#         row = cur.fetchone()
+#         conn.close()
         
-        if row:
-            return {
-                "id": row["id"],
-                "periodo": row["periodo"],
-                "data_geracao": row["data_geracao"],
-                "dados": row["dados_json"]
-            }
-        return {"erro": True, "mensagem": "Histórico não encontrado."}
-    except Exception as e:
-        print(f"[ERRO] Falha ao buscar histórico ID {id}: {e}")
-        return {"erro": True, "mensagem": str(e)}
+#         if row:
+#             return {
+#                 "id": row["id"],
+#                 "periodo": row["periodo"],
+#                 "data_geracao": row["data_geracao"],
+#                 "dados": row["dados_json"]
+#             }
+#         return {"erro": True, "mensagem": "Histórico não encontrado."}
+#     except Exception as e:
+#         print(f"[ERRO] Falha ao buscar histórico ID {id}: {e}")
+#         return {"erro": True, "mensagem": str(e)}
 
 
-@app.post("/excluir_multiplos_comparativo_despesas")
-async def excluir_multiplos_comparativo_despesas(request: Request):
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
+# @app.post("/excluir_multiplos_comparativo_despesas")
+# async def excluir_multiplos_comparativo_despesas(request: Request):
+#     import psycopg2
+#     from psycopg2.extras import RealDictCursor
     
-    from .config import PG_CONFIG
+#     from .config import PG_CONFIG
     
-    try:
-        body = await request.json()
-        ids = body.get("ids", [])
+#     try:
+#         body = await request.json()
+#         ids = body.get("ids", [])
         
-        if not ids:
-            return {"ok": False, "mensagem": "Nenhum ID fornecido."}
+#         if not ids:
+#             return {"ok": False, "mensagem": "Nenhum ID fornecido."}
         
-        conn = psycopg2.connect(**PG_CONFIG)
-        cur = conn.cursor()
-        placeholders = ",".join(["%s"] * len(ids))
-        cur.execute(f"DELETE FROM historico_comparativo_despesas WHERE id IN ({placeholders})", ids)
-        excluidos = cur.rowcount
-        conn.commit()
-        conn.close()
+#         conn = psycopg2.connect(**PG_CONFIG)
+#         cur = conn.cursor()
+#         placeholders = ",".join(["%s"] * len(ids))
+#         cur.execute(f"DELETE FROM historico_comparativo_despesas WHERE id IN ({placeholders})", ids)
+#         excluidos = cur.rowcount
+#         conn.commit()
+#         conn.close()
         
-        return {"ok": True, "excluidos": excluidos}
-    except Exception as e:
-        print(f"[ERRO] Falha ao excluir históricos: {e}")
-        return {"ok": False, "mensagem": str(e)}
+#         return {"ok": True, "excluidos": excluidos}
+#     except Exception as e:
+#         print(f"[ERRO] Falha ao excluir históricos: {e}")
+#         return {"ok": False, "mensagem": str(e)}
 
 
 
@@ -4880,34 +4889,34 @@ def gerar_pdf_panorama(historico_id: int):
 # ROTAS DE SALVAR E EXCLUIR - COMPARATIVO DE RECEITAS
 # ============================================================
 
-@app.post("/api/comparativo_receitas_v2/{periodo}/salvar")
-def salvar_comparativo_receitas(periodo: str):
-    import sqlite3, os, json
-    from datetime import datetime
+# @app.post("/api/comparativo_receitas_v2/{periodo}/salvar")
+# def salvar_comparativo_receitas(periodo: str):
+#     import sqlite3, os, json
+#     from datetime import datetime
 
-    # Pega os dados atuais via API
-    try:
-        dados = api_comparativo_receitas_v2(periodo)
-    except Exception as e:
-        return {"erro": True, "mensagem": f"Erro ao buscar dados: {str(e)}"}
+#     # Pega os dados atuais via API
+#     try:
+#         dados = api_comparativo_receitas_v2(periodo)
+#     except Exception as e:
+#         return {"erro": True, "mensagem": f"Erro ao buscar dados: {str(e)}"}
 
-    if dados.get("erro"):
-        return {"erro": True, "mensagem": dados.get("mensagem", "Dados não encontrados")}
+#     if dados.get("erro"):
+#         return {"erro": True, "mensagem": dados.get("mensagem", "Dados não encontrados")}
 
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_receitas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
+#     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#     conn = sqlite3.connect(db_path)
+#     cur = conn.cursor()
+#     cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_receitas (
+#         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
 
-    data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
-    dados_json = json.dumps(dados)
+#     data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
+#     dados_json = json.dumps(dados)
 
-    cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)",
-                (periodo, data_geracao, dados_json))
-    conn.commit()
-    conn.close()
-    return {"erro": False, "mensagem": "Salvo com sucesso!"}
+#     cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)",
+#                 (periodo, data_geracao, dados_json))
+#     conn.commit()
+#     conn.close()
+#     return {"erro": False, "mensagem": "Salvo com sucesso!"}
 
 
 
@@ -5773,41 +5782,41 @@ async def gerar_pdf_analise_bp(id: int):
 
 
 
-@app.get("/gerar_pdf_comparativo_receitas")
-def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
-    from playwright.sync_api import sync_playwright
-    from fastapi.responses import Response
-    import time, os
+# @app.get("/gerar_pdf_comparativo_receitas")
+# def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+#     from playwright.sync_api import sync_playwright
+#     from fastapi.responses import Response
+#     import time, os
 
-    if historico_id:
-        url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
-    else:
-        url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
+#     if historico_id:
+#         url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
+#     else:
+#         url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(bypass_csp=True)
-        page = context.new_page()
-        page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-        page.goto(url, wait_until="networkidle")
-        page.wait_for_timeout(3000)  # Espera gráficos renderizarem
-        page.evaluate("""() => {
-            document.querySelectorAll('canvas').forEach(canvas => {
-                const img = document.createElement('img');
-                img.src = canvas.toDataURL('image/png');
-                img.className = 'canvas-img';
-                img.style.cssText = 'display: block; max-width: 100%; max-height: 240px; margin: 0 auto;';
-                canvas.parentNode.insertBefore(img, canvas.nextSibling);
-            });
-        }""")
-        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
-        browser.close()
+#     with sync_playwright() as p:
+#         browser = p.chromium.launch()
+#         context = browser.new_context(bypass_csp=True)
+#         page = context.new_page()
+#         page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
+#         page.goto(url, wait_until="networkidle")
+#         page.wait_for_timeout(3000)  # Espera gráficos renderizarem
+#         page.evaluate("""() => {
+#             document.querySelectorAll('canvas').forEach(canvas => {
+#                 const img = document.createElement('img');
+#                 img.src = canvas.toDataURL('image/png');
+#                 img.className = 'canvas-img';
+#                 img.style.cssText = 'display: block; max-width: 100%; max-height: 240px; margin: 0 auto;';
+#                 canvas.parentNode.insertBefore(img, canvas.nextSibling);
+#             });
+#         }""")
+#         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+#         browser.close()
 
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=relatorio_receitas_{periodo}.pdf"}
-    )
+#     return Response(
+#         content=pdf_bytes,
+#         media_type="application/pdf",
+#         headers={"Content-Disposition": f"inline; filename=relatorio_receitas_{periodo}.pdf"}
+#     )
 
 
 # ========== ROTAS DO COMPARATIVO DE DESPESAS ==========
@@ -5967,24 +5976,24 @@ def api_comparativo_despesas_v2(periodo: str):
             "percentual_total": 0.0, "grupos": [], "detalhes": []
         }
     }
-@app.get("/historico_comparativo_despesas")
-def get_historico_comparativo_despesas():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
-    rows = cur.fetchall()
-    conn.close()
+# @app.get("/historico_comparativo_despesas")
+# def get_historico_comparativo_despesas():
+#     conn = sqlite3.connect(DB_PATH)
+#     cur = conn.cursor()
+#     cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
+#     rows = cur.fetchall()
+#     conn.close()
     
-    resultado = []
-    for r in rows:
-        resultado.append({
-            "id": r[0], 
-            "periodo": r[1], 
-            "data_geracao": r[2], 
-            "dados": r[3]
-        })
+#     resultado = []
+#     for r in rows:
+#         resultado.append({
+#             "id": r[0], 
+#             "periodo": r[1], 
+#             "data_geracao": r[2], 
+#             "dados": r[3]
+#         })
         
-    return Response(content=json.dumps(resultado), media_type="application/json")
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
 
 @app.post("/salvar_comparativo_despesas")
@@ -6015,25 +6024,25 @@ def serve_analise_comparativo_despesas():
 @app.get("/gerar_pdf_conferencia/{check_id}")
 
 
-@app.get("/gerar_pdf_comparativo_despesas")
-def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
-    from playwright.sync_api import sync_playwright
-    from fastapi.responses import Response
-    import time, os
-    if historico_id:
-        url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
-    else:
-        url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(bypass_csp=True)
-        page = context.new_page()
-        page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-        page.goto(url, wait_until="networkidle")
-        page.wait_for_timeout(3000)
-        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
-        browser.close()
-    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_despesas_{periodo}.pdf"})
+# @app.get("/gerar_pdf_comparativo_despesas")
+# def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+#     from playwright.sync_api import sync_playwright
+#     from fastapi.responses import Response
+#     import time, os
+#     if historico_id:
+#         url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
+#     else:
+#         url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
+#     with sync_playwright() as p:
+#         browser = p.chromium.launch()
+#         context = browser.new_context(bypass_csp=True)
+#         page = context.new_page()
+#         page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
+#         page.goto(url, wait_until="networkidle")
+#         page.wait_for_timeout(3000)
+#         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+#         browser.close()
+#     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_despesas_{periodo}.pdf"})
 
 
 @app.get("/relatorio_comparativo_despesas", response_class=HTMLResponse)
@@ -6046,27 +6055,27 @@ def serve_relatorio_comparativo_despesas():
 
 
 # ========== ROTAS DE HISTí“RICO DESPESAS (FORÇADAS) ==========
-@app.post("/api/comparativo_despesas_v2/{periodo}/salvar")
-def rota_salvar_comparativo_despesas(periodo: str):
-    import sqlite3, os, json
-    from datetime import datetime
+# @app.post("/api/comparativo_despesas_v2/{periodo}/salvar")
+# def rota_salvar_comparativo_despesas(periodo: str):
+#     import sqlite3, os, json
+#     from datetime import datetime
 
-    dados = api_comparativo_despesas_v2(periodo)
-    if dados.get("erro"): return {"erro": True, "mensagem": dados.get("mensagem")}
+#     dados = api_comparativo_despesas_v2(periodo)
+#     if dados.get("erro"): return {"erro": True, "mensagem": dados.get("mensagem")}
 
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_despesas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
+#     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#     conn = sqlite3.connect(db_path)
+#     cur = conn.cursor()
+#     cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_despesas (
+#         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
 
-    data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
-    dados_json = json.dumps(dados)
+#     data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
+#     dados_json = json.dumps(dados)
 
-    cur.execute("INSERT INTO historico_comparativo_despesas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo, data_geracao, dados_json))
-    conn.commit()
-    conn.close()
-    return {"erro": False, "mensagem": "Salvo com sucesso!"}
+#     cur.execute("INSERT INTO historico_comparativo_despesas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo, data_geracao, dados_json))
+#     conn.commit()
+#     conn.close()
+#     return {"erro": False, "mensagem": "Salvo com sucesso!"}
 
 @app.delete("/historico_comparativo_despesas/{id}")
 def rota_excluir_comparativo_despesas(id: int):
