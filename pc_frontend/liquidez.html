@@ -83,7 +83,13 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.erro) {
-                        resultado.innerHTML = '<div class="erro">Erro: ' + (data.mensagem || 'Arquivo não encontrado') + '</div>';
+                        resultado.innerHTML = `
+                            <div style="text-align: center; padding: 40px; background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; color: #718096;">
+                                <h3 style="margin-bottom: 10px; color: #2d3748;">📂 Arquivos não importados para este período</h3>
+                                <p>Não encontramos os dados do Balanço Patrimonial para <strong>${periodo}</strong>.</p>
+                                <p style="font-size: 12px;">Por favor, importe os arquivos e tente novamente.</p>
+                            </div>
+                        `;
                         return;
                     }
                     renderizarResultado(data);
