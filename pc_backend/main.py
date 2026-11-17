@@ -66,6 +66,9 @@ from pc_backend.app.routers import integridade
 app.include_router(integridade.router)
 from pc_backend.app.routers import analise_orcamentaria
 app.include_router(analise_orcamentaria.router)
+from pc_backend.app.routers import analise_financeira
+app.include_router(analise_financeira.router)
+
 
 
 
@@ -1930,361 +1933,361 @@ async def excluir_composicao(id: int):
 async def serve_composicao():
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "composicao_receitas_despesas.html")
     return FileResponse(caminho)
-# @app.get("/api/analise_financeira_bf/{periodo}")  # MIGRADO para app/routers/balanco_financeiro.py
-async def api_analise_financeira_bf(periodo: str):
-    try:
-        # === REGRA DE INTEGRIDADE ===
-        from .matriz_integridade import _get_csv
-        caminho_check = _get_csv("BALANCO_FINANCEIRO", periodo)
-        if not caminho_check or not os.path.exists(caminho_check):
-            return {"erro": "faltando", "pecas": ["Balanço Financeiro"]}
-        from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
-        caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
-        if not caminho or not os.path.exists(caminho):
-            return {"erro": True, "mensagem": f"BF {periodo} nao importado."}
-        linhas = _ler_linhas(caminho)
-        def buscar(termo):
-            for p in linhas:
-                if p and termo.upper() in p[0].strip().upper():
-                    return p
-            return None
-        def val(p, idx):
-            if p and len(p) > idx: return abs(_limpar_valor(p[idx]))
-            return 0.0
-        l10 = buscar("RECEITA REALIZADA")
-        l28 = buscar("Recebimentos Extraorçamentários")
-        l33 = buscar("Saldo em espécie do Exercí­cio Anterior")
-        l36 = buscar("Total:")
-        dados = {
-            "receita_realizada": {"atual": val(l10,1), "anterior": val(l10,2)},
-            "despesa_orcamentaria": {"atual": val(l10,4), "anterior": val(l10,5)},
-            "recebimentos_extra": {"atual": val(l28,1), "anterior": val(l28,2)},
-            "pagamentos_extra": {"atual": val(l28,4), "anterior": val(l28,5)},
-            "saldo_anterior": {"atual": val(l33,1), "anterior": val(l33,2)},
-            "saldo_seguinte": {"atual": val(l33,4), "anterior": val(l33,5)},
-            "total_ingressos": {"atual": val(l36,1), "anterior": val(l36,2)},
-            "total_dispendios": {"atual": val(l36,4), "anterior": val(l36,5)},
-        }
-        return {"erro": False, "dados": dados}
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
-@app.post("/salvar_analise_financeira_bf/{periodo}/{periodo_anterior}")
-async def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str):
-    atual = await api_analise_financeira_bf(periodo)
-    if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
-    # O periodo anterior JA esta no mesmo CSV (coluna 2). Nao precisa buscar outro arquivo.
-    dados = {"periodo": periodo, "periodo_anterior": periodo_anterior,
-             "atual": atual.get("dados", {}), "anterior": {}}
-    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_financeira_bf (
+# # @app.get("/api/analise_financeira_bf/{periodo}")  # MIGRADO para app/routers/balanco_financeiro.py
+# async def api_analise_financeira_bf(periodo: str):
+#     try:
+#         # === REGRA DE INTEGRIDADE ===
+#         from .matriz_integridade import _get_csv
+#         caminho_check = _get_csv("BALANCO_FINANCEIRO", periodo)
+#         if not caminho_check or not os.path.exists(caminho_check):
+#             return {"erro": "faltando", "pecas": ["Balanço Financeiro"]}
+#         from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
+#         caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
+#         if not caminho or not os.path.exists(caminho):
+#             return {"erro": True, "mensagem": f"BF {periodo} nao importado."}
+#         linhas = _ler_linhas(caminho)
+#         def buscar(termo):
+#             for p in linhas:
+#                 if p and termo.upper() in p[0].strip().upper():
+#                     return p
+#             return None
+#         def val(p, idx):
+#             if p and len(p) > idx: return abs(_limpar_valor(p[idx]))
+#             return 0.0
+#         l10 = buscar("RECEITA REALIZADA")
+#         l28 = buscar("Recebimentos Extraorçamentários")
+#         l33 = buscar("Saldo em espécie do Exercí­cio Anterior")
+#         l36 = buscar("Total:")
+#         dados = {
+#             "receita_realizada": {"atual": val(l10,1), "anterior": val(l10,2)},
+#             "despesa_orcamentaria": {"atual": val(l10,4), "anterior": val(l10,5)},
+#             "recebimentos_extra": {"atual": val(l28,1), "anterior": val(l28,2)},
+#             "pagamentos_extra": {"atual": val(l28,4), "anterior": val(l28,5)},
+#             "saldo_anterior": {"atual": val(l33,1), "anterior": val(l33,2)},
+#             "saldo_seguinte": {"atual": val(l33,4), "anterior": val(l33,5)},
+#             "total_ingressos": {"atual": val(l36,1), "anterior": val(l36,2)},
+#             "total_dispendios": {"atual": val(l36,4), "anterior": val(l36,5)},
+#         }
+#         return {"erro": False, "dados": dados}
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
+# @app.post("/salvar_analise_financeira_bf/{periodo}/{periodo_anterior}")
+# async def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str):
+#     atual = await api_analise_financeira_bf(periodo)
+#     if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
+#     # O periodo anterior JA esta no mesmo CSV (coluna 2). Nao precisa buscar outro arquivo.
+#     dados = {"periodo": periodo, "periodo_anterior": periodo_anterior,
+#              "atual": atual.get("dados", {}), "anterior": {}}
+#     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+#     cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_financeira_bf (
 
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
-    data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    cur.execute("INSERT INTO historico_analise_financeira_bf (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
-                (f"{periodo} vs {periodo_anterior}", data_agora, json.dumps(dados)))
-    conn.commit(); conn.close()
-    return {"mensagem": "Salvo"}
-@app.get("/historico_analise_financeira_bf")
-def get_historico_analise_financeira_bf():
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_financeira_bf ORDER BY id DESC")
-    rows = cur.fetchall()
-    conn.close()
+#         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+#     data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+#     cur.execute("INSERT INTO historico_analise_financeira_bf (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
+#                 (f"{periodo} vs {periodo_anterior}", data_agora, json.dumps(dados)))
+#     conn.commit(); conn.close()
+#     return {"mensagem": "Salvo"}
+# @app.get("/historico_analise_financeira_bf")
+# def get_historico_analise_financeira_bf():
+#     conn = sqlite3.connect(DB_PATH)
+#     cur = conn.cursor()
+#     cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_financeira_bf ORDER BY id DESC")
+#     rows = cur.fetchall()
+#     conn.close()
     
-    resultado = []
-    for r in rows:
-        resultado.append({
-            "id": r[0], 
-            "periodo": r[1], 
-            "data_geracao": r[2], 
-            "dados": r[3]
-        })
+#     resultado = []
+#     for r in rows:
+#         resultado.append({
+#             "id": r[0], 
+#             "periodo": r[1], 
+#             "data_geracao": r[2], 
+#             "dados": r[3]
+#         })
         
-    return Response(content=json.dumps(resultado), media_type="application/json")
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
-@app.get("/historico_analise_financeira_bf/{id}")
-async def get_bf_id(id: int):
-    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-    cur.execute("SELECT periodo, resultado_json FROM historico_analise_financeira_bf WHERE id=?", (id,))
-    row = cur.fetchone(); conn.close()
-    if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
-    return json.loads(row[1])
-@app.delete("/excluir_analise_financeira_bf/{id}")
-async def excluir_bf(id: int):
-    conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
-    cur.execute("DELETE FROM historico_analise_financeira_bf WHERE id=?", (id,))
-    conn.commit(); conn.close()
-    return {"mensagem": "Excluido"}
+# @app.get("/historico_analise_financeira_bf/{id}")
+# async def get_bf_id(id: int):
+#     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+#     cur.execute("SELECT periodo, resultado_json FROM historico_analise_financeira_bf WHERE id=?", (id,))
+#     row = cur.fetchone(); conn.close()
+#     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+#     return json.loads(row[1])
+# @app.delete("/excluir_analise_financeira_bf/{id}")
+# async def excluir_bf(id: int):
+#     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+#     cur.execute("DELETE FROM historico_analise_financeira_bf WHERE id=?", (id,))
+#     conn.commit(); conn.close()
+#     return {"mensagem": "Excluido"}
 
-@app.get("/gerar_pdf_analise_financeira_bf/{id}")
-async def gerar_pdf_analise_financeira_bf(id: int):
-    try:
-        from fpdf import FPDF
-        from fpdf.enums import XPos, YPos
-        from fastapi.responses import Response
-# [REMOVIDO - import quebrado]         from app.routers.balanco_financeiro import processar_bf
-        import sqlite3, os
-        from datetime import datetime
+# @app.get("/gerar_pdf_analise_financeira_bf/{id}")
+# async def gerar_pdf_analise_financeira_bf(id: int):
+#     try:
+#         from fpdf import FPDF
+#         from fpdf.enums import XPos, YPos
+#         from fastapi.responses import Response
+# # [REMOVIDO - import quebrado]         from app.routers.balanco_financeiro import processar_bf
+#         import sqlite3, os
+#         from datetime import datetime
 
-        fonte_padrao = "ArialUnicode"  # Definicao da fonte
+#         fonte_padrao = "ArialUnicode"  # Definicao da fonte
 
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT periodo FROM historico_analise_financeira_bf WHERE id = ?", (id,))
-        row = cursor.fetchone()
-        conn.close()
-        periodo = row[0] if row else "2026-TRIMESTRE-3"
+#         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+#         conn = sqlite3.connect(db_path)
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT periodo FROM historico_analise_financeira_bf WHERE id = ?", (id,))
+#         row = cursor.fetchone()
+#         conn.close()
+#         periodo = row[0] if row else "2026-TRIMESTRE-3"
 
-        periodo = periodo.split(" vs ")[0].strip() if " vs " in periodo else periodo
-        p_limpo = periodo.replace("-", "_")
-        caminho_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", f"BALANCO_FINANCEIRO_{p_limpo}.csv")
+#         periodo = periodo.split(" vs ")[0].strip() if " vs " in periodo else periodo
+#         p_limpo = periodo.replace("-", "_")
+#         caminho_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", f"BALANCO_FINANCEIRO_{p_limpo}.csv")
 
-        if not os.path.exists(caminho_csv):
-            raise Exception(f"Arquivo do Balanco Financeiro nao encontrado para {periodo}")
+#         if not os.path.exists(caminho_csv):
+#             raise Exception(f"Arquivo do Balanco Financeiro nao encontrado para {periodo}")
 
-# [REMOVIDO - dependente de import quebrado]         resultado = processar_bf(caminho_csv)
-        d = resultado["dados"]
+# # [REMOVIDO - dependente de import quebrado]         resultado = processar_bf(caminho_csv)
+#         d = resultado["dados"]
 
-        pdf = FPDF()
-        pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
-        pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
-        pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
-        pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
-        pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
-        pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=False)
+#         pdf = FPDF()
+#         pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_page()
+#         pdf.set_auto_page_break(auto=False)
 
-        # Cabecalho
-        pdf.set_fill_color(0, 51, 102)
-        pdf.rect(0, 0, 210, 35, "F")
-        pdf.set_font(fonte_padrao, "B", 22)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_xy(15, 8)
-        pdf.cell(180, 10, "Balanço Financeiro", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font(fonte_padrao, "", 13)
-        pdf.set_xy(15, 20)
-        pdf.cell(180, 8, f"Perí­odo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         # Cabecalho
+#         pdf.set_fill_color(0, 51, 102)
+#         pdf.rect(0, 0, 210, 35, "F")
+#         pdf.set_font(fonte_padrao, "B", 22)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_xy(15, 8)
+#         pdf.cell(180, 10, "Balanço Financeiro", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_font(fonte_padrao, "", 13)
+#         pdf.set_xy(15, 20)
+#         pdf.cell(180, 8, f"Perí­odo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-        pdf.set_draw_color(0, 51, 102)
-        pdf.set_line_width(1.5)
-        pdf.line(0, 35, 210, 35)
+#         pdf.set_draw_color(0, 51, 102)
+#         pdf.set_line_width(1.5)
+#         pdf.line(0, 35, 210, 35)
 
-        def fmt(v):
-            try:
-                s = f"R$ {v:,.2f}"
-                return s.replace(",", "X").replace(".", ",").replace("X", ".")
-            except Exception:
-                return str(v)
+#         def fmt(v):
+#             try:
+#                 s = f"R$ {v:,.2f}"
+#                 return s.replace(",", "X").replace(".", ",").replace("X", ".")
+#             except Exception:
+#                 return str(v)
 
-        # --- CARDS DE TOTAIS ---
-        y_pos = 50
-        card_w = 55
-        card_h = 25
+#         # --- CARDS DE TOTAIS ---
+#         y_pos = 50
+#         card_w = 55
+#         card_h = 25
 
-        pdf.set_fill_color(232, 244, 248)
-        pdf.rect(15, y_pos, card_w, card_h, "F")
-        pdf.set_text_color(0, 51, 102)
-        pdf.set_font(fonte_padrao, "B", 12)
-        pdf.set_xy(18, y_pos + 4)
-        pdf.cell(card_w - 6, 8, fmt(d["receitas"]["total"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font(fonte_padrao, "", 9)
-        pdf.set_text_color(80, 80, 80)
-        pdf.set_xy(18, y_pos + 15)
-        pdf.cell(card_w - 6, 5, "Total de Receitas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_fill_color(232, 244, 248)
+#         pdf.rect(15, y_pos, card_w, card_h, "F")
+#         pdf.set_text_color(0, 51, 102)
+#         pdf.set_font(fonte_padrao, "B", 12)
+#         pdf.set_xy(18, y_pos + 4)
+#         pdf.cell(card_w - 6, 8, fmt(d["receitas"]["total"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_font(fonte_padrao, "", 9)
+#         pdf.set_text_color(80, 80, 80)
+#         pdf.set_xy(18, y_pos + 15)
+#         pdf.cell(card_w - 6, 5, "Total de Receitas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-        pdf.set_fill_color(248, 232, 232)
-        pdf.rect(77, y_pos, card_w, card_h, "F")
-        pdf.set_text_color(220, 53, 69)
-        pdf.set_font(fonte_padrao, "B", 12)
-        pdf.set_xy(80, y_pos + 4)
-        pdf.cell(card_w - 6, 8, fmt(d["despesas"]["total"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font(fonte_padrao, "", 9)
-        pdf.set_text_color(80, 80, 80)
-        pdf.set_xy(80, y_pos + 15)
-        pdf.cell(card_w - 6, 5, "Total de Despesas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_fill_color(248, 232, 232)
+#         pdf.rect(77, y_pos, card_w, card_h, "F")
+#         pdf.set_text_color(220, 53, 69)
+#         pdf.set_font(fonte_padrao, "B", 12)
+#         pdf.set_xy(80, y_pos + 4)
+#         pdf.cell(card_w - 6, 8, fmt(d["despesas"]["total"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_font(fonte_padrao, "", 9)
+#         pdf.set_text_color(80, 80, 80)
+#         pdf.set_xy(80, y_pos + 15)
+#         pdf.cell(card_w - 6, 5, "Total de Despesas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-        pdf.set_fill_color(238, 245, 232)
-        pdf.rect(139, y_pos, card_w, card_h, "F")
-        pdf.set_text_color(40, 167, 69)
-        pdf.set_font(fonte_padrao, "B", 12)
-        pdf.set_xy(142, y_pos + 4)
-        pdf.cell(card_w - 6, 8, fmt(d["caixa"]["saldo_seguinte"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font(fonte_padrao, "", 9)
-        pdf.set_text_color(80, 80, 80)
-        pdf.set_xy(142, y_pos + 15)
-        pdf.cell(card_w - 6, 5, "Saldo p/ Exerc. Seguinte", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_fill_color(238, 245, 232)
+#         pdf.rect(139, y_pos, card_w, card_h, "F")
+#         pdf.set_text_color(40, 167, 69)
+#         pdf.set_font(fonte_padrao, "B", 12)
+#         pdf.set_xy(142, y_pos + 4)
+#         pdf.cell(card_w - 6, 8, fmt(d["caixa"]["saldo_seguinte"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_font(fonte_padrao, "", 9)
+#         pdf.set_text_color(80, 80, 80)
+#         pdf.set_xy(142, y_pos + 15)
+#         pdf.cell(card_w - 6, 5, "Saldo p/ Exerc. Seguinte", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-        # --- TABELA DETALHADA ---
-        y_pos += 40
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font(fonte_padrao, "B", 10)
-        pdf.set_fill_color(0, 51, 102)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_xy(15, y_pos)
-        pdf.cell(90, 8, "Indicador", border=1, fill=True)
-        pdf.cell(40, 8, "Periodo Atual", border=1, fill=True, align="R")
-        pdf.cell(40, 8, "Periodo Anterior", border=1, fill=True, align="R")
-        pdf.ln()
-        y_pos += 8
+#         # --- TABELA DETALHADA ---
+#         y_pos += 40
+#         pdf.set_text_color(0, 0, 0)
+#         pdf.set_font(fonte_padrao, "B", 10)
+#         pdf.set_fill_color(0, 51, 102)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(90, 8, "Indicador", border=1, fill=True)
+#         pdf.cell(40, 8, "Periodo Atual", border=1, fill=True, align="R")
+#         pdf.cell(40, 8, "Periodo Anterior", border=1, fill=True, align="R")
+#         pdf.ln()
+#         y_pos += 8
 
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_draw_color(0, 51, 102)
-        pdf.set_line_width(0.2)
-        pdf.set_font(fonte_padrao, "", 9)
+#         pdf.set_text_color(0, 0, 0)
+#         pdf.set_draw_color(0, 51, 102)
+#         pdf.set_line_width(0.2)
+#         pdf.set_font(fonte_padrao, "", 9)
 
-        def add_linha(nome, at, ant, bold=False, fill_color=None, text_color=(0,0,0)):
-            nonlocal y_pos
-            if bold:
-                pdf.set_font(fonte_padrao, "B", 9)
-            else:
-                pdf.set_font(fonte_padrao, "", 9)
-            if fill_color:
-                pdf.set_fill_color(*fill_color)
-            pdf.set_text_color(*text_color)
+#         def add_linha(nome, at, ant, bold=False, fill_color=None, text_color=(0,0,0)):
+#             nonlocal y_pos
+#             if bold:
+#                 pdf.set_font(fonte_padrao, "B", 9)
+#             else:
+#                 pdf.set_font(fonte_padrao, "", 9)
+#             if fill_color:
+#                 pdf.set_fill_color(*fill_color)
+#             pdf.set_text_color(*text_color)
 
-            pdf.set_xy(15, y_pos)
-            pdf.cell(90, 6, nome, border=1, fill=bool(fill_color))
-            pdf.cell(40, 6, fmt(at), border=1, align="R", fill=bool(fill_color))
-            pdf.cell(40, 6, fmt(ant), border=1, align="R", fill=bool(fill_color))
-            pdf.ln()
-            y_pos += 6
+#             pdf.set_xy(15, y_pos)
+#             pdf.cell(90, 6, nome, border=1, fill=bool(fill_color))
+#             pdf.cell(40, 6, fmt(at), border=1, align="R", fill=bool(fill_color))
+#             pdf.cell(40, 6, fmt(ant), border=1, align="R", fill=bool(fill_color))
+#             pdf.ln()
+#             y_pos += 6
 
-        # Grupo Receitas
-        pdf.set_fill_color(232, 244, 248)
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font(fonte_padrao, "B", 9)
-        pdf.set_xy(15, y_pos)
-        pdf.cell(170, 6, "RECEITAS", border=1, fill=True)
-        pdf.ln()
-        y_pos += 6
-        add_linha("Receitas Correntes", d["receitas"]["corrente"]["atual"], d["receitas"]["corrente"]["anterior"])
-        add_linha("Receitas de Capital", d["receitas"]["capital"]["atual"], d["receitas"]["capital"]["anterior"])
-        add_linha("TOTAL DE RECEITAS", d["receitas"]["total"]["atual"], d["receitas"]["total"]["anterior"], bold=True)
+#         # Grupo Receitas
+#         pdf.set_fill_color(232, 244, 248)
+#         pdf.set_text_color(0, 0, 0)
+#         pdf.set_font(fonte_padrao, "B", 9)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "RECEITAS", border=1, fill=True)
+#         pdf.ln()
+#         y_pos += 6
+#         add_linha("Receitas Correntes", d["receitas"]["corrente"]["atual"], d["receitas"]["corrente"]["anterior"])
+#         add_linha("Receitas de Capital", d["receitas"]["capital"]["atual"], d["receitas"]["capital"]["anterior"])
+#         add_linha("TOTAL DE RECEITAS", d["receitas"]["total"]["atual"], d["receitas"]["total"]["anterior"], bold=True)
 
-        # Grupo Despesas
-        pdf.set_fill_color(248, 232, 232)
-        pdf.set_font(fonte_padrao, "B", 9)
-        pdf.set_xy(15, y_pos)
-        pdf.cell(170, 6, "DESPESAS", border=1, fill=True)
-        pdf.ln()
-        y_pos += 6
-        add_linha("Despesas Correntes", d["despesas"]["corrente"]["atual"], d["despesas"]["corrente"]["anterior"])
-        add_linha("Despesas de Capital", d["despesas"]["capital"]["atual"], d["despesas"]["capital"]["anterior"])
-        add_linha("TOTAL DE DESPESAS", d["despesas"]["total"]["atual"], d["despesas"]["total"]["anterior"], bold=True)
+#         # Grupo Despesas
+#         pdf.set_fill_color(248, 232, 232)
+#         pdf.set_font(fonte_padrao, "B", 9)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "DESPESAS", border=1, fill=True)
+#         pdf.ln()
+#         y_pos += 6
+#         add_linha("Despesas Correntes", d["despesas"]["corrente"]["atual"], d["despesas"]["corrente"]["anterior"])
+#         add_linha("Despesas de Capital", d["despesas"]["capital"]["atual"], d["despesas"]["capital"]["anterior"])
+#         add_linha("TOTAL DE DESPESAS", d["despesas"]["total"]["atual"], d["despesas"]["total"]["anterior"], bold=True)
 
-        # Grupo Extraorcamentario
-        pdf.set_fill_color(240, 240, 240)
-        pdf.set_font(fonte_padrao, "B", 9)
-        pdf.set_xy(15, y_pos)
-        pdf.cell(170, 6, "EXTRAORÇAMENTíRIO", border=1, fill=True)
-        pdf.ln()
-        y_pos += 6
-        add_linha("Recebimentos Extraorcamentarios", d["extra"]["recebimentos"]["atual"], d["extra"]["recebimentos"]["anterior"])
-        add_linha("Pagamentos Extraorcamentarios", d["extra"]["pagamentos"]["atual"], d["extra"]["pagamentos"]["anterior"])
+#         # Grupo Extraorcamentario
+#         pdf.set_fill_color(240, 240, 240)
+#         pdf.set_font(fonte_padrao, "B", 9)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "EXTRAORÇAMENTíRIO", border=1, fill=True)
+#         pdf.ln()
+#         y_pos += 6
+#         add_linha("Recebimentos Extraorcamentarios", d["extra"]["recebimentos"]["atual"], d["extra"]["recebimentos"]["anterior"])
+#         add_linha("Pagamentos Extraorcamentarios", d["extra"]["pagamentos"]["atual"], d["extra"]["pagamentos"]["anterior"])
 
-        # Grupo Caixa
-        pdf.set_fill_color(238, 245, 232)
-        pdf.set_font(fonte_padrao, "B", 9)
-        pdf.set_xy(15, y_pos)
-        pdf.cell(170, 6, "CAIXA E EQUIVALENTES", border=1, fill=True)
-        pdf.ln()
-        y_pos += 6
-        add_linha("Saldo em Espécie do Exercí­cio Anterior", d["caixa"]["saldo_anterior"]["atual"], d["caixa"]["saldo_anterior"]["anterior"])
-        add_linha("Geração Lí­quida de Caixa", d["caixa"]["geracao_liquida"]["atual"], d["caixa"]["geracao_liquida"]["anterior"], bold=True)
-        add_linha("Saldo em Espécie para o Exercí­cio Seguinte", d["caixa"]["saldo_seguinte"]["atual"], d["caixa"]["saldo_seguinte"]["anterior"], bold=True)
+#         # Grupo Caixa
+#         pdf.set_fill_color(238, 245, 232)
+#         pdf.set_font(fonte_padrao, "B", 9)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "CAIXA E EQUIVALENTES", border=1, fill=True)
+#         pdf.ln()
+#         y_pos += 6
+#         add_linha("Saldo em Espécie do Exercí­cio Anterior", d["caixa"]["saldo_anterior"]["atual"], d["caixa"]["saldo_anterior"]["anterior"])
+#         add_linha("Geração Lí­quida de Caixa", d["caixa"]["geracao_liquida"]["atual"], d["caixa"]["geracao_liquida"]["anterior"], bold=True)
+#         add_linha("Saldo em Espécie para o Exercí­cio Seguinte", d["caixa"]["saldo_seguinte"]["atual"], d["caixa"]["saldo_seguinte"]["anterior"], bold=True)
 
-        # ==========================================
-        # NOVOS TOTAIS (INGRESSOS E DISPÊNDIOS)
-        # ==========================================
-        y_pos += 5
+#         # ==========================================
+#         # NOVOS TOTAIS (INGRESSOS E DISPÊNDIOS)
+#         # ==========================================
+#         y_pos += 5
 
-        # Calculos de Ingressos
-        totRecAt = d["receitas"]["total"]["atual"]
-        totRecAnt = d["receitas"]["total"]["anterior"]
-        totExtAt = d["extra"]["recebimentos"]["atual"]
-        totExtAnt = d["extra"]["recebimentos"]["anterior"]
-        saldoAntAt = d["caixa"]["saldo_anterior"]["atual"]
-        saldoAntAnt = d["caixa"]["saldo_anterior"]["anterior"]
+#         # Calculos de Ingressos
+#         totRecAt = d["receitas"]["total"]["atual"]
+#         totRecAnt = d["receitas"]["total"]["anterior"]
+#         totExtAt = d["extra"]["recebimentos"]["atual"]
+#         totExtAnt = d["extra"]["recebimentos"]["anterior"]
+#         saldoAntAt = d["caixa"]["saldo_anterior"]["atual"]
+#         saldoAntAnt = d["caixa"]["saldo_anterior"]["anterior"]
 
-        totalIngAt = totRecAt + totExtAt + saldoAntAt
-        totalIngAnt = totRecAnt + totExtAnt + saldoAntAnt
+#         totalIngAt = totRecAt + totExtAt + saldoAntAt
+#         totalIngAnt = totRecAnt + totExtAnt + saldoAntAnt
 
-        # Tabela de Ingressos
-        pdf.set_fill_color(0, 86, 179)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font(fonte_padrao, "B", 10)
-        pdf.set_xy(15, y_pos)
-        pdf.cell(170, 6, "TOTAL GERAL DE INGRESSOS", border=1, fill=True)
-        pdf.ln()
-        y_pos += 6
+#         # Tabela de Ingressos
+#         pdf.set_fill_color(0, 86, 179)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_font(fonte_padrao, "B", 10)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "TOTAL GERAL DE INGRESSOS", border=1, fill=True)
+#         pdf.ln()
+#         y_pos += 6
 
-        add_linha("Receitas Orçamentárias (Corrente + Capital)", totRecAt, totRecAnt)
-        add_linha("Recebimentos Extraorcamentarios", totExtAt, totExtAnt)
-        add_linha("Saldo em Espécie do Exercí­cio Anterior", saldoAntAt, saldoAntAnt)
-        add_linha("TOTAL DE INGRESSOS", totalIngAt, totalIngAnt, bold=True, fill_color=(233, 236, 239), text_color=(0, 86, 179))
+#         add_linha("Receitas Orçamentárias (Corrente + Capital)", totRecAt, totRecAnt)
+#         add_linha("Recebimentos Extraorcamentarios", totExtAt, totExtAnt)
+#         add_linha("Saldo em Espécie do Exercí­cio Anterior", saldoAntAt, saldoAntAnt)
+#         add_linha("TOTAL DE INGRESSOS", totalIngAt, totalIngAnt, bold=True, fill_color=(233, 236, 239), text_color=(0, 86, 179))
 
-        # Calculos de Dispíªndios
-        y_pos += 5
-        totDespAt = d["despesas"]["total"]["atual"]
-        totDespAnt = d["despesas"]["total"]["anterior"]
-        pagExtAt = d["extra"]["pagamentos"]["atual"]
-        pagExtAnt = d["extra"]["pagamentos"]["anterior"]
-        saldoSegAt = d["caixa"]["saldo_seguinte"]["atual"]
-        saldoSegAnt = d["caixa"]["saldo_seguinte"]["anterior"]
+#         # Calculos de Dispíªndios
+#         y_pos += 5
+#         totDespAt = d["despesas"]["total"]["atual"]
+#         totDespAnt = d["despesas"]["total"]["anterior"]
+#         pagExtAt = d["extra"]["pagamentos"]["atual"]
+#         pagExtAnt = d["extra"]["pagamentos"]["anterior"]
+#         saldoSegAt = d["caixa"]["saldo_seguinte"]["atual"]
+#         saldoSegAnt = d["caixa"]["saldo_seguinte"]["anterior"]
 
-        totalDispAt = totDespAt + pagExtAt + saldoSegAt
-        totalDispAnt = totDespAnt + pagExtAnt + saldoSegAnt
+#         totalDispAt = totDespAt + pagExtAt + saldoSegAt
+#         totalDispAnt = totDespAnt + pagExtAnt + saldoSegAnt
 
-        # Tabela de Dispíªndios
-        pdf.set_fill_color(220, 53, 69)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font(fonte_padrao, "B", 10)
-        pdf.set_xy(15, y_pos)
-        pdf.cell(170, 6, "TOTAL GERAL DE DISPÊNDIOS", border=1, fill=True)
-        pdf.ln()
-        y_pos += 6
+#         # Tabela de Dispíªndios
+#         pdf.set_fill_color(220, 53, 69)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_font(fonte_padrao, "B", 10)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "TOTAL GERAL DE DISPÊNDIOS", border=1, fill=True)
+#         pdf.ln()
+#         y_pos += 6
 
-        add_linha("Despesas Orçamentárias (Corrente + Capital)", totDespAt, totDespAnt)
-        add_linha("Pagamentos Extraorcamentarios", pagExtAt, pagExtAnt)
-        add_linha("Saldo em Espécie para o Exercí­cio Seguinte", saldoSegAt, saldoSegAnt)
-        add_linha("TOTAL DE DISPÊNDIOS", totalDispAt, totalDispAnt, bold=True, fill_color=(233, 236, 239), text_color=(220, 53, 69))
+#         add_linha("Despesas Orçamentárias (Corrente + Capital)", totDespAt, totDespAnt)
+#         add_linha("Pagamentos Extraorcamentarios", pagExtAt, pagExtAnt)
+#         add_linha("Saldo em Espécie para o Exercí­cio Seguinte", saldoSegAt, saldoSegAnt)
+#         add_linha("TOTAL DE DISPÊNDIOS", totalDispAt, totalDispAnt, bold=True, fill_color=(233, 236, 239), text_color=(220, 53, 69))
 
-        # Rodape - Posiciona dinamicamente, abaixo da ultima linha (se houver espaco)
-        y_rodape = max(y_pos + 5, 270)
-        if y_rodape > 280:
-            y_rodape = 280
+#         # Rodape - Posiciona dinamicamente, abaixo da ultima linha (se houver espaco)
+#         y_rodape = max(y_pos + 5, 270)
+#         if y_rodape > 280:
+#             y_rodape = 280
 
-        pdf.set_draw_color(200, 200, 200)
-        pdf.set_line_width(0.3)
-        pdf.line(15, y_rodape, 195, y_rodape)
-        pdf.set_text_color(120, 120, 120)
-        pdf.set_font(fonte_padrao, "I", 8)
-        pdf.set_xy(15, y_rodape + 2)
-        pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
-        pdf.set_xy(135, y_rodape + 2)
-        pdf.cell(60, 5, f"Gerado em: {datetime.now():%d/%m/%Y %H:%M}", align="R")
+#         pdf.set_draw_color(200, 200, 200)
+#         pdf.set_line_width(0.3)
+#         pdf.line(15, y_rodape, 195, y_rodape)
+#         pdf.set_text_color(120, 120, 120)
+#         pdf.set_font(fonte_padrao, "I", 8)
+#         pdf.set_xy(15, y_rodape + 2)
+#         pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
+#         pdf.set_xy(135, y_rodape + 2)
+#         pdf.cell(60, 5, f"Gerado em: {datetime.now():%d/%m/%Y %H:%M}", align="R")
 
-        pdf_bytes = bytes(pdf.output())
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"inline; filename=balanco_financeiro_{periodo}.pdf"}
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
+#         pdf_bytes = bytes(pdf.output())
+#         return Response(
+#             content=pdf_bytes,
+#             media_type="application/pdf",
+#             headers={"Content-Disposition": f"inline; filename=balanco_financeiro_{periodo}.pdf"}
+#         )
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         import traceback
+#         traceback.print_exc()
+#         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
 
-@app.get("/analise_financeira_bf")
-async def serve_analise_financeira_bf():
-    from fastapi.responses import FileResponse
-    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_financeira_bf.html")
-    return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
+# @app.get("/analise_financeira_bf")
+# async def serve_analise_financeira_bf():
+#     from fastapi.responses import FileResponse
+#     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_financeira_bf.html")
+#     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
 
 # ============ ROTAS DFC (Analise do Fluxo de Caixa) ============
 

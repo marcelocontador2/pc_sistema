@@ -315,6 +315,35 @@ tr:nth-child(even){background:#f8fbff}
 .concl{margin-top:15px;padding:15px;background:#f0f9ff;border-left:4px solid #003366;font-size:13px}
 #btn-confirmar{background:#28a745;display:none}
 </style>
+
+
+
+
+<style id="css-print">
+@media print {
+    /* Esconde o histórico, menus, botões, filtros e selects */
+    .topbar, .sidebar, .menu-lateral, .historico-container, #historico,
+    .filtros, .acoes, .btn-group, button, .btn, select, input,
+    #btn-voltar, #btn-exibir, #btn-excluir, #btn-pdf-unico, #btn-verificar, #btn-confirmar,
+    .header-controls, .header-buttons {
+        display: none !important;
+    }
+    /* Faz o conteúdo principal ocupar 100% da folha */
+    body, html, .container, .main-content, #main, #conteudo {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+    /* Tabela e gráfico ocupam a largura total */
+    table { width: 100% !important; page-break-inside: avoid; }
+    canvas { max-width: 100% !important; height: auto !important; }
+    /* Força cores no PDF */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
+</style>
+
 </head>
 <body>
 <div class="topbar">
@@ -340,7 +369,94 @@ tr:nth-child(even){background:#f8fbff}
 <div class="esq">
 <div class="tab"><table id="tab">
 <thead><tr><th>Indicador</th><th>Período Atual</th><th>Período Anterior</th><th>Var. (%)</th></tr></thead>
-<tbody><tr><td colspan="4" style="text-align:center">Clique em Verificar</td></tr></tbody>
+<tbody>
+<tbody>
+    <tr style="background:#003366; color:#fff; font-weight:bold;">
+        <td colspan="4">RECEITAS</td>
+    </tr>
+    <tr>
+        <td>Receitas Correntes</td>
+        <td id="rec_corrente">0,00</td>
+        <td id="rec_corrente_ant">0,00</td>
+        <td id="rec_corrente_var">+0,00%</td>
+    </tr>
+    <tr>
+        <td>Receitas de Capital</td>
+        <td id="rec_capital">0,00</td>
+        <td id="rec_capital_ant">0,00</td>
+        <td id="rec_capital_var">+0,00%</td>
+    </tr>
+    <tr style="font-weight:bold;">
+        <td>Total de Receitas</td>
+        <td id="rec_total">0,00</td>
+        <td id="rec_total_ant">0,00</td>
+        <td id="rec_total_var">+0,00%</td>
+    </tr>
+    <tr><td colspan="4" style="height:5px; border:none;"></td></tr>
+    
+    <tr style="background:#dc3545; color:#fff; font-weight:bold;">
+        <td colspan="4">DESPESAS</td>
+    </tr>
+    <tr>
+        <td>Despesas Correntes</td>
+        <td id="des_corrente">0,00</td>
+        <td id="des_corrente_ant">0,00</td>
+        <td id="des_corrente_var">+0,00%</td>
+    </tr>
+    <tr>
+        <td>Despesas de Capital</td>
+        <td id="des_capital">0,00</td>
+        <td id="des_capital_ant">0,00</td>
+        <td id="des_capital_var">+0,00%</td>
+    </tr>
+    <tr style="font-weight:bold;">
+        <td>Total de Despesas</td>
+        <td id="des_total">0,00</td>
+        <td id="des_total_ant">0,00</td>
+        <td id="des_total_var">+0,00%</td>
+    </tr>
+    <tr><td colspan="4" style="height:5px; border:none;"></td></tr>
+    
+    <tr style="background:#6c757d; color:#fff; font-weight:bold;">
+        <td colspan="4">EXTRAORÇAMENTARIO</td>
+    </tr>
+    <tr>
+        <td>Recebimentos Extraorçamentarios</td>
+        <td id="extra_receb">0,00</td>
+        <td id="extra_receb_ant">0,00</td>
+        <td id="extra_receb_var">+0,00%</td>
+    </tr>
+    <tr>
+        <td>Pagamentos Extraorçamentarios</td>
+        <td id="extra_pag">0,00</td>
+        <td id="extra_pag_ant">0,00</td>
+        <td id="extra_pag_var">+0,00%</td>
+    </tr>
+    <tr><td colspan="4" style="height:5px; border:none;"></td></tr>
+    
+    <tr style="background:#28a745; color:#fff; font-weight:bold;">
+        <td colspan="4">CAIXA E EQUIVALENTES</td>
+    </tr>
+    <tr>
+        <td>Saldo em Especie do Exerc. Anterior</td>
+        <td id="caixa_anterior">0,00</td>
+        <td id="caixa_anterior_ant">0,00</td>
+        <td id="caixa_anterior_var">+0,00%</td>
+    </tr>
+    <tr>
+        <td>Geracao Liquida de Caixa</td>
+        <td id="caixa_geracao">0,00</td>
+        <td id="caixa_geracao_ant">0,00</td>
+        <td id="caixa_geracao_var">+0,00%</td>
+    </tr>
+    <tr>
+        <td>Saldo em Especie para o Exerc. Seguinte</td>
+        <td id="caixa_seguinte">0,00</td>
+        <td id="caixa_seguinte_ant">0,00</td>
+        <td id="caixa_seguinte_var">+0,00%</td>
+    </tr>
+</tbody>
+</tbody>
 </table></div>
 <div class="concl" id="concl" style="display:none"></div>
 </div>
@@ -963,5 +1079,237 @@ function exibirSelecionado() {
         }
 
         </script>
+
+
+<script>
+(function() {
+    console.log('[FINAL] Carregando funções essenciais...');
+
+    function getVal(obj, path) {
+        if (!obj) return 0;
+        var parts = path.split('.');
+        var cur = obj;
+        for (var i = 0; i < parts.length; i++) {
+            if (cur && cur[parts[i]] !== undefined) cur = cur[parts[i]];
+            else return 0;
+        }
+        return typeof cur === 'number' ? cur : (cur.atual !== undefined ? cur.atual : 0);
+    }
+
+    function fmt(v) {
+        return (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    window.render = function(at, ant) {
+        console.log('[FINAL] render() chamado');
+        var tbody = document.querySelector('#tab tbody') || document.querySelector('table tbody');
+        if (!tbody) { console.log('[FINAL] Tabela não encontrada!'); return; }
+        
+        // Limpa o "Carregando..." se existir
+        if (tbody.innerText.includes('Carregando') || tbody.innerText.includes('Clique em')) {
+            tbody.innerHTML = '';
+        }
+
+        var mapa = {
+            'receitas correntes': 'receitas.corrente',
+            'receitas de capital': 'receitas.capital',
+            'total de receitas': 'receitas.total',
+            'despesas correntes': 'despesas.corrente',
+            'despesas de capital': 'despesas.capital',
+            'total de despesas': 'despesas.total',
+            'recebimentos extraorcamentarios': 'extra.recebimentos',
+            'pagamentos extraorcamentarios': 'extra.pagamentos',
+            'saldo em especie do exerc. anterior': 'caixa.saldo_anterior',
+            'geracao liquida de caixa': 'caixa.geracao_liquida',
+            'saldo em especie para o exerc. seguinte': 'caixa.saldo_seguinte'
+        };
+
+        var linhas = tbody.querySelectorAll('tr');
+        console.log('[FINAL] Linhas na tabela: ' + linhas.length);
+        
+        linhas.forEach(function(tr) {
+            var tds = tr.querySelectorAll('td');
+            if (tds.length >= 2) {
+                var nome = tds[0].innerText.trim().toLowerCase();
+                nome = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                for (var chave in mapa) {
+                    if (nome.includes(chave)) {
+                        tds[1].innerText = fmt(getVal(at, mapa[chave]));
+                        break;
+                    }
+                }
+            }
+        });
+
+        // Gráfico
+        var canvas = document.getElementById('graf');
+        if (typeof Chart !== 'undefined' && canvas) {
+            var ctx = canvas.getContext('2d');
+            var c = Chart.getChart(ctx);
+            if (c) c.destroy();
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Receitas', 'Despesas', 'Saldo Ant', 'Saldo Seg'],
+                    datasets: [{
+                        label: 'Atual',
+                        data: [getVal(at, 'receitas.total'), getVal(at, 'despesas.total'), getVal(at, 'caixa.saldo_anterior'), getVal(at, 'caixa.saldo_seguinte')],
+                        backgroundColor: ['#003366', '#dc3545', '#28a745', '#17a2b8']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    };
+
+    window.carregar = function() {
+        console.log('[FINAL] carregar() chamado');
+        var ano = document.getElementById('ano') ? document.getElementById('ano').value : '2026';
+        var tipo = document.getElementById('tipo') ? document.getElementById('tipo').value : 'TRIMESTRE';
+        var val = document.getElementById('valor') ? document.getElementById('valor').value : '3';
+        var per_atual = ano + '-' + tipo + '-' + val;
+        var per_ant = (parseInt(ano) - 1) + '-' + tipo + '-' + val;
+        
+        fetch('/api/analise_financeira_bf/' + per_atual + '/' + per_ant)
+            .then(r => r.json())
+            .then(j => {
+                if (j.erro) { alert('Erro: ' + j.mensagem); return; }
+                window.render(j.dados, j.dados);
+            })
+            .catch(e => console.error('[FINAL] Erro carregar:', e));
+    };
+
+    window.exibirSelecionado = function() {
+        console.log('[FINAL] exibirSelecionado() chamado');
+        var checks = document.querySelectorAll('input[type="checkbox"]');
+        var sel = null;
+        for (var i = 0; i < checks.length; i++) { if (checks[i].checked) { sel = checks[i]; break; } }
+        if (!sel) { alert('Selecione um item no Histórico.'); return; }
+        var id = sel.value || sel.getAttribute('data-id');
+        if (!id) { alert('ID não encontrado.'); return; }
+        fetch('/historico_analise_financeira_bf/' + id)
+            .then(r => r.json())
+            .then(j => { if (j.dados) window.render(j.dados, j.dados); })
+            .catch(e => console.error('[FINAL] Erro exibir:', e));
+    };
+
+    console.log('[FINAL] Funções prontas.');
+})();
+</script>
+
+
+
+
+
+
+
+
+<script id="fix-render">
+(function() {
+    console.log('[RENDER] Função corrigida para ler atual e anterior.');
+
+    function getVal(obj, path, lado) {
+        // lado = 'atual' ou 'anterior'
+        if (!obj) return 0;
+        var parts = path.split('.');
+        var cur = obj;
+        for (var i = 0; i < parts.length; i++) {
+            if (cur && cur[parts[i]] !== undefined) cur = cur[parts[i]];
+            else return 0;
+        }
+        // Se cur for um objeto com .atual / .anterior, retorna o lado correto
+        if (cur && typeof cur === 'object') {
+            return cur[lado] !== undefined ? cur[lado] : 0;
+        }
+        return cur || 0;
+    }
+
+    function fmt(v) {
+        return (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function pct(a, b) {
+        if (!b || b === 0) return '-';
+        var p = ((a - b) / Math.abs(b)) * 100;
+        return (p >= 0 ? '+' : '') + p.toFixed(2).replace('.', ',') + '%';
+    }
+
+    window.render = function(at, ant) {
+        console.log('[RENDER] render() chamado');
+
+        var campos = {
+            'rec_corrente': 'receitas.corrente',
+            'rec_capital': 'receitas.capital',
+            'rec_total': 'receitas.total',
+            'des_corrente': 'despesas.corrente',
+            'des_capital': 'despesas.capital',
+            'des_total': 'despesas.total',
+            'extra_receb': 'extra.recebimentos',
+            'extra_pag': 'extra.pagamentos',
+            'caixa_anterior': 'caixa.saldo_anterior',
+            'caixa_geracao': 'caixa.geracao_liquida',
+            'caixa_seguinte': 'caixa.saldo_seguinte'
+        };
+
+        for (var id in campos) {
+            var path = campos[id];
+            // Lê ATUAL do objeto 'at' e ANTERIOR do objeto 'ant'
+            var vAtual = getVal(at, path, 'atual');
+            var vAnterior = getVal(ant, path, 'anterior');
+
+            var el = document.getElementById(id);
+            if (el) el.innerText = fmt(vAtual);
+
+            var elAnt = document.getElementById(id + '_ant');
+            if (elAnt) elAnt.innerText = fmt(vAnterior);
+
+            var elVar = document.getElementById(id + '_var');
+            if (elVar) {
+                elVar.innerText = pct(vAtual, vAnterior);
+                elVar.className = (vAtual - vAnterior) >= 0 ? 'pos' : 'neg';
+            }
+        }
+
+        console.log('[RENDER] Tabela preenchida (atual e anterior diferentes).');
+
+        // Gráfico
+        var canvas = document.getElementById('graf');
+        if (typeof Chart !== 'undefined' && canvas) {
+            var ctx = canvas.getContext('2d');
+            var c = Chart.getChart(ctx);
+            if (c) c.destroy();
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Receitas', 'Despesas', 'Saldo Ant', 'Saldo Seg'],
+                    datasets: [
+                        {
+                            label: 'Atual',
+                            data: [
+                                getVal(at, 'receitas.total', 'atual'),
+                                getVal(at, 'despesas.total', 'atual'),
+                                getVal(at, 'caixa.saldo_anterior', 'atual'),
+                                getVal(at, 'caixa.saldo_seguinte', 'atual')
+                            ],
+                            backgroundColor: '#003366'
+                        },
+                        {
+                            label: 'Anterior',
+                            data: [
+                                getVal(ant, 'receitas.total', 'anterior'),
+                                getVal(ant, 'despesas.total', 'anterior'),
+                                getVal(ant, 'caixa.saldo_anterior', 'anterior'),
+                                getVal(ant, 'caixa.saldo_seguinte', 'anterior')
+                            ],
+                            backgroundColor: '#17a2b8'
+                        }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    };
+})();
+</script>
 
 </body></html>
