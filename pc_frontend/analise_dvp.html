@@ -1,0 +1,286 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Analise DVP - Demonstracao das Variacoes Patrimoniais</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-voltar { background: #f0ad4e; }
+        .btn-salvar { background: #28a745; }
+        .btn-pdf { background: #0056b3; }
+        .btn-excluir { background: #dc3545; }
+        .btn-exibir { background: #17a2b8; }
+        .btn-verificar { background: #0056b3; }
+        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+        .filtros label { font-size: 12px; font-weight: bold; color: #555; }
+        .filtros select, .filtros input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        .layout { display: flex; gap: 20px; }
+        .sidebar { width: 250px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: fit-content; }
+        .sidebar h3 { margin-top: 0; font-size: 16px; color: #003366; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .hist-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .hist-item input { cursor: pointer; }
+        .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .cards { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .card { flex: 1; min-width: 150px; text-align: center; padding: 15px; border-radius: 8px; background: #f9fafb; border: 1px solid #e5e7eb; }
+        .card .label { font-size: 11px; color: #6b7280; text-transform: uppercase; margin-bottom: 5px; }
+        .card .value { font-size: 18px; font-weight: bold; color: #003366; }
+        .card.vpa .value { color: #0056b3; }
+        .card.vpd .value { color: #dc3545; }
+        .card.resultado .value { color: #28a745; }
+        .card.margem .value { color: #17a2b8; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #003366; color: white; padding: 10px; text-align: left; }
+        th.right, td.right { text-align: right; }
+        td { padding: 8px; border-bottom: 1px solid #eee; }
+        .tr-header { font-weight: bold; color: white; }
+        .bg-vpa { background: #0056b3; }
+        .bg-vpd { background: #dc3545; }
+        .bg-resultado { background: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="btn btn-voltar" onclick="window.location.href='/panorama'">← Voltar</button>
+        <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
+        <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+        <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
+        <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir</button>
+    </div>
+
+    <h2 style="color: #003366; margin-bottom: 10px;">Demonstração das Variações Patrimoniais (DVP)</h2>
+    <p style="color: #6b7280; margin-top: 0;">Comparativo do período atual vs. anterior.</p>
+
+    <div class="filtros">
+        <label>Ano:</label>
+        <input type="number" id="ano" value="2026" style="width: 80px;">
+        <label>Tipo:</label>
+        <select id="tipo">
+            <option value="TRIMESTRE">Trimestre</option>
+            <option value="MES">Mês</option>
+            <option value="EXERCICIO">Exercício</option>
+        </select>
+        <label>Período:</label>
+        <select id="val">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+        </select>
+        <button class="btn btn-verificar" onclick="carregar()">Verificar Dados</button>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <h3>Histórico Salvo</h3>
+            <div id="historico"><p style="font-size: 13px; color: #999;">Carregando...</p></div>
+        </div>
+        <div class="main-content">
+            <div class="cards">
+                <div class="card vpa">
+                    <div class="label">Total VPA</div>
+                    <div class="value" id="card-vpa">R$ 0,00</div>
+                </div>
+                <div class="card vpd">
+                    <div class="label">Total VPD</div>
+                    <div class="value" id="card-vpd">R$ 0,00</div>
+                </div>
+                <div class="card resultado">
+                    <div class="label">Resultado</div>
+                    <div class="value" id="card-resultado">R$ 0,00</div>
+                </div>
+                <div class="card margem">
+                    <div class="label">Margem</div>
+                    <div class="value" id="card-margem">0,00%</div>
+                </div>
+            </div>
+
+            <table id="tab">
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th class="right">Período Atual</th>
+                        <th class="right">Período Anterior</th>
+                        <th class="right">Var. (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" style="text-align:center; color:#999;">Clique em Verificar para carregar os dados.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function mp(a, t, v) { return a + "-" + t + "-" + v; }
+        function fmt(v) { return (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function pct(va, vb) { if (!vb || vb === 0) return "-"; return (((va - vb) / Math.abs(vb)) * 100).toFixed(2).replace(".", ",") + "%"; }
+
+        function carregar() {
+            const ano = document.getElementById('ano').value;
+            const tipo = document.getElementById('tipo').value;
+            const val = document.getElementById('val').value;
+            const periodoAtual = mp(ano, tipo, val);
+            console.log('[DVP] Carregando periodo:', periodoAtual);
+
+            fetch('/api/analise_patrimonial/' + periodoAtual)
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(data => {
+                    if (data.erro) {
+                        document.querySelector('#tab tbody').innerHTML = '<tr><td colspan="4" style="color:red; text-align:center;">' + (data.mensagem || 'Arquivo CSV nao encontrado.') + '</td></tr>';
+                        return;
+                    }
+                    render(data.dados, data.dados);
+                    const btn = document.getElementById('btn-salvar');
+                    btn.style.display = 'inline-block';
+                    btn.setAttribute('data-periodo', periodoAtual);
+                })
+                .catch(e => {
+                    console.error('[DVP] Erro:', e);
+                    document.querySelector('#tab tbody').innerHTML = '<tr><td colspan="4" style="color:red; text-align:center;">Erro: ' + e.message + '</td></tr>';
+                });
+        }
+
+        function render(at, ant) {
+            const tbody = document.querySelector('#tab tbody');
+            tbody.innerHTML = '';
+
+            const secoes = [
+                { titulo: 'VARIACOES PATRIMONIAIS AUMENTATIVAS (VPA)', cor: 'bg-vpa', campos: [
+                    { nome: 'VPA Financeiras', path: 'vpa_financeiras' },
+                    { nome: 'Transferencias Recebidas', path: 'transf_recebidas' },
+                    { nome: 'Outras VPA', path: 'outras_vpa' },
+                    { nome: 'Reversao de Provisoes', path: 'reversao_provisoes' },
+                    { nome: 'TOTAL VPA', path: 'total_vpa', negrito: true }
+                ]},
+                { titulo: 'VARIACOES PATRIMONIAIS DIMINUTIVAS (VPD)', cor: 'bg-vpd', campos: [
+                    { nome: 'VPD Financeiras', path: 'vpd_financeiras' },
+                    { nome: 'Pessoal e Encargos', path: 'pessoal_encargos' },
+                    { nome: 'Uso de Material de Consumo', path: 'uso_material_consumo' },
+                    { nome: 'Servicos', path: 'servicos' },
+                    { nome: 'Depreciacao', path: 'depreciacao' },
+                    { nome: 'Amortizacao', path: 'amortizacao' },
+                    { nome: 'Transferencias Concedidas', path: 'transf_concedidas' },
+                    { nome: 'Outras VPD', path: 'outras_vpd' },
+                    { nome: 'Tributarias', path: 'tributarias' },
+                    { nome: 'TOTAL VPD', path: 'total_vpd', negrito: true }
+                ]},
+                { titulo: 'RESULTADO PATRIMONIAL', cor: 'bg-resultado', campos: [
+                    { nome: 'Resultado do Periodo', path: 'resultado', negrito: true },
+                    { nome: 'Tipo de Resultado', path: 'tipo_resultado', texto: true },
+                    { nome: 'Margem (%)', path: 'margem_resultado', sufixo: '%' }
+                ]}
+            ];
+
+            function getValLocal(obj, path, lado) {
+                if (!obj) return 0;
+                var parts = path.split('.');
+                var cur = obj;
+                for (var i = 0; i < parts.length; i++) {
+                    if (cur && cur[parts[i]] !== undefined) cur = cur[parts[i]];
+                    else return 0;
+                }
+                if (cur && typeof cur === 'object') {
+                    return cur[lado] !== undefined ? cur[lado] : 0;
+                }
+                return cur || 0;
+            }
+
+            secoes.forEach(sec => {
+                const tr = document.createElement('tr');
+                tr.className = 'tr-header ' + sec.cor;
+                tr.innerHTML = '<td colspan="4">' + sec.titulo + '</td>';
+                tbody.appendChild(tr);
+
+                sec.campos.forEach(campo => {
+                    const tr = document.createElement('tr');
+                    if (campo.negrito) tr.style.fontWeight = 'bold';
+
+                    const va = getValLocal(at, campo.path, 'atual');
+                    const vb = getValLocal(ant, campo.path, 'anterior');
+
+                    if (campo.texto) {
+                        tr.innerHTML = '<td>' + campo.nome + '</td><td class="right">' + (va || '-') + '</td><td class="right">' + (vb || '-') + '</td><td class="right">-</td>';
+                    } else if (campo.sufixo) {
+                        tr.innerHTML = '<td>' + campo.nome + '</td><td class="right">' + fmt(va) + campo.sufixo + '</td><td class="right">' + fmt(vb) + campo.sufixo + '</td><td class="right">-</td>';
+                    } else {
+                        tr.innerHTML = '<td>' + campo.nome + '</td><td class="right">R$ ' + fmt(va) + '</td><td class="right">R$ ' + fmt(vb) + '</td><td class="right">' + pct(va, vb) + '</td>';
+                    }
+                    tbody.appendChild(tr);
+                });
+            });
+
+            document.getElementById('card-vpa').innerText = 'R$ ' + fmt(getValLocal(at, 'total_vpa', 'atual'));
+            document.getElementById('card-vpd').innerText = 'R$ ' + fmt(getValLocal(at, 'total_vpd', 'atual'));
+            document.getElementById('card-resultado').innerText = 'R$ ' + fmt(getValLocal(at, 'resultado', 'atual'));
+            document.getElementById('card-margem').innerText = fmt(getValLocal(at, 'margem_resultado', 'atual')) + '%';
+        }
+
+        function salvar() {
+            const btn = document.getElementById('btn-salvar');
+            const periodo = btn.getAttribute('data-periodo');
+            if (!periodo) { alert('Verifique os dados primeiro.'); return; }
+            const partes = periodo.split('-');
+            const anterior = (parseInt(partes[0]) - 1) + '-' + partes[1] + '-' + partes[2];
+            fetch('/api/analise_patrimonial/salvar/' + periodo + '/' + anterior, { method: 'POST' })
+                .then(r => r.json())
+                .then(j => { if (j.ok) { alert('Salvo com ID ' + j.id); carregarHistorico(); } else alert('Erro: ' + j.mensagem); });
+        }
+
+        function carregarHistorico() {
+            fetch('/api/analise_patrimonial/historico')
+                .then(r => r.json())
+                .then(hist => {
+                    const div = document.getElementById('historico');
+                    div.innerHTML = '';
+                    if (!hist.length) { div.innerHTML = '<p style="font-size:13px;color:#999;">Nenhum histórico.</p>'; return; }
+                    hist.forEach(h => {
+                        const d = document.createElement('div');
+                        d.className = 'hist-item';
+                        d.innerHTML = '<input type="checkbox" value="' + h.id + '"> <span>' + h.periodo + '</span>';
+                        div.appendChild(d);
+                    });
+                });
+        }
+
+        function exibirSelecionado() {
+            const sel = document.querySelector('.hist-item input:checked');
+            if (!sel) { alert('Selecione um item no histórico.'); return; }
+            fetch('/api/analise_patrimonial/historico/' + sel.value)
+                .then(r => r.json())
+                .then(j => { if (j.dados) render(j.dados, j.dados); });
+        }
+
+        function excluirSelecionado() {
+            const sel = document.querySelector('.hist-item input:checked');
+            if (!sel) { alert('Selecione um item.'); return; }
+            if (!confirm('Excluir?')) return;
+            fetch('/api/analise_patrimonial/excluir/' + sel.value, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(j => { if (j.ok) carregarHistorico(); });
+        }
+
+        function gerarPDF() {
+            const sel = document.querySelector('.hist-item input:checked');
+            if (!sel) { alert('Selecione um item no histórico.'); return; }
+            window.open('/api/analise_patrimonial/gerar_pdf/' + sel.value, '_blank');
+        }
+
+        // Auto-load por ?id=
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            if (!id) return;
+            console.log('[DVP-AUTO] Carregando id=' + id);
+            fetch('/api/analise_patrimonial/historico/' + id)
+                .then(r => r.json())
+                .then(j => { if (j.dados) render(j.dados, j.dados); });
+        })();
+
+        // Carrega histórico ao abrir
+        document.addEventListener('DOMContentLoaded', carregarHistorico);
+    </script>
+</body>
+</html>
+
