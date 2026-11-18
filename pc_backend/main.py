@@ -4,6 +4,7 @@ from pc_backend import sqlite_compat
 
 from fastapi.staticfiles import StaticFiles
 from pc_backend.app.routers import dfc
+from pc_backend.app.routers import dvp
 from fastapi import Response, Request, Request, FastAPI, Request, Form
 from fastapi import FastAPI, UploadFile, File
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
@@ -985,6 +986,7 @@ async def ler_relatorio_csv(tipo: str):
     return {"tipo": tipo, "arquivo": os.path.basename(arquivo), "dados": dados}
 # --- CONEXAO DA MATRIZ DE INTEGRIDADE ---
 app.include_router(dfc.router)
+app.include_router(dvp.router)
 # =======================================================
 # ROTINAS DE LIQUIDEZ (CALCULO, SALVAR, HISTORICO, PDF)
 # =======================================================
@@ -8986,3 +8988,13 @@ async def serve_analise_dfc_tela():
     if os.path.exists(caminho):
         return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
     return {"erro": "Arquivo HTML nao encontrado", "caminho": caminho}
+
+
+
+@app.get("/analise_dvp")
+async def serve_analise_dvp():
+    from fastapi.responses import FileResponse
+    caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend", "analise_dvp.html")
+    if os.path.exists(caminho):
+        return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    return {"erro": "Arquivo nao encontrado", "caminho": caminho}

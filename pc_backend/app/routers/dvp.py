@@ -133,3 +133,130 @@ async def api_analise_patrimonial(periodo: str):
     except Exception as e:
         print(f"[DVP] ERRO: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================
+# ROTAS DE SALVAR, HISTÓRICO E PDF (PostgreSQL)
+# ============================================================
+import json
+from datetime import datetime
+from fastapi import Response
+import psycopg2
+from pc_backend.app.config import PG_CONFIG
+
+
+@router.post("/salvar/{periodo}/{periodo_anterior}")
+def salvar_analise_dvp(periodo: str, periodo_anterior: str):
+    try:
+        p_limpo = periodo.replace("-", "_")
+        caminho = os.path.join(UPLOADS_DIR, f"DVP_{p_limpo}.csv")
+        if not os.path.exists(caminho):
+            return {"ok": False, "mensagem": f"CSV nao encontrado: DVP_{p_limpo}.csv"}
+        
+        resultado = processar_dvp(caminho)
+        if resultado.get("erro"):
+            return {"ok": False, "mensagem": resultado.get("mensagem", "Erro no processamento")}
+        
+        dados_json = resultado["dados"]
+        periodo_label = f"{periodo} vs {periodo_anterior}"
+        
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO historico_analise_dvp (periodo, data_geracao, resultado_json)
+            VALUES (%s, NOW(), %s) RETURNING id
+        """, (periodo_label, json.dumps(dados_json, ensure_ascii=False)))
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        conn.close()
+        
+        return {"ok": True, "id": new_id, "mensagem": "Salvo com sucesso"}
+    except Exception as e:
+        import traceback
+        print(f"[DVP] Erro ao salvar: {e}\n{traceback.format_exc()}")
+        return {"ok": False, "mensagem": str(e)}
+
+
+@router.get("/historico")
+def get_historico_dvp():
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dvp ORDER BY id DESC")
+        rows = cur.fetchall()
+        conn.close()
+        return [{"id": r[0], "periodo": r[1], "data_geracao": str(r[2])} for r in rows]
+    except Exception as e:
+        print(f"[DVP] Erro ao listar historico: {e}")
+        return []
+
+
+@router.get("/historico/{id}")
+def get_historico_dvp_id(id: int):
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT periodo, resultado_json FROM historico_analise_dvp WHERE id = %s", (id,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return {"erro": True, "mensagem": "Nao encontrado"}
+        dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
+        return {"erro": False, "periodo": row[0], "dados": dados}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+
+
+@router.delete("/excluir/{id}")
+def excluir_dvp(id: int):
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("DELETE FROM historico_analise_dvp WHERE id = %s", (id,))
+        conn.commit()
+        conn.close()
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "mensagem": str(e)}
+
+
+@router.get("/gerar_pdf/{id}")
+def gerar_pdf_analise_dvp(id: int):
+    import traceback
+    try:
+        from playwright.sync_api import sync_playwright
+        import time
+        
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT periodo, resultado_json FROM historico_analise_dvp WHERE id = %s", (id,))
+        row = cur.fetchone()
+        conn.close()
+        
+        if not row:
+            return Response(content=b"Registro nao encontrado", media_type="text/plain", status_code=404)
+        
+        periodo_label = row[0]
+        dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
+        
+        url = "http://127.0.0.1:994/analise_dvp?id=" + str(id) + "&_t=" + str(int(time.time()))
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.goto(url, wait_until="networkidle")
+            page.wait_for_timeout(4000)
+            page.evaluate("() => { const el = document.querySelector('.top-bar, .filtros, .sidebar, .btn'); if (el) el.style.display = 'none'; }")
+            page.add_style_tag(content="button, select, .top-bar, .filtros, .sidebar { display: none !important; }")
+            page.wait_for_timeout(1000)
+            pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "10mm", "bottom": "10mm", "left": "10mm", "right": "10mm"})
+            browser.close()
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=Analise_DVP_{id}.pdf"},
+        )
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[DVP] ERRO NO PDF: {e}\n{tb}")
+        return Response(content=f"ERRO: {e}\n\n{tb}".encode("utf-8"), media_type="text/plain", status_code=500)
