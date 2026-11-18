@@ -207,10 +207,10 @@ def processar_bf_comparativo(caminho_csv):
     doc_2025 = inserir_documento(cursor, pid_2025, "BALANCO_FINANCEIRO", os.path.basename(caminho_csv), file_hash)
     linhas = ler_linhas(caminho_csv)
     mapa = {
-        "RECEITA ORÃ‡AMENTÃRIA": "Receita Orcamentaria",
-        "DESPESA ORÃ‡AMENTÃRIA": "Despesa Orcamentaria",
-        "SALDO EM ESPÃ‰CIE DO EXERCÃCIO ANTERIOR": "Saldo Inicial",
-        "SALDO EM ESPÃ‰CIE PARA O EXERCÃCIO SEGUINTE": "Saldo Final"
+        "RECEITA ORÇAMENTíRIA": "Receita Orcamentaria",
+        "DESPESA ORÇAMENTíRIA": "Despesa Orcamentaria",
+        "SALDO EM ESPí‰CIE DO EXERCíCIO ANTERIOR": "Saldo Inicial",
+        "SALDO EM ESPí‰CIE PARA O EXERCíCIO SEGUINTE": "Saldo Final"
     }
     for row in linhas:
         if len(row) >= 3:
@@ -235,7 +235,7 @@ def processar_dfc_comparativo(caminho_csv):
     mapa = {
         "CAIXA E EQUIVALENTES DE CAIXA INICIAL": "Caixa Inicial",
         "CAIXA E EQUIVALENTES DE CAIXA FINAL": "Caixa Final",
-        "GERAÃ‡ÃƒO LÃQUIDA DE CAIXA E EQUIVALENTES DE CAIXA": "Geracao Liquida Caixa"
+        "GERAÇíƒO LíQUIDA DE CAIXA E EQUIVALENTES DE CAIXA": "Geracao Liquida Caixa"
     }
     for row in linhas:
         if len(row) >= 4:
@@ -260,17 +260,17 @@ def processar_dvp_comparativo(caminho_csv):
     for row in linhas:
         if len(row) >= 7:
             texto_linha = ";".join([normalizar(c) for c in row])
-            if "VARIAÃ‡ÃƒO PATRIMONIAL AUMENTATIVA" in texto_linha and "TOTAL" not in texto_linha:
+            if "VARIAÇíƒO PATRIMONIAL AUMENTATIVA" in texto_linha and "TOTAL" not in texto_linha:
                 v2026 = limpar_valor(row[2]) if len(row) > 2 else 0.0
                 v2025 = limpar_valor(row[3]) if len(row) > 3 else 0.0
                 if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, "Variacoes Ativas", v2026)
                 if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, "Variacoes Ativas", v2025)
-            if "VARIAÃ‡ÃƒO PATRIMONIAL DIMINUTIVA" in texto_linha and "TOTAL" not in texto_linha:
+            if "VARIAÇíƒO PATRIMONIAL DIMINUTIVA" in texto_linha and "TOTAL" not in texto_linha:
                 v2026 = limpar_valor(row[6]) if len(row) > 6 else 0.0
                 v2025 = limpar_valor(row[7]) if len(row) > 7 else 0.0
                 if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, "Variacoes Diminutivas", v2026)
                 if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, "Variacoes Diminutivas", v2025)
-            if "SUPERÃVIT DO EXERCÃCIO" in texto_linha:
+            if "SUPERíVIT DO EXERCíCIO" in texto_linha:
                 v2026 = limpar_valor(row[6]) if len(row) > 6 else 0.0
                 v2025 = limpar_valor(row[7]) if len(row) > 7 else 0.0
                 if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, "Superavit Patrimonial", v2026)
@@ -293,7 +293,7 @@ def processar_dmpl(caminho_csv, ano):
             d = normalizar(row[0])
             if d == "SALDOS INICIAIS":
                 inserir_valor(cursor, doc_id, periodo_id, "PL Inicial", abs(limpar_valor(row[7])))
-            elif d == "RESULTADO DO PERÃODO":
+            elif d == "RESULTADO DO PERíODO":
                 inserir_valor(cursor, doc_id, periodo_id, "Resultado Periodo", abs(limpar_valor(row[7])))
             elif d == "SALDOS FINAIS":
                 inserir_valor(cursor, doc_id, periodo_id, "PL Final", abs(limpar_valor(row[7])))

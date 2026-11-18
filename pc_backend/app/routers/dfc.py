@@ -132,7 +132,7 @@ async def serve_analise_dfc():
     return {"erro": "Arquivo HTML nao encontrado", "caminho": caminho}
 
 # ============================================================
-# ROTAS DE SALVAR, HISTÃ“RICO E PDF (PostgreSQL)
+# ROTAS DE SALVAR, HISTí“RICO E PDF (PostgreSQL)
 # ============================================================
 import json
 from datetime import datetime
@@ -144,7 +144,7 @@ from pc_backend.app.config import PG_CONFIG
 @router.post("/salvar/{periodo}/{periodo_anterior}")
 async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
     try:
-        # Chama a funÃ§Ã£o de processamento do DFC
+        # Chama a função de processamento do DFC
         p_limpo = periodo.replace("-", "_")
         caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
         if not os.path.exists(caminho):
