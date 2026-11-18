@@ -4,6 +4,7 @@ Rota do DVP (AnÃ¡lise Patrimonial) â€” reescrita do zero em 31/10/2026.
 import csv
 import os
 from fastapi import APIRouter, HTTPException
+from pc_backend.app.services.pdf_dvp import desenhar_tabela_dvp, fmt_brl
 router = APIRouter(prefix="/api/analise_patrimonial", tags=["analise_patrimonial"])
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "..", "..", "..", "pc_storage", "uploads_raw")
@@ -284,77 +285,9 @@ def gerar_pdf_analise_dvp(id: int):
         pdf.cell(0, 5, "Superávit Patrimonial")
 
         # ------------------------------------------------------------------
-        # TABELA MELHORADA
-        # ------------------------------------------------------------------
-        y = 92
+        # Tabela
+        y = desenhar_tabela_dvp(pdf, dados, y_inicial=92)
 
-        # Cabecalho da tabela
-        pdf.set_fill_color(0, 51, 102)
-        pdf.rect(15, y, 180, 9, style="F")
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Arial", "B", 9)
-        pdf.set_xy(18, y + 2.5)
-        pdf.cell(90, 4, "Indicador")
-        pdf.set_xy(110, y + 2.5)
-        pdf.cell(40, 4, "Periodo Atual", align="R")
-        pdf.set_xy(160, y + 2.5)
-        pdf.cell(30, 4, "Periodo Anterior", align="R")
-        y += 9
-
-        # Linhas
-        itens = [
-            ("vpa_financeiras",    "VPA Financeiras",            False, False),
-            ("transf_recebidas",   "Transferencias Recebidas",   False, False),
-            ("outras_vpa",         "Outras VPA",                 False, False),
-            ("total_vpa",          "TOTAL VPA",                  True,  False),
-            ("vpd_financeiras",    "VPD Financeiras",            False, True),
-            ("pessoal_encargos",   "Pessoal e Encargos",         False, True),
-            ("servicos",           "Servicos",                   False, True),
-            ("total_vpd",          "TOTAL VPD",                  True,  True),
-        ]
-
-        for i, (chave, nome, negrito, is_vpd) in enumerate(itens):
-            bloco = dados.get(chave) or {}
-            val = bloco.get("atual", 0)
-            ant = bloco.get("anterior", 0)
-
-            # Fundo zebrado (alternado)
-            if negrito:
-                pdf.set_fill_color(227, 242, 253)  # azul claro para totais
-            elif i % 2 == 0:
-                pdf.set_fill_color(245, 245, 245)  # cinza muito claro
-            else:
-                pdf.set_fill_color(255, 255, 255)  # branco
-
-            pdf.rect(15, y, 180, 8, style="F")
-
-            # Linha inferior (borda)
-            pdf.set_draw_color(200, 200, 200)
-            pdf.set_line_width(0.1)
-            pdf.line(15, y + 8, 195, y + 8)
-
-            # Texto da linha
-            if negrito:
-                pdf.set_font("Arial", "B", 9)
-                pdf.set_text_color(0, 51, 102)  # azul escuro
-            else:
-                pdf.set_font("Arial", "", 9)
-                pdf.set_text_color(0, 0, 0)
-
-            pdf.set_xy(18, y + 2)
-            pdf.cell(90, 4, nome)
-
-            # Valores alinhados a direita
-            pdf.set_xy(110, y + 2)
-            pdf.cell(40, 4, fmt_brl(val), align="R")
-
-            pdf.set_xy(160, y + 2)
-            pdf.cell(30, 4, fmt_brl(ant), align="R")
-
-            y += 8
-
-        # Espaco antes do rodape
-        y += 6
         pdf_bytes = bytes(pdf.output())
         return Response(
             content=pdf_bytes,

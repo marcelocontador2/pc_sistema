@@ -200,3 +200,5 @@ injetar_*.py
 
 # Diretorio local de banco/PDFs (nunca versionar)
 pc_backend/pc_storage/
+
+_teste_*.pdf
