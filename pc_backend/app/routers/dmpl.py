@@ -32,11 +32,12 @@ def limpar(v):
         return 0.0
 
 
+
 def processar_dmpl(caminho):
     """
     Le o CSV do DMPL.
-    Estrutura: linhas 9-17 contêm os saldos.
-    Colunas 1-7: contas do PL. Coluna 8: total.
+    Filtra apenas as linhas relevantes (Saldos, Ajustes, Resultado, etc.)
+    e corrige o encoding.
     """
     dados = {
         "saldos_iniciais": {"atual": 0.0, "anterior": 0.0},
@@ -54,52 +55,69 @@ def processar_dmpl(caminho):
     with open(caminho, "r", encoding="latin-1", errors="ignore") as f:
         linhas = list(csv.reader(f, delimiter=";"))
     
+    # Palavras-chave das linhas relevantes
+    palavras_chave = [
+        "SALDOS INICIAIS", "AJUSTES DE EXERC", "AUMENTO DE CAPITAL",
+        "RESULTADO DO EXERC", "RESULTADO DO PER", "AJUSTES DE AVALIA",
+        "CONSTITUI", "DEMAIS VARIA", "SALDOS FINAIS"
+    ]
+    
+    def corrigir_encoding(texto):
+        try:
+            # Tenta corrigir o encoding (latin-1 -> utf-8)
+            return texto.encode("latin-1").decode("utf-8", errors="ignore")
+        except Exception:
+            return texto
+    
     for linha in linhas:
         if not linha or len(linha) < 9:
             continue
         
-        nome = linha[0].strip().upper()
-        # Coluna 8 = TOTAL
+        descricao_original = linha[0].strip()
+        descricao_corrigida = corrigir_encoding(descricao_original).upper()
+        
+        # Verifica se a linha é relevante
+        is_relevante = any(p in descricao_corrigida for p in palavras_chave)
+        if not is_relevante:
+            continue
+        
         val_total = limpar(linha[8]) if len(linha) > 8 else 0.0
-        # Coluna 7 = RESULTADOS ACUMULADOS (onde os valores aparecem)
         val_acum = limpar(linha[7]) if len(linha) > 7 else 0.0
         
-        # Saldos iniciais (linha 9): usa coluna 7 e 8
-        if "SALDOS INICIAIS" in nome:
+        # Preenche os campos específicos
+        if "SALDOS INICIAIS" in descricao_corrigida:
             dados["saldos_iniciais"]["atual"] = val_acum
             dados["saldos_iniciais"]["anterior"] = val_total
-        elif "AJUSTES DE EXERC" in nome:
+        elif "AJUSTES DE EXERC" in descricao_corrigida:
             dados["ajustes_exercicios"]["atual"] = val_acum
             dados["ajustes_exercicios"]["anterior"] = val_total
-        elif "AUMENTO DE CAPITAL" in nome:
+        elif "AUMENTO DE CAPITAL" in descricao_corrigida:
             dados["aumento_capital"]["atual"] = val_acum
             dados["aumento_capital"]["anterior"] = val_total
-        elif "RESULTADO DO EXERC" in nome:
+        elif "RESULTADO DO EXERC" in descricao_corrigida:
             dados["resultado_exercicio"]["atual"] = val_acum
             dados["resultado_exercicio"]["anterior"] = val_total
-        elif "RESULTADO DO PER" in nome:
+        elif "RESULTADO DO PER" in descricao_corrigida:
             dados["resultado_periodo"]["atual"] = val_acum
             dados["resultado_periodo"]["anterior"] = val_total
-        elif "AJUSTES DE AVALIA" in nome:
+        elif "AJUSTES DE AVALIA" in descricao_corrigida:
             dados["ajustes_avaliacao"]["atual"] = val_acum
             dados["ajustes_avaliacao"]["anterior"] = val_total
-        elif "CONSTITUI" in nome and "RESERVAS" in nome:
+        elif "CONSTITUI" in descricao_corrigida and "RESERVAS" in descricao_corrigida:
             dados["constituicao_reservas"]["atual"] = val_acum
             dados["constituicao_reservas"]["anterior"] = val_total
-        elif "DEMAIS VARIA" in nome:
+        elif "DEMAIS VARIA" in descricao_corrigida:
             dados["demais_variacoes"]["atual"] = val_acum
             dados["demais_variacoes"]["anterior"] = val_total
-        elif "SALDOS FINAIS" in nome:
+        elif "SALDOS FINAIS" in descricao_corrigida:
             dados["saldos_finais"]["atual"] = val_acum
             dados["saldos_finais"]["anterior"] = val_total
-    
-    # Guarda as linhas brutas para renderização genérica
-    for linha in linhas:
-        if linha and len(linha) >= 9:
-            dados["linhas"].append({
-                "descricao": linha[0].strip(),
-                "valores": [limpar(c) for c in linha[1:9]],
-            })
+        
+        # Adiciona a linha (apenas as relevantes)
+        dados["linhas"].append({
+            "descricao": descricao_corrigida,
+            "valores": [limpar(c) for c in linha[1:9]],
+        })
     
     return {"dados": dados}
 
