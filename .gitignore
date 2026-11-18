@@ -69,3 +69,75 @@ _pdfs_teste/
 # Variaveis de ambiente
 .env
 !pc_backend/app/routers/bp.py
+
+# === Debug e scripts ad-hoc (não versionar) ===
+teste_*.py
+teste_*.png
+testar_*.py
+fix_*.py
+ver_*.py
+diag_*.py
+audit_*.py
+mapear_*.py
+comentar_*.py
+conectar_*.py
+descomentar_*.py
+recriar_*.py
+copiar_*.py
+extrair_*.py
+listar_*.py
+aplicar_*.py
+add_*.py
+buscar_*.py
+check_*.py
+comparar_*.py
+final*.py
+tela_*.py
+reconstruir_*.py
+reconectar_*.py
+registrar_*.py
+remover_*.py
+resgatar_*.py
+resolver_*.py
+forcar_*.py
+baixar_*.py
+nova_*.py
+gerar_*.py
+pdf_*.py
+readicionar_*.py
+remove_*.py
+mudar_*.py
+substituir_*.py
+
+# === Backups automáticos ===
+*.bak
+*.bak_*
+*.pre_*
+*.pre_PR*
+*.pre_env*
+*.ANTES_RESTORE_*
+main.py.pre_*
+main.py.bak_*
+
+# === Binários de debug ===
+*.dump
+debug_*.png
+audit_*.png
+teste_*.png
+PDF_FINAL_*.png
+
+# === Logos (uploads de usuários) ===
+pc_storage/uploads_logos/*.png
+
+# === Arquivos corrompidos / lixo ===
+pc_backend/−
+pc_backend/*.tmp
+
+# === Baselines e relatórios de debug ===
+*.tsv
+duplicatas_divergentes.txt
+relatorio_duplicatas.md
+relatorio_rotas.md
+mapeamento_funcoes.tsv
+offsets.tsv
+requirements_venv_*.txt
