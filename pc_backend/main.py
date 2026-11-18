@@ -896,7 +896,6 @@ async def criar_tabela_integridade():
     conn.commit()
     conn.close()
 # Rota que CHAMA a analise, pega o resultado e SALVA no banco
-# @app.get("/historico_integridade")
 # async def listar_historico():
 #     try:
 #         conn = sqlite3.connect(DB_PATH)
@@ -917,7 +916,6 @@ async def criar_tabela_integridade():
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 # # Rota que abre um histí­³rico especifico pelo ID
-# @app.get("/historico_integridade/{id}")
 # async def buscar_historico(id: int):
 #     try:
 #         conn = sqlite3.connect(DB_PATH)
@@ -959,12 +957,10 @@ async def lista_periodos():
 # =======================================================
 from fastapi.responses import FileResponse
 import os as _os
-# @app.get("/conferencia")
 # async def serve_conferencia():
 #     from fastapi.responses import FileResponse
 #     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
 #     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
-# @app.get("/integridade")
 # async def serve_integridade():
 #     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")
 #     return FileResponse(caminho)
@@ -1375,7 +1371,6 @@ async def excluir_panorama(id: int):
     conn.close()
     return {"mensagem": "Excluido"}
 
-# @app.get("/api/conferencia/{periodo}")
 # async def api_conferencia_calcular(periodo: str):
 #     try:
 #         from .matriz_integridade import _get_csv
@@ -1388,7 +1383,6 @@ async def excluir_panorama(id: int):
 #         return dados
 #     except Exception as e:
 #         return {"erro": "falha", "mensagem": str(e)}
-# @app.get("/salvar_conferencia/{periodo}")
 # async def salvar_conferencia(periodo: str):
 #     try:
 #         from integridade import analise_integridade
@@ -1407,7 +1401,6 @@ async def excluir_panorama(id: int):
 #         return {"mensagem": "Conferencia salva!", "dados": dados}
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
-# @app.get("/historico_conferencia")
 # def listar_conferencia():
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
@@ -1427,7 +1420,6 @@ async def excluir_panorama(id: int):
         
 #     return Response(content=json.dumps(resultado), media_type="application/json")
 
-# @app.get("/historico_conferencia/{id}")
 # async def buscar_conferencia(id: int):
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
@@ -1437,7 +1429,6 @@ async def excluir_panorama(id: int):
 #     conn.close()
 #     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
 #     return json.loads(row[0])
-# @app.delete("/excluir_conferencia/{id}")
 # async def excluir_conferencia(id: int):
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
@@ -1449,7 +1440,6 @@ async def excluir_panorama(id: int):
 # =======================================================
 # ROTAS ISOLADAS: INTEGRIDADE (Tabela historico_integridade_matriz)
 # =======================================================
-# @app.get("/api/integridade_matriz/{periodo}")
 # async def api_integridade_matriz_calcular(periodo: str):
 #     import json
 #     import psycopg2
@@ -1477,7 +1467,6 @@ async def excluir_panorama(id: int):
 #     except Exception as e:
 #         return {"erro": True, "mensagem": str(e)}
 
-# @app.post("/api/integridade_matriz/{periodo}/salvar")
 # async def salvar_integridade_matriz(periodo: str, request: Request):
 #     import json
 #     from datetime import datetime
@@ -1595,7 +1584,6 @@ async def excluir_panorama(id: int):
 #     except Exception as e:
 #         return {"erro": True, "mensagem": str(e)}
 
-# @app.get("/historico_integridade_matriz")
 # def listar_integridade_matriz():
 #     import json
 #     import psycopg2
@@ -1625,7 +1613,6 @@ async def excluir_panorama(id: int):
 #     except Exception as e:
 #         return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
 
-# @app.get("/historico_integridade_matriz/{id}")
 # async def buscar_integridade_matriz(id: int):
 #     import json
 #     import psycopg2
@@ -1648,7 +1635,6 @@ async def excluir_panorama(id: int):
 #     except Exception as e:
 #         return {"erro": True, "mensagem": str(e)}
 
-# @app.post("/excluir_multiplos_integridade_matriz")
 # async def excluir_integridade_matriz(request: Request):
 #     try:
 #         body = await request.json()
@@ -1754,7 +1740,6 @@ async def excluir_panorama(id: int):
 # #         }
 # #     except Exception as e:
 # #         return {"erro": True, "mensagem": str(e)}
-# @app.get("/historico_analise_orcamentaria")
 # def get_historico_analise_orcamentaria():
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
@@ -1773,7 +1758,6 @@ async def excluir_panorama(id: int):
         
 #     return Response(content=json.dumps(resultado), media_type="application/json")
 
-# @app.get("/historico_analise_orcamentaria/{id}")
 # async def get_analise_orcamentaria_id(id: int):
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
@@ -1781,7 +1765,6 @@ async def excluir_panorama(id: int):
 #     row = cur.fetchone(); conn.close()
 #     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
 #     return json.loads(row[1])
-# @app.post("/salvar_analise_orcamentaria/{periodo}")
 # async def salvar_analise_orcamentaria(periodo: str):
 #     atual = await api_analise_orcamentaria_bo(periodo)
 #     if atual.get("erro"):
@@ -1977,7 +1960,6 @@ async def serve_composicao():
 #         return {"erro": False, "dados": dados}
 #     except Exception as e:
 #         return {"erro": True, "mensagem": str(e)}
-# @app.post("/salvar_analise_financeira_bf/{periodo}/{periodo_anterior}")
 # async def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str):
 #     atual = await api_analise_financeira_bf(periodo)
 #     if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
@@ -1993,7 +1975,6 @@ async def serve_composicao():
 #                 (f"{periodo} vs {periodo_anterior}", data_agora, json.dumps(dados)))
 #     conn.commit(); conn.close()
 #     return {"mensagem": "Salvo"}
-# @app.get("/historico_analise_financeira_bf")
 # def get_historico_analise_financeira_bf():
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
@@ -2012,21 +1993,18 @@ async def serve_composicao():
         
 #     return Response(content=json.dumps(resultado), media_type="application/json")
 
-# @app.get("/historico_analise_financeira_bf/{id}")
 # async def get_bf_id(id: int):
 #     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
 #     cur.execute("SELECT periodo, resultado_json FROM historico_analise_financeira_bf WHERE id=?", (id,))
 #     row = cur.fetchone(); conn.close()
 #     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
 #     return json.loads(row[1])
-# @app.delete("/excluir_analise_financeira_bf/{id}")
 # async def excluir_bf(id: int):
 #     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
 #     cur.execute("DELETE FROM historico_analise_financeira_bf WHERE id=?", (id,))
 #     conn.commit(); conn.close()
 #     return {"mensagem": "Excluido"}
 
-# @app.get("/gerar_pdf_analise_financeira_bf/{id}")
 # async def gerar_pdf_analise_financeira_bf(id: int):
 #     try:
 #         from fpdf import FPDF
@@ -2289,7 +2267,6 @@ async def serve_composicao():
 #         traceback.print_exc()
 #         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
 
-# @app.get("/analise_financeira_bf")
 # async def serve_analise_financeira_bf():
 #     from fastapi.responses import FileResponse
 #     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_financeira_bf.html")
@@ -2680,7 +2657,6 @@ async def serve_composicao():
 # [DFC-LEGADO]     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_dfc.html")
 # [DFC-LEGADO]     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
 # [DFC-LEGADO] 
-# @app.delete("/excluir_analise_orcamentaria/{id}")
 # async def excluir_analise_orcamentaria(id: int):
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
@@ -2806,7 +2782,6 @@ async def buscar_historico_composicao_rd(id: int):
         try: dados_json = json.loads(dados_json)
         except: dados_json = {}
     return {"periodo": periodo, "dados": dados_json}
-# @app.get("/gerar_pdf_analise_orcamentaria/{id}")
 # async def gerar_pdf_analise_orcamentaria(id: int):
 #     try:
 #         from fastapi.responses import Response
@@ -3536,7 +3511,6 @@ async def excluir_historico_custo_pessoal(id: int):
     conn.commit()
     conn.close()
     return {"mensagem": "Excluido"}
-# @app.get("/analise_orcamentaria")
 # async def serve_analise_orcamentaria():
 #     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_orcamentaria.html")
 #     return FileResponse(caminho)
@@ -3596,7 +3570,6 @@ async def listar_base_legal():
     rows = cursor.fetchall()
     conn.close()
     return [{"id": r[0], "periodo": r[1], "periodo_anterior": r[2], "data_geracao": r[3]} for r in rows]
-# @app.get("/liquidez")
 # async def serve_liquidez():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "liquidez.html")
     return FileResponse(caminho)
@@ -4564,7 +4537,6 @@ def serve_relatorio_final():
 
 
 # ========== ROTAS DO COMPARATIVO DE RECEITAS ==========
-# @app.get("/api/comparativo_receitas/{periodo}")
 # def api_comparativo_receitas(periodo: str):
 #     import os, csv, io
 #     upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
@@ -4576,7 +4548,6 @@ def serve_relatorio_final():
 #     ]
 #     return {"erro": False, "periodo": periodo, "receitas": receitas}
 
-# @app.get("/historico_comparativo_receitas")
 # def get_historico_comparativo_receitas():
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
@@ -4595,7 +4566,6 @@ def serve_relatorio_final():
         
 #     return Response(content=json.dumps(resultado), media_type="application/json")
 
-# @app.get("/historico_comparativo_receitas/{id}")
 # def get_historico_comparativo_receitas_id(id: int):
 #     import sqlite3, os, json
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -4609,7 +4579,6 @@ def serve_relatorio_final():
 
 @app.post("/salvar_comparativo_receitas")
 
-# @app.post("/excluir_multiplos_comparativo_receitas")
 # async def excluir_multiplos_comparativo_receitas(request: Request):
 #     import sqlite3, os
 #     dados = await request.json()
@@ -4775,7 +4744,6 @@ def api_comparativo_receitas_v2(periodo: str):
 
 
 
-# @app.get("/historico_comparativo_despesas/{id}")
 # def get_historico_comparativo_despesas_id(id: int):
 #     import psycopg2
 #     from psycopg2.extras import RealDictCursor
@@ -4803,7 +4771,6 @@ def api_comparativo_receitas_v2(periodo: str):
 #         return {"erro": True, "mensagem": str(e)}
 
 
-# @app.post("/excluir_multiplos_comparativo_despesas")
 # async def excluir_multiplos_comparativo_despesas(request: Request):
 #     import psycopg2
 #     from psycopg2.extras import RealDictCursor
@@ -4832,7 +4799,6 @@ def api_comparativo_receitas_v2(periodo: str):
 
 
 
-# @app.get("/gerar_pdf_integridade_matriz/{check_id}")
 # def gerar_pdf_integridade_matriz(check_id: str):
 #     from playwright.sync_api import sync_playwright
 #     from fastapi.responses import Response
@@ -4904,7 +4870,6 @@ def gerar_pdf_panorama(historico_id: int):
 # ROTAS DE SALVAR E EXCLUIR - COMPARATIVO DE RECEITAS
 # ============================================================
 
-# @app.post("/api/comparativo_receitas_v2/{periodo}/salvar")
 # def salvar_comparativo_receitas(periodo: str):
 #     import sqlite3, os, json
 #     from datetime import datetime
@@ -5548,14 +5513,12 @@ async def gerar_pdf_analise_bp(id: int):
 # =========================================================
 
 
-# @app.get("/api/calcular_liquidez/{periodo}")
 # async def api_calcular_liquidez(periodo: str):
     dados = _calc_liquidez(periodo)
     if not dados:
         return {"erro": True, "mensagem": "Balanco Patrimonial nao encontrado para este periodo."}
     return dados
 
-# @app.post("/salvar_liquidez/{periodo}")
 # async def salvar_liquidez_rota(periodo: str):
     try:
         dados = _calc_liquidez(periodo)
@@ -5577,7 +5540,6 @@ async def gerar_pdf_analise_bp(id: int):
         return {"erro": True, "mensagem": str(e)}
 
 
-# @app.get("/historico_liquidez")
 # def listar_historico_liquidez():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -5596,7 +5558,6 @@ async def gerar_pdf_analise_bp(id: int):
         
     return Response(content=json.dumps(resultado), media_type="application/json")
 
-# @app.get("/historico_liquidez/{id}")
 # async def get_liquidez_id(id: int):
     import sqlite3 as _sq, json as _js
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -5613,7 +5574,6 @@ async def gerar_pdf_analise_bp(id: int):
     return dados
 
 
-# @app.delete("/excluir_liquidez/{id}")
 # async def excluir_liquidez(id: int):
     import sqlite3 as _sq
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -5625,7 +5585,6 @@ async def gerar_pdf_analise_bp(id: int):
     return {"ok": True}
 
 
-# @app.get("/gerar_pdf_liquidez/{id}")
 # def gerar_pdf_liquidez(id: int):
     import sqlite3 as _sq
     from fpdf import FPDF
@@ -5797,7 +5756,6 @@ async def gerar_pdf_analise_bp(id: int):
 
 
 
-# @app.get("/gerar_pdf_comparativo_receitas")
 # def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
 #     from playwright.sync_api import sync_playwright
 #     from fastapi.responses import Response
@@ -5991,7 +5949,6 @@ def api_comparativo_despesas_v2(periodo: str):
             "percentual_total": 0.0, "grupos": [], "detalhes": []
         }
     }
-# @app.get("/historico_comparativo_despesas")
 # def get_historico_comparativo_despesas():
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
@@ -6039,7 +5996,6 @@ def serve_analise_comparativo_despesas():
 @app.get("/gerar_pdf_conferencia/{check_id}")
 
 
-# @app.get("/gerar_pdf_comparativo_despesas")
 # def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
 #     from playwright.sync_api import sync_playwright
 #     from fastapi.responses import Response
@@ -6070,7 +6026,6 @@ def serve_relatorio_comparativo_despesas():
 
 
 # ========== ROTAS DE HISTí­“RICO DESPESAS (FORÇADAS) ==========
-# @app.post("/api/comparativo_despesas_v2/{periodo}/salvar")
 # def rota_salvar_comparativo_despesas(periodo: str):
 #     import sqlite3, os, json
 #     from datetime import datetime
