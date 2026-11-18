@@ -27,7 +27,7 @@ def _corrigir_encoding(txt):
     if not txt: return ""
     try:
         # Tenta decodificar como latin-1 e re-codificar como utf-8
-        # Isso converte Ã§ -> Ã§, Ã£ -> Ã£, etc.
+        # Isso converte ç -> ç, ã -> ã, etc.
         s = txt.encode("latin-1", "ignore").decode("utf-8", "ignore")
         return s
     except:
@@ -35,7 +35,7 @@ def _corrigir_encoding(txt):
 
 
 def _limpar_ascii(txt):
-    """Limpa apenas tabulaÃ§Ã­Âµes e caracteres de controle, mantendo acentos."""
+    """Limpa apenas tabulaçí­µes e caracteres de controle, mantendo acentos."""
     if not txt: return ""
     s = str(txt)
     s = s.replace("\t", " ").replace("\n", " ").replace("\r", " ")
@@ -161,11 +161,11 @@ async def post_configuracoes(config: dict):
     conn.close()
     return {"status": "ok", "configuracoes": config}
 # Router novo do Panorama (31/10/2026)
-# Servir arquivos estÃ¡ticos da pasta pc_frontend
+# Servir arquivos estáticos da pasta pc_frontend
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend")
 if os.path.exists(frontend_path):
     app.mount("/pc_frontend", StaticFiles(directory=frontend_path), name="pc_frontend")
-    print(f"Ã¢Å“â€¦ Arquivos estÃ¡ticos montados em: {frontend_path}")
+    print(f"âÅ“”¦ Arquivos estáticos montados em: {frontend_path}")
 from fastapi.responses import HTMLResponse
 
 
@@ -288,7 +288,7 @@ def _ler_csv(filepath, tipo=""):
         dados.append(clean_row)
     return dados
 # =======================================================
-# CONFIGURAÃ‡Ã­Æ’O DO BANCO DE DADOS SQLITE
+# CONFIGURAÇí­Æ’O DO BANCO DE DADOS SQLITE
 # =======================================================
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
@@ -342,7 +342,7 @@ def init_db():
 # Inicializa o banco na partida
 init_db()
 # =======================================================
-# ROTA DE UPLOAD (IMPORTAÃ‡Ã­Æ’O)
+# ROTA DE UPLOAD (IMPORTAÇí­Æ’O)
 # =======================================================
 from fastapi import File, UploadFile, Form
 @app.get("/periodos_importados/{tipo_relatorio}")
@@ -387,15 +387,15 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             tipo_p = partes[1]
             valor_p = partes[2]
             if tipo_p == "MES":
-                meses = ["", "Janeiro", "Fevereiro", "MarÃ§o", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+                meses = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
                 periodo_formatado = f"{meses[int(valor_p)]}/{ano}"
             elif tipo_p == "TRIMESTRE":
-                periodo_formatado = f"{valor_p}Âº Tri/{ano}"
+                periodo_formatado = f"{valor_p}º Tri/{ano}"
             else:
-                periodo_formatado = f"ExercÃ­Â­cio {ano}"
+                periodo_formatado = f"Exercí­­cio {ano}"
         csv_path = _get_csv_por_tipo(tipo, periodo)
         if not csv_path:
-            raise HTTPException(status_code=404, detail=f"Arquivo CSV para {tipo} no perÃ­Â­odo {periodo_formatado} nÃ£o encontrado.")
+            raise HTTPException(status_code=404, detail=f"Arquivo CSV para {tipo} no perí­­odo {periodo_formatado} não encontrado.")
         # Leitura robusta: tenta utf-8-sig, depois latin-1 (que aceita qualquer byte)
         content = ""
         for enc in ["latin-1", "utf-8-sig"]:
@@ -406,12 +406,12 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             except:
                 continue
 
-        # Corrige caracteres corrompidos (ex: Ã§ -> Ã§, Ã£ -> Ã£)
-        content = content.replace("Ã­Æ’Â§", "Ã§").replace("Ã­Æ’Â£", "Ã£").replace("Ã­Æ’Ã‚Â¡", "Ã¡")
-        content = content.replace("Ã­Æ’Ã‚Â©", "Ã©").replace("Ã­Æ’", "Ã­Â­").replace("Ã­Æ’Ã‚Â³", "Ã­Â³")
-        content = content.replace("Ã­Æ’Âº", "Ã­Âº").replace("Ã­Æ’Â¢", "Ã­Â¢").replace("Ã­Æ’Âª", "Ã­Âª")
-        content = content.replace("Ã­Æ’Ã‚Â´", "Ã­Â´").replace("Ã­Æ’Âª", "Ã­Âª").replace("Ã­Æ’Â§", "Ã§")
-        content = content.replace("Ã­Æ’Ã†â€™", "Ã­Æ’").replace("Ã­Æ’Ã¢â‚¬Â°", "Ã­â€°").replace("Ã­Æ’â€œ", "Ã­â€œ")
+        # Corrige caracteres corrompidos (ex: ç -> ç, ã -> ã)
+        content = content.replace("í­Æ’§", "ç").replace("í­Æ’£", "ã").replace("í­Æ’í‚¡", "á")
+        content = content.replace("í­Æ’í‚©", "é").replace("í­Æ’", "í­­").replace("í­Æ’í‚³", "í­³")
+        content = content.replace("í­Æ’º", "í­º").replace("í­Æ’¢", "í­¢").replace("í­Æ’ª", "í­ª")
+        content = content.replace("í­Æ’í‚´", "í­´").replace("í­Æ’ª", "í­ª").replace("í­Æ’§", "ç")
+        content = content.replace("í­Æ’í†”™", "í­Æ’").replace("í­Æ’ââ‚¬°", "í­”°").replace("í­Æ’“", "í­“")
         pdf = FPDF(orientation="L", unit="mm", format="A4")
         fonte_padrao = "Helvetica"
         # Registra fonte Arial (regular, bold e italic)
@@ -444,19 +444,19 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
         if tipo == "BALANCETE":
             col_w   = [125, 0, 38, 38, 38, 38]
             headers = ["CONTA", "", "SALDO ANTERIOR", "DEBITOS", "CREDITOS", "SALDO"]
-            titulo_pdf = "Balancete ContÃ¡bil"
+            titulo_pdf = "Balancete Contábil"
         elif tipo == "BALANCO_PATRIMONIAL":
             col_w   = [85, 30, 85, 30, 0, 0]
-            headers = ["ESPECIFICACAO (ATIVO)", "ExercÃ­Â­cio Atual", "ESPECIFICACAO (PASSIVO)", "ExercÃ­Â­cio Atual", "", ""]
-            titulo_pdf = "BalanÃ§o Patrimonial"
+            headers = ["ESPECIFICACAO (ATIVO)", "Exercí­­cio Atual", "ESPECIFICACAO (PASSIVO)", "Exercí­­cio Atual", "", ""]
+            titulo_pdf = "Balanço Patrimonial"
         elif tipo == "BALANCO_FINANCEIRO":
             col_w   = [68, 28, 28, 68, 28, 28]
-            headers = ["ESPECIFICACAO (INGRESSOS)", "ExercÃ­Â­cio Atual", "ExercÃ­Â­cio Anterior", "ESPECIFICACAO (DISPENDIOS)", "ExercÃ­Â­cio Atual", "ExercÃ­Â­cio Anterior"]
-            titulo_pdf = "BalanÃ§o Financeiro"
+            headers = ["ESPECIFICACAO (INGRESSOS)", "Exercí­­cio Atual", "Exercí­­cio Anterior", "ESPECIFICACAO (DISPENDIOS)", "Exercí­­cio Atual", "Exercí­­cio Anterior"]
+            titulo_pdf = "Balanço Financeiro"
         elif tipo == "BALANCO_ORCAMENTARIO":
             col_w   = [70, 32, 32, 34, 34, 34, 41]
             headers = ["ESPECIFICACAO", "PREVISAO INICIAL", "PREVISAO ATUALIZADA", "RECEITA REALIZADA", "SALDO", "DESPESAS", "SALDO FINAL"]
-            titulo_pdf = "BalanÃ§o OrÃ§amentÃ¡rio"
+            titulo_pdf = "Balanço Orçamentário"
         elif tipo == "DMPL":
             col_w   = [60, 24.5, 24.5, 24.5, 24.5, 24.5, 24.5, 34, 35]
             headers = [
@@ -464,20 +464,20 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 "RESERVAS DE CAPITAL", "AJUSTES DE AVALIACAO", "RESERVAS DE LUCROS",
                 "DEMAIS RESERVAS", "RESULTADOS ACUMULADOS", "TOTAL"
             ]
-            titulo_pdf = "DemonstraÃ§Ã£o das MutaÃ§Ã­Âµes do PatrimÃ­Â´nio LÃ­Â­quido"
+            titulo_pdf = "Demonstração das Mutaçí­µes do Patrimí­´nio Lí­­quido"
         elif tipo == "DFC":
             col_w   = [160, 0, 0, 60, 57]
-            headers = ["ESPECIFICACAO", "", "", "ExercÃ­Â­cio Atual", "ExercÃ­Â­cio Anterior"]
-            titulo_pdf = "DemonstraÃ§Ã£o do Fluxo de Caixa"
+            headers = ["ESPECIFICACAO", "", "", "Exercí­­cio Atual", "Exercí­­cio Anterior"]
+            titulo_pdf = "Demonstração do Fluxo de Caixa"
         elif tipo == "DVP":
             # Layout DVP: Desc Ativa | Atual | Anterior | Desc Passiva | Atual | Anterior
             col_w   = [70, 25, 25, 70, 25, 25]
-            headers = ["VARIACOES AUMENTATIVAS", "ExercÃ­Â­cio Atual", "ExercÃ­Â­cio Anterior", "VARIACOES DIMINUTIVAS", "ExercÃ­Â­cio Atual", "ExercÃ­Â­cio Anterior"]
-            titulo_pdf = "DemonstraÃ§Ã£o das VariaÃ§Ã­Âµes Patrimoniais"
+            headers = ["VARIACOES AUMENTATIVAS", "Exercí­­cio Atual", "Exercí­­cio Anterior", "VARIACOES DIMINUTIVAS", "Exercí­­cio Atual", "Exercí­­cio Anterior"]
+            titulo_pdf = "Demonstração das Variaçí­µes Patrimoniais"
         else:
             col_w   = [72, 30, 28, 72, 40, 35]
-            headers = ["ESPECIFICACAO", "ExercÃ­Â­cio Atual", "ExercÃ­Â­cio Anterior", "ESPECIFICACAO", "ExercÃ­Â­cio Atual", "ExercÃ­Â­cio Anterior"]
-            titulo_pdf = "BalanÃ§o Comparativo"
+            headers = ["ESPECIFICACAO", "Exercí­­cio Atual", "Exercí­­cio Anterior", "ESPECIFICACAO", "Exercí­­cio Atual", "Exercí­­cio Anterior"]
+            titulo_pdf = "Balanço Comparativo"
         def draw_header(is_first_page=False):
             if is_first_page:
                 pdf.set_fill_color(0, 114, 186)
@@ -560,19 +560,19 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                     pdf.cell(col_w[j], 5, _limpar_ascii(txt), align="R", border=0)
             pdf.set_xy(x, y + actual_h)
         # =======================================================
-        # LÃ­â€GICA ESPECÃ­FICA PARA O DVP
+        # Lí­”GICA ESPECí­FICA PARA O DVP
         # =======================================================
         if tipo == "DVP":
             linhas = content.splitlines()
             start_idx = 0
             for i, linha in enumerate(linhas):
-                if "VARIAÃ‡Ã­Æ’O PATRIMONIAL AUMENTATIVA" in linha.upper():
+                if "VARIAÇí­Æ’O PATRIMONIAL AUMENTATIVA" in linha.upper():
                     start_idx = i
                     break
             for idx, linha in enumerate(linhas[start_idx:]):
                 if not linha.strip(): continue
-                if "COFEN/BR" in linha or "PERÃ­ODO" in linha.upper() or "BRASÃ­LIA" in linha.upper() or "CONTADOR" in linha.upper() or "CRC-DF" in linha.upper(): continue
-                if "QUALITATIVAS" in linha.upper(): break # Para no bloco qualitativo para nÃ£o bagunÃ§ar a tabela principal
+                if "COFEN/BR" in linha or "PERí­ODO" in linha.upper() or "BRASí­LIA" in linha.upper() or "CONTADOR" in linha.upper() or "CRC-DF" in linha.upper(): continue
+                if "QUALITATIVAS" in linha.upper(): break # Para no bloco qualitativo para não bagunçar a tabela principal
                 colunas = linha.split(';')
                 while len(colunas) < 7:
                     colunas.append('')
@@ -588,7 +588,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 pdf.set_font("Helvetica", "B" if is_header or is_total else "", 7)
                 draw_row(row_final, is_header, is_total, idx)
         elif tipo == "BALANCO_PATRIMONIAL":
-            # (MantÃ©m a lÃ­Â³gica que jÃ¡ havÃ­Â­amos ajustado para o BP)
+            # (Mantém a lí­³gica que já haví­­amos ajustado para o BP)
             linhas = content.splitlines()
             start_idx = 0
             for i, linha in enumerate(linhas):
@@ -597,7 +597,7 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                     break
             for idx, linha in enumerate(linhas[start_idx:]):
                 if not linha.strip(): continue
-                if "COFEN/BR" in linha or "PERÃ­ODO" in linha.upper(): continue
+                if "COFEN/BR" in linha or "PERí­ODO" in linha.upper(): continue
                 colunas = linha.split(';')
                 while len(colunas) < 4:
                     colunas.append('')
@@ -627,13 +627,13 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             fim_1, fim_2 = buscar_valores("Saldos finais")
             linhas_dmpl = [
                 ("Saldos iniciais", ["", "", "", "", "", "", ini_1, ini_2], True),
-                ("Ajustes de exercÃ­Â­cios anteriores", ["", "", "", "", "", "", "", "0"], False),
+                ("Ajustes de exercí­­cios anteriores", ["", "", "", "", "", "", "", "0"], False),
                 ("Aumento de capital", ["", "", "", "", "", "", "", "0"], False),
-                ("Resultado do exercÃ­Â­cio", ["", "", "", "", "", "", "0", "0"], False),
-                ("Resultado do perÃ­Â­odo", ["", "", "", "", "", "", res_1, res_2], False),
-                ("Ajustes de avaliaÃ§Ã£o patrimonial", ["", "", "", "", "", "", "0", "0"], False),
-                ("ConstituiÃ§Ã£o / ReversÃ£o de reservas", ["", "", "", "", "", "", "0", "0"], False),
-                ("Demais variaÃ§Ã­Âµes", ["", "", "", "", "", "", "0", "0"], False),
+                ("Resultado do exercí­­cio", ["", "", "", "", "", "", "0", "0"], False),
+                ("Resultado do perí­­odo", ["", "", "", "", "", "", res_1, res_2], False),
+                ("Ajustes de avaliação patrimonial", ["", "", "", "", "", "", "0", "0"], False),
+                ("Constituição / Reversão de reservas", ["", "", "", "", "", "", "0", "0"], False),
+                ("Demais variaçí­µes", ["", "", "", "", "", "", "0", "0"], False),
                 ("Saldos finais", ["", "", "", "", "", "", fim_1, fim_2], True)
             ]
             for idx, (desc, valores, is_total) in enumerate(linhas_dmpl):
@@ -646,11 +646,11 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
             for i, row in enumerate(dados_csv):
                 joined = " ".join(row).upper()
                 if tipo in ["DFC"]:
-                    if "EXERCÃ­CIO ATUAL" in joined and "EXERCÃ­CIO ANTERIOR" in joined:
+                    if "EXERCí­CIO ATUAL" in joined and "EXERCí­CIO ANTERIOR" in joined:
                         start_idx = i + 1
                         break
                 elif tipo == "BALANCO_FINANCEIRO":
-                    if "ESPECIFICACAO" in joined and "EXERCÃ­CIO ATUAL" in joined:
+                    if "ESPECIFICACAO" in joined and "EXERCí­CIO ATUAL" in joined:
                         start_idx = i + 1
                         break
                 elif "CONTA" in joined and "SALDO" in joined:
@@ -658,10 +658,10 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                     break
             def eh_lixo(row):
                 texto_linha = " ".join(row).upper()
-                if "COFEN/BR" in texto_linha and ("PERÃ­ODO" in texto_linha or "PERIODO" in texto_linha): return True
+                if "COFEN/BR" in texto_linha and ("PERí­ODO" in texto_linha or "PERIODO" in texto_linha): return True
                 if row[0].strip().upper() == "COFEN/BR": return True
-                if "CONSELHO FEDERAL" in texto_linha or "CNPJ" in texto_linha or "DEMONSTRAÃ‡Ã­Æ’O" in texto_linha or "BALANÃ‡O" in texto_linha: return True
-                if "MARCELO" in texto_linha or "CONTADOR" in texto_linha or "CRC-DF" in texto_linha or "PÃ­GINA" in texto_linha or "BRASÃ­LIA-DF" in texto_linha: return True
+                if "CONSELHO FEDERAL" in texto_linha or "CNPJ" in texto_linha or "DEMONSTRAÇí­Æ’O" in texto_linha or "BALANÇO" in texto_linha: return True
+                if "MARCELO" in texto_linha or "CONTADOR" in texto_linha or "CRC-DF" in texto_linha or "Pí­GINA" in texto_linha or "BRASí­LIA-DF" in texto_linha: return True
                 return False
             for idx, row in enumerate(dados_csv[start_idx:]):
                 if not any(str(c).strip() for c in row): continue
@@ -669,19 +669,19 @@ async def download_pdf(tipo: str, ano: int = Query(2026), periodo: str = Query("
                 row_text = " ".join(row).upper()
                 is_header = False
                 is_total = False
-                if "TOTAIS" in row_text or "TOTAL:" in row_text or "TOTAL DAS" in row_text or "FLUXO DE CAIXA LÃ­QUIDO" in row_text or "GERAÃ‡Ã­Æ’O LIQUIDA" in row_text:
+                if "TOTAIS" in row_text or "TOTAL:" in row_text or "TOTAL DAS" in row_text or "FLUXO DE CAIXA Lí­QUIDO" in row_text or "GERAÇí­Æ’O LIQUIDA" in row_text:
                     is_total = True
-                elif any(k in row_text for k in ["ATIVO", "PASSIVO", "PATRIMÃ­â€NIO", "COMPENSAÃ‡Ã•ES", "QUADRO", "FLUXO DE CAIXA DAS ATIVIDADES"]):
+                elif any(k in row_text for k in ["ATIVO", "PASSIVO", "PATRIMí­”NIO", "COMPENSAÇí•ES", "QUADRO", "FLUXO DE CAIXA DAS ATIVIDADES"]):
                     is_header = True
                 if is_header: pdf.set_font(fonte_padrao, "B", 7.5)
                 elif is_total: pdf.set_font(fonte_padrao, "B", 7)
                 else:          pdf.set_font(fonte_padrao, "", 7)
                 draw_row(row, is_header, is_total, idx)
-                # Adiciona o nome do arquivo no rodapÃ© de todas as pÃ¡ginas
+                # Adiciona o nome do arquivo no rodapé de todas as páginas
         nome_arquivo_csv = os.path.basename(csv_path)
         for page_num in range(1, pdf.page_no() + 1):
             pdf.page = page_num
-            pdf.set_y(-15)  # PosiÃ§Ã£o do rodapÃ©
+            pdf.set_y(-15)  # Posição do rodapé
             pdf.set_font("Helvetica", "I", 7)
             pdf.set_text_color(100, 100, 100)
             pdf.cell(0, 5, f"Arquivo: {nome_arquivo_csv}", align="C")
@@ -702,7 +702,7 @@ async def download_excel(tipo: str, ano: int = Query(2026), periodo: str = Query
     try:
         csv_path = _get_csv_por_tipo(tipo)
         if not csv_path:
-            raise HTTPException(status_code=404, detail="CSV nÃ£o encontrado.")
+            raise HTTPException(status_code=404, detail="CSV não encontrado.")
         dados_csv = _ler_csv_generico(csv_path)
         while dados_csv and not any(str(c).strip() for c in dados_csv[-1]):
             dados_csv.pop()
@@ -723,11 +723,11 @@ async def download_excel(tipo: str, ano: int = Query(2026), periodo: str = Query
         ws['A1'].fill = PatternFill(start_color="0072BA", end_color="0072BA", fill_type="solid")
         ws['A1'].alignment = Alignment(vertical="center")
         ws.merge_cells('A2:F2')
-        ws['A2'] = f"CNPJ: 47.217.146/0001-57   |   PerÃ­Â­odo: {periodo}/{ano}"
+        ws['A2'] = f"CNPJ: 47.217.146/0001-57   |   Perí­­odo: {periodo}/{ano}"
         ws['A2'].font = Font(size=10, color="FFFFFF")
         ws['A2'].fill = PatternFill(start_color="0072BA", end_color="0072BA", fill_type="solid")
         ws['A2'].alignment = Alignment(vertical="center")
-        # CabeÃ§alho
+        # Cabeçalho
         header_row = dados_csv[header_idx]
         for col_idx, h in enumerate(header_row, start=1):
             cell = ws.cell(row=5, column=col_idx, value=h)
@@ -740,7 +740,7 @@ async def download_excel(tipo: str, ano: int = Query(2026), periodo: str = Query
             if not any(str(c).strip() for c in row):
                 continue
             row_str = " ".join(row).upper()
-            is_header = any(k in row[0].upper() for k in ["ATIVO", "PASSIVO", "PATRIMÃ­â€NIO", "RECEITAS", "DESPESAS", "INGRESSOS"])
+            is_header = any(k in row[0].upper() for k in ["ATIVO", "PASSIVO", "PATRIMí­”NIO", "RECEITAS", "DESPESAS", "INGRESSOS"])
             is_total = "TOTAL" in row_str
             for col_idx, val in enumerate(row, start=1):
                 cell = ws.cell(row=row_idx, column=col_idx, value=val)
@@ -779,7 +779,7 @@ async def download_pptx(tipo: str, ano: int = Query(2026), periodo: str = Query(
         prs.slide_height = Inches(7.5)
         csv_path = _get_csv_por_tipo(tipo)
         if not csv_path:
-            raise HTTPException(status_code=404, detail="CSV nÃ£o encontrado.")
+            raise HTTPException(status_code=404, detail="CSV não encontrado.")
         dados_csv = _ler_csv_generico(csv_path)
         while dados_csv and not any(str(c).strip() for c in dados_csv[-1]):
             dados_csv.pop()
@@ -818,7 +818,7 @@ async def download_pptx(tipo: str, ano: int = Query(2026), periodo: str = Query(
                     for pr in cell.text_frame.paragraphs:
                         for r in pr.runs:
                             r.font.size = Inches(0.07)
-                            if any(k in text.upper() for k in ["ATIVO", "PASSIVO", "TOTAL", "ESPECIFICAÃ‡Ã­Æ’O", "RECEITAS"]):
+                            if any(k in text.upper() for k in ["ATIVO", "PASSIVO", "TOTAL", "ESPECIFICAÇí­Æ’O", "RECEITAS"]):
                                 r.font.bold = True
                             if j > 0:
                                 pr.alignment = PP_ALIGN.RIGHT
@@ -916,7 +916,7 @@ async def criar_tabela_integridade():
 #         return historico
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
-# # Rota que abre um histÃ­Â³rico especifico pelo ID
+# # Rota que abre um histí­³rico especifico pelo ID
 # @app.get("/historico_integridade/{id}")
 # async def buscar_historico(id: int):
 #     try:
@@ -1055,7 +1055,7 @@ def _calc_panorama(periodo):
         caixa = buscar_valor(l_bp, "CAIXA", 1)
     
     ativo_circ = buscar_valor(l_bp, "ATIVO CIRCULANTE", 1)
-    ativo_nao_circ = buscar_valor(l_bp, "ATIVO NÃƒO CIRCULANTE", 1)
+    ativo_nao_circ = buscar_valor(l_bp, "ATIVO NíƒO CIRCULANTE", 1)
     if ativo_nao_circ == 0:
         ativo_nao_circ = buscar_valor(l_bp, "ATIVO NAO CIRCULANTE", 1)
     ativo_total = ativo_circ + ativo_nao_circ
@@ -1064,7 +1064,7 @@ def _calc_panorama(periodo):
     
     passivo_total = buscar_valor(l_bp, "TOTAL DO PASSIVO", 3)
     
-    pl = buscar_valor(l_bp, "TOTAL DO PATRIMÃ”NIO LÃQUIDO", 3)
+    pl = buscar_valor(l_bp, "TOTAL DO PATRIMí”NIO LíQUIDO", 3)
     if pl == 0:
         pl = buscar_valor(l_bp, "TOTAL DO PATRIMONIO LIQUIDO", 3)
     
@@ -1084,18 +1084,18 @@ def _calc_panorama(periodo):
             continue
         linha_str = " | ".join(str(c) for c in p).upper()
         # IMPORTANTE: verificar SUPERAVIT primeiro (a mesma linha pode ter tanto deficit quanto superavit)
-        if "SUPERÃVIT DO EXERCÃCIO" in linha_str or "SUPERAVIT DO EXERCICIO" in linha_str:
+        if "SUPERíVIT DO EXERCíCIO" in linha_str or "SUPERAVIT DO EXERCICIO" in linha_str:
             v = limpar(p[6])
             if v > 0:
                 superavit_patr = v
                 break
-        elif "DÃ‰FICIT DO EXERCÃCIO" in linha_str or "DEFICIT DO EXERCICIO" in linha_str:
+        elif "Dí‰FICIT DO EXERCíCIO" in linha_str or "DEFICIT DO EXERCICIO" in linha_str:
             v = limpar(p[6])
             if v > 0:
                 superavit_patr = -v
                 break
     
-    superavit_fin = buscar_valor(l_bp, "SUPERÃVIT FINANCEIRO", 2)
+    superavit_fin = buscar_valor(l_bp, "SUPERíVIT FINANCEIRO", 2)
     if superavit_fin == 0:
         superavit_fin = buscar_valor(l_bp, "SUPERAVIT FINANCEIRO", 2)
     if superavit_fin == 0:
@@ -1136,12 +1136,12 @@ async def api_panorama(periodo: str):
             return []
 
         demonstrativos = {
-            "BALANCO_PATRIMONIAL": "BalanÃ§o Patrimonial",
-            "BALANCO_ORCAMENTARIO": "BalanÃ§o OrÃ§amentÃ¡rio",
-            "BALANCO_FINANCEIRO": "BalanÃ§o Financeiro",
-            "DFC": "DemonstraÃ§Ã£o do Fluxo de Caixa",
-            "DVP": "DemonstraÃ§Ã£o das VariaÃ§Ãµes Patrimoniais",
-            "DMPL": "DemonstraÃ§Ã£o das MutaÃ§Ãµes do PL",
+            "BALANCO_PATRIMONIAL": "Balanço Patrimonial",
+            "BALANCO_ORCAMENTARIO": "Balanço Orçamentário",
+            "BALANCO_FINANCEIRO": "Balanço Financeiro",
+            "DFC": "Demonstração do Fluxo de Caixa",
+            "DVP": "Demonstração das Variações Patrimoniais",
+            "DMPL": "Demonstração das Mutações do PL",
         }
         faltando = []
         for tipo, nome in demonstrativos.items():
@@ -1239,7 +1239,7 @@ async def api_panorama(periodo: str):
 
         # --- ATIVO TOTAL (soma de ATIVO CIRCULANTE + ATIVO NAO CIRCULANTE) ---
         ativo_circ = pegar_valor(l_bp, "ATIVO CIRCULANTE", 1)
-        ativo_nao_circ = pegar_valor(l_bp, "ATIVO NÃƒO CIRCULANTE", 1)
+        ativo_nao_circ = pegar_valor(l_bp, "ATIVO NíƒO CIRCULANTE", 1)
         ativo_total = ativo_circ + ativo_nao_circ
         if ativo_total == 0:
             ativo_total = pegar_valor(l_bp, "TOTAL DO ATIVO", 1)
@@ -1248,7 +1248,7 @@ async def api_panorama(periodo: str):
         passivo_total = pegar_valor(l_bp, "TOTAL DO PASSIVO", 3)
 
         # --- PATRIMONIO LIQUIDO (TOTAL DO PATRIMONIO LIQUIDO na coluna 3) ---
-        pl = pegar_valor(l_bp, "TOTAL DO PATRIMÃ”NIO LÃQUIDO", 3)
+        pl = pegar_valor(l_bp, "TOTAL DO PATRIMí”NIO LíQUIDO", 3)
         if pl == 0:
             pl = pegar_valor(l_bp, "TOTAL DO PATRIMONIO LIQUIDO", 3)
 
@@ -1266,11 +1266,11 @@ async def api_panorama(periodo: str):
         superavit_orc = receita - despesa
 
         # --- SUPERAVIT PATRIMONIAL (DVP: Superavit do Exercicio na coluna 6) ---
-        superavit_patr = pegar_valor(l_dvp, "SUPERÃVIT DO EXERCÃCIO", 6)
+        superavit_patr = pegar_valor(l_dvp, "SUPERíVIT DO EXERCíCIO", 6)
         if superavit_patr == 0:
             superavit_patr = pegar_valor(l_dvp, "SUPERAVIT DO EXERCICIO", 6)
         if superavit_patr == 0:
-            deficit = pegar_valor(l_dvp, "DÃ‰FICIT DO EXERCÃCIO", 6)
+            deficit = pegar_valor(l_dvp, "Dí‰FICIT DO EXERCíCIO", 6)
             if deficit > 0:
                 superavit_patr = -deficit
 
@@ -1279,7 +1279,7 @@ async def api_panorama(periodo: str):
         passivo_fin = pegar_valor(l_bp, "PASSIVO FINANCEIRO", 3)
         superavit_fin = ativo_fin - passivo_fin
         if superavit_fin == 0:
-            superavit_fin = pegar_valor(l_bp, "SUPERÃVIT FINANCEIRO", 1)
+            superavit_fin = pegar_valor(l_bp, "SUPERíVIT FINANCEIRO", 1)
             if superavit_fin == 0:
                 superavit_fin = pegar_valor(l_bp, "SUPERAVIT FINANCEIRO", 1)
 
@@ -1454,11 +1454,11 @@ async def excluir_panorama(id: int):
 #     import json
 #     import psycopg2
     
-#     # DefiniÃ§Ã£o local para garantir que a variÃ¡vel exista no escopo
+#     # Definição local para garantir que a variável exista no escopo
 #     from .config import PG_CONFIG
     
 #     try:
-#         # Tenta primeiro buscar o Ãºltimo histÃ³rico salvo no PostgreSQL
+#         # Tenta primeiro buscar o último histórico salvo no PostgreSQL
 #         conn = psycopg2.connect(**PG_CONFIG)
 #         cursor = conn.cursor()
 #         cursor.execute("SELECT resultado_json FROM historico_integridade_matriz ORDER BY id DESC LIMIT 1")
@@ -1467,10 +1467,10 @@ async def excluir_panorama(id: int):
 #         conn.close()
         
 #         if row:
-#             # Se encontrou histÃ³rico, retorna exatamente o JSON salvo
+#             # Se encontrou histórico, retorna exatamente o JSON salvo
 #             return json.loads(row[0])
             
-#         # Se nÃ£o encontrou, tenta calcular via CSVs (fallback)
+#         # Se não encontrou, tenta calcular via CSVs (fallback)
 #         from .matriz_integridade import gerar_matriz
 #         dados = gerar_matriz(periodo)
 #         return dados
@@ -1483,7 +1483,7 @@ async def excluir_panorama(id: int):
 #     from datetime import datetime
 #     import psycopg2
     
-#     # DefiniÃ§Ã£o local para garantir que a variÃ¡vel exista no escopo
+#     # Definição local para garantir que a variável exista no escopo
 #     from .config import PG_CONFIG
     
 #     try:
@@ -1573,7 +1573,7 @@ async def excluir_panorama(id: int):
 #         conn = psycopg2.connect(**PG_CONFIG)
 #         cursor = conn.cursor()
         
-#         # Cria a tabela se nÃ£o existir no Postgres
+#         # Cria a tabela se não existir no Postgres
 #         cursor.execute("""
 #             CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
 #                 id SERIAL PRIMARY KEY, 
@@ -1630,7 +1630,7 @@ async def excluir_panorama(id: int):
 #     import json
 #     import psycopg2
     
-#     # DefiniÃ§Ã£o local para garantir que a variÃ¡vel exista
+#     # Definição local para garantir que a variável exista
 #     from .config import PG_CONFIG
     
 #     try:
@@ -1642,7 +1642,7 @@ async def excluir_panorama(id: int):
 #         conn.close()
         
 #         if not row: 
-#             raise HTTPException(status_code=404, detail="NÃ£o encontrado")
+#             raise HTTPException(status_code=404, detail="Não encontrado")
             
 #         return json.loads(row[0])
 #     except Exception as e:
@@ -1666,7 +1666,7 @@ async def excluir_panorama(id: int):
 #         conn.commit()
 #         cursor.close()
 #         conn.close()
-#         return {"ok": True, "mensagem": "ExcluÃ­do com sucesso!"}
+#         return {"ok": True, "mensagem": "Excluí­do com sucesso!"}
 #     except Exception as e:
 #         return {"ok": False, "mensagem": str(e)}
 
@@ -1723,11 +1723,11 @@ async def excluir_panorama(id: int):
 # #         from .matriz_integridade import _get_csv
 # #         caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
 # #         if not caminho_check or not os.path.exists(caminho_check):
-# #             return {"erro": "faltando", "pecas": ["BalanÃ§o OrÃ§amentÃ¡rio"]}
+# #             return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
 # #         from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
 # #         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
 # #         if not caminho or not os.path.exists(caminho):
-# #             return {"erro": True, "mensagem": f"BO do perÃ­Â­odo {periodo} nÃ£o foi importado."}
+# #             return {"erro": True, "mensagem": f"BO do perí­­odo {periodo} não foi importado."}
 # #         linhas = _ler_linhas(caminho)
 # #         def buscar(termo, col, apos=0):
 # #             for i, p in enumerate(linhas):
@@ -1809,7 +1809,7 @@ async def api_composicao_rd(periodo: str):
 
         caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
         if not caminho or not os.path.exists(caminho):
-            return {"erro": "faltando", "pecas": ["BalanÃ§o OrÃ§amentÃ¡rio"]}
+            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
 
         linhas = _ler_linhas(caminho)
 
@@ -1826,7 +1826,7 @@ async def api_composicao_rd(periodo: str):
         receitas = {
             "Receitas Correntes": buscar("RECEITAS CORRENTE"),
             "Receitas Patrimoniais": buscar("RECEITAS PATRIMONIAIS"),
-            "Transferencias Correntes": buscar("TRANSFERÃŠNCIAS CORRENTES"),
+            "Transferencias Correntes": buscar("TRANSFERíŠNCIAS CORRENTES"),
             "Outras Receitas Correntes": buscar("OUTRAS RECEITAS CORRENTES"),
             "Receitas de Capital": buscar("RECEITAS DE CAPITAL"),
         }
@@ -1834,8 +1834,8 @@ async def api_composicao_rd(periodo: str):
         despesas = {
             "Pessoal e Encargos": buscar("PESSOAL E ENCARGOS SOCIAIS", 4),
             "Outras Despesas Correntes": buscar("OUTRAS DESPESAS CORRENTES", 4),
-            "Investimentos": buscar("INVESTIMENTOS - APLICAÃ‡Ã•ES DIRETAS", 4),
-            "Inversoes Financeiras": buscar("INVERSÃ•ES FINANCEIRAS", 4),
+            "Investimentos": buscar("INVESTIMENTOS - APLICAÇí•ES DIRETAS", 4),
+            "Inversoes Financeiras": buscar("INVERSí•ES FINANCEIRAS", 4),
         }
 
         return {"erro": False, "receitas": receitas, "despesas": despesas}
@@ -1946,7 +1946,7 @@ async def serve_composicao():
 #         from .matriz_integridade import _get_csv
 #         caminho_check = _get_csv("BALANCO_FINANCEIRO", periodo)
 #         if not caminho_check or not os.path.exists(caminho_check):
-#             return {"erro": "faltando", "pecas": ["BalanÃ§o Financeiro"]}
+#             return {"erro": "faltando", "pecas": ["Balanço Financeiro"]}
 #         from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
 #         caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
 #         if not caminho or not os.path.exists(caminho):
@@ -1961,8 +1961,8 @@ async def serve_composicao():
 #             if p and len(p) > idx: return abs(_limpar_valor(p[idx]))
 #             return 0.0
 #         l10 = buscar("RECEITA REALIZADA")
-#         l28 = buscar("Recebimentos ExtraorÃ§amentÃ¡rios")
-#         l33 = buscar("Saldo em espÃ©cie do ExercÃ­Â­cio Anterior")
+#         l28 = buscar("Recebimentos Extraorçamentários")
+#         l33 = buscar("Saldo em espécie do Exercí­­cio Anterior")
 #         l36 = buscar("Total:")
 #         dados = {
 #             "receita_realizada": {"atual": val(l10,1), "anterior": val(l10,2)},
@@ -2072,10 +2072,10 @@ async def serve_composicao():
 #         pdf.set_font(fonte_padrao, "B", 22)
 #         pdf.set_text_color(255, 255, 255)
 #         pdf.set_xy(15, 8)
-#         pdf.cell(180, 10, "BalanÃ§o Financeiro", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.cell(180, 10, "Balanço Financeiro", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 #         pdf.set_font(fonte_padrao, "", 13)
 #         pdf.set_xy(15, 20)
-#         pdf.cell(180, 8, f"PerÃ­Â­odo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.cell(180, 8, f"Perí­­odo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
 #         pdf.set_draw_color(0, 51, 102)
 #         pdf.set_line_width(1.5)
@@ -2188,7 +2188,7 @@ async def serve_composicao():
 #         pdf.set_fill_color(240, 240, 240)
 #         pdf.set_font(fonte_padrao, "B", 9)
 #         pdf.set_xy(15, y_pos)
-#         pdf.cell(170, 6, "EXTRAORÃ‡AMENTÃ­RIO", border=1, fill=True)
+#         pdf.cell(170, 6, "EXTRAORÇAMENTí­RIO", border=1, fill=True)
 #         pdf.ln()
 #         y_pos += 6
 #         add_linha("Recebimentos Extraorcamentarios", d["extra"]["recebimentos"]["atual"], d["extra"]["recebimentos"]["anterior"])
@@ -2201,12 +2201,12 @@ async def serve_composicao():
 #         pdf.cell(170, 6, "CAIXA E EQUIVALENTES", border=1, fill=True)
 #         pdf.ln()
 #         y_pos += 6
-#         add_linha("Saldo em EspÃ©cie do ExercÃ­Â­cio Anterior", d["caixa"]["saldo_anterior"]["atual"], d["caixa"]["saldo_anterior"]["anterior"])
-#         add_linha("GeraÃ§Ã£o LÃ­Â­quida de Caixa", d["caixa"]["geracao_liquida"]["atual"], d["caixa"]["geracao_liquida"]["anterior"], bold=True)
-#         add_linha("Saldo em EspÃ©cie para o ExercÃ­Â­cio Seguinte", d["caixa"]["saldo_seguinte"]["atual"], d["caixa"]["saldo_seguinte"]["anterior"], bold=True)
+#         add_linha("Saldo em Espécie do Exercí­­cio Anterior", d["caixa"]["saldo_anterior"]["atual"], d["caixa"]["saldo_anterior"]["anterior"])
+#         add_linha("Geração Lí­­quida de Caixa", d["caixa"]["geracao_liquida"]["atual"], d["caixa"]["geracao_liquida"]["anterior"], bold=True)
+#         add_linha("Saldo em Espécie para o Exercí­­cio Seguinte", d["caixa"]["saldo_seguinte"]["atual"], d["caixa"]["saldo_seguinte"]["anterior"], bold=True)
 
 #         # ==========================================
-#         # NOVOS TOTAIS (INGRESSOS E DISPÃŠNDIOS)
+#         # NOVOS TOTAIS (INGRESSOS E DISPíŠNDIOS)
 #         # ==========================================
 #         y_pos += 5
 
@@ -2230,12 +2230,12 @@ async def serve_composicao():
 #         pdf.ln()
 #         y_pos += 6
 
-#         add_linha("Receitas OrÃ§amentÃ¡rias (Corrente + Capital)", totRecAt, totRecAnt)
+#         add_linha("Receitas Orçamentárias (Corrente + Capital)", totRecAt, totRecAnt)
 #         add_linha("Recebimentos Extraorcamentarios", totExtAt, totExtAnt)
-#         add_linha("Saldo em EspÃ©cie do ExercÃ­Â­cio Anterior", saldoAntAt, saldoAntAnt)
+#         add_linha("Saldo em Espécie do Exercí­­cio Anterior", saldoAntAt, saldoAntAnt)
 #         add_linha("TOTAL DE INGRESSOS", totalIngAt, totalIngAnt, bold=True, fill_color=(233, 236, 239), text_color=(0, 86, 179))
 
-#         # Calculos de DispÃ­Âªndios
+#         # Calculos de Dispí­ªndios
 #         y_pos += 5
 #         totDespAt = d["despesas"]["total"]["atual"]
 #         totDespAnt = d["despesas"]["total"]["anterior"]
@@ -2247,19 +2247,19 @@ async def serve_composicao():
 #         totalDispAt = totDespAt + pagExtAt + saldoSegAt
 #         totalDispAnt = totDespAnt + pagExtAnt + saldoSegAnt
 
-#         # Tabela de DispÃ­Âªndios
+#         # Tabela de Dispí­ªndios
 #         pdf.set_fill_color(220, 53, 69)
 #         pdf.set_text_color(255, 255, 255)
 #         pdf.set_font(fonte_padrao, "B", 10)
 #         pdf.set_xy(15, y_pos)
-#         pdf.cell(170, 6, "TOTAL GERAL DE DISPÃŠNDIOS", border=1, fill=True)
+#         pdf.cell(170, 6, "TOTAL GERAL DE DISPíŠNDIOS", border=1, fill=True)
 #         pdf.ln()
 #         y_pos += 6
 
-#         add_linha("Despesas OrÃ§amentÃ¡rias (Corrente + Capital)", totDespAt, totDespAnt)
+#         add_linha("Despesas Orçamentárias (Corrente + Capital)", totDespAt, totDespAnt)
 #         add_linha("Pagamentos Extraorcamentarios", pagExtAt, pagExtAnt)
-#         add_linha("Saldo em EspÃ©cie para o ExercÃ­Â­cio Seguinte", saldoSegAt, saldoSegAnt)
-#         add_linha("TOTAL DE DISPÃŠNDIOS", totalDispAt, totalDispAnt, bold=True, fill_color=(233, 236, 239), text_color=(220, 53, 69))
+#         add_linha("Saldo em Espécie para o Exercí­­cio Seguinte", saldoSegAt, saldoSegAnt)
+#         add_linha("TOTAL DE DISPíŠNDIOS", totalDispAt, totalDispAnt, bold=True, fill_color=(233, 236, 239), text_color=(220, 53, 69))
 
 #         # Rodape - Posiciona dinamicamente, abaixo da ultima linha (se houver espaco)
 #         y_rodape = max(y_pos + 5, 270)
@@ -2412,13 +2412,13 @@ async def serve_composicao():
 # [DFC-LEGADO]     pdf.set_fill_color(0, 51, 102)
 # [DFC-LEGADO]     pdf.set_text_color(255, 255, 255)
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 16)
-# [DFC-LEGADO]     pdf.cell(0, 15, "COFEN/BR - ANÃ­LISE DA DEMONSTRAÃ‡Ã­Æ’O DO FLUXO DE CAIXA", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
+# [DFC-LEGADO]     pdf.cell(0, 15, "COFEN/BR - ANí­LISE DA DEMONSTRAÇí­Æ’O DO FLUXO DE CAIXA", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     pdf.set_text_color(0, 0, 0)
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
 # [DFC-LEGADO]     pdf.ln(5)
-# [DFC-LEGADO]     pdf.cell(0, 6, f"PerÃ­Â­odo de ReferÃ­Âªncia: {periodo.replace('-', ' ')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-# [DFC-LEGADO]     pdf.cell(0, 6, f"Data de GeraÃ§Ã£o do RelatÃ­Â³rio: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+# [DFC-LEGADO]     pdf.cell(0, 6, f"Perí­­odo de Referí­ªncia: {periodo.replace('-', ' ')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+# [DFC-LEGADO]     pdf.cell(0, 6, f"Data de Geração do Relatí­³rio: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
 # [DFC-LEGADO]     pdf.ln(10)
 # [DFC-LEGADO] 
     # Tabela
@@ -2427,7 +2427,7 @@ async def serve_composicao():
 # [DFC-LEGADO]     pdf.set_text_color(255, 255, 255)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     col_w = [70, 35, 35, 30]
-# [DFC-LEGADO]     headers = ["ESPECIFICAÃ‡Ã­Æ’O", "PERÃ­ODO ATUAL", "PERÃ­ODO ANTERIOR", "VAR. (%)"]
+# [DFC-LEGADO]     headers = ["ESPECIFICAÇí­Æ’O", "PERí­ODO ATUAL", "PERí­ODO ANTERIOR", "VAR. (%)"]
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     for i, h in enumerate(headers):
 # [DFC-LEGADO]         pdf.cell(col_w[i], 8, h, border=1, align="C", fill=True)
@@ -2455,26 +2455,26 @@ async def serve_composicao():
 # [DFC-LEGADO]         pdf.ln()
 # [DFC-LEGADO] 
     # Operacional
-# [DFC-LEGADO]     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DAS OPERAÃ‡Ã•ES", 0, 0, is_header=True)
+# [DFC-LEGADO]     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DAS OPERAÇí•ES", 0, 0, is_header=True)
 # [DFC-LEGADO]     draw_row("Ingressos Operacionais", op.get("ingressos", {}).get("atual", 0), op.get("ingressos", {}).get("anterior", 0))
 # [DFC-LEGADO]     draw_row("Desembolsos Operacionais", op.get("desembolsos", {}).get("atual", 0), op.get("desembolsos", {}).get("anterior", 0))
-# [DFC-LEGADO]     draw_row("Caixa LÃ­Â­quido das OperaÃ§Ã­Âµes", op.get("liquido", {}).get("atual", 0), op.get("liquido", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO]     draw_row("Caixa Lí­­quido das Operaçí­µes", op.get("liquido", {}).get("atual", 0), op.get("liquido", {}).get("anterior", 0), is_total=True)
 # [DFC-LEGADO] 
     # Investimento
 # [DFC-LEGADO]     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DE INVESTIMENTO", 0, 0, is_header=True)
 # [DFC-LEGADO]     draw_row("Ingressos de Investimento", inv.get("ingressos", {}).get("atual", 0), inv.get("ingressos", {}).get("anterior", 0))
 # [DFC-LEGADO]     draw_row("Desembolsos de Investimento", inv.get("desembolsos", {}).get("atual", 0), inv.get("desembolsos", {}).get("anterior", 0))
-# [DFC-LEGADO]     draw_row("Caixa LÃ­Â­quido de Investimento", inv.get("liquido", {}).get("atual", 0), inv.get("liquido", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO]     draw_row("Caixa Lí­­quido de Investimento", inv.get("liquido", {}).get("atual", 0), inv.get("liquido", {}).get("anterior", 0), is_total=True)
 # [DFC-LEGADO] 
     # Financiamento
 # [DFC-LEGADO]     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DE FINANCIAMENTO", 0, 0, is_header=True)
 # [DFC-LEGADO]     draw_row("Ingressos de Financiamento", fin.get("ingressos", {}).get("atual", 0), fin.get("ingressos", {}).get("anterior", 0))
 # [DFC-LEGADO]     draw_row("Desembolsos de Financiamento", fin.get("desembolsos", {}).get("atual", 0), fin.get("desembolsos", {}).get("anterior", 0))
-# [DFC-LEGADO]     draw_row("Caixa LÃ­Â­quido de Financiamento", fin.get("liquido", {}).get("atual", 0), fin.get("liquido", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO]     draw_row("Caixa Lí­­quido de Financiamento", fin.get("liquido", {}).get("atual", 0), fin.get("liquido", {}).get("anterior", 0), is_total=True)
 # [DFC-LEGADO] 
     # Apuracao
-# [DFC-LEGADO]     draw_row("APURAÃ‡Ã­Æ’O DO FLUXO DE CAIXA DO PERÃ­ODO", 0, 0, is_header=True)
-# [DFC-LEGADO]     draw_row("GeraÃ§Ã£o LÃ­Â­quida de Caixa", cxa.get("geracao", {}).get("atual", 0), cxa.get("geracao", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO]     draw_row("APURAÇí­Æ’O DO FLUXO DE CAIXA DO PERí­ODO", 0, 0, is_header=True)
+# [DFC-LEGADO]     draw_row("Geração Lí­­quida de Caixa", cxa.get("geracao", {}).get("atual", 0), cxa.get("geracao", {}).get("anterior", 0), is_total=True)
 # [DFC-LEGADO]     draw_row("Caixa e Equivalentes Inicial", cxa.get("inicial", {}).get("atual", 0), cxa.get("inicial", {}).get("anterior", 0))
 # [DFC-LEGADO]     draw_row("Caixa e Equivalentes Final", cxa.get("final", {}).get("atual", 0), cxa.get("final", {}).get("anterior", 0), is_total=True)
 # [DFC-LEGADO] 
@@ -2482,59 +2482,59 @@ async def serve_composicao():
 # [DFC-LEGADO] 
     # Analise Textual
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
-# [DFC-LEGADO]     pdf.cell(0, 6, "1. ANÃ­LISE DAS ATIVIDADES OPERACIONAIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# [DFC-LEGADO]     pdf.cell(0, 6, "1. ANí­LISE DAS ATIVIDADES OPERACIONAIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "", 9)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     liq_op = op.get("liquido", {}).get("atual", 0)
 # [DFC-LEGADO]     if liq_op > 0:
-# [DFC-LEGADO]         txt_op = f"As atividades operacionais geraram um caixa lÃ­Â­quido positivo de R$ {fmt(liq_op)} no perÃ­Â­odo atual. Isso indica que as receitas e ingressos operacionais foram suficientes para cobrir os custos e desembolsos operacionais."
+# [DFC-LEGADO]         txt_op = f"As atividades operacionais geraram um caixa lí­­quido positivo de R$ {fmt(liq_op)} no perí­­odo atual. Isso indica que as receitas e ingressos operacionais foram suficientes para cobrir os custos e desembolsos operacionais."
 # [DFC-LEGADO]     else:
-# [DFC-LEGADO]         txt_op = f"As atividades operacionais apresentaram um caixa lÃ­Â­quido negativo de R$ {fmt(liq_op)} no perÃ­Â­odo atual. Isso demonstra que a entidade precisou consumir reservas ou obter financiamentos para cobrir seus desembolsos operacionais."
+# [DFC-LEGADO]         txt_op = f"As atividades operacionais apresentaram um caixa lí­­quido negativo de R$ {fmt(liq_op)} no perí­­odo atual. Isso demonstra que a entidade precisou consumir reservas ou obter financiamentos para cobrir seus desembolsos operacionais."
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     pdf.multi_cell(0, 5, txt_op)
 # [DFC-LEGADO]     pdf.ln(5)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
-# [DFC-LEGADO]     pdf.cell(0, 6, "2. ANÃ­LISE DAS ATIVIDADES DE INVESTIMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# [DFC-LEGADO]     pdf.cell(0, 6, "2. ANí­LISE DAS ATIVIDADES DE INVESTIMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "", 9)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     liq_inv = inv.get("liquido", {}).get("atual", 0)
 # [DFC-LEGADO]     if liq_inv < 0:
 # [DFC-LEGADO]         txt_inv = f"O fluxo de caixa de investimentos foi negativo em R$ {fmt(abs(liq_inv))}, o que e comum e esperado quando a entidade realiza aquisicoes de ativos (investimentos) e imobilizacoes."
 # [DFC-LEGADO]     else:
-# [DFC-LEGADO]         txt_inv = f"O fluxo de caixa de investimentos foi positivo em R$ {fmt(liq_inv)}, indicando que a entidade obteve mais recursos com alienaÃ§Ã£o de ativos do que gastou com aquisiÃ§Ã­Âµes."
+# [DFC-LEGADO]         txt_inv = f"O fluxo de caixa de investimentos foi positivo em R$ {fmt(liq_inv)}, indicando que a entidade obteve mais recursos com alienação de ativos do que gastou com aquisiçí­µes."
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     pdf.multi_cell(0, 5, txt_inv)
 # [DFC-LEGADO]     pdf.ln(5)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
-# [DFC-LEGADO]     pdf.cell(0, 6, "3. ANÃ­LISE DAS ATIVIDADES DE FINANCIAMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# [DFC-LEGADO]     pdf.cell(0, 6, "3. ANí­LISE DAS ATIVIDADES DE FINANCIAMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "", 9)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     liq_fin = fin.get("liquido", {}).get("atual", 0)
 # [DFC-LEGADO]     if liq_fin > 0:
-# [DFC-LEGADO]         txt_fin = f"O fluxo de caixa de financiamentos foi positivo em R$ {fmt(liq_fin)}, decorrente de captaÃ§Ã£o de emprÃ©stimos ou financiamentos."
+# [DFC-LEGADO]         txt_fin = f"O fluxo de caixa de financiamentos foi positivo em R$ {fmt(liq_fin)}, decorrente de captação de empréstimos ou financiamentos."
 # [DFC-LEGADO]     elif liq_fin < 0:
-# [DFC-LEGADO]         txt_fin = f"O fluxo de caixa de financiamentos foi negativo em R$ {fmt(abs(liq_fin))}, indicando amortizaÃ§Ã£o de dÃ­Â­vidas ou devoluÃ§Ã£o de recursos."
+# [DFC-LEGADO]         txt_fin = f"O fluxo de caixa de financiamentos foi negativo em R$ {fmt(abs(liq_fin))}, indicando amortização de dí­­vidas ou devolução de recursos."
 # [DFC-LEGADO]     else:
-# [DFC-LEGADO]         txt_fin = "NÃ£o houve movimentaÃ§Ã£o significativa no fluxo de caixa de financiamentos no perÃ­Â­odo."
+# [DFC-LEGADO]         txt_fin = "Não houve movimentação significativa no fluxo de caixa de financiamentos no perí­­odo."
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     pdf.multi_cell(0, 5, txt_fin)
 # [DFC-LEGADO]     pdf.ln(5)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
-# [DFC-LEGADO]     pdf.cell(0, 6, "4. CONCLUSÃ­Æ’O SOBRE A LIQUIDEZ", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# [DFC-LEGADO]     pdf.cell(0, 6, "4. CONCLUSí­Æ’O SOBRE A LIQUIDEZ", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 # [DFC-LEGADO]     pdf.set_font("ArialUnicode", "", 9)
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     geracao = cxa.get("geracao", {}).get("atual", 0)
 # [DFC-LEGADO]     inicial = cxa.get("inicial", {}).get("atual", 0)
 # [DFC-LEGADO]     final = cxa.get("final", {}).get("atual", 0)
 # [DFC-LEGADO] 
-# [DFC-LEGADO]     txt_concl = f"A entidade encerrou o perÃ­Â­odo com um saldo de caixa de R$ {fmt(final)} (variacao de R$ {fmt(geracao)} em relaÃ§Ã£o ao saldo inicial de R$ {fmt(inicial)}). "
+# [DFC-LEGADO]     txt_concl = f"A entidade encerrou o perí­­odo com um saldo de caixa de R$ {fmt(final)} (variacao de R$ {fmt(geracao)} em relação ao saldo inicial de R$ {fmt(inicial)}). "
 # [DFC-LEGADO]     if geracao > 0:
-# [DFC-LEGADO]         txt_concl += "O aumento no saldo de caixa demonstra uma boa geraÃ§Ã£o de recursos no perÃ­Â­odo."
+# [DFC-LEGADO]         txt_concl += "O aumento no saldo de caixa demonstra uma boa geração de recursos no perí­­odo."
 # [DFC-LEGADO]     else:
-# [DFC-LEGADO]         txt_concl += "A reduÃ§Ã£o no saldo de caixa requer atenÃ§Ã£o aos prÃ­Â³ximos perÃ­Â­odos para garantir a manutenÃ§Ã£o das atividades."
+# [DFC-LEGADO]         txt_concl += "A redução no saldo de caixa requer atenção aos prí­³ximos perí­­odos para garantir a manutenção das atividades."
 # [DFC-LEGADO] 
 # [DFC-LEGADO]     pdf.multi_cell(0, 5, txt_concl)
 # [DFC-LEGADO] 
@@ -2829,7 +2829,7 @@ async def buscar_historico_composicao_rd(id: int):
 #         # Estrutura esperada: { atual: {...}, anterior: {...} }
 #         a = d.get("atual", {})
 #         b = d.get("anterior", {})
-#         # --- 1. GERA O GRÃ­FICO (Atual primeiro) ---
+#         # --- 1. GERA O GRí­FICO (Atual primeiro) ---
 #         labels = ["Receita Realizada", "Despesa Empenhada", "Superavit"]
 #         ant = [b.get("receita_realizada", 0), b.get("despesa_empenhada", 0), b.get("superavit", 0)]
 #         atu = [a.get("receita_realizada", 0), a.get("despesa_empenhada", 0), a.get("superavit", 0)]
@@ -2880,7 +2880,7 @@ async def buscar_historico_composicao_rd(id: int):
 #         pdf.set_font(f_family, "", 9)
 #         def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 #         # Indicadores na ordem que queremos
-#         # Calcula os percentuais na hora para garantir precisÃ£o
+#         # Calcula os percentuais na hora para garantir precisão
 #         rec_orc = a.get("receita_orcada", 0) or 0
 #         rec_real = a.get("receita_realizada", 0) or 0
 #         desp_orc = a.get("despesa_orcada", 0) or 0
@@ -2969,10 +2969,10 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_font(fonte_padrao, "B", 22)
         pdf.set_text_color(255, 255, 255)
         pdf.set_xy(15, 8)
-        pdf.cell(180, 10, "DVP - DemonstraÃ§Ã£o das VariaÃ§Ã­Âµes Patrimoniais", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(180, 10, "DVP - Demonstração das Variaçí­µes Patrimoniais", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font(fonte_padrao, "", 13)
         pdf.set_xy(15, 20)
-        pdf.cell(180, 8, f"PerÃ­Â­odo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(180, 8, f"Perí­­odo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         # Linha amarela
         pdf.set_draw_color(0, 51, 102)  # Linha azul (era amarela)
         pdf.set_line_width(1.5)
@@ -2998,7 +2998,7 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_font(fonte_padrao, "", 10)
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(20, y_pos + 20)
-        pdf.cell(card_w, 5, "Total VPA (VariaÃ§Ã­Âµes Aumentativas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(card_w, 5, "Total VPA (Variaçí­µes Aumentativas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         # Card 2: Total VPD
         pdf.set_fill_color(248, 232, 232)
         pdf.rect(105, y_pos, card_w, card_h, "F")
@@ -3009,7 +3009,7 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_font(fonte_padrao, "", 10)
         pdf.set_text_color(80, 80, 80)
         pdf.set_xy(110, y_pos + 20)
-        pdf.cell(card_w, 5, "Total VPD (VariaÃ§Ã­Âµes Diminutivas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(card_w, 5, "Total VPD (Variaçí­µes Diminutivas)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         # Card 3: Resultado
         y_pos += 45
         pdf.set_fill_color(238, 245, 232)
@@ -3039,8 +3039,8 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_text_color(255, 255, 255)
         pdf.set_xy(15, y_pos)
         pdf.cell(90, 8, "Indicador", border=1, fill=True)
-        pdf.cell(40, 8, "PerÃ­Â­odo Atual", border=1, fill=True, align="R")
-        pdf.cell(40, 8, "PerÃ­Â­odo Anterior", border=1, fill=True, align="R")
+        pdf.cell(40, 8, "Perí­­odo Atual", border=1, fill=True, align="R")
+        pdf.cell(40, 8, "Perí­­odo Anterior", border=1, fill=True, align="R")
         pdf.ln()
         y_pos += 8
         pdf.set_text_color(0, 0, 0)
@@ -3061,30 +3061,30 @@ async def gerar_pdf_analise_patrimonial(id: int):
         pdf.set_fill_color(232, 244, 248)
         pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
-        pdf.cell(170, 7, "VPA - VARIAÃ‡Ã•ES PATRIMONIAIS AUMENTATIVAS", border=1, fill=True)
+        pdf.cell(170, 7, "VPA - VARIAÇí•ES PATRIMONIAIS AUMENTATIVAS", border=1, fill=True)
         pdf.ln()
         y_pos += 6
         add_linha("VPA Financeiras", d['vpa_financeiras']['atual'], d['vpa_financeiras']['anterior'])
-        add_linha("TransferÃ­Âªncias Recebidas", d['transf_recebidas']['atual'], d['transf_recebidas']['anterior'])
+        add_linha("Transferí­ªncias Recebidas", d['transf_recebidas']['atual'], d['transf_recebidas']['anterior'])
         add_linha("Outras VPA", d['outras_vpa']['atual'], d['outras_vpa']['anterior'])
-        add_linha("ReversÃ£o de ProvisÃ­Âµes", d['reversao_provisoes']['atual'], d['reversao_provisoes']['anterior'])
+        add_linha("Reversão de Provisí­µes", d['reversao_provisoes']['atual'], d['reversao_provisoes']['anterior'])
         add_linha("TOTAL VPA", d['total_vpa']['atual'], d['total_vpa']['anterior'], bold=True)
         # Bloco VPD
         pdf.set_fill_color(248, 232, 232)
         pdf.set_font(fonte_padrao, "B", 9)
         pdf.set_xy(15, y_pos)
-        pdf.cell(170, 7, "VPD - VARIAÃ‡Ã•ES PATRIMONIAIS DIMINUTIVAS", border=1, fill=True)
+        pdf.cell(170, 7, "VPD - VARIAÇí•ES PATRIMONIAIS DIMINUTIVAS", border=1, fill=True)
         pdf.ln()
         y_pos += 6
         add_linha("VPD Financeiras", d['vpd_financeiras']['atual'], d['vpd_financeiras']['anterior'])
         add_linha("Pessoal e Encargos", d['pessoal_encargos']['atual'], d['pessoal_encargos']['anterior'])
         add_linha("Uso de Material de Consumo", d['uso_material_consumo']['atual'], d['uso_material_consumo']['anterior'])
-        add_linha("ServiÃ§os", d['servicos']['atual'], d['servicos']['anterior'])
-        add_linha("DepreciaÃ§Ã£o", d['depreciacao']['atual'], d['depreciacao']['anterior'])
-        add_linha("AmortizaÃ§Ã£o", d['amortizacao']['atual'], d['amortizacao']['anterior'])
-        add_linha("TransferÃ­Âªncias Concedidas", d['transf_concedidas']['atual'], d['transf_concedidas']['anterior'])
+        add_linha("Serviços", d['servicos']['atual'], d['servicos']['anterior'])
+        add_linha("Depreciação", d['depreciacao']['atual'], d['depreciacao']['anterior'])
+        add_linha("Amortização", d['amortizacao']['atual'], d['amortizacao']['anterior'])
+        add_linha("Transferí­ªncias Concedidas", d['transf_concedidas']['atual'], d['transf_concedidas']['anterior'])
         add_linha("Outras VPD", d['outras_vpd']['atual'], d['outras_vpd']['anterior'])
-        add_linha("TributÃ¡rias", d['tributarias']['atual'], d['tributarias']['anterior'])
+        add_linha("Tributárias", d['tributarias']['atual'], d['tributarias']['anterior'])
         add_linha("TOTAL VPD", d['total_vpd']['atual'], d['total_vpd']['anterior'], bold=True)
         # Rodape
         pdf.set_draw_color(200, 200, 200)
@@ -3110,7 +3110,7 @@ async def gerar_pdf_analise_patrimonial(id: int):
 @app.get("/gerar_pdf_composicao_receitas_despesas/{id}")
 def gerar_pdf_composicao_receitas_despesas(id: int):
     def fmt_moeda(valor):
-        # Formata o valor no padrÃ£o brasileiro completo: 1.234.567,89
+        # Formata o valor no padrão brasileiro completo: 1.234.567,89
         try:
             v = float(valor)
             s = f"{v:,.2f}"
@@ -3196,12 +3196,12 @@ def gerar_pdf_composicao_receitas_despesas(id: int):
         pdf.set_fill_color(0, 51, 102)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", "B", 16)
-        pdf.cell(0, 15, "COMPOSIÃ‡ÃƒO DE RECEITAS E DESPESAS", ln=True, align="C", fill=True)
+        pdf.cell(0, 15, "COMPOSIÇíƒO DE RECEITAS E DESPESAS", ln=True, align="C", fill=True)
         pdf.ln(2)
         
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", "", 10)
-        pdf.cell(0, 8, f"PerÃ­odo Atual: {periodo}  |  PerÃ­odo Anterior: {periodo_anterior}", ln=True, align="C")
+        pdf.cell(0, 8, f"Perí­odo Atual: {periodo}  |  Perí­odo Anterior: {periodo_anterior}", ln=True, align="C")
         pdf.cell(0, 8, f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
         pdf.ln(10)
 
@@ -3222,8 +3222,8 @@ def gerar_pdf_composicao_receitas_despesas(id: int):
         pdf.set_font("Arial", "B", 8)
         pdf.cell(10, 8, "", border=0)
         pdf.cell(60, 8, "Conta", border=1, align="L", fill=True)
-        pdf.cell(45, 8, "PerÃ­odo Atual", border=1, align="R", fill=True)
-        pdf.cell(45, 8, "PerÃ­odo Anterior", border=1, align="R", fill=True)
+        pdf.cell(45, 8, "Perí­odo Atual", border=1, align="R", fill=True)
+        pdf.cell(45, 8, "Perí­odo Anterior", border=1, align="R", fill=True)
         pdf.cell(30, 8, "Var. (%)", border=1, align="R", fill=True)
         pdf.ln()
         
@@ -3254,8 +3254,8 @@ def gerar_pdf_composicao_receitas_despesas(id: int):
         pdf.set_font("Arial", "B", 8)
         pdf.cell(10, 8, "", border=0)
         pdf.cell(60, 8, "Conta", border=1, align="L", fill=True)
-        pdf.cell(45, 8, "PerÃ­odo Atual", border=1, align="R", fill=True)
-        pdf.cell(45, 8, "PerÃ­odo Anterior", border=1, align="R", fill=True)
+        pdf.cell(45, 8, "Perí­odo Atual", border=1, align="R", fill=True)
+        pdf.cell(45, 8, "Perí­odo Anterior", border=1, align="R", fill=True)
         pdf.cell(30, 8, "Var. (%)", border=1, align="R", fill=True)
         pdf.ln()
         
@@ -3313,7 +3313,7 @@ async def gerar_pdf_base_legal(periodo: str):
         pdf.set_font(f_family, "", 10)
         normas = [
             "Lei no 4.320/1964",
-            "ResoluÃ§Ã£o Cofen nÂº 814/2026",
+            "Resolução Cofen nº 814/2026",
             "Manual de Contabilidade Aplicada ao Setor Publico (MCASP)",
             "Resolucao COFEN no 340/2008 (Regulamento da Administracao Financeira e Contabil)",
             "Resolucao COFEN no 764/2024 (Prestacao de Contas)",
@@ -3417,7 +3417,7 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
                     val = 0.0
                 if val > maior_pessoal:
                     maior_pessoal = val
-            # Outras Despesas VariÃ¡veis - pega o maior valor
+            # Outras Despesas Variáveis - pega o maior valor
             if "OUTRAS DESPESAS VARI" in nome.upper() and ("PESSOAL" in nome.upper() or "RGPS" in nome.upper()):
                 if len(linha) >= 8:
                     val = _limpar_valor(linha[5])
@@ -3427,7 +3427,7 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
                     val = 0.0
                 if val > maior_outras:
                     maior_outras = val
-            # TerceirizaÃ§Ã£o - pega o maior valor
+            # Terceirização - pega o maior valor
             if "OUTRAS DESPESAS DE PESSOAL DECORRENTES" in nome:
                 if len(linha) >= 8:
                     val = _limpar_valor(linha[5])
@@ -3437,8 +3437,8 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
                     val = 0.0
                 if val > maior_terc:
                     maior_terc = val
-            # SentenÃ§as Judiciais Trabalhistas - pega o maior valor
-            if "SENTENÃ‡AS JUDICIAIS" in nome and "TRABALHISTAS" in nome:
+            # Sentenças Judiciais Trabalhistas - pega o maior valor
+            if "SENTENÇAS JUDICIAIS" in nome and "TRABALHISTAS" in nome:
                 if len(linha) >= 8:
                     val = _limpar_valor(linha[5])
                 elif len(linha) >= 7:
@@ -3458,28 +3458,28 @@ async def api_custo_pessoal(periodo: str, entidade: str = None):
     custo_anterior = sum(d["pessoal"] + d["outras"] + d["terc"] - d["sent"] for d in dados_anteriores)
     rcl_atual = dados_atual["receitas_realizadas"] - dados_atual["cota_parte"]
     rcl_anterior = sum(d["receitas_realizadas"] - d["cota_parte"] for d in dados_anteriores)
-    # LÃ­Â³gica de Faixas de Controle (Art. 6Âº da ResoluÃ§Ã£o Cofen 814/2026)
+    # Lí­³gica de Faixas de Controle (Art. 6º da Resolução Cofen 814/2026)
     pct_custo_total = ((custo_atual + custo_anterior) / (rcl_atual + rcl_anterior)) * 100 if (rcl_atual + rcl_anterior) > 0 else 0
     is_coren = (entidade.upper() == "COREN")
 
     if is_coren:
         if pct_custo_total > 60:
-            faixa, cor = "Faixa CrÃ­Â­tica (> 60%)", "danger"
+            faixa, cor = "Faixa Crí­­tica (> 60%)", "danger"
         elif pct_custo_total >= 57:
             faixa, cor = "Faixa Prudencial (57% a 60%)", "warning"
         elif pct_custo_total >= 54:
             faixa, cor = "Faixa de Alerta (54% a 57%)", "warning"
         else:
-            faixa, cor = "Abaixo da Faixa de Alerta (SaudÃ¡vel)", "success"
+            faixa, cor = "Abaixo da Faixa de Alerta (Saudável)", "success"
     else:
         if pct_custo_total > 50:
-            faixa, cor = "Faixa CrÃ­Â­tica (> 50%)", "danger"
+            faixa, cor = "Faixa Crí­­tica (> 50%)", "danger"
         elif pct_custo_total >= 47.5:
             faixa, cor = "Faixa Prudencial (47,5% a 50%)", "warning"
         elif pct_custo_total >= 45:
             faixa, cor = "Faixa de Alerta (45% a 47,5%)", "warning"
         else:
-            faixa, cor = "Abaixo da Faixa de Alerta (SaudÃ¡vel)", "success"
+            faixa, cor = "Abaixo da Faixa de Alerta (Saudável)", "success"
 
     return {
         "erro": False,
@@ -3551,7 +3551,7 @@ async def api_relatorios_importados():
             nome = os.path.basename(arq)
             partes = nome.replace(".csv", "").split("_")
             tipo = partes[0] if partes else "Desconhecido"
-            periodo = "NÃ£o identificado"
+            periodo = "Não identificado"
             for i, p in enumerate(partes):
                 if len(p) == 4 and p.isdigit():
                     if i + 2 < len(partes):
@@ -3570,8 +3570,8 @@ async def serve_base_legal():
 async def salvar_base_legal(periodo: str, periodo_anterior: str = "2025-TRIMESTRE-3"):
     try:
         import sqlite3, json, datetime, os
-        # Simulamos o salvamento dos dados do Base Legal (que sÃ£o fixos, mas dependem do perÃ­Â­odo)
-        # O PDF serÃ¡ gerado posteriormente com base no ID salvo
+        # Simulamos o salvamento dos dados do Base Legal (que são fixos, mas dependem do perí­­odo)
+        # O PDF será gerado posteriormente com base no ID salvo
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -3724,7 +3724,7 @@ async def listar_base_legal():
 #
 #     return {
 #         "periodo": periodo,
-#         "periodo_anterior": periodo_anterior_label or "ExercÃ­Â­cio Anterior",
+#         "periodo_anterior": periodo_anterior_label or "Exercí­­cio Anterior",
 #         "liquidez": idx_atual["liquidez"],
 #         "estrutura": idx_atual["estrutura"],
 #         "valores": idx_atual["valores"],
@@ -3735,15 +3735,15 @@ async def listar_base_legal():
 #
 #
 def demonstracoes_em_breve():
-    return HTMLResponse(content="<html><body><h1>DemonstraÃ§Ã­Âµes ContÃ¡beis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
+    return HTMLResponse(content="<html><body><h1>Demonstraçí­µes Contábeis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
 @app.get("/analises", response_class=HTMLResponse)
 def analises_em_breve():
-    return HTMLResponse(content="<html><body><h1>AnÃ¡lises ContÃ¡beis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
+    return HTMLResponse(content="<html><body><h1>Análises Contábeis</h1><p>Em breve.</p><a href='/'>Voltar</a></body></html>")
 @app.post("/salvar_custo_pessoal/{periodo}")
 def salvar_custo_pessoal_rota(periodo: str):
     import sqlite3, json, os, datetime
     try:
-        # Chama a funÃ§Ã£o de cÃ¡lculo diretamente
+        # Chama a função de cálculo diretamente
         from main import api_custo_pessoal
         import asyncio
         dados = asyncio.run(api_custo_pessoal(periodo))
@@ -3761,7 +3761,7 @@ def salvar_custo_pessoal_rota(periodo: str):
                     (periodo, data_agora, json.dumps(dados)))
         conn.commit()
         conn.close()
-        return {"status": "sucesso", "mensagem": "RelatÃ­Â³rio salvo!"}
+        return {"status": "sucesso", "mensagem": "Relatí­³rio salvo!"}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 # === ROUTER DO PANORAMA (registrado por ultimo para vencer a rota antiga) ===
@@ -3780,7 +3780,7 @@ def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
         html_content = f.read()
     pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
     # Substitui o texto descritivo
-    html_content = html_content.replace("Limite ResoluÃ§Ã£o Cofen 814/2026 (50% da RCL)", f"Limite ResoluÃ§Ã£o Cofen 814/2026 ({pct} da RCL)")
+    html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
     # Substitui o valor na coluna % da RCL
     html_content = html_content.replace('<td class="right">50,00%</td>', f'<td class="right">{pct}</td>')
     return HTMLResponse(content=html_content, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
@@ -3791,7 +3791,7 @@ def serve_custo_pessoal_pdf_resumo(entidade: str = "COFEN"):
         html_content = f.read()
     pct = "60,00%" if entidade.upper() == "COREN" else "50,00%"
     # Substitui o texto descritivo
-    html_content = html_content.replace("Limite ResoluÃ§Ã£o Cofen 814/2026 (50% da RCL)", f"Limite ResoluÃ§Ã£o Cofen 814/2026 ({pct} da RCL)")
+    html_content = html_content.replace("Limite Resolução Cofen 814/2026 (50% da RCL)", f"Limite Resolução Cofen 814/2026 ({pct} da RCL)")
     # Substitui o valor na coluna % da RCL
     html_content = html_content.replace('<td class="right">50,00%</td>', f'<td class="right">{pct}</td>')
     return HTMLResponse(content=html_content, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
@@ -3887,7 +3887,7 @@ def serve_analise_custo_pessoal():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return HTMLResponse(content="<h1>Arquivo analise_custo_pessoal.html nÃ£o encontrado!</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Arquivo analise_custo_pessoal.html não encontrado!</h1>", status_code=404)
 @app.get("/historico_custo_pessoal")
 def listar_historico_custo_pessoal():
     conn = sqlite3.connect(DB_PATH)
@@ -3944,7 +3944,7 @@ def serve_configuracoes_custo_pessoal():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>Arquivo de configuraÃ§Ã­Âµes nÃ£o encontrado</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Arquivo de configuraçí­µes não encontrado</h1>", status_code=404)
 
 
 @app.get("/analise_centro_custos", response_class=HTMLResponse)
@@ -3953,7 +3953,7 @@ def serve_analise_centro_custos():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>Tela nÃ£o encontrada</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Tela não encontrada</h1>", status_code=404)
 
 
 @app.get("/historico_centro_custos")
@@ -4042,18 +4042,18 @@ async def excluir_multiplos_custo_pessoal(request: Request):
 async def importar_centro_custos(file: UploadFile = File(...)):
     import csv, io
     try:
-        # LÃ­Âª o conteÃ­Âºdo do arquivo
+        # Lí­ª o conteí­ºdo do arquivo
         contents = await file.read()
         decoded = contents.decode('utf-8-sig')  # Remove BOM se houver
         reader = csv.DictReader(io.StringIO(decoded))
 
         centros = []
         for row in reader:
-            # Tenta encontrar as colunas (aceita variaÃ§Ã­Âµes de nome)
+            # Tenta encontrar as colunas (aceita variaçí­µes de nome)
             nome = row.get("Centro de Custo") or row.get("centro_custo") or row.get("Nome") or row.get("nome") or ""
             valor_str = row.get("Valor") or row.get("valor") or row.get("Valor (R$)") or "0"
 
-            # Limpa o valor (troca vÃ­Â­rgula por ponto e remove R$)
+            # Limpa o valor (troca ví­­rgula por ponto e remove R$)
             valor_str = str(valor_str).replace("R$", "").replace(".", "").replace(",", ".").strip()
             try:
                 valor = float(valor_str)
@@ -4078,7 +4078,7 @@ def api_relatorio_centro_custos(id: int = None, periodo: str = "2026-TRIMESTRE-3
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
-    # Calcula o perÃ­Â­odo anterior automaticamente (mesmo trimestre do ano anterior)
+    # Calcula o perí­­odo anterior automaticamente (mesmo trimestre do ano anterior)
     if not periodo_anterior:
         partes = periodo.split("-")
         if len(partes) == 3:
@@ -4111,7 +4111,7 @@ def api_relatorio_centro_custos(id: int = None, periodo: str = "2026-TRIMESTRE-3
                 with open(arquivo, "r", encoding="utf-8", errors="ignore") as f:
                     linhas = f.readlines()
 
-            # Encontra o inÃ­Â­cio dos dados reais (primeira linha que comeÃ§a com "01 - AF")
+            # Encontra o iní­­cio dos dados reais (primeira linha que começa com "01 - AF")
             inicio_dados = 0
             for i, linha in enumerate(linhas):
                 linha_limpa = linha.strip().strip('"')
@@ -4206,7 +4206,7 @@ def api_relatorio_centro_custos(id: int = None, periodo: str = "2026-TRIMESTRE-3
             "anterior": {"total": 0, "centros": [], "maior_centro": {"nome": "-", "valor": 0}, "media_mensal": 0, "meses": {}},
             "variacao_total": 0,
             "variacao_pct": 0,
-            "aviso": "NÃ£o hÃ¡ dados para o perÃ­Â­odo anterior."
+            "aviso": "Não há dados para o perí­­odo anterior."
         }
 
     return {
@@ -4223,7 +4223,7 @@ def serve_relatorio_centro_custos():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>RelatÃ­Â³rio nÃ£o encontrado</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Relatí­³rio não encontrado</h1>", status_code=404)
 
 
 @app.get("/relatorio_centro_custos_completo", response_class=HTMLResponse)
@@ -4232,7 +4232,7 @@ def serve_relatorio_centro_custos_completo():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>RelatÃ­Â³rio nÃ£o encontrado</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Relatí­³rio não encontrado</h1>", status_code=404)
 
 
 @app.post("/excluir_multiplos_centro_custos")
@@ -4285,7 +4285,7 @@ def api_centro_custos(periodo: str):
                 with open(arquivo, "r", encoding="utf-8", errors="ignore") as f:
                     linhas = f.readlines()
 
-            # Encontra o inÃ­Â­cio dos dados reais (primeira linha que comeÃ§a com "01 - AF")
+            # Encontra o iní­­cio dos dados reais (primeira linha que começa com "01 - AF")
             inicio_dados = 0
             for i, linha in enumerate(linhas):
                 linha_limpa = linha.strip().strip('"')
@@ -4323,12 +4323,12 @@ def api_centro_custos(periodo: str):
         except Exception as e:
             return None
 
-    # LÃ­Âª o perÃ­Â­odo atual
+    # Lí­ª o perí­­odo atual
     centros_atual = ler_csv(periodo)
     if centros_atual is None:
-        return {"erro": True, "mensagem": f"Arquivo para o perÃ­Â­odo {periodo} nÃ£o encontrado."}
+        return {"erro": True, "mensagem": f"Arquivo para o perí­­odo {periodo} não encontrado."}
 
-    # Calcula o perÃ­Â­odo anterior (mesmo trimestre/mÃ­Âªs do ano anterior)
+    # Calcula o perí­­odo anterior (mesmo trimestre/mí­ªs do ano anterior)
     partes = periodo.split("-")
     if len(partes) == 3:
         ano = int(partes[0])
@@ -4356,7 +4356,7 @@ def api_relatorio_v2(periodo: str):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
 
-    # Calcula o perÃ­Â­odo anterior (mesmo trimestre do ano anterior)
+    # Calcula o perí­­odo anterior (mesmo trimestre do ano anterior)
     partes = periodo.split("-")
     if len(partes) == 3:
         ano = int(partes[0])
@@ -4401,7 +4401,7 @@ def api_relatorio_v2(periodo: str):
             if inicio_dados < len(linhas) and "COFEN/BR" in linhas[inicio_dados]:
                 inicio_dados += 1
 
-            # LÃ­Âª o cabeÃ§alho para descobrir os meses
+            # Lí­ª o cabeçalho para descobrir os meses
             meses_disponiveis = []
             for i in range(max(0, inicio_dados - 5), inicio_dados):
                 if "JAN" in linhas[i].upper():
@@ -4432,7 +4432,7 @@ def api_relatorio_v2(periodo: str):
                 if not nome or "TOTAL" in nome.upper() or "Centro de Custo" in nome:
                     continue
 
-                # Valor total (Ã­Âºltima coluna)
+                # Valor total (í­ºltima coluna)
                 valor = 0.0
                 for parte in reversed(partes):
                     parte_limpa = parte.strip().strip('"').replace(".", "").replace(",", ".")
@@ -4523,7 +4523,7 @@ def serve_relatorio_v2():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>RelatÃ­Â³rio nÃ£o encontrado</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Relatí­³rio não encontrado</h1>", status_code=404)
 
 
 @app.post("/salvar_relatorio_v2")
@@ -4560,7 +4560,7 @@ def serve_relatorio_final():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>RelatÃ­Â³rio nÃ£o encontrado</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Relatí­³rio não encontrado</h1>", status_code=404)
 
 
 # ========== ROTAS DO COMPARATIVO DE RECEITAS ==========
@@ -4568,9 +4568,9 @@ def serve_relatorio_final():
 # def api_comparativo_receitas(periodo: str):
 #     import os, csv, io
 #     upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
-#     # SimulaÃ§Ã£o: retorna dados fictÃ­Â­cios de receitas (adapte para ler o CSV real, se houver)
+#     # Simulação: retorna dados fictí­­cios de receitas (adapte para ler o CSV real, se houver)
 #     receitas = [
-#         {"nome": "Receita de ServiÃ§os", "valor": 120000000.0},
+#         {"nome": "Receita de Serviços", "valor": 120000000.0},
 #         {"nome": "Receitas Financeiras", "valor": 25000000.0},
 #         {"nome": "Outras Receitas", "valor": 12000000.0}
 #     ]
@@ -4631,16 +4631,16 @@ def serve_analise_comparativo_receitas():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>Tela nÃ£o encontrada</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Tela não encontrada</h1>", status_code=404)
 
 @app.get("/relatorio_comparativo_receitas", response_class=HTMLResponse)
 def serve_relatorio_comparativo_receitas():
-    # Por enquanto, redireciona para o relatÃ­Â³rio de centro de custos (ou crie um novo HTML)
+    # Por enquanto, redireciona para o relatí­³rio de centro de custos (ou crie um novo HTML)
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "relatorio_final.html")
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>RelatÃ­Â³rio nÃ£o encontrado</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Relatí­³rio não encontrado</h1>", status_code=404)
 
 
 @app.get("/api/comparativo_receitas_v2/{periodo}")
@@ -4694,7 +4694,7 @@ def api_comparativo_receitas_v2(periodo: str):
                 "cores": []
             }
 
-            grupos_nomes = ["RECEITAS DE CONTRIBUIÃ‡Ã•ES", "RECEITAS PATRIMONIAIS", "RECEITAS DE SERVIÃ‡OS", "TRANSFERÃŠNCIAS CORRENTES", "OUTRAS RECEITAS CORRENTES", "RECEITAS DE CAPITAL"]
+            grupos_nomes = ["RECEITAS DE CONTRIBUIÇí•ES", "RECEITAS PATRIMONIAIS", "RECEITAS DE SERVIÇOS", "TRANSFERíŠNCIAS CORRENTES", "OUTRAS RECEITAS CORRENTES", "RECEITAS DE CAPITAL"]
 
             for linha in linhas:
                 if ";" not in linha:
@@ -4750,7 +4750,7 @@ def api_comparativo_receitas_v2(periodo: str):
     anterior = ler_csv(periodo_anterior)
 
     if not atual:
-        return {"erro": True, "mensagem": f"Dados nÃ£o encontrados para o perÃ­odo {periodo}."}
+        return {"erro": True, "mensagem": f"Dados não encontrados para o perí­odo {periodo}."}
 
     retorno = {
         "orcado_total": atual["orcado_total"],
@@ -4797,9 +4797,9 @@ def api_comparativo_receitas_v2(periodo: str):
 #                 "data_geracao": row["data_geracao"],
 #                 "dados": row["dados_json"]
 #             }
-#         return {"erro": True, "mensagem": "HistÃ³rico nÃ£o encontrado."}
+#         return {"erro": True, "mensagem": "Histórico não encontrado."}
 #     except Exception as e:
-#         print(f"[ERRO] Falha ao buscar histÃ³rico ID {id}: {e}")
+#         print(f"[ERRO] Falha ao buscar histórico ID {id}: {e}")
 #         return {"erro": True, "mensagem": str(e)}
 
 
@@ -4827,7 +4827,7 @@ def api_comparativo_receitas_v2(periodo: str):
         
 #         return {"ok": True, "excluidos": excluidos}
 #     except Exception as e:
-#         print(f"[ERRO] Falha ao excluir histÃ³ricos: {e}")
+#         print(f"[ERRO] Falha ao excluir históricos: {e}")
 #         return {"ok": False, "mensagem": str(e)}
 
 
@@ -4862,7 +4862,7 @@ def api_comparativo_receitas_v2(periodo: str):
 
 
 
-# ========== ROTAS DE HISTÃ­â€œRICO DESPESAS (FORÃ‡ADAS) ==========
+# ========== ROTAS DE HISTí­“RICO DESPESAS (FORÇADAS) ==========
 
 # ============================================================
 
@@ -4873,7 +4873,7 @@ def gerar_pdf_panorama(historico_id: int):
     from fastapi.responses import Response
     import time
 
-    # Abre a tela do panorama passando o ID do histÃ­Â³rico
+    # Abre a tela do panorama passando o ID do histí­³rico
     url = f"http://127.0.0.1:994/relatorio_panorama?historico_id={historico_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
@@ -4916,7 +4916,7 @@ def gerar_pdf_panorama(historico_id: int):
 #         return {"erro": True, "mensagem": f"Erro ao buscar dados: {str(e)}"}
 
 #     if dados.get("erro"):
-#         return {"erro": True, "mensagem": dados.get("mensagem", "Dados nÃ£o encontrados")}
+#         return {"erro": True, "mensagem": dados.get("mensagem", "Dados não encontrados")}
 
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
@@ -4966,7 +4966,7 @@ async def deletar_entidade(id: int):
     cursor.execute("DELETE FROM configuracoes_entidade WHERE id = ?", (id,))
     conn.commit()
     conn.close()
-    return {"ok": True, "mensagem": "Entidade excluÃ­da com sucesso"}
+    return {"ok": True, "mensagem": "Entidade excluí­da com sucesso"}
 
 
 @app.post("/api/login")
@@ -5314,7 +5314,7 @@ async def api_analise_bp(periodo: str):
         # Busca os valores (atual, anterior)
         ativo_circ_at, ativo_circ_ant = buscar_ativo("ATIVO CIRCULANTE")
         caixa_at, caixa_ant = buscar_ativo("CAIXA E EQUIVALENTES")
-        # Busca o SuperÃ¡vit Financeiro na coluna 3 (valor) da linha que contÃ©m "SUPERVIT" ou "SUPERAVIT"
+        # Busca o Superávit Financeiro na coluna 3 (valor) da linha que contém "SUPERVIT" ou "SUPERAVIT"
         superavit_at = 0.0
         superavit_ant = 0.0
         for p in linhas:
@@ -5506,11 +5506,11 @@ async def gerar_pdf_analise_bp(id: int):
         pdf.cell(col_w[1], 7, fmt(va), border=1, align="R")
         pdf.cell(col_w[2], 7, fmt(vb), border=1, align="R")
 
-        # VariaÃ§Ã£o (%)
+        # Variação (%)
         pct = "-" if not vb else f"{(((va - vb) / abs(vb)) * 100):,.2f}%".replace(".", ",")
         pdf.cell(col_w[3], 7, pct, border=1, align="R")
 
-        # AnÃ¡lise Vertical (AV %)
+        # Análise Vertical (AV %)
         if base_av and base_av != 0:
             av = (va / base_av) * 100
             av_str = f"{av:,.2f}%".replace(".", ",")
@@ -5537,7 +5537,7 @@ async def gerar_pdf_analise_bp(id: int):
     linha("Passivo Total", d.get("passivo_total", {}).get("atual", 0), d.get("passivo_total", {}).get("anterior", 0), total_passivo_val)
     linha("Patrimonio Liquido", d.get("patrimonio_liquido", {}).get("atual", 0), d.get("patrimonio_liquido", {}).get("anterior", 0), total_passivo_val)
     linha("TOTAL DO PASSIVO", total_passivo_val, d.get("total_passivo", {}).get("anterior", 0), total_passivo_val)
-    linha("SuperÃ¡vit Financeiro", 63825301.60, 114355899.33)
+    linha("Superávit Financeiro", 63825301.60, 114355899.33)
 
     pdf_bytes = bytes(pdf.output())
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Analise_BP_{periodo}.pdf"})
@@ -5715,17 +5715,17 @@ async def gerar_pdf_analise_bp(id: int):
         linha_resumo(label, va, vp, var_pct(va, vp))
 
     sub_header("ESTRUTURA PATRIMONIAL")
-    for label, chave in [("Endividamento Geral", "endividamento_geral"), ("Part. Capital de Terceiros", "part_capital_terceiros"), ("ImobilizaÃ§Ã£o do PL", "imobilizacao_pl")]:
+    for label, chave in [("Endividamento Geral", "endividamento_geral"), ("Part. Capital de Terceiros", "part_capital_terceiros"), ("Imobilização do PL", "imobilizacao_pl")]:
         va = fmt_num(est.get(chave, "-"))
         vp = fmt_num(est_ant.get(chave, "-"))
         linha_resumo(label, va + "%", vp + "%", var_pct(va, vp))
 
     pdf.ln(8)
 
-    # --- TABELA 2: MEMÃ­â€œRIA DE CÃ­LCULO ---
+    # --- TABELA 2: MEMí­“RIA DE Cí­LCULO ---
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(0, 45, 90)
-    pdf.cell(277, 6, "MemÃ­Â³ria de CÃ¡lculo (Atual x Anterior)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(277, 6, "Memí­³ria de Cálculo (Atual x Anterior)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(2)
 
     # Larguras ajustadas: 35 + 55 + 71 + 20 + 71 + 25 = 277mm
@@ -5733,10 +5733,10 @@ async def gerar_pdf_analise_bp(id: int):
     pdf.set_fill_color(0, 70, 140)
     pdf.set_text_color(255, 255, 255)
     pdf.cell(35, 7, "INDICE", border=0, align="C", fill=True)
-    pdf.cell(55, 7, "FÃ­â€œRMULA", border=0, align="C", fill=True)
-    pdf.cell(71, 7, "CÃ­LCULO (ATUAL)", border=0, align="C", fill=True)
+    pdf.cell(55, 7, "Fí­“RMULA", border=0, align="C", fill=True)
+    pdf.cell(71, 7, "Cí­LCULO (ATUAL)", border=0, align="C", fill=True)
     pdf.cell(20, 7, "RESULTADO", border=0, align="C", fill=True)
-    pdf.cell(71, 7, "CÃ­LCULO (ANTERIOR)", border=0, align="C", fill=True)
+    pdf.cell(71, 7, "Cí­LCULO (ANTERIOR)", border=0, align="C", fill=True)
     pdf.cell(25, 7, "RESULTADO", border=0, align="C", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     pdf.set_text_color(0, 0, 0)
@@ -5782,7 +5782,7 @@ async def gerar_pdf_analise_bp(id: int):
         f"{fmt_moeda(val_ant.get('passivo_total'))} / {fmt_moeda(val_ant.get('patrimonio_liquido'))}", str(est_ant.get("part_capital_terceiros", "-")) + "%"
     )
     draw_row_memoria(
-        "ImobilizaÃ§Ã£o do PL", "Imobilizado / PL",
+        "Imobilização do PL", "Imobilizado / PL",
         f"{fmt_moeda(val.get('imobilizado'))} / {fmt_moeda(val.get('patrimonio_liquido'))}", str(est.get("imobilizacao_pl", "-")) + "%",
         f"{fmt_moeda(val_ant.get('imobilizado'))} / {fmt_moeda(val_ant.get('patrimonio_liquido'))}", str(est_ant.get("imobilizacao_pl", "-")) + "%"
     )
@@ -5814,7 +5814,7 @@ async def gerar_pdf_analise_bp(id: int):
 #         page = context.new_page()
 #         page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
 #         page.goto(url, wait_until="networkidle")
-#         page.wait_for_timeout(3000)  # Espera grÃ¡ficos renderizarem
+#         page.wait_for_timeout(3000)  # Espera gráficos renderizarem
 #         page.evaluate("""() => {
 #             document.querySelectorAll('canvas').forEach(canvas => {
 #                 const img = document.createElement('img');
@@ -5887,7 +5887,7 @@ def api_comparativo_despesas_v2(periodo: str):
                 "percentual_total": 0.0, "grupos": [], "detalhes": []
             }
 
-            # Lista fixa de cabeÃ§alhos que NÃ­Æ’O sÃ£o contas analÃ­Â­ticas
+            # Lista fixa de cabeçalhos que Ní­Æ’O são contas analí­­ticas
             cabecalhos = [
                 "CREDITO DISPONIVEL", "CREDITO DISPONIVEL - DESPESA CORRENTE",
                 "CREDITO DISPONIVEL - DESPESA CAPITAL",
@@ -5935,7 +5935,7 @@ def api_comparativo_despesas_v2(periodo: str):
                     dados["liquidado_total"] = parse_valor(partes_linha[2])
                     dados["percentual_total"] = parse_pct(partes_linha[3])
 
-                # Grupos contÃ¡beis
+                # Grupos contábeis
                 grupos_alvo_norm = [
                     "PESSOAL E ENCARGOS SOCIAIS",
                     "JUROS E ENCARGOS DA DIVIDA",
@@ -5954,10 +5954,10 @@ def api_comparativo_despesas_v2(periodo: str):
                             "percentual": parse_pct(partes_linha[3])
                         })
 
-                # Detalhes: exclui cabeÃ§alhos e pega o resto com valor > 0
+                # Detalhes: exclui cabeçalhos e pega o resto com valor > 0
                 valor_emp = parse_valor(partes_linha[2])
                 if valor_emp > 0 and nome_norm not in cabecalhos_norm:
-                    # Exclui tambÃ©m linhas com "TOTAL" no nome (sÃ£o somatÃ­Â³rios)
+                    # Exclui também linhas com "TOTAL" no nome (são somatí­³rios)
                     if "TOTAL" not in nome_norm and "SUBTOTAL" not in nome_norm:
                         detalhes_temp.append({
                             "nome": nome_original,
@@ -6032,7 +6032,7 @@ def serve_analise_comparativo_despesas():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>Tela nÃ£o encontrada</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Tela não encontrada</h1>", status_code=404)
 
 
 
@@ -6066,10 +6066,10 @@ def serve_relatorio_comparativo_despesas():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), headers={"Cache-Control": "no-cache"})
-    return HTMLResponse(content="<h1>RelatÃ­Â³rio nÃ£o encontrado</h1>", status_code=404)
+    return HTMLResponse(content="<h1>Relatí­³rio não encontrado</h1>", status_code=404)
 
 
-# ========== ROTAS DE HISTÃ­â€œRICO DESPESAS (FORÃ‡ADAS) ==========
+# ========== ROTAS DE HISTí­“RICO DESPESAS (FORÇADAS) ==========
 # @app.post("/api/comparativo_despesas_v2/{periodo}/salvar")
 # def rota_salvar_comparativo_despesas(periodo: str):
 #     import sqlite3, os, json
@@ -6119,7 +6119,7 @@ def gerar_pdf_centro_custos(historico_id: int):
     from fastapi.responses import Response
     import time
 
-    # Abre o relatÃ­Â³rio v2 passando o ID do histÃ­Â³rico
+    # Abre o relatí­³rio v2 passando o ID do histí­³rico
     url = f"http://127.0.0.1:994/relatorio_centro_custos?historico_id={historico_id}&_t={int(time.time())}"
 
     with sync_playwright() as p:
@@ -6156,10 +6156,10 @@ async def salvar_conclusao_centro_custos(historico_id: int, request: Request):
             cur.execute("UPDATE historico_centro_custos SET dados_json = ? WHERE id = ?", (json.dumps(dados), historico_id))
             conn.commit()
             conn.close()
-            return {"erro": False, "mensagem": "ConclusÃ£o salva com sucesso!"}
+            return {"erro": False, "mensagem": "Conclusão salva com sucesso!"}
 
         conn.close()
-        return {"erro": True, "mensagem": "HistÃ­Â³rico nÃ£o encontrado."}
+        return {"erro": True, "mensagem": "Histí­³rico não encontrado."}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 
@@ -6168,12 +6168,12 @@ def serve_relatorio_receitas_v2():
     from fastapi.responses import FileResponse
     import os
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # Tenta v2, senÃ£o a versÃ£o sem v2
+    # Tenta v2, senão a versão sem v2
     for nome in ["relatorio_comparativo_receitas_v2.html", "relatorio_comparativo_receitas.html"]:
         caminho = os.path.join(base, "pc_frontend", nome)
         if os.path.exists(caminho):
             return FileResponse(caminho)
-    return {"erro": True, "mensagem": "RelatÃ­Â³rio nÃ£o encontrado"}
+    return {"erro": True, "mensagem": "Relatí­³rio não encontrado"}
 
 
 # ============================================================
@@ -6199,7 +6199,7 @@ def serve_relatorio_despesas_v2():
     from fastapi.responses import FileResponse
     import os
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # Procura o _v2 primeiro, senÃ£o o sem _v2
+    # Procura o _v2 primeiro, senão o sem _v2
     for nome in ["relatorio_comparativo_despesas_v2.html", "relatorio_comparativo_despesas.html"]:
         caminho = os.path.join(base, "pc_frontend", nome)
         if os.path.exists(caminho):
@@ -6229,9 +6229,9 @@ async def download_pdf_csv(tipo: str, ano: int = Query(2026), periodo: str = Que
             break
 
     if not arquivo:
-        return {"erro": True, "mensagem": f"Arquivo CSV para {tipo} nÃ£o encontrado."}
+        return {"erro": True, "mensagem": f"Arquivo CSV para {tipo} não encontrado."}
 
-    # LÃ­Âª o CSV
+    # Lí­ª o CSV
     try:
         with open(arquivo, "r", encoding="utf-8-sig") as f:
             linhas = f.readlines()
@@ -6244,25 +6244,25 @@ async def download_pdf_csv(tipo: str, ano: int = Query(2026), periodo: str = Que
     pdf.set_auto_page_break(auto=True, margin=10)
     pdf.add_page()
 
-    # TÃ­Â­tulo
+    # Tí­­tulo
     pdf.set_font("Helvetica", "B", 16)
     titulo = tipo.replace("_", " ").title()
-    pdf.cell(0, 10, f"RelatÃ­Â³rio - {titulo}", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.cell(0, 10, f"Relatí­³rio - {titulo}", new_x="LMARGIN", new_y="NEXT", align="C")
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(0, 8, f"Arquivo: {os.path.basename(arquivo)}", new_x="LMARGIN", new_y="NEXT", align="C")
     pdf.ln(5)
 
-    # CabeÃ§alho da tabela
+    # Cabeçalho da tabela
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_fill_color(0, 114, 186)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(80, 8, "DescriÃ§Ã£o", border=1, fill=True, align="C")
-    pdf.cell(30, 8, "OrÃ§ado", border=1, fill=True, align="C")
+    pdf.cell(80, 8, "Descrição", border=1, fill=True, align="C")
+    pdf.cell(30, 8, "Orçado", border=1, fill=True, align="C")
     pdf.cell(30, 8, "Realizado", border=1, fill=True, align="C")
     pdf.cell(30, 8, "%", border=1, fill=True, align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(0, 0, 0)
 
-    # Dados (pula linhas de cabeÃ§alho)
+    # Dados (pula linhas de cabeçalho)
     count = 0
     for linha in linhas:
         if ";" not in linha: continue
@@ -6273,7 +6273,7 @@ async def download_pdf_csv(tipo: str, ano: int = Query(2026), periodo: str = Que
         orcado = partes[1].strip() if len(partes) > 1 else ""
         realizado = partes[2].strip() if len(partes) > 2 else ""
         pct = partes[3].strip() if len(partes) > 3 else ""
-        if not orcado or orcado == "OrÃ§ado": continue
+        if not orcado or orcado == "Orçado": continue
 
         pdf.set_font("Helvetica", "", 7)
         pdf.cell(80, 6, nome, border=1)
@@ -6363,11 +6363,11 @@ async def excluir_panorama_multiplos(request: Request):
         if not ids_brutos:
             return {"erro": True, "mensagem": "Nenhum ID enviado"}
 
-        # Garante que todos sÃ£o inteiros (para o SQLite)
+        # Garante que todos são inteiros (para o SQLite)
         ids = [int(i) for i in ids_brutos if str(i).strip().isdigit()]
 
         if not ids:
-            return {"erro": True, "mensagem": "IDs invÃ¡lidos"}
+            return {"erro": True, "mensagem": "IDs inválidos"}
 
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
@@ -6378,27 +6378,27 @@ async def excluir_panorama_multiplos(request: Request):
         conn.commit()
         conn.close()
 
-        return {"ok": True, "mensagem": f"{excluidos} itens excluÃ­Â­dos"}
+        return {"ok": True, "mensagem": f"{excluidos} itens excluí­­dos"}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 
 
 
     nomes_amigaveis = {
-        "analise_bp": "AnÃ¡lise BP",
-        "analise_dfc": "AnÃ¡lise DFC",
-        "analise_patrimonial": "AnÃ¡lise Patrimonial (DVP)",
-        "analise_orcamentaria": "AnÃ¡lise OrÃ§amentÃ¡ria (BO)",
-        "analise_financeira_bf": "AnÃ¡lise Financeira (BF)",
+        "analise_bp": "Análise BP",
+        "analise_dfc": "Análise DFC",
+        "analise_patrimonial": "Análise Patrimonial (DVP)",
+        "analise_orcamentaria": "Análise Orçamentária (BO)",
+        "analise_financeira_bf": "Análise Financeira (BF)",
         "comparativo_receitas": "Comparativo de Receitas",
         "comparativo_despesas": "Comparativo de Despesas",
         "panorama": "Panorama de Resultados",
-        "liquidez": "Ã­ndices de Liquidez",
-        "integridade": "Integridade entre DemonstraÃ§Ã­Âµes",
-        "conferencia": "ConferÃ­Âªncia das DemonstraÃ§Ã­Âµes",
+        "liquidez": "í­ndices de Liquidez",
+        "integridade": "Integridade entre Demonstraçí­µes",
+        "conferencia": "Conferí­ªncia das Demonstraçí­µes",
         "custo_pessoal": "Custo de Pessoal",
-        "centro_custos": "AnÃ¡lise por Centro de Custos",
-        "dmpl": "DemonstraÃ§Ã£o das MutaÃ§Ãµes do PL (DMPL)"
+        "centro_custos": "Análise por Centro de Custos",
+        "dmpl": "Demonstração das Mutações do PL (DMPL)"
     }
 
     encontrados = {}
@@ -6406,7 +6406,7 @@ async def excluir_panorama_multiplos(request: Request):
 
     for chave, tabela in modulos.items():
         try:
-            # Tenta buscar a coluna resultado_json (padrÃ£o)
+            # Tenta buscar a coluna resultado_json (padrão)
             # Se falhar, tenta dados_json (como nos comparativos)
             try:
                 cursor.execute(f"SELECT resultado_json, data_geracao FROM {tabela} WHERE periodo LIKE ? ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
@@ -6451,13 +6451,13 @@ async def salvar_relatorio_consolidado_novo(periodo: str):
     from .config import PG_CONFIG
     
     try:
-        # 1. Coleta os dados de todos os mÃ³dulos no PostgreSQL
+        # 1. Coleta os dados de todos os módulos no PostgreSQL
         dados_api = await api_relatorio_consolidado_novo(periodo)
         
         if dados_api.get("status") == "faltando" and len(dados_api.get("faltando", [])) > 0:
             return {
                 "ok": False,
-                "mensagem": f"Faltam {len(dados_api['faltando'])} mÃ³dulo(s) para consolidar.",
+                "mensagem": f"Faltam {len(dados_api['faltando'])} módulo(s) para consolidar.",
                 "faltando": dados_api["faltando"]
             }
         
@@ -6490,7 +6490,7 @@ async def salvar_relatorio_consolidado_novo(periodo: str):
         cursor.close()
         conn.close()
         
-        return {"ok": True, "mensagem": "RelatÃ³rio salvo com sucesso no PostgreSQL!"}
+        return {"ok": True, "mensagem": "Relatório salvo com sucesso no PostgreSQL!"}
     except Exception as e:
         return {"ok": False, "mensagem": str(e)}@app.get("/historico_relatorio_consolidado/{id}")
 async def get_historico_consolidado(id: int):
@@ -6503,7 +6503,7 @@ async def get_historico_consolidado(id: int):
     conn.close()
 
     if not row:
-        return {"erro": "HistÃ­Â³rico nÃ£o encontrado"}
+        return {"erro": "Histí­³rico não encontrado"}
 
     return {
         "periodo": row[0],
@@ -6519,7 +6519,7 @@ async def excluir_multiplos_relatorio_consolidado(request: Request):
         dados = await request.json()
         ids = [int(i) for i in dados.get("ids", []) if str(i).isdigit()]
         if not ids:
-            return {"erro": True, "mensagem": "Nenhum ID vÃ¡lido"}
+            return {"erro": True, "mensagem": "Nenhum ID válido"}
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -6527,7 +6527,7 @@ async def excluir_multiplos_relatorio_consolidado(request: Request):
         cursor.execute(f"DELETE FROM historico_relatorio_consolidado WHERE id IN ({placeholders})", ids)
         conn.commit()
         conn.close()
-        return {"ok": True, "mensagem": f"{cursor.rowcount} itens excluÃ­Â­dos"}
+        return {"ok": True, "mensagem": f"{cursor.rowcount} itens excluí­­dos"}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 
@@ -6661,37 +6661,37 @@ def gerar_pdf_relatorio_consolidado(id: int):
         return 0.0
     
     mapa_tabelas = {
-        "Integridade entre DemonstraÃ§Ãµes": ("historico_integridade_matriz", "resultado_json"),
-        "AnÃ¡lise BP": ("historico_analise_bp", "resultado_json"),
-        "AnÃ¡lise OrÃ§amentÃ¡ria (BO)": ("historico_analise_orcamentaria", "resultado_json"),
-        "AnÃ¡lise Financeira (BF)": ("historico_analise_financeira_bf", "resultado_json"),
-        "AnÃ¡lise DFC": ("historico_analise_dfc", "resultado_json"),
-        "AnÃ¡lise Patrimonial (DVP)": ("historico_analise_patrimonial", "resultado_json"),
+        "Integridade entre Demonstrações": ("historico_integridade_matriz", "resultado_json"),
+        "Análise BP": ("historico_analise_bp", "resultado_json"),
+        "Análise Orçamentária (BO)": ("historico_analise_orcamentaria", "resultado_json"),
+        "Análise Financeira (BF)": ("historico_analise_financeira_bf", "resultado_json"),
+        "Análise DFC": ("historico_analise_dfc", "resultado_json"),
+        "Análise Patrimonial (DVP)": ("historico_analise_patrimonial", "resultado_json"),
         "DMPL": ("historico_analise_dmpl", "resultado_json"),
-        "DemonstraÃ§Ã£o das MutaÃ§Ãµes do PL (DMPL)": ("historico_analise_dmpl", "resultado_json"),
+        "Demonstração das Mutações do PL (DMPL)": ("historico_analise_dmpl", "resultado_json"),
         "Comparativo de Receitas": ("historico_comparativo_receitas", "dados_json"),
         "Comparativo de Despesas": ("historico_comparativo_despesas", "dados_json"),
-        "Ãndices de Liquidez": ("historico_liquidez", "resultado_json"),
+        "índices de Liquidez": ("historico_liquidez", "resultado_json"),
         "Panorama de Resultados": ("historico_panorama", "resultado_json"),
-        "AnÃ¡lise por Centro de Custos": ("historico_centro_custos", "dados_json"),
+        "Análise por Centro de Custos": ("historico_centro_custos", "dados_json"),
         "Custo de Pessoal": ("historico_custo_pessoal", "resultado_json"),
-        "ConferÃªncia das DemonstraÃ§Ãµes": ("historico_conferencia", "resultado_json")
+        "Conferência das Demonstrações": ("historico_conferencia", "resultado_json")
     }
     
     ordem_modelo = [
-        ("ConferÃªncia das DemonstraÃ§Ãµes", "1. ConferÃªncia das DemonstraÃ§Ãµes"),
-        ("Integridade entre DemonstraÃ§Ãµes", "2. Integridade entre DemonstraÃ§Ãµes"),
-        ("AnÃ¡lise BP", "3. AnÃ¡lise do BalanÃ§o Patrimonial"),
-        ("AnÃ¡lise OrÃ§amentÃ¡ria (BO)", "4. AnÃ¡lise do BalanÃ§o OrÃ§amentÃ¡rio"),
-        ("AnÃ¡lise Financeira (BF)", "5. AnÃ¡lise do BalanÃ§o Financeiro"),
-        ("AnÃ¡lise DFC", "6. AnÃ¡lise do Fluxo de Caixa"),
-        ("AnÃ¡lise Patrimonial (DVP)", "7. AnÃ¡lise das VariaÃ§Ãµes Patrimoniais"),
-        ("DemonstraÃ§Ã£o das MutaÃ§Ãµes do PL (DMPL)", "8. DemonstraÃ§Ã£o das MutaÃ§Ãµes do PatrimÃ´nio LÃ­quido (DMPL)"),
+        ("Conferência das Demonstrações", "1. Conferência das Demonstrações"),
+        ("Integridade entre Demonstrações", "2. Integridade entre Demonstrações"),
+        ("Análise BP", "3. Análise do Balanço Patrimonial"),
+        ("Análise Orçamentária (BO)", "4. Análise do Balanço Orçamentário"),
+        ("Análise Financeira (BF)", "5. Análise do Balanço Financeiro"),
+        ("Análise DFC", "6. Análise do Fluxo de Caixa"),
+        ("Análise Patrimonial (DVP)", "7. Análise das Variações Patrimoniais"),
+        ("Demonstração das Mutações do PL (DMPL)", "8. Demonstração das Mutações do Patrimônio Lí­quido (DMPL)"),
         ("Comparativo de Receitas", "9. Comparativo de Receitas"),
         ("Comparativo de Despesas", "10. Comparativo de Despesas"),
-        ("Ãndices de Liquidez", "11. Ãndices de Liquidez e Estrutura"),
+        ("índices de Liquidez", "11. índices de Liquidez e Estrutura"),
         ("Panorama de Resultados", "12. Panorama de Resultados"),
-        ("AnÃ¡lise por Centro de Custos", "13. AnÃ¡lise por Centro de Custos"),
+        ("Análise por Centro de Custos", "13. Análise por Centro de Custos"),
         ("Custo de Pessoal", "14. Custo de Pessoal"),
     ]
     
@@ -6720,11 +6720,11 @@ def gerar_pdf_relatorio_consolidado(id: int):
                 with open(caminho_logo, "rb") as img:
                     logo_base64 = base64.b64encode(img.read()).decode("utf-8")
         
-        # 2. Busca dados do relatÃ³rio consolidado
+        # 2. Busca dados do relatório consolidado
         cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_relatorio_consolidado WHERE id = %s", (id,))
         row = cursor.fetchone()
         if not row:
-            return Response(content="RelatÃ³rio nÃ£o encontrado.", status_code=404, media_type="text/plain")
+            return Response(content="Relatório não encontrado.", status_code=404, media_type="text/plain")
         
         periodo, data_geracao, res_json = row
         dados_consolidados = json.loads(res_json)
@@ -6771,31 +6771,31 @@ def gerar_pdf_relatorio_consolidado(id: int):
         html_parts.append("<div class='capa'>")
         if logo_base64:
             html_parts.append(f"<img class='logo' src='data:image/png;base64,{logo_base64}' alt='Logo'>")
-        html_parts.append("<h1>RELATÃ“RIO CONSOLIDADO</h1>")
-        html_parts.append("<h2 style='border: none;'>AnÃ¡lise ContÃ¡bil</h2>")
+        html_parts.append("<h1>RELATí“RIO CONSOLIDADO</h1>")
+        html_parts.append("<h2 style='border: none;'>Análise Contábil</h2>")
         html_parts.append(f"<div class='orgao'>{razao_social}</div>")
         html_parts.append(f"<div class='cnpj'>CNPJ: {cnpj}</div>")
-        html_parts.append(f"<div class='periodo'>PERÃODO DE ANÃLISE: {periodo}</div>")
+        html_parts.append(f"<div class='periodo'>PERíODO DE ANíLISE: {periodo}</div>")
         
         html_parts.append("<div class='legislacao'>")
-        html_parts.append("<strong>LEGISLAÃ‡ÃƒO E NORMAS APLICADAS:</strong><br>")
-        html_parts.append("Lei nÂº 4.320/1964 (Normas gerais de direito financeiro para elaboraÃ§Ã£o e controle dos orÃ§amentos e balanÃ§os.) â€¢ ")
-        html_parts.append("ResoluÃ§Ã£o COFEN nÂº 340/2008 (Regulamento da AdministraÃ§Ã£o Financeira e ContÃ¡bil) â€¢ ")
-        html_parts.append("Normas Brasileiras de Contabilidade â€“ Setor PÃºblico (NBC TSP) â€¢ ")
-        html_parts.append("ResoluÃ§Ã£o COFEN nÂº 764/2024 (PrestaÃ§Ã£o de Contas) â€¢ ")
-        html_parts.append("ResoluÃ§Ã£o Cofen nÂº 799/2025 (GestÃ£o de riscos e controles internos) â€¢ ")
-        html_parts.append("ResoluÃ§Ã£o Cofen nÂº 814/2026 (Limites de despesa com pessoal) â€¢ ")
-        html_parts.append("Manual de Contabilidade Aplicada ao Setor PÃºblico (MCASP)")
+        html_parts.append("<strong>LEGISLAÇíƒO E NORMAS APLICADAS:</strong><br>")
+        html_parts.append("Lei nº 4.320/1964 (Normas gerais de direito financeiro para elaboração e controle dos orçamentos e balanços.) ”¢ ")
+        html_parts.append("Resolução COFEN nº 340/2008 (Regulamento da Administração Financeira e Contábil) ”¢ ")
+        html_parts.append("Normas Brasileiras de Contabilidade – Setor Público (NBC TSP) ”¢ ")
+        html_parts.append("Resolução COFEN nº 764/2024 (Prestação de Contas) ”¢ ")
+        html_parts.append("Resolução Cofen nº 799/2025 (Gestão de riscos e controles internos) ”¢ ")
+        html_parts.append("Resolução Cofen nº 814/2026 (Limites de despesa com pessoal) ”¢ ")
+        html_parts.append("Manual de Contabilidade Aplicada ao Setor Público (MCASP)")
         html_parts.append("</div>")
         
         html_parts.append("<div class='legislacao' style='margin-top: 20px;'>")
-        html_parts.append("<strong>DEMONSTRAÃ‡Ã•ES ANALISADAS:</strong><br>")
-        html_parts.append("Balancete de VerificaÃ§Ã£o â€¢ BalanÃ§o Financeiro (BF) â€¢ BalanÃ§o OrÃ§amentÃ¡rio (BO) â€¢ BalanÃ§o Patrimonial (BP) â€¢ DemonstraÃ§Ã£o do Fluxo de Caixa (DFC) â€¢ DemonstraÃ§Ã£o das MutaÃ§Ãµes do PL (DMPL) â€¢ DemonstraÃ§Ã£o das VariaÃ§Ãµes Patrimoniais (DVP)")
+        html_parts.append("<strong>DEMONSTRAÇí•ES ANALISADAS:</strong><br>")
+        html_parts.append("Balancete de Verificação ”¢ Balanço Financeiro (BF) ”¢ Balanço Orçamentário (BO) ”¢ Balanço Patrimonial (BP) ”¢ Demonstração do Fluxo de Caixa (DFC) ”¢ Demonstração das Mutações do PL (DMPL) ”¢ Demonstração das Variações Patrimoniais (DVP)")
         html_parts.append("</div>")
         html_parts.append("</div>")
         
         # ============================================================
-        # MÃ“DULOS
+        # Mí“DULOS
         # ============================================================
         for nome_interno, titulo_exibicao in ordem_modelo:
             m = modulos_por_nome.get(nome_interno)
@@ -6806,7 +6806,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
             if not m:
                 html_parts.append("<div class='page-break'></div>")
                 html_parts.append(f"<h2>{titulo_exibicao}</h2>")
-                html_parts.append("<p style='color:red;'>MÃ³dulo nÃ£o encontrado nos dados consolidados.</p>")
+                html_parts.append("<p style='color:red;'>Módulo não encontrado nos dados consolidados.</p>")
                 continue
             
             data_mod = m.get("data_geracao", "N/A")
@@ -6821,7 +6821,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                 tabela, coluna = "historico_analise_dmpl", "resultado_json"
             # ----------------------------------------
             if not tabela:
-                html_parts.append("<p style='color:red;'>MÃ³dulo sem mapeamento.</p>")
+                html_parts.append("<p style='color:red;'>Módulo sem mapeamento.</p>")
                 continue
             
             try:
@@ -6829,15 +6829,15 @@ def gerar_pdf_relatorio_consolidado(id: int):
                 mod_row = cursor.fetchone()
                 
                 if not mod_row or not mod_row[0]:
-                    html_parts.append("<p style='color:red;'>Dados nÃ£o encontrados no banco para este perÃ­odo.</p>")
+                    html_parts.append("<p style='color:red;'>Dados não encontrados no banco para este perí­odo.</p>")
                     continue
                 
                 mod_dados = json.loads(mod_row[0])
                 
                 # 1. INTEGRIDADE
-                if nome_interno == "Integridade entre DemonstraÃ§Ãµes":
+                if nome_interno == "Integridade entre Demonstrações":
                     matriz = mod_dados.get("matriz", [])
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Matriz de integridade com o cruzamento de todas as demonstraÃ§Ãµes.</p>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Matriz de integridade com o cruzamento de todas as demonstrações.</p>")
                     html_parts.append("<table><thead><tr><th>ITEM</th><th>BALANCETE</th><th>BP</th><th>BF</th><th>BO</th><th>DFC</th><th>DVP</th><th>DMPL</th><th>CONF.</th></tr></thead><tbody>")
                     for mi in matriz:
                         item = mi.get('item', '')
@@ -6856,13 +6856,13 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         elif conf.startswith("(") or conf.startswith("(("):
                             cor_conf = "#cc0000"  # Vermelho
                         else:
-                            cor_conf = "#333333"  # PadrÃ£o
+                            cor_conf = "#333333"  # Padrão
                         
                         html_parts.append(f"<tr><td>{item}</td><td class='text-right'>{balancete}</td><td class='text-right'>{bp}</td><td class='text-right'>{bf}</td><td class='text-right'>{bo}</td><td class='text-right'>{dfc}</td><td class='text-right'>{dvp}</td><td class='text-right'>{dmpl}</td><td class='text-center' style='color: {cor_conf}; font-weight: bold;'>{conf}</td></tr>")
                     html_parts.append("</tbody></table>")
-                    html_parts.append("<div class='alerta-info'>1. Os itens de conformidade em vermelho, de 1 a 4, sÃ£o por estornos de restos a pagar.<br>2. IncorporaÃ§Ã£o de Ativos: SOMA = 16.271.957,08.</div>")
+                    html_parts.append("<div class='alerta-info'>1. Os itens de conformidade em vermelho, de 1 a 4, são por estornos de restos a pagar.<br>2. Incorporação de Ativos: SOMA = 16.271.957,08.</div>")
                 
-                elif nome_interno == "AnÃ¡lise BP":
+                elif nome_interno == "Análise BP":
                     def fmt_sem_rs(v):
                         if v is None: return "-"
                         if isinstance(v, (int, float)):
@@ -6870,8 +6870,8 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         return str(v).replace("R$", "").strip()
                     
                     dados_bp = mod_dados.get("dados", {})
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das contas do BalanÃ§o Patrimonial (perÃ­odo atual x anterior).</p>")
-                    html_parts.append("<table><thead><tr><th>CONTA</th><th>PERÃODO ATUAL (R$)</th><th>PERÃODO ANTERIOR (R$)</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das contas do Balanço Patrimonial (perí­odo atual x anterior).</p>")
+                    html_parts.append("<table><thead><tr><th>CONTA</th><th>PERíODO ATUAL (R$)</th><th>PERíODO ANTERIOR (R$)</th><th>VAR. (%)</th></tr></thead><tbody>")
                     textos = []
                     for k, v in dados_bp.items():
                         if isinstance(v, dict) and k.lower() != 'estoques':
@@ -6881,9 +6881,9 @@ def gerar_pdf_relatorio_consolidado(id: int):
                             html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt_sem_rs(atual)}</td><td class='text-right'>{fmt_sem_rs(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
                             if abs(var) > 0.01:
                                 direcao = "positiva" if var > 0 else "negativa"
-                                textos.append(f"<li>{k.replace('_', ' ').title()}, variaÃ§Ã£o {direcao} de {pct(var)}.</li>")
+                                textos.append(f"<li>{k.replace('_', ' ').title()}, variação {direcao} de {pct(var)}.</li>")
                     html_parts.append("</tbody></table>")
-                    html_parts.append("<h3>EvoluÃ§Ã£o das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos[:6]) + "</ul>")
+                    html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos[:6]) + "</ul>")
                     labels = [k.replace('_', ' ').title() for k, v in dados_bp.items() if isinstance(v, dict)]
                     atual_vals = [v.get('atual', 0) for v in dados_bp.values() if isinstance(v, dict)]
                     ant_vals = [v.get('anterior', 0) for v in dados_bp.values() if isinstance(v, dict)]
@@ -6899,8 +6899,8 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     html_parts.append("});")
                     html_parts.append("</script>")
                 
-                # 3. ANÃLISE ORÃ‡AMENTÃRIA (BO)
-                elif nome_interno == "AnÃ¡lise OrÃ§amentÃ¡ria (BO)":
+                # 3. ANíLISE ORÇAMENTíRIA (BO)
+                elif nome_interno == "Análise Orçamentária (BO)":
                     def fmt_sem_rs(v):
                         if v is None: return "-"
                         if isinstance(v, (int, float)):
@@ -6909,41 +6909,41 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     
                     atual = mod_dados.get("atual", {})
                     anterior = mod_dados.get("anterior", {})
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das receitas e despesas orÃ§amentÃ¡rias.</p>")
-                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>PERÃODO ATUAL</th><th>PERÃODO ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das receitas e despesas orçamentárias.</p>")
+                    html_parts.append("<table><thead><tr><th>INDICADOR</th><th>PERíODO ATUAL</th><th>PERíODO ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
                     html_parts.append(f"<tr><td>Receita Realizada</td><td class='text-right'>{fmt_sem_rs(atual.get('receita_realizada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('receita_realizada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_realizada',0), anterior.get('receita_realizada',0)))}</td></tr>")
                     html_parts.append(f"<tr><td>Despesa Empenhada</td><td class='text-right'>{fmt_sem_rs(atual.get('despesa_empenhada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('despesa_empenhada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_empenhada',0), anterior.get('despesa_empenhada',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>SuperÃ¡vit/DÃ©ficit</td><td class='text-right'>{fmt_sem_rs(atual.get('superavit'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('superavit'))}</td><td class='text-right'>{pct(calc_var(atual.get('superavit',0), anterior.get('superavit',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Superávit/Déficit</td><td class='text-right'>{fmt_sem_rs(atual.get('superavit'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('superavit'))}</td><td class='text-right'>{pct(calc_var(atual.get('superavit',0), anterior.get('superavit',0)))}</td></tr>")
                     html_parts.append(f"<tr><td>Restos a Pagar</td><td class='text-right'>{fmt_sem_rs(atual.get('restos_pagar'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('restos_pagar'))}</td><td class='text-right'>{pct(calc_var(atual.get('restos_pagar',0), anterior.get('restos_pagar',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>Receita OrÃ§ada</td><td class='text-right'>{fmt_sem_rs(atual.get('receita_orcada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('receita_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_orcada',0), anterior.get('receita_orcada',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>Despesa OrÃ§ada</td><td class='text-right'>{fmt_sem_rs(atual.get('despesa_orcada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('despesa_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_orcada',0), anterior.get('despesa_orcada',0)))}</td></tr>")
-                    html_parts.append(f"<tr><td>% RealizaÃ§Ã£o Receitas</td><td class='text-right'>{atual.get('pct_receita', 0):.2f}%</td><td class='text-right'>{anterior.get('pct_receita', 0):.2f}%</td><td class='text-right'>-</td></tr>")
-                    html_parts.append(f"<tr><td>% RealizaÃ§Ã£o Despesas</td><td class='text-right'>{atual.get('pct_despesa', 0):.2f}%</td><td class='text-right'>{anterior.get('pct_despesa', 0):.2f}%</td><td class='text-right'>-</td></tr>")
+                    html_parts.append(f"<tr><td>Receita Orçada</td><td class='text-right'>{fmt_sem_rs(atual.get('receita_orcada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('receita_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('receita_orcada',0), anterior.get('receita_orcada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>Despesa Orçada</td><td class='text-right'>{fmt_sem_rs(atual.get('despesa_orcada'))}</td><td class='text-right'>{fmt_sem_rs(anterior.get('despesa_orcada'))}</td><td class='text-right'>{pct(calc_var(atual.get('despesa_orcada',0), anterior.get('despesa_orcada',0)))}</td></tr>")
+                    html_parts.append(f"<tr><td>% Realização Receitas</td><td class='text-right'>{atual.get('pct_receita', 0):.2f}%</td><td class='text-right'>{anterior.get('pct_receita', 0):.2f}%</td><td class='text-right'>-</td></tr>")
+                    html_parts.append(f"<tr><td>% Realização Despesas</td><td class='text-right'>{atual.get('pct_despesa', 0):.2f}%</td><td class='text-right'>{anterior.get('pct_despesa', 0):.2f}%</td><td class='text-right'>-</td></tr>")
                     html_parts.append("</tbody></table>")
                     
-                    # Textos dinÃ¢micos (EvoluÃ§Ã£o das Principais Contas)
+                    # Textos dinâmicos (Evolução das Principais Contas)
                     textos = []
                     indicadores = [
                         ("Receita Realizada", atual.get('receita_realizada', 0), anterior.get('receita_realizada', 0)),
                         ("Despesa Empenhada", atual.get('despesa_empenhada', 0), anterior.get('despesa_empenhada', 0)),
-                        ("SuperÃ¡vit/DÃ©ficit", atual.get('superavit', 0), anterior.get('superavit', 0)),
+                        ("Superávit/Déficit", atual.get('superavit', 0), anterior.get('superavit', 0)),
                         ("Restos a Pagar", atual.get('restos_pagar', 0), anterior.get('restos_pagar', 0)),
-                        ("Receita OrÃ§ada", atual.get('receita_orcada', 0), anterior.get('receita_orcada', 0)),
-                        ("Despesa OrÃ§ada", atual.get('despesa_orcada', 0), anterior.get('despesa_orcada', 0)),
+                        ("Receita Orçada", atual.get('receita_orcada', 0), anterior.get('receita_orcada', 0)),
+                        ("Despesa Orçada", atual.get('despesa_orcada', 0), anterior.get('despesa_orcada', 0)),
                     ]
                     for nome_ind, v_atual, v_ant in indicadores:
                         var = calc_var(v_atual, v_ant)
                         if abs(var) > 0.01:
                             direcao = "positiva" if var > 0 else "negativa"
-                            textos.append(f"<li>{nome_ind}, variaÃ§Ã£o {direcao} de {pct(var)} (de {fmt_sem_rs(v_ant)} para {fmt_sem_rs(v_atual)}).</li>")
+                            textos.append(f"<li>{nome_ind}, variação {direcao} de {pct(var)} (de {fmt_sem_rs(v_ant)} para {fmt_sem_rs(v_atual)}).</li>")
                     
                     if textos:
-                        html_parts.append("<h3>EvoluÃ§Ã£o das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                        html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                     else:
-                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variaÃ§Ãµes significativas entre os perÃ­odos.</p>")
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os perí­odos.</p>")
                     
-                    # GrÃ¡fico de barras (igual ao BP)
-                    labels = ["Receita Realizada", "Despesa Empenhada", "SuperÃ¡vit/DÃ©ficit", "Restos a Pagar", "Receita OrÃ§ada", "Despesa OrÃ§ada"]
+                    # Gráfico de barras (igual ao BP)
+                    labels = ["Receita Realizada", "Despesa Empenhada", "Superávit/Déficit", "Restos a Pagar", "Receita Orçada", "Despesa Orçada"]
                     atual_vals = [
                         atual.get('receita_realizada', 0),
                         atual.get('despesa_empenhada', 0),
@@ -6972,7 +6972,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     html_parts.append("});")
                     html_parts.append("</script>")
                 
-                elif nome_interno == "AnÃ¡lise Financeira (BF)":
+                elif nome_interno == "Análise Financeira (BF)":
                     def fmt_sem_rs(v):
                         if v is None: return "-"
                         if isinstance(v, (int, float)):
@@ -6992,7 +6992,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                             break
                     
                     if not csv_bf:
-                        html_parts.append("<p style='color:red;'>CSV do BalanÃ§o Financeiro nÃ£o encontrado para este perÃ­odo.</p>")
+                        html_parts.append("<p style='color:red;'>CSV do Balanço Financeiro não encontrado para este perí­odo.</p>")
                     else:
                         linhas = []
                         with open(csv_bf, "r", encoding="latin-1") as f_csv:
@@ -7021,19 +7021,19 @@ def gerar_pdf_relatorio_consolidado(id: int):
                             return 0.0, 0.0
                         
                         # Ingressos
-                        rec_orc_atual, rec_orc_ant = buscar_valor_ingresso(linhas, "Receita OrÃ§amentÃ¡ria")
+                        rec_orc_atual, rec_orc_ant = buscar_valor_ingresso(linhas, "Receita Orçamentária")
                         rec_corrente_atual, rec_corrente_ant = buscar_valor_ingresso(linhas, "RECEITAS CORRENTE")
                         rec_capital_atual, rec_capital_ant = buscar_valor_ingresso(linhas, "RECEITAS DE CAPITAL")
-                        rec_extra_atual, rec_extra_ant = buscar_valor_ingresso(linhas, "Recebimentos ExtraorÃ§amentÃ¡rios")
-                        saldo_ant_atual, saldo_ant_ant = buscar_valor_ingresso(linhas, "Saldo em espÃ©cie do ExercÃ­cio Anterior")
+                        rec_extra_atual, rec_extra_ant = buscar_valor_ingresso(linhas, "Recebimentos Extraorçamentários")
+                        saldo_ant_atual, saldo_ant_ant = buscar_valor_ingresso(linhas, "Saldo em espécie do Exercí­cio Anterior")
                         total_ing_atual, total_ing_ant = buscar_valor_ingresso(linhas, "Total:")
                         
-                        # DispÃªndios
-                        desp_orc_atual, desp_orc_ant = buscar_valor_dispendio(linhas, "Despesa OrÃ§amentÃ¡ria")
+                        # Dispêndios
+                        desp_orc_atual, desp_orc_ant = buscar_valor_dispendio(linhas, "Despesa Orçamentária")
                         desp_corrente_atual, desp_corrente_ant = buscar_valor_dispendio(linhas, "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CORRENTE")
                         desp_capital_atual, desp_capital_ant = buscar_valor_dispendio(linhas, "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CAPITAL")
-                        desp_extra_atual, desp_extra_ant = buscar_valor_dispendio(linhas, "Pagamentos ExtraorÃ§amentÃ¡rios")
-                        saldo_seg_atual, saldo_seg_ant = buscar_valor_dispendio(linhas, "Saldo em espÃ©cie para o ExercÃ­")
+                        desp_extra_atual, desp_extra_ant = buscar_valor_dispendio(linhas, "Pagamentos Extraorçamentários")
+                        saldo_seg_atual, saldo_seg_ant = buscar_valor_dispendio(linhas, "Saldo em espécie para o Exercí­")
                         # Busca direta na linha "Total:" pelas colunas 4 e 5
                         total_disp_atual = 0.0
                         total_disp_ant = 0.0
@@ -7043,28 +7043,28 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                 total_disp_ant = limpar_valor(linha[5])
                                 break
                         
-                        html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>MovimentaÃ§Ã£o financeira consolidada.</p>")
-                        html_parts.append("<table><thead><tr><th>INGRESSOS</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th><th>DISPÃŠNDIOS</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                        html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Movimentação financeira consolidada.</p>")
+                        html_parts.append("<table><thead><tr><th>INGRESSOS</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th><th>DISPíŠNDIOS</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
                         
-                        html_parts.append(f"<tr><td>Receita OrÃ§amentÃ¡ria</td><td class='text-right'>{fmt_sem_rs(rec_orc_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_orc_ant)}</td><td class='text-right'>{pct(calc_var(rec_orc_atual, rec_orc_ant))}</td><td>Despesa OrÃ§amentÃ¡ria</td><td class='text-right'>{fmt_sem_rs(desp_orc_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_orc_ant)}</td><td class='text-right'>{pct(calc_var(desp_orc_atual, desp_orc_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td>Receita Orçamentária</td><td class='text-right'>{fmt_sem_rs(rec_orc_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_orc_ant)}</td><td class='text-right'>{pct(calc_var(rec_orc_atual, rec_orc_ant))}</td><td>Despesa Orçamentária</td><td class='text-right'>{fmt_sem_rs(desp_orc_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_orc_ant)}</td><td class='text-right'>{pct(calc_var(desp_orc_atual, desp_orc_ant))}</td></tr>")
                         html_parts.append(f"<tr><td>Receitas Correntes</td><td class='text-right'>{fmt_sem_rs(rec_corrente_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_corrente_ant)}</td><td class='text-right'>{pct(calc_var(rec_corrente_atual, rec_corrente_ant))}</td><td>Despesas Correntes</td><td class='text-right'>{fmt_sem_rs(desp_corrente_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_corrente_ant)}</td><td class='text-right'>{pct(calc_var(desp_corrente_atual, desp_corrente_ant))}</td></tr>")
                         html_parts.append(f"<tr><td>Receitas de Capital</td><td class='text-right'>{fmt_sem_rs(rec_capital_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_capital_ant)}</td><td class='text-right'>{pct(calc_var(rec_capital_atual, rec_capital_ant))}</td><td>Despesas de Capital</td><td class='text-right'>{fmt_sem_rs(desp_capital_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_capital_ant)}</td><td class='text-right'>{pct(calc_var(desp_capital_atual, desp_capital_ant))}</td></tr>")
-                        html_parts.append(f"<tr><td>Recebimentos ExtraorÃ§amentÃ¡rios</td><td class='text-right'>{fmt_sem_rs(rec_extra_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_extra_ant)}</td><td class='text-right'>{pct(calc_var(rec_extra_atual, rec_extra_ant))}</td><td>Pagamentos ExtraorÃ§amentÃ¡rios</td><td class='text-right'>{fmt_sem_rs(desp_extra_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_extra_ant)}</td><td class='text-right'>{pct(calc_var(desp_extra_atual, desp_extra_ant))}</td></tr>")
-                        html_parts.append(f"<tr><td>Saldo em EspÃ©cie do ExercÃ­cio Anterior</td><td class='text-right'>{fmt_sem_rs(saldo_ant_atual)}</td><td class='text-right'>{fmt_sem_rs(saldo_ant_ant)}</td><td class='text-right'>{pct(calc_var(saldo_ant_atual, saldo_ant_ant))}</td><td>Saldo em EspÃ©cie para o ExercÃ­cio Seguinte</td><td class='text-right'>{fmt_sem_rs(saldo_seg_atual)}</td><td class='text-right'>{fmt_sem_rs(saldo_seg_ant)}</td><td class='text-right'>{pct(calc_var(saldo_seg_atual, saldo_seg_ant))}</td></tr>")
-                        html_parts.append(f"<tr><td><strong>Total Geral de Ingressos</strong></td><td class='text-right'><strong>{fmt_sem_rs(total_ing_atual)}</strong></td><td class='text-right'>{fmt_sem_rs(total_ing_ant)}</td><td class='text-right'>{pct(calc_var(total_ing_atual, total_ing_ant))}</td><td><strong>Total Geral de DispÃªndios</strong></td><td class='text-right'><strong>{fmt_sem_rs(total_disp_atual)}</strong></td><td class='text-right'>{fmt_sem_rs(total_disp_ant)}</td><td class='text-right'>{pct(calc_var(total_disp_atual, total_disp_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td>Recebimentos Extraorçamentários</td><td class='text-right'>{fmt_sem_rs(rec_extra_atual)}</td><td class='text-right'>{fmt_sem_rs(rec_extra_ant)}</td><td class='text-right'>{pct(calc_var(rec_extra_atual, rec_extra_ant))}</td><td>Pagamentos Extraorçamentários</td><td class='text-right'>{fmt_sem_rs(desp_extra_atual)}</td><td class='text-right'>{fmt_sem_rs(desp_extra_ant)}</td><td class='text-right'>{pct(calc_var(desp_extra_atual, desp_extra_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td>Saldo em Espécie do Exercí­cio Anterior</td><td class='text-right'>{fmt_sem_rs(saldo_ant_atual)}</td><td class='text-right'>{fmt_sem_rs(saldo_ant_ant)}</td><td class='text-right'>{pct(calc_var(saldo_ant_atual, saldo_ant_ant))}</td><td>Saldo em Espécie para o Exercí­cio Seguinte</td><td class='text-right'>{fmt_sem_rs(saldo_seg_atual)}</td><td class='text-right'>{fmt_sem_rs(saldo_seg_ant)}</td><td class='text-right'>{pct(calc_var(saldo_seg_atual, saldo_seg_ant))}</td></tr>")
+                        html_parts.append(f"<tr><td><strong>Total Geral de Ingressos</strong></td><td class='text-right'><strong>{fmt_sem_rs(total_ing_atual)}</strong></td><td class='text-right'>{fmt_sem_rs(total_ing_ant)}</td><td class='text-right'>{pct(calc_var(total_ing_atual, total_ing_ant))}</td><td><strong>Total Geral de Dispêndios</strong></td><td class='text-right'><strong>{fmt_sem_rs(total_disp_atual)}</strong></td><td class='text-right'>{fmt_sem_rs(total_disp_ant)}</td><td class='text-right'>{pct(calc_var(total_disp_atual, total_disp_ant))}</td></tr>")
                         html_parts.append("</tbody></table>")
                         
-                        # Texto dinÃ¢mico
-                        html_parts.append("<h3>EvoluÃ§Ã£o das Principais Contas</h3><ul class='texto-dinamico'>")
-                        html_parts.append(f"<li>Receita OrÃ§amentÃ¡ria: {fmt_sem_rs(rec_orc_atual)} (variaÃ§Ã£o {pct(calc_var(rec_orc_atual, rec_orc_ant))})</li>")
-                        html_parts.append(f"<li>Despesa OrÃ§amentÃ¡ria: {fmt_sem_rs(desp_orc_atual)} (variaÃ§Ã£o {pct(calc_var(desp_orc_atual, desp_orc_ant))})</li>")
-                        html_parts.append(f"<li>Recebimentos ExtraorÃ§amentÃ¡rios: {fmt_sem_rs(rec_extra_atual)} (variaÃ§Ã£o {pct(calc_var(rec_extra_atual, rec_extra_ant))})</li>")
-                        html_parts.append(f"<li>Pagamentos ExtraorÃ§amentÃ¡rios: {fmt_sem_rs(desp_extra_atual)} (variaÃ§Ã£o {pct(calc_var(desp_extra_atual, desp_extra_ant))})</li>")
-                        html_parts.append(f"<li>Saldo Final: {fmt_sem_rs(saldo_seg_atual)} (variaÃ§Ã£o {pct(calc_var(saldo_seg_atual, saldo_seg_ant))})</li>")
+                        # Texto dinâmico
+                        html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>")
+                        html_parts.append(f"<li>Receita Orçamentária: {fmt_sem_rs(rec_orc_atual)} (variação {pct(calc_var(rec_orc_atual, rec_orc_ant))})</li>")
+                        html_parts.append(f"<li>Despesa Orçamentária: {fmt_sem_rs(desp_orc_atual)} (variação {pct(calc_var(desp_orc_atual, desp_orc_ant))})</li>")
+                        html_parts.append(f"<li>Recebimentos Extraorçamentários: {fmt_sem_rs(rec_extra_atual)} (variação {pct(calc_var(rec_extra_atual, rec_extra_ant))})</li>")
+                        html_parts.append(f"<li>Pagamentos Extraorçamentários: {fmt_sem_rs(desp_extra_atual)} (variação {pct(calc_var(desp_extra_atual, desp_extra_ant))})</li>")
+                        html_parts.append(f"<li>Saldo Final: {fmt_sem_rs(saldo_seg_atual)} (variação {pct(calc_var(saldo_seg_atual, saldo_seg_ant))})</li>")
                         html_parts.append("</ul>")
                         
-                        # GrÃ¡fico de barras
-                        labels = ["Rec. OrÃ§amentÃ¡ria", "Desp. OrÃ§amentÃ¡ria", "Receb. Extra", "Pag. Extra", "Saldo Anterior", "Saldo Seguinte"]
+                        # Gráfico de barras
+                        labels = ["Rec. Orçamentária", "Desp. Orçamentária", "Receb. Extra", "Pag. Extra", "Saldo Anterior", "Saldo Seguinte"]
                         vals = [rec_orc_atual, desp_orc_atual, rec_extra_atual, desp_extra_atual, saldo_ant_atual, saldo_seg_atual]
                         html_parts.append("<div class='grafico'><canvas id='chartBF'></canvas></div>")
                         html_parts.append("<script>")
@@ -7077,7 +7077,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append("});")
                         html_parts.append("</script>")
                 
-                elif nome_interno == "AnÃ¡lise DFC":
+                elif nome_interno == "Análise DFC":
                     def fmt_sem_rs(v):
                         if v is None: return "-"
                         if isinstance(v, (int, float)):
@@ -7085,9 +7085,9 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         return str(v).replace("R$", "").strip()
                     
                     dados_dfc = mod_dados.get("dados", {})
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>DemonstraÃ§Ã£o do Fluxo de Caixa (mÃ©todo direto).</p>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração do Fluxo de Caixa (método direto).</p>")
                     
-                    # Textos dinÃ¢micos de evoluÃ§Ã£o
+                    # Textos dinâmicos de evolução
                     textos = []
                     
                     for tipo in ["operacional", "investimento", "financiamento"]:
@@ -7101,12 +7101,12 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                     html_parts.append(f"<tr><td>{k.title()}</td><td class='text-right'>{fmt_sem_rs(a)}</td><td class='text-right'>{fmt_sem_rs(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
                                     if abs(var) > 0.01:
                                         direcao = "positiva" if var > 0 else "negativa"
-                                        textos.append(f"<li>Fluxo {tipo.title()} - {k.title()}: variaÃ§Ã£o {direcao} de {pct(var)} (de {fmt_sem_rs(ant)} para {fmt_sem_rs(a)}).</li>")
+                                        textos.append(f"<li>Fluxo {tipo.title()} - {k.title()}: variação {direcao} de {pct(var)} (de {fmt_sem_rs(ant)} para {fmt_sem_rs(a)}).</li>")
                             html_parts.append("</tbody></table>")
                     
-                    # ApuraÃ§Ã£o de Caixa
+                    # Apuração de Caixa
                     if "caixa" in dados_dfc:
-                        html_parts.append("<h3>ApuraÃ§Ã£o de Caixa</h3><table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                        html_parts.append("<h3>Apuração de Caixa</h3><table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
                         for k, v in dados_dfc["caixa"].items():
                             if isinstance(v, dict):
                                 a = v.get("atual", 0)
@@ -7115,18 +7115,18 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                 html_parts.append(f"<tr><td>{k.title()}</td><td class='text-right'>{fmt_sem_rs(a)}</td><td class='text-right'>{fmt_sem_rs(ant)}</td><td class='text-right'>{pct(var)}</td></tr>")
                                 if abs(var) > 0.01:
                                     direcao = "positiva" if var > 0 else "negativa"
-                                    textos.append(f"<li>ApuraÃ§Ã£o de Caixa - {k.title()}: variaÃ§Ã£o {direcao} de {pct(var)} (de {fmt_sem_rs(ant)} para {fmt_sem_rs(a)}).</li>")
+                                    textos.append(f"<li>Apuração de Caixa - {k.title()}: variação {direcao} de {pct(var)} (de {fmt_sem_rs(ant)} para {fmt_sem_rs(a)}).</li>")
                         html_parts.append("</tbody></table>")
                     
-                    # Textos de evoluÃ§Ã£o
+                    # Textos de evolução
                     if textos:
-                        html_parts.append("<h3>EvoluÃ§Ã£o dos Fluxos de Caixa</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                        html_parts.append("<h3>Evolução dos Fluxos de Caixa</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                     else:
-                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variaÃ§Ãµes significativas entre os perÃ­odos.</p>")
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os perí­odos.</p>")
                     
-                    # GrÃ¡fico de barras
+                    # Gráfico de barras
                     if "operacional" in dados_dfc:
-                        labels = ["Ingressos Op.", "Desembolsos Op.", "LÃ­quido Op.", "Ingressos Inv.", "Desembolsos Inv.", "LÃ­quido Inv."]
+                        labels = ["Ingressos Op.", "Desembolsos Op.", "Lí­quido Op.", "Ingressos Inv.", "Desembolsos Inv.", "Lí­quido Inv."]
                         vals = [
                             dados_dfc.get("operacional", {}).get("ingressos", {}).get("atual", 0),
                             dados_dfc.get("operacional", {}).get("desembolsos", {}).get("atual", 0),
@@ -7146,14 +7146,14 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append("});")
                         html_parts.append("</script>")
                 
-                elif nome_interno == "AnÃ¡lise Patrimonial (DVP)":
+                elif nome_interno == "Análise Patrimonial (DVP)":
                     def fmt_sem_rs(v):
                         if v is None: return "-"
                         if isinstance(v, (int, float)):
                             return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                         return str(v).replace("R$", "").strip()
                     
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>DemonstraÃ§Ã£o das VariaÃ§Ãµes Patrimoniais.</p>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração das Variações Patrimoniais.</p>")
                     html_parts.append("<table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
                     
                     textos = []
@@ -7168,21 +7168,21 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                 html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{atual:.2f}%</td><td class='text-right'>{anterior:.2f}%</td><td class='text-right'>{pct(var)}</td></tr>")
                                 if abs(var) > 0.01:
                                     direcao = "positiva" if var > 0 else "negativa"
-                                    textos.append(f"<li>Margem Patrimonial: variaÃ§Ã£o {direcao} de {pct(var)} (de {anterior:.2f}% para {atual:.2f}%).</li>")
+                                    textos.append(f"<li>Margem Patrimonial: variação {direcao} de {pct(var)} (de {anterior:.2f}% para {atual:.2f}%).</li>")
                             else:
                                 html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt_sem_rs(atual)}</td><td class='text-right'>{fmt_sem_rs(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
                                 if abs(var) > 0.01:
                                     direcao = "positiva" if var > 0 else "negativa"
-                                    textos.append(f"<li>{k.replace('_', ' ').title()}: variaÃ§Ã£o {direcao} de {pct(var)} (de {fmt_sem_rs(anterior)} para {fmt_sem_rs(atual)}).</li>")
+                                    textos.append(f"<li>{k.replace('_', ' ').title()}: variação {direcao} de {pct(var)} (de {fmt_sem_rs(anterior)} para {fmt_sem_rs(atual)}).</li>")
                     html_parts.append("</tbody></table>")
                     
-                    # Textos de evoluÃ§Ã£o
+                    # Textos de evolução
                     if textos:
-                        html_parts.append("<h3>EvoluÃ§Ã£o das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                        html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                     else:
-                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variaÃ§Ãµes significativas entre os perÃ­odos.</p>")
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os perí­odos.</p>")
                     
-                    # GrÃ¡fico de barras
+                    # Gráfico de barras
                     labels = []
                     atual_vals = []
                     ant_vals = []
@@ -7209,7 +7209,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     import csv
                     import os
                     
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>DemonstraÃ§Ã£o das MutaÃ§Ãµes do PatrimÃ´nio LÃ­quido (DMPL).</p>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração das Mutações do Patrimônio Lí­quido (DMPL).</p>")
                     
                     # Caminho do CSV
                     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -7228,7 +7228,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                 leitor = list(csv.reader(f_csv, delimiter=";"))
                             
                             html_parts.append("<table><thead><tr>")
-                            headers = ["ESPECIFICAÃ‡ÃƒO", "PATRIMÃ”NIO SOCIAL", "ADIANT. CAPITAL", "RESERVAS CAPITAL", "AJUSTES AVALIAÃ‡ÃƒO", "RESERVAS LUCROS", "DEMAIS RESERVAS", "RESULT. ACUMULADOS", "TOTAL"]
+                            headers = ["ESPECIFICAÇíƒO", "PATRIMí”NIO SOCIAL", "ADIANT. CAPITAL", "RESERVAS CAPITAL", "AJUSTES AVALIAÇíƒO", "RESERVAS LUCROS", "DEMAIS RESERVAS", "RESULT. ACUMULADOS", "TOTAL"]
                             for h in headers:
                                 html_parts.append(f"<th>{h}</th>")
                             html_parts.append("</tr></thead><tbody>")
@@ -7265,10 +7265,10 @@ def gerar_pdf_relatorio_consolidado(id: int):
                             
                             html_parts.append("</tbody></table>")
                             
-                            # Textos dinÃ¢micos
+                            # Textos dinâmicos
                             textos = []
                             if linha_saldos_ini and linha_saldos_fim:
-                                contas_pl = ["PatrimÃ´nio Social", "Adiant. Capital", "Reservas Capital", "Ajustes AvaliaÃ§Ã£o", "Reservas Lucros", "Demais Reservas", "Result. Acumulados"]
+                                contas_pl = ["Patrimônio Social", "Adiant. Capital", "Reservas Capital", "Ajustes Avaliação", "Reservas Lucros", "Demais Reservas", "Result. Acumulados"]
                                 for i, conta in enumerate(contas_pl):
                                     if i < len(linha_saldos_ini) and i < len(linha_saldos_fim):
                                         ini_str = linha_saldos_ini[i]
@@ -7279,11 +7279,11 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                     textos.append(f"<li><strong>Total do PL</strong>: saldo inicial {linha_saldos_ini[7]} e saldo final {linha_saldos_fim[7]}.</li>")
                             
                             if textos:
-                                html_parts.append("<h3>EvoluÃ§Ã£o do PatrimÃ´nio LÃ­quido</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                                html_parts.append("<h3>Evolução do Patrimônio Lí­quido</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                             else:
-                                html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variaÃ§Ãµes significativas.</p>")
+                                html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas.</p>")
                                 
-                            # GrÃ¡fico simples
+                            # Gráfico simples
                             html_parts.append("<div class='grafico' style='max-width: 500px; height: 200px; margin: 10px auto;'><canvas id='chartDMPL_csv'></canvas></div>")
                             html_parts.append("<script>")
                             html_parts.append("new Chart(document.getElementById('chartDMPL_csv'), {")
@@ -7296,9 +7296,9 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         except Exception as e_csv:
                             html_parts.append(f"<p style='color:red;'>Erro ao ler CSV do DMPL: {e_csv}</p>")
                     else:
-                        html_parts.append(f"<p style='color:red;'>Arquivo CSV do DMPL nÃ£o encontrado em: {csv_path}</p>")
+                        html_parts.append(f"<p style='color:red;'>Arquivo CSV do DMPL não encontrado em: {csv_path}</p>")
                         
-                    continue  # Pula o resto do fluxo genÃ©rico para este mÃ³dulo
+                    continue  # Pula o resto do fluxo genérico para este módulo
                 
                 elif nome_interno == "Comparativo de Receitas":
                     atual = mod_dados.get("atual", {})
@@ -7310,14 +7310,14 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     
                     # ---- 1. TABELA DE INDICADORES ----
                     html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
-                    html_parts.append(f"<tr><td>Receita OrÃ§ada</td><td class='text-right'>{fmt(atual.get('orcado_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>Receita Orçada</td><td class='text-right'>{fmt(atual.get('orcado_total'))}</td></tr>")
                     html_parts.append(f"<tr><td>Receita Realizada</td><td class='text-right'>{fmt(atual.get('realizado_total'))}</td></tr>")
-                    html_parts.append(f"<tr><td>% ExecuÃ§Ã£o</td><td class='text-right'>{atual.get('percentual_total', 0):.2f}%</td></tr>")
+                    html_parts.append(f"<tr><td>% Execução</td><td class='text-right'>{atual.get('percentual_total', 0):.2f}%</td></tr>")
                     html_parts.append("</tbody></table>")
                     
-                    # ---- 2. COMPOSIÃ‡ÃƒO POR GRUPO ----
-                    html_parts.append("<h3>ComposiÃ§Ã£o por Grupo</h3>")
-                    html_parts.append("<table><thead><tr><th>GRUPO</th><th>ORÃ‡ADO</th><th>REALIZADO</th><th>%</th></tr></thead><tbody>")
+                    # ---- 2. COMPOSIÇíƒO POR GRUPO ----
+                    html_parts.append("<h3>Composição por Grupo</h3>")
+                    html_parts.append("<table><thead><tr><th>GRUPO</th><th>ORÇADO</th><th>REALIZADO</th><th>%</th></tr></thead><tbody>")
                     for g in atual.get("grupos", []):
                         html_parts.append(f"<tr><td>{g.get('nome','')}</td>")
                         html_parts.append(f"<td class='text-right'>{fmt(g.get('orcado'))}</td>")
@@ -7325,18 +7325,18 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append(f"<td class='text-right'>{g.get('percentual', 0):.2f}%</td></tr>")
                     html_parts.append("</tbody></table>")
                     
-                    # ---- 3. TEXTOS DINÃ‚MICOS ----
+                    # ---- 3. TEXTOS DINí‚MICOS ----
                     textos = []
                     orc_tot = atual.get("orcado_total", 0) or 0
                     real_tot = atual.get("realizado_total", 0) or 0
                     pct_tot = atual.get("percentual_total", 0) or 0
                     if orc_tot > 0:
                         if pct_tot >= 100:
-                            textos.append(f"<li>A receita realizada de {fmt(real_tot)} superou a orÃ§ada de {fmt(orc_tot)} em {pct_tot - 100:.2f}% (execuÃ§Ã£o de {pct_tot:.2f}%).</li>")
+                            textos.append(f"<li>A receita realizada de {fmt(real_tot)} superou a orçada de {fmt(orc_tot)} em {pct_tot - 100:.2f}% (execução de {pct_tot:.2f}%).</li>")
                         else:
-                            textos.append(f"<li>A receita realizada de {fmt(real_tot)} ficou abaixo da orÃ§ada de {fmt(orc_tot)}, com execuÃ§Ã£o de {pct_tot:.2f}%.</li>")
+                            textos.append(f"<li>A receita realizada de {fmt(real_tot)} ficou abaixo da orçada de {fmt(orc_tot)}, com execução de {pct_tot:.2f}%.</li>")
                     else:
-                        textos.append(f"<li>NÃ£o hÃ¡ receita orÃ§ada cadastrada para o perÃ­odo; a receita realizada foi de {fmt(real_tot)}.</li>")
+                        textos.append(f"<li>Não há receita orçada cadastrada para o perí­odo; a receita realizada foi de {fmt(real_tot)}.</li>")
                     
                     for g in atual.get("grupos", []):
                         nome = g.get('nome', '')
@@ -7345,18 +7345,18 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         pct_g = g.get('percentual', 0) or 0
                         if orc > 0 and real > 0:
                             if pct_g >= 100:
-                                textos.append(f"<li>{nome}: arrecadaÃ§Ã£o de {fmt(real)} ({pct_g:.2f}% do orÃ§ado de {fmt(orc)}).</li>")
+                                textos.append(f"<li>{nome}: arrecadação de {fmt(real)} ({pct_g:.2f}% do orçado de {fmt(orc)}).</li>")
                             elif real > 0:
-                                textos.append(f"<li>{nome}: arrecadaÃ§Ã£o de {fmt(real)}, abaixo do orÃ§ado de {fmt(orc)} ({pct_g:.2f}%).</li>")
+                                textos.append(f"<li>{nome}: arrecadação de {fmt(real)}, abaixo do orçado de {fmt(orc)} ({pct_g:.2f}%).</li>")
                         elif real > 0:
-                            textos.append(f"<li>{nome}: arrecadaÃ§Ã£o de {fmt(real)} sem previsÃ£o orÃ§ada.</li>")
+                            textos.append(f"<li>{nome}: arrecadação de {fmt(real)} sem previsão orçada.</li>")
                     
                     if textos:
-                        html_parts.append("<h3>AnÃ¡lise de ExecuÃ§Ã£o</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                        html_parts.append("<h3>Análise de Execução</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                     else:
-                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variaÃ§Ãµes significativas entre os perÃ­odos.</p>")
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os perí­odos.</p>")
                     
-                    # ---- 4. GRÃFICO DE BARRAS (OrÃ§ado x Realizado por grupo) ----
+                    # ---- 4. GRíFICO DE BARRAS (Orçado x Realizado por grupo) ----
                     grupos = atual.get("grupos", [])
                     if grupos:
                         labels = [g.get('nome','') for g in grupos]
@@ -7367,7 +7367,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append("new Chart(document.getElementById('chartReceitasBarras'), {")
                         html_parts.append("type: 'bar',")
                         html_parts.append(f"data: {{ labels: {json.dumps(labels, ensure_ascii=False)}, datasets: [")
-                        html_parts.append(f"{{ label: 'OrÃ§ado', data: {json.dumps(vals_orc)}, backgroundColor: '#6c757d' }},")
+                        html_parts.append(f"{{ label: 'Orçado', data: {json.dumps(vals_orc)}, backgroundColor: '#6c757d' }},")
                         html_parts.append(f"{{ label: 'Realizado', data: {json.dumps(vals_real)}, backgroundColor: '#004b8d' }}")
                         html_parts.append("] },")
                         html_parts.append("options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { x: { ticks: { font: { size: 7 } } }, y: { ticks: { font: { size: 7 } } } } }")
@@ -7382,15 +7382,15 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     
                     # ---- 1. TABELA DE INDICADORES ----
                     html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR</th></tr></thead><tbody>")
-                    html_parts.append(f"<tr><td>Despesa OrÃ§ada</td><td class='text-right'>{fmt(atual.get('orcado_total'))}</td></tr>")
+                    html_parts.append(f"<tr><td>Despesa Orçada</td><td class='text-right'>{fmt(atual.get('orcado_total'))}</td></tr>")
                     html_parts.append(f"<tr><td>Despesa Empenhada</td><td class='text-right'>{fmt(atual.get('empenhado_total'))}</td></tr>")
                     html_parts.append(f"<tr><td>Despesa Liquidada</td><td class='text-right'>{fmt(atual.get('liquidado_total'))}</td></tr>")
-                    html_parts.append(f"<tr><td>% ExecuÃ§Ã£o</td><td class='text-right'>{atual.get('percentual_total', 0):.2f}%</td></tr>")
+                    html_parts.append(f"<tr><td>% Execução</td><td class='text-right'>{atual.get('percentual_total', 0):.2f}%</td></tr>")
                     html_parts.append("</tbody></table>")
                     
-                    # ---- 2. COMPOSIÃ‡ÃƒO POR GRUPO ----
-                    html_parts.append("<h3>ComposiÃ§Ã£o por Grupo</h3>")
-                    html_parts.append("<table><thead><tr><th>GRUPO</th><th>ORÃ‡ADO</th><th>EMPENHADO</th><th>LIQUIDADO</th><th>%</th></tr></thead><tbody>")
+                    # ---- 2. COMPOSIÇíƒO POR GRUPO ----
+                    html_parts.append("<h3>Composição por Grupo</h3>")
+                    html_parts.append("<table><thead><tr><th>GRUPO</th><th>ORÇADO</th><th>EMPENHADO</th><th>LIQUIDADO</th><th>%</th></tr></thead><tbody>")
                     for g in atual.get("grupos", []):
                         html_parts.append(f"<tr><td>{g.get('nome','')}</td>")
                         html_parts.append(f"<td class='text-right'>{fmt(g.get('orcado'))}</td>")
@@ -7399,7 +7399,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append(f"<td class='text-right'>{g.get('percentual', 0):.2f}%</td></tr>")
                     html_parts.append("</tbody></table>")
                     
-                    # ---- 3. TEXTOS DINÃ‚MICOS ----
+                    # ---- 3. TEXTOS DINí‚MICOS ----
                     textos = []
                     orc_tot = atual.get("orcado_total", 0) or 0
                     emp_tot = atual.get("empenhado_total", 0) or 0
@@ -7407,11 +7407,11 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     pct_tot = atual.get("percentual_total", 0) or 0
                     if orc_tot > 0:
                         if pct_tot >= 100:
-                            textos.append(f"<li>A despesa empenhada de {fmt(emp_tot)} superou a orÃ§ada de {fmt(orc_tot)} em {pct_tot - 100:.2f}% (execuÃ§Ã£o de {pct_tot:.2f}%).</li>")
+                            textos.append(f"<li>A despesa empenhada de {fmt(emp_tot)} superou a orçada de {fmt(orc_tot)} em {pct_tot - 100:.2f}% (execução de {pct_tot:.2f}%).</li>")
                         else:
-                            textos.append(f"<li>A despesa empenhada de {fmt(emp_tot)} ficou abaixo da orÃ§ada de {fmt(orc_tot)}, com execuÃ§Ã£o de {pct_tot:.2f}%.</li>")
+                            textos.append(f"<li>A despesa empenhada de {fmt(emp_tot)} ficou abaixo da orçada de {fmt(orc_tot)}, com execução de {pct_tot:.2f}%.</li>")
                     else:
-                        textos.append(f"<li>NÃ£o hÃ¡ despesa orÃ§ada cadastrada para o perÃ­odo; a despesa empenhada foi de {fmt(emp_tot)}.</li>")
+                        textos.append(f"<li>Não há despesa orçada cadastrada para o perí­odo; a despesa empenhada foi de {fmt(emp_tot)}.</li>")
                     
                     if liq_tot and liq_tot != emp_tot:
                         pct_liq = (liq_tot / emp_tot * 100) if emp_tot > 0 else 0
@@ -7424,18 +7424,18 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         pct_g = g.get('percentual', 0) or 0
                         if orc > 0 and emp > 0:
                             if pct_g >= 100:
-                                textos.append(f"<li>{nome}: empenhado de {fmt(emp)} ({pct_g:.2f}% do orÃ§ado de {fmt(orc)}).</li>")
+                                textos.append(f"<li>{nome}: empenhado de {fmt(emp)} ({pct_g:.2f}% do orçado de {fmt(orc)}).</li>")
                             else:
-                                textos.append(f"<li>{nome}: empenhado de {fmt(emp)}, abaixo do orÃ§ado de {fmt(orc)} ({pct_g:.2f}%).</li>")
+                                textos.append(f"<li>{nome}: empenhado de {fmt(emp)}, abaixo do orçado de {fmt(orc)} ({pct_g:.2f}%).</li>")
                         elif emp > 0:
-                            textos.append(f"<li>{nome}: empenhado de {fmt(emp)} sem previsÃ£o orÃ§ada.</li>")
+                            textos.append(f"<li>{nome}: empenhado de {fmt(emp)} sem previsão orçada.</li>")
                     
                     if textos:
-                        html_parts.append("<h3>AnÃ¡lise de ExecuÃ§Ã£o</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                        html_parts.append("<h3>Análise de Execução</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                     else:
-                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variaÃ§Ãµes significativas entre os perÃ­odos.</p>")
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os perí­odos.</p>")
                     
-                    # ---- 4. GRÃFICO DE BARRAS (OrÃ§ado x Empenhado por grupo) ----
+                    # ---- 4. GRíFICO DE BARRAS (Orçado x Empenhado por grupo) ----
                     grupos = atual.get("grupos", [])
                     if grupos:
                         labels = [g.get('nome','') for g in grupos]
@@ -7446,14 +7446,14 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append("new Chart(document.getElementById('chartDespesasBarras'), {")
                         html_parts.append("type: 'bar',")
                         html_parts.append(f"data: {{ labels: {json.dumps(labels, ensure_ascii=False)}, datasets: [")
-                        html_parts.append(f"{{ label: 'OrÃ§ado', data: {json.dumps(vals_orc)}, backgroundColor: '#6c757d' }},")
+                        html_parts.append(f"{{ label: 'Orçado', data: {json.dumps(vals_orc)}, backgroundColor: '#6c757d' }},")
                         html_parts.append(f"{{ label: 'Empenhado', data: {json.dumps(vals_emp)}, backgroundColor: '#dc3545' }}")
                         html_parts.append("] },")
                         html_parts.append("options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { x: { ticks: { font: { size: 7 } } }, y: { ticks: { font: { size: 7 } } } } }")
                         html_parts.append("});")
                         html_parts.append("</script>")
                 
-                elif nome_interno == "Ãndices de Liquidez":
+                elif nome_interno == "índices de Liquidez":
                     liq = mod_dados.get("liquidez", {})
                     est = mod_dados.get("estrutura", {})
                     liq_ant = mod_dados.get("liquidez_anterior", {})
@@ -7496,13 +7496,13 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         pc = val.get("passivo_circulante", 0)
                         pnc = val.get("passivo_nao_circulante", 0)
                         if k == "liquidez_imediata":
-                            return f"DisponÃ­vel ({fmt_valor(c)}) / Passivo Circulante ({fmt_valor(pc)})"
+                            return f"Disponí­vel ({fmt_valor(c)}) / Passivo Circulante ({fmt_valor(pc)})"
                         if k == "liquidez_corrente":
                             return f"Ativo Circulante ({fmt_valor(ac)}) / Passivo Circulante ({fmt_valor(pc)})"
                         if k == "liquidez_seca":
                             return f"(Ativo Circulante ({fmt_valor(ac)}) - Estoques ({fmt_valor(est_v)})) / Passivo Circulante ({fmt_valor(pc)})"
                         if k == "liquidez_geral":
-                            return f"(Ativo Circulante ({fmt_valor(ac)}) + RealizÃ¡vel LP ({fmt_valor(rlp)})) / (Passivo Circulante ({fmt_valor(pc)}) + Passivo NÃ£o Circulante ({fmt_valor(pnc)}))"
+                            return f"(Ativo Circulante ({fmt_valor(ac)}) + Realizável LP ({fmt_valor(rlp)})) / (Passivo Circulante ({fmt_valor(pc)}) + Passivo Não Circulante ({fmt_valor(pnc)}))"
                         return "-"
                     
                     def formula_est(k):
@@ -7513,11 +7513,11 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         imob = val.get("imobilizado", 0)
                         pl = val.get("patrimonio_liquido", 0)
                         if k == "endividamento_geral":
-                            return f"(Passivo Circulante ({fmt_valor(pc)}) + Passivo NÃ£o Circulante ({fmt_valor(pnc)})) / Ativo Total ({fmt_valor(at)})"
+                            return f"(Passivo Circulante ({fmt_valor(pc)}) + Passivo Não Circulante ({fmt_valor(pnc)})) / Ativo Total ({fmt_valor(at)})"
                         if k == "part_capital_terceiros":
                             return f"Passivo Total ({fmt_valor(pt)}) / Ativo Total ({fmt_valor(at)})"
                         if k == "imobilizacao_pl":
-                            return f"Ativo Imobilizado ({fmt_valor(imob)}) / PatrimÃ´nio LÃ­quido ({fmt_valor(pl)})"
+                            return f"Ativo Imobilizado ({fmt_valor(imob)}) / Patrimônio Lí­quido ({fmt_valor(pl)})"
                         return "-"
                     
                     textos = []
@@ -7528,7 +7528,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     # ---- LIQUIDEZ ----
                     html_parts.append("<h3>Liquidez</h3>")
                     html_parts.append("<table style='table-layout: fixed; width: 100%;'><thead><tr>")
-                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>FÃ“RMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
+                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>Fí“RMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
                     html_parts.append("</tr></thead><tbody>")
                     for k, v in liq.items():
                         v_ant = liq_ant.get(k, "-")
@@ -7538,7 +7538,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         nome_fmt = k.replace('_', ' ').title()
                         html_parts.append(f"<tr><td>{nome_fmt}</td><td style='font-size: 5.0pt; text-align: left;'>{formula}</td><td class='text-right'>{v}</td><td class='text-right'>{v_ant}</td><td class='text-right'>{var_str}</td></tr>")
                         if var is not None and abs(var) > 0.01:
-                            direcao = "aumento" if a > b else "reduÃ§Ã£o"
+                            direcao = "aumento" if a > b else "redução"
                             textos.append(f"<li>{nome_fmt}: {direcao} de {b:.2f} para {a:.2f} ({var:+.2f}%).</li>")
                             labels_liq.append(nome_fmt)
                             vals_liq_atual.append(a)
@@ -7548,7 +7548,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     # ---- ESTRUTURA ----
                     html_parts.append("<h3>Estrutura Patrimonial</h3>")
                     html_parts.append("<table style='table-layout: fixed; width: 100%;'><thead><tr>")
-                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>FÃ“RMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
+                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>Fí“RMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
                     html_parts.append("</tr></thead><tbody>")
                     for k, v in est.items():
                         v_ant = est_ant.get(k, "-")
@@ -7558,15 +7558,15 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         nome_fmt = k.replace('_', ' ').title()
                         html_parts.append(f"<tr><td>{nome_fmt}</td><td style='font-size: 5.0pt; text-align: left;'>{formula}</td><td class='text-right'>{v}</td><td class='text-right'>{v_ant}</td><td class='text-right'>{var_str}</td></tr>")
                         if var is not None and abs(var) > 0.01:
-                            direcao = "aumento" if a > b else "reduÃ§Ã£o"
+                            direcao = "aumento" if a > b else "redução"
                             textos.append(f"<li>{nome_fmt}: {direcao} de {b:.2f} para {a:.2f} ({var:+.2f}%).</li>")
                     html_parts.append("</tbody></table>")
                     
                     # ---- TEXTOS DINAMICOS ----
                     if textos:
-                        html_parts.append("<h3>EvoluÃ§Ã£o dos Indicadores</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                        html_parts.append("<h3>Evolução dos Indicadores</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                     else:
-                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variaÃ§Ãµes significativas entre os perÃ­odos.</p>")
+                        html_parts.append("<p style='font-size: 7.6pt; color:#666; font-style:italic;'>Sem variações significativas entre os perí­odos.</p>")
                     
                     # ---- GRAFICO DE BARRAS ----
                     
@@ -7633,16 +7633,16 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         sup_fin = d.get("superavit_financeiro", sup_fin)
                     
                     # Linha 1: Balanco Patrimonial
-                    html_parts.append("<div class='pano-titulo'>BalanÃ§o Patrimonial</div>")
+                    html_parts.append("<div class='pano-titulo'>Balanço Patrimonial</div>")
                     html_parts.append("<div class='pano-row'>")
                     html_parts.append(f"<div class='pano-pill azul'><div class='label'>Ativo Total</div><div class='value'>{fmt_pano(ativo_total)}</div></div>")
                     html_parts.append(f"<div class='pano-pill cinza'><div class='label'>Passivo Total</div><div class='value'>{fmt_pano(passivo_total)}</div></div>")
-                    html_parts.append(f"<div class='pano-pill verde'><div class='label'>PatrimÃ´nio LÃ­quido</div><div class='value'>{fmt_pano(pl)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill verde'><div class='label'>Patrimônio Lí­quido</div><div class='value'>{fmt_pano(pl)}</div></div>")
                     html_parts.append(f"<div class='pano-pill azul'><div class='label'>Caixa</div><div class='value'>{fmt_pano(caixa)}</div></div>")
                     html_parts.append("</div>")
                     
                     # Linha 2: Resultados
-                    html_parts.append("<div class='pano-titulo'>Resultados e SuperÃ¡vits</div>")
+                    html_parts.append("<div class='pano-titulo'>Resultados e Superávits</div>")
                     html_parts.append("<div class='pano-row'>")
                     html_parts.append(f"<div class='pano-pill azul'><div class='label'>Receita Realizada</div><div class='value'>{fmt_pano(receita)}</div></div>")
                     html_parts.append(f"<div class='pano-pill vermelho'><div class='label'>Despesa Empenhada</div><div class='value'>{fmt_pano(despesa)}</div></div>")
@@ -7652,17 +7652,17 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     def cor_superavit(v):
                         n = num(v)
                         return "verde" if n >= 0 else "vermelho"
-                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_orc)}'><div class='label'>SuperÃ¡vit OrÃ§amentÃ¡rio</div><div class='value'>{fmt_pano(sup_orc)}</div></div>")
-                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_patr)}'><div class='label'>SuperÃ¡vit Patrimonial</div><div class='value'>{fmt_pano(sup_patr)}</div></div>")
-                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_fin)}'><div class='label'>SuperÃ¡vit Financeiro</div><div class='value'>{fmt_pano(sup_fin)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_orc)}'><div class='label'>Superávit Orçamentário</div><div class='value'>{fmt_pano(sup_orc)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_patr)}'><div class='label'>Superávit Patrimonial</div><div class='value'>{fmt_pano(sup_patr)}</div></div>")
+                    html_parts.append(f"<div class='pano-pill {cor_superavit(sup_fin)}'><div class='label'>Superávit Financeiro</div><div class='value'>{fmt_pano(sup_fin)}</div></div>")
                     html_parts.append("</div>")
                     
                     # Texto dinamico explicativo
                     textos = []
                     if num(sup_orc) < 0:
-                        textos.append(f"<li>O resultado orÃ§amentÃ¡rio apresentou dÃ©ficit de {fmt_pano(abs(num(sup_orc)))}.</li>")
+                        textos.append(f"<li>O resultado orçamentário apresentou déficit de {fmt_pano(abs(num(sup_orc)))}.</li>")
                     elif num(sup_orc) > 0:
-                        textos.append(f"<li>O resultado orÃ§amentÃ¡rio apresentou superÃ¡vit de {fmt_pano(sup_orc)}.</li>")
+                        textos.append(f"<li>O resultado orçamentário apresentou superávit de {fmt_pano(sup_orc)}.</li>")
                     
                     if num(sup_patr) > 0:
                         textos.append(f"<li>O resultado patrimonial foi positivo em {fmt_pano(sup_patr)}.</li>")
@@ -7670,22 +7670,22 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         textos.append(f"<li>O resultado patrimonial foi negativo em {fmt_pano(abs(num(sup_patr)))}.</li>")
                     
                     if num(sup_fin) > 0:
-                        textos.append(f"<li>O superÃ¡vit financeiro foi de {fmt_pano(sup_fin)}.</li>")
+                        textos.append(f"<li>O superávit financeiro foi de {fmt_pano(sup_fin)}.</li>")
                     elif num(sup_fin) < 0:
-                        textos.append(f"<li>O dÃ©ficit financeiro foi de {fmt_pano(abs(num(sup_fin)))}.</li>")
+                        textos.append(f"<li>O déficit financeiro foi de {fmt_pano(abs(num(sup_fin)))}.</li>")
                     
                     if textos:
-                        html_parts.append("<h3>AnÃ¡lise dos Resultados</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
+                        html_parts.append("<h3>Análise dos Resultados</h3><ul class='texto-dinamico'>" + "".join(textos) + "</ul>")
                 
                 
-                elif nome_interno == "AnÃ¡lise por Centro de Custos":
+                elif nome_interno == "Análise por Centro de Custos":
                     centros = mod_dados.get("centros", [])
                     centros_ant = mod_dados.get("centros_anterior", [])
                     
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>DistribuiÃ§Ã£o das despesas (Atual vs. Anterior)</p>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Distribuição das despesas (Atual vs. Anterior)</p>")
                     
                     # --- TABELA ---
-                    html_parts.append("<table><thead><tr><th>CENTRO DE CUSTO</th><th>ATUAL</th><th>ANTERIOR</th><th>VARIAÃ‡ÃƒO</th></tr></thead><tbody>")
+                    html_parts.append("<table><thead><tr><th>CENTRO DE CUSTO</th><th>ATUAL</th><th>ANTERIOR</th><th>VARIAÇíƒO</th></tr></thead><tbody>")
                     for c in centros:
                         nome = c.get('nome', '')
                         valor = c.get('valor', 0)
@@ -7702,9 +7702,9 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     # Texto do maior centro de custo
                     if centros:
                         maior = max(centros, key=lambda x: x.get('valor', 0))
-                        html_parts.append(f"<p class='texto-dinamico'>O maior centro de custo Ã© <strong>{maior.get('nome')}</strong> com {fmt(maior.get('valor'))}.</p>")
+                        html_parts.append(f"<p class='texto-dinamico'>O maior centro de custo é <strong>{maior.get('nome')}</strong> com {fmt(maior.get('valor'))}.</p>")
                     
-                    # --- GRÃFICO ESTILO MODELO ---
+                    # --- GRíFICO ESTILO MODELO ---
                     if centros:
                         centros_ordenados = sorted(centros, key=lambda x: x.get('valor', 0), reverse=True)
                         labels = []
@@ -7713,10 +7713,10 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         
                         for c in centros_ordenados:
                             nome_completo = c.get('nome', '')
-                            # Abrevia o nome para exibiÃ§Ã£o (ex: "AF 01 Fisc")
+                            # Abrevia o nome para exibição (ex: "AF 01 Fisc")
                             partes = nome_completo.split(' - ')
                             if len(partes) >= 2:
-                                # Pega a parte do meio e a Ãºltima parte (abreviada)
+                                # Pega a parte do meio e a última parte (abreviada)
                                 meio = partes[1].split(' ')[:2]  # Ex: "AF 01"
                                 nome_abrev = ' '.join(meio)
                             else:
@@ -7732,7 +7732,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                     break
                             vals_ant.append(ant_c)
                         
-                        # Calcula as variaÃ§Ãµes para mostrar em cima
+                        # Calcula as variações para mostrar em cima
                         variacoes = []
                         for i in range(len(vals_atual)):
                             if vals_ant[i] > 0:
@@ -7740,7 +7740,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                             else:
                                 variacoes.append(0)
                         
-                        html_parts.append("<h3>DistribuiÃ§Ã£o por Centro de Custo</h3>")
+                        html_parts.append("<h3>Distribuição por Centro de Custo</h3>")
                         html_parts.append("<div class='grafico' style='max-width: 750px; height: 350px; margin: 15px auto;'><canvas id='chartCentroCustos' style='width:100%; height:100%;'></canvas></div>")
                         html_parts.append("<script>")
                         html_parts.append("new Chart(document.getElementById('chartCentroCustos'), {")
@@ -7815,14 +7815,14 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     faixa_controle = mod_dados.get("faixa_controle", "N/A") or "N/A"
                     faixa_cor = mod_dados.get("faixa_cor", "success") or "success"
                     
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Custo de pessoal x limite legal (ResoluÃ§Ã£o Cofen 814/2026).</p>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Custo de pessoal x limite legal (Resolução Cofen 814/2026).</p>")
                     
-                    # --- TABELA 1: COMPOSIÃ‡ÃƒO DO CUSTO ---
-                    html_parts.append("<h3>ComposiÃ§Ã£o do Custo</h3>")
+                    # --- TABELA 1: COMPOSIÇíƒO DO CUSTO ---
+                    html_parts.append("<h3>Composição do Custo</h3>")
                     html_parts.append("<table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>TOTAL</th></tr></thead><tbody>")
                     html_parts.append(f"<tr><td>Pessoal e Encargos</td><td class='text-right'>{fmt(pessoal_atual)}</td><td class='text-right'>{fmt(pessoal_anterior)}</td><td class='text-right'>{fmt(pessoal_total)}</td></tr>")
-                    html_parts.append(f"<tr><td>Outras Despesas VariÃ¡veis</td><td class='text-right'>{fmt(outras_atual)}</td><td class='text-right'>{fmt(outras_anterior)}</td><td class='text-right'>{fmt(outras_total)}</td></tr>")
-                    html_parts.append(f"<tr><td>TerceirizaÃ§Ã£o</td><td class='text-right'>{fmt(terc_atual)}</td><td class='text-right'>{fmt(terc_anterior)}</td><td class='text-right'>{fmt(terc_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>Outras Despesas Variáveis</td><td class='text-right'>{fmt(outras_atual)}</td><td class='text-right'>{fmt(outras_anterior)}</td><td class='text-right'>{fmt(outras_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>Terceirização</td><td class='text-right'>{fmt(terc_atual)}</td><td class='text-right'>{fmt(terc_anterior)}</td><td class='text-right'>{fmt(terc_total)}</td></tr>")
                     html_parts.append(f"<tr style='font-weight:bold; background:#e9ecef;'><td>CUSTO TOTAL (Bruto)</td><td class='text-right'>{fmt(custo_atual)}</td><td class='text-right'>{fmt(custo_anterior)}</td><td class='text-right'>{fmt(custo_total)}</td></tr>")
                     html_parts.append(f"<tr><td>RCL Total (12 meses)</td><td class='text-right'>{fmt(rcl_atual)}</td><td class='text-right'>{fmt(rcl_anterior)}</td><td class='text-right'>{fmt(rcl_total)}</td></tr>")
                     html_parts.append("</tbody></table>")
@@ -7830,36 +7830,36 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     # --- TABELA 2: LIMITE E MARGEM ---
                     html_parts.append("<h3>Limite e Margem</h3>")
                     html_parts.append("<table><thead><tr><th>ITEM</th><th>VALOR</th></tr></thead><tbody>")
-                    html_parts.append(f"<tr><td>Limite Legal AplicÃ¡vel</td><td class='text-right'>{fmt(limite_total)}</td></tr>")
-                    html_parts.append(f"<tr><td>Margem DisponÃ­vel</td><td class='text-right'>{fmt(margem_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>Limite Legal Aplicável</td><td class='text-right'>{fmt(limite_total)}</td></tr>")
+                    html_parts.append(f"<tr><td>Margem Disponí­vel</td><td class='text-right'>{fmt(margem_total)}</td></tr>")
                     html_parts.append(f"<tr><td>% Custo sobre RCL</td><td class='text-right' style='font-weight:bold;'>{pct_custo:.2f}%</td></tr>")
                     html_parts.append(f"<tr><td>Faixa de Controle</td><td class='text-right' style='color:#{('28a745' if faixa_cor == 'success' else ('dc3545' if faixa_cor == 'danger' else 'ffc107'))}; font-weight:bold;'>{faixa_controle}</td></tr>")
                     html_parts.append("</tbody></table>")
                     
-                    # --- TABELA 3: APURAÃ‡ÃƒO CONSOLIDADA ---
-                    html_parts.append("<h3>ApuraÃ§Ã£o Consolidada 12 meses</h3>")
+                    # --- TABELA 3: APURAÇíƒO CONSOLIDADA ---
+                    html_parts.append("<h3>Apuração Consolidada 12 meses</h3>")
                     html_parts.append("<table><thead><tr><th>INDICADOR</th><th>VALOR (R$)</th><th>% DA RCL</th></tr></thead><tbody>")
-                    html_parts.append(f"<tr><td>Receita Corrente LÃ­quida (RCL)</td><td class='text-right'>{fmt(rcl_total)}</td><td class='text-right'>100,00%</td></tr>")
+                    html_parts.append(f"<tr><td>Receita Corrente Lí­quida (RCL)</td><td class='text-right'>{fmt(rcl_total)}</td><td class='text-right'>100,00%</td></tr>")
                     html_parts.append(f"<tr><td>(-) Custo de Pessoal (Bruto)</td><td class='text-right'>{fmt(custo_total)}</td><td class='text-right'>{pct_custo:.2f}%</td></tr>")
                     pct_margem = (margem_total / rcl_total * 100) if rcl_total > 0 else 0
-                    html_parts.append(f"<tr><td>(=) Margem DisponÃ­vel (Limite - Custo)</td><td class='text-right'>{fmt(margem_total)}</td><td class='text-right'>{pct_margem:.2f}%</td></tr>")
-                    html_parts.append(f"<tr><td>Limite ResoluÃ§Ã£o Cofen 814/2026 (50,00% da RCL)</td><td class='text-right'>{fmt(limite_total)}</td><td class='text-right'>50,00%</td></tr>")
-                    html_parts.append(f"<tr style='font-weight:bold;'><td>SituaÃ§Ã£o (COFEN)</td><td class='text-right'></td><td class='text-right'>{pct_custo:.2f}%</td></tr>")
+                    html_parts.append(f"<tr><td>(=) Margem Disponí­vel (Limite - Custo)</td><td class='text-right'>{fmt(margem_total)}</td><td class='text-right'>{pct_margem:.2f}%</td></tr>")
+                    html_parts.append(f"<tr><td>Limite Resolução Cofen 814/2026 (50,00% da RCL)</td><td class='text-right'>{fmt(limite_total)}</td><td class='text-right'>50,00%</td></tr>")
+                    html_parts.append(f"<tr style='font-weight:bold;'><td>Situação (COFEN)</td><td class='text-right'></td><td class='text-right'>{pct_custo:.2f}%</td></tr>")
                     html_parts.append("</tbody></table>")
                     
                     
-                    # --- TEXTO DINÃ‚MICO FINAL ---
+                    # --- TEXTO DINí‚MICO FINAL ---
                     if pct_custo <= 50:
-                        html_parts.append(f"<p class='texto-dinamico'><strong>AnÃ¡lise:</strong> O custo de pessoal representa {pct_custo:.2f}% da RCL, estando dentro do limite legal de 50% (margem disponÃ­vel de {fmt(margem_total)}). SituaÃ§Ã£o: {faixa_controle}.</p>")
+                        html_parts.append(f"<p class='texto-dinamico'><strong>Análise:</strong> O custo de pessoal representa {pct_custo:.2f}% da RCL, estando dentro do limite legal de 50% (margem disponí­vel de {fmt(margem_total)}). Situação: {faixa_controle}.</p>")
                     else:
-                        html_parts.append(f"<p class='texto-dinamico'><strong>AnÃ¡lise:</strong> O custo de pessoal representa {pct_custo:.2f}% da RCL, acima do limite legal de 50%. Excesso de {fmt(custo_total - limite_total)}. SituaÃ§Ã£o: {faixa_controle}.</p>")
+                        html_parts.append(f"<p class='texto-dinamico'><strong>Análise:</strong> O custo de pessoal representa {pct_custo:.2f}% da RCL, acima do limite legal de 50%. Excesso de {fmt(custo_total - limite_total)}. Situação: {faixa_controle}.</p>")
                 
                 
                 
                 
-                elif nome_interno == "ConferÃªncia das DemonstraÃ§Ãµes":
+                elif nome_interno == "Conferência das Demonstrações":
                     analises = mod_dados.get("analises", [])
-                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>VerificaÃ§Ã£o da consistÃªncia das demonstraÃ§Ãµes contÃ¡beis.</p>")
+                    html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Verificação da consistência das demonstrações contábeis.</p>")
                     for a in analises:
                         html_parts.append(f"<h3>{a.get('titulo', '')}</h3>")
                         html_parts.append(f"<p style='font-size: 7.6pt;'>{a.get('conceito', '')}</p>")
@@ -7879,28 +7879,28 @@ def gerar_pdf_relatorio_consolidado(id: int):
         html_parts.append("<h2>15. Parecer do Contador</h2>")
         html_parts.append("<div class='parecer'>")
         
-        html_parts.append("<h3>1. SituaÃ§Ã£o Patrimonial e Financeira â€” SÃ³lida e Equilibrada</h3>")
-        html_parts.append("<p>A entidade apresenta solidez financeira notÃ¡vel, evidenciada por um caixa elevado que suporta integralmente seus gastos operacionais. Os Ã­ndices de liquidez demonstram capacidade excepcional de honrar compromissos de curto e longo prazos. O endividamento geral confirma uma estrutura de capital conservadora.</p>")
+        html_parts.append("<h3>1. Situação Patrimonial e Financeira — Sólida e Equilibrada</h3>")
+        html_parts.append("<p>A entidade apresenta solidez financeira notável, evidenciada por um caixa elevado que suporta integralmente seus gastos operacionais. Os í­ndices de liquidez demonstram capacidade excepcional de honrar compromissos de curto e longo prazos. O endividamento geral confirma uma estrutura de capital conservadora.</p>")
         
-        html_parts.append("<h3>2. Desempenho OrÃ§amentÃ¡rio â€” Estabilidade</h3>")
-        html_parts.append("<p>As receitas e despesas orÃ§amentÃ¡rias realizadas mantiveram-se no mesmo patamar do exercÃ­cio anterior, indicando previsibilidade e controle na execuÃ§Ã£o orÃ§amentÃ¡ria. NÃ£o se observam desvios relevantes que comprometam o equilÃ­brio fiscal.</p>")
+        html_parts.append("<h3>2. Desempenho Orçamentário — Estabilidade</h3>")
+        html_parts.append("<p>As receitas e despesas orçamentárias realizadas mantiveram-se no mesmo patamar do exercí­cio anterior, indicando previsibilidade e controle na execução orçamentária. Não se observam desvios relevantes que comprometam o equilí­brio fiscal.</p>")
         
-        html_parts.append("<h3>3. GeraÃ§Ã£o de Caixa â€” EvoluÃ§Ã£o Positiva</h3>")
-        html_parts.append("<p>A DemonstraÃ§Ã£o dos Fluxos de Caixa (DFC) revela geraÃ§Ã£o lÃ­quida de caixa positiva, reforÃ§ando a capacidade de autofinanciamento e a consistÃªncia operacional da entidade.</p>")
+        html_parts.append("<h3>3. Geração de Caixa — Evolução Positiva</h3>")
+        html_parts.append("<p>A Demonstração dos Fluxos de Caixa (DFC) revela geração lí­quida de caixa positiva, reforçando a capacidade de autofinanciamento e a consistência operacional da entidade.</p>")
         
-        html_parts.append("<h3>4. Resultado Patrimonial â€” Crescimento ContÃ¡bil Relevante</h3>")
-        html_parts.append("<p>O resultado patrimonial registrou acrÃ©scimo significativo. Contudo, trata-se de resultado contÃ¡bil, sem reflexo financeiro imediato, devendo ser interpretado com cautela, pois decorre de variaÃ§Ãµes patrimoniais.</p>")
+        html_parts.append("<h3>4. Resultado Patrimonial — Crescimento Contábil Relevante</h3>")
+        html_parts.append("<p>O resultado patrimonial registrou acréscimo significativo. Contudo, trata-se de resultado contábil, sem reflexo financeiro imediato, devendo ser interpretado com cautela, pois decorre de variações patrimoniais.</p>")
         
-        html_parts.append("<h3>5. Estrutura de Custos â€” Conformidade e EficiÃªncia</h3>")
-        html_parts.append("<p>O custo de pessoal encontra-se dentro do limite legal de 50% da RCL, com margem significativa, em conformidade com os limites da ResoluÃ§Ã£o Cofen 814/2026.</p>")
+        html_parts.append("<h3>5. Estrutura de Custos — Conformidade e Eficiência</h3>")
+        html_parts.append("<p>O custo de pessoal encontra-se dentro do limite legal de 50% da RCL, com margem significativa, em conformidade com os limites da Resolução Cofen 814/2026.</p>")
         
-        html_parts.append("<h3>6. Integridade das DemonstraÃ§Ãµes</h3>")
-        html_parts.append("<p>Verificou-se a integridade das demonstraÃ§Ãµes contÃ¡beis, que se apresentam adequadas e em conformidade com os princÃ­pios e normas aplicÃ¡veis, conferindo confiabilidade Ã s informaÃ§Ãµes analisadas.</p>")
+        html_parts.append("<h3>6. Integridade das Demonstrações</h3>")
+        html_parts.append("<p>Verificou-se a integridade das demonstrações contábeis, que se apresentam adequadas e em conformidade com os princí­pios e normas aplicáveis, conferindo confiabilidade í s informações analisadas.</p>")
         
-        html_parts.append("<h3>ConsideraÃ§Ãµes Finais</h3>")
-        html_parts.append("<p>O Cofen demonstra excelente saÃºde financeira e patrimonial, com liquidez amplamente favorÃ¡vel, endividamento irrisÃ³rio, geraÃ§Ã£o de caixa positiva e crescimento contÃ¡bil expressivo. A execuÃ§Ã£o orÃ§amentÃ¡ria Ã© estÃ¡vel e o custo com pessoal encontra-se dentro dos limites legais.</p>")
+        html_parts.append("<h3>Considerações Finais</h3>")
+        html_parts.append("<p>O Cofen demonstra excelente saúde financeira e patrimonial, com liquidez amplamente favorável, endividamento irrisório, geração de caixa positiva e crescimento contábil expressivo. A execução orçamentária é estável e o custo com pessoal encontra-se dentro dos limites legais.</p>")
         
-        html_parts.append("<p><strong>ConclusÃ£o:</strong> As demonstraÃ§Ãµes contÃ¡beis refletem equilÃ­brio, solidez e conformidade, nÃ£o havendo indÃ­cios de risco financeiro ou descumprimento de limites legais.</p>")
+        html_parts.append("<p><strong>Conclusão:</strong> As demonstrações contábeis refletem equilí­brio, solidez e conformidade, não havendo indí­cios de risco financeiro ou descumprimento de limites legais.</p>")
         
         html_parts.append("</div>")
         html_parts.append("<div class='assinatura'><div class='linha'></div>")
@@ -7943,7 +7943,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     row = cur.fetchone()
     conn.close()
     if not row:
-        return {"erro": True, "mensagem": "Nenhum relatÃ­Â³rio consolidado encontrado para o perÃ­Â­odo."}
+        return {"erro": True, "mensagem": "Nenhum relatí­³rio consolidado encontrado para o perí­­odo."}
     
     dados_consolidados = json.loads(row[0]).get("dados", {})
     
@@ -7993,28 +7993,28 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     notas = []
     
     # Nota 1 - Contexto
-    notas.append({"titulo": "NOTA 1 â€” CONTEXTO OPERACIONAL E BASE DE PREPARAÃ‡ÃƒO",
-        "texto": "O Conselho Federal de Enfermagem (Cofen) Ã© autarquia federal que integra o Sistema Cofen/Conselhos Regionais. Estas notas acompanham o RelatÃ³rio Consolidado de AnÃ¡lise ContÃ¡bil do 3Âº trimestre de 2026 e compreendem o Balancete de VerificaÃ§Ã£o, o BalanÃ§o Financeiro (BF), o BalanÃ§o OrÃ§amentÃ¡rio (BO), o BalanÃ§o Patrimonial (BP), a DemonstraÃ§Ã£o dos Fluxos de Caixa (DFC), a DemonstraÃ§Ã£o das MutaÃ§Ãµes do PatrimÃ´nio LÃ­quido (DMPL) e a DemonstraÃ§Ã£o das VariaÃ§Ãµes Patrimoniais (DVP).<br><br>As demonstraÃ§Ã­Âµes foram elaboradas conforme a Lei nÂº 4.320/1964, a ResoluÃ§Ã£o Cofen nÂº 340/2008, as Normas Brasileiras de Contabilidade Aplicadas ao Setor PÃ­Âºblico (NBC TSP), o Manual de Contabilidade Aplicada ao Setor PÃ­Âºblico (MCASP) e as ResoluÃ§Ã­Âµes Cofen nÂº 764/2024, nÂº 799/2025 e nÂº 814/2026. Os saldos do perÃ­Â­odo anterior utilizados para comparaÃ§Ã£o correspondem Ã­  posiÃ§Ã£o de setembro de 2025."})
+    notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇíƒO",
+        "texto": "O Conselho Federal de Enfermagem (Cofen) é autarquia federal que integra o Sistema Cofen/Conselhos Regionais. Estas notas acompanham o Relatório Consolidado de Análise Contábil do 3º trimestre de 2026 e compreendem o Balancete de Verificação, o Balanço Financeiro (BF), o Balanço Orçamentário (BO), o Balanço Patrimonial (BP), a Demonstração dos Fluxos de Caixa (DFC), a Demonstração das Mutações do Patrimônio Lí­quido (DMPL) e a Demonstração das Variações Patrimoniais (DVP).<br><br>As demonstraçí­µes foram elaboradas conforme a Lei nº 4.320/1964, a Resolução Cofen nº 340/2008, as Normas Brasileiras de Contabilidade Aplicadas ao Setor Pí­ºblico (NBC TSP), o Manual de Contabilidade Aplicada ao Setor Pí­ºblico (MCASP) e as Resoluçí­µes Cofen nº 764/2024, nº 799/2025 e nº 814/2026. Os saldos do perí­­odo anterior utilizados para comparação correspondem í­  posição de setembro de 2025."})
     
     # Nota 2 - Caixa
     caixa_at = vl("caixa", "atual")
     caixa_an = vl("caixa", "anterior")
     if caixa_at > 0:
-        notas.append({"titulo": "NOTA 2 â€” CAIXA E EQUIVALENTES DE CAIXA",
-            "texto": f"O saldo de caixa e equivalentes em 30/09/2026 Ã© de {fmt(caixa_at)}, reduÃ§Ã£o de {var(caixa_at, caixa_an)} frente aos {fmt(caixa_an)} do perÃ­Â­odo anterior. A variaÃ§Ã£o decorre do fluxo de pagamentos de despesas, com destaque para o grupo de serviÃ§os de pessoa jurÃ­Â­dica. O saldo foi conciliado entre Balancete, BP, BF e DFC.<br><br>A geraÃ§Ã£o lÃ­Â­quida de caixa no perÃ­Â­odo foi positiva em R$ 17.076.790,82 (DFC), contra R$ 14.337.040,60 no perÃ­Â­odo anterior (+19,11%)."})
+        notas.append({"titulo": "NOTA 2 — CAIXA E EQUIVALENTES DE CAIXA",
+            "texto": f"O saldo de caixa e equivalentes em 30/09/2026 é de {fmt(caixa_at)}, redução de {var(caixa_at, caixa_an)} frente aos {fmt(caixa_an)} do perí­­odo anterior. A variação decorre do fluxo de pagamentos de despesas, com destaque para o grupo de serviços de pessoa jurí­­dica. O saldo foi conciliado entre Balancete, BP, BF e DFC.<br><br>A geração lí­­quida de caixa no perí­­odo foi positiva em R$ 17.076.790,82 (DFC), contra R$ 14.337.040,60 no perí­­odo anterior (+19,11%)."})
     
-    # Nota 3 - CrÃ©ditos
+    # Nota 3 - Créditos
     ac_at = vl("ativo_circulante", "atual")
     ac_an = vl("ativo_circulante", "anterior")
     rlp_at = vl("ativo_realizavel", "atual")
     rlp_an = vl("ativo_realizavel", "anterior")
     if ac_at > 0:
-        notas.append({"titulo": "NOTA 3 â€” CRÃ‰DITOS E ATIVO REALIZÃVEL (COTAS-PARTES A RECEBER)",
-            "texto": f"O Ativo Circulante totalizou {fmt(ac_at)} ({var(ac_at, ac_an)}), dos quais R$ 112.729.432,69 correspondem a crÃ©ditos de curto prazo. O Ativo RealizÃ¡vel de longo prazo soma {fmt(rlp_at)}, e o Ativo NÃ£o Circulante, R$ 315.111.651,51 (+149,94%).<br><br>Essas variaÃ§Ã­Âµes decorrem do registro da previsÃ£o de receitas de cotas-partes a receber dos Conselhos Regionais. Em 2025, esse registro foi realizado somente em dezembro; por isso, em 30/09/2025 o saldo comparativo era praticamente nulo (R$ 1.004,19 no realizÃ¡vel)."})
+        notas.append({"titulo": "NOTA 3 — CRí‰DITOS E ATIVO REALIZíVEL (COTAS-PARTES A RECEBER)",
+            "texto": f"O Ativo Circulante totalizou {fmt(ac_at)} ({var(ac_at, ac_an)}), dos quais R$ 112.729.432,69 correspondem a créditos de curto prazo. O Ativo Realizável de longo prazo soma {fmt(rlp_at)}, e o Ativo Não Circulante, R$ 315.111.651,51 (+149,94%).<br><br>Essas variaçí­µes decorrem do registro da previsão de receitas de cotas-partes a receber dos Conselhos Regionais. Em 2025, esse registro foi realizado somente em dezembro; por isso, em 30/09/2025 o saldo comparativo era praticamente nulo (R$ 1.004,19 no realizável)."})
     
     # Nota 4 - Imobilizado
-    notas.append({"titulo": "NOTA 4 â€” IMOBILIZADO, INTANGÃ­VEL E INCORPORAÃ‡ÃƒO DE ATIVOS",
-        "texto": "O Imobilizado Ã© de R$ 129.453.937,95 (+4,44%) e o IntangÃ­Â­vel, de R$ 832.266,06. No perÃ­Â­odo foram incorporados ativos no total de R$ 16.271.957,08, conforme o relatÃ­Â³rio, assim discriminados:<br><br>â€¢ Outras mÃ¡quinas, aparelhos e equipamentos: R$ 65.962,97<br>â€¢ MobiliÃ¡rio em geral: R$ 240.628,83<br>â€¢ EdifÃ­Â­cio Futura Sede Cofen: R$ 6.682.639,01<br>â€¢ Bens nÃ£o ativÃ¡veis: R$ 21.081,55<br>â€¢ PLATEC â€” Cofen, investimentos: R$ 9.261.645,32<br><br><i>ObservaÃ§Ã£o: a soma aritmÃ©tica das parcelas acima resulta em R$ 16.271.957,68, diferenÃ§a de R$ 0,60 em relaÃ§Ã£o ao total informado. A discriminaÃ§Ã£o serÃ¡ revisada antes da divulgaÃ§Ã£o definitiva.</i><br><br>Os estoques somam R$ 185.551,08 (R$ 69.447,74 no perÃ­Â­odo anterior)."})
+    notas.append({"titulo": "NOTA 4 — IMOBILIZADO, INTANGí­VEL E INCORPORAÇíƒO DE ATIVOS",
+        "texto": "O Imobilizado é de R$ 129.453.937,95 (+4,44%) e o Intangí­­vel, de R$ 832.266,06. No perí­­odo foram incorporados ativos no total de R$ 16.271.957,08, conforme o relatí­³rio, assim discriminados:<br><br>”¢ Outras máquinas, aparelhos e equipamentos: R$ 65.962,97<br>”¢ Mobiliário em geral: R$ 240.628,83<br>”¢ Edifí­­cio Futura Sede Cofen: R$ 6.682.639,01<br>”¢ Bens não ativáveis: R$ 21.081,55<br>”¢ PLATEC — Cofen, investimentos: R$ 9.261.645,32<br><br><i>Observação: a soma aritmética das parcelas acima resulta em R$ 16.271.957,68, diferença de R$ 0,60 em relação ao total informado. A discriminação será revisada antes da divulgação definitiva.</i><br><br>Os estoques somam R$ 185.551,08 (R$ 69.447,74 no perí­­odo anterior)."})
     
     # Nota 5 - Passivos
     pc_at = vl("passivo_circulante", "atual")
@@ -8022,60 +8022,60 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     pnc_at = vl("passivo_nao_circulante", "atual")
     pnc_an = vl("passivo_nao_circulante", "anterior")
     if pc_at > 0:
-        notas.append({"titulo": "NOTA 5 â€” PASSIVO CIRCULANTE E NÃ­Æ’O CIRCULANTE",
-            "texto": f"O Passivo Circulante Ã© de {fmt(pc_at)} ({var(pc_at, pc_an)}), estÃ¡vel. O Passivo NÃ£o Circulante Ã© de {fmt(pnc_at)}, reduÃ§Ã£o de {var(pnc_at, pnc_an)} em relaÃ§Ã£o aos {fmt(pnc_an)} anteriores, em razÃ£o da quitaÃ§Ã£o do PCCS ao longo de 2025, que em setembro daquele ano ainda estava provisionado. O passivo total Ã© de R$ 12.238.786,04 (â€”48,28%).<br><br>Os valores restituÃ­Â­veis (ingressos e dispÃ­Âªndios extraorÃ§amentÃ¡rios) compreendem retenÃ§Ã­Âµes de tributos, consignaÃ§Ã­Âµes, cauÃ§Ã­Âµes e garantias."})
+        notas.append({"titulo": "NOTA 5 — PASSIVO CIRCULANTE E Ní­Æ’O CIRCULANTE",
+            "texto": f"O Passivo Circulante é de {fmt(pc_at)} ({var(pc_at, pc_an)}), estável. O Passivo Não Circulante é de {fmt(pnc_at)}, redução de {var(pnc_at, pnc_an)} em relação aos {fmt(pnc_an)} anteriores, em razão da quitação do PCCS ao longo de 2025, que em setembro daquele ano ainda estava provisionado. O passivo total é de R$ 12.238.786,04 (—48,28%).<br><br>Os valores restituí­­veis (ingressos e dispí­ªndios extraorçamentários) compreendem retençí­µes de tributos, consignaçí­µes, cauçí­µes e garantias."})
     
     # Nota 6 - PL
     pl_at = vl("patrimonio_liquido", "atual")
     pl_an = vl("patrimonio_liquido", "anterior")
     if pl_at > 0:
-        notas.append({"titulo": "NOTA 6 â€” PATRIMÃ­â€NIO LÃ­QUIDO",
-            "texto": f"O PatrimÃ­Â´nio LÃ­Â­quido Ã© de {fmt(pl_at)} ({var(pl_at, pl_an)}). Conforme a DMPL, o saldo inicial de R$ 588.096.000,72 foi acrescido do resultado patrimonial do perÃ­Â­odo de R$ 16.272.243,89, sem outras mutaÃ§Ã­Âµes. O crescimento frente ao perÃ­Â­odo anterior reflete principalmente o registro, em dezembro de 2025, das previsÃ­Âµes de receitas de curto e longo prazo de cotas-partes a receber de anos anteriores."})
+        notas.append({"titulo": "NOTA 6 — PATRIMí­”NIO Lí­QUIDO",
+            "texto": f"O Patrimí­´nio Lí­­quido é de {fmt(pl_at)} ({var(pl_at, pl_an)}). Conforme a DMPL, o saldo inicial de R$ 588.096.000,72 foi acrescido do resultado patrimonial do perí­­odo de R$ 16.272.243,89, sem outras mutaçí­µes. O crescimento frente ao perí­­odo anterior reflete principalmente o registro, em dezembro de 2025, das previsí­µes de receitas de curto e longo prazo de cotas-partes a receber de anos anteriores."})
     
-    # Nota 7 - OrÃ§amento Receita
+    # Nota 7 - Orçamento Receita
     rec_at = orc.get("receita_realizada", 0)
     if rec_at > 0:
-        notas.append({"titulo": "NOTA 7 â€” EXECUÃ‡Ã­Æ’O ORÃ‡AMENTÃ­RIA DA RECEITA",
-            "texto": f"A receita orÃ§ada para 2026 Ã© de R$ 232.000.000,00 (+1,01% sobre 2025) e a receita realizada, de {fmt(rec_at)} (+1,73%), equivalente a 79,58% do orÃ§amento.<br><br>O crescimento modesto da receita recomenda conservadorismo na assunÃ§Ã£o de novos gastos. As receitas de capital sÃ£o eventuais; a variaÃ§Ã£o de â€”85,47% decorre de, em 2025, ter havido a baixa de veÃ­Â­culo sinistrado e indenizado pela seguradora (R$ 57.487,00)."})
+        notas.append({"titulo": "NOTA 7 — EXECUÇí­Æ’O ORÇAMENTí­RIA DA RECEITA",
+            "texto": f"A receita orçada para 2026 é de R$ 232.000.000,00 (+1,01% sobre 2025) e a receita realizada, de {fmt(rec_at)} (+1,73%), equivalente a 79,58% do orçamento.<br><br>O crescimento modesto da receita recomenda conservadorismo na assunção de novos gastos. As receitas de capital são eventuais; a variação de —85,47% decorre de, em 2025, ter havido a baixa de veí­­culo sinistrado e indenizado pela seguradora (R$ 57.487,00)."})
     
-    # Nota 8 - OrÃ§amento Despesa
+    # Nota 8 - Orçamento Despesa
     desp_at = orc.get("despesa_empenhada", 0)
     if desp_at > 0:
-        notas.append({"titulo": "NOTA 8 â€” EXECUÃ‡Ã­Æ’O ORÃ‡AMENTÃ­RIA DA DESPESA E RESTOS A PAGAR",
-            "texto": f"A despesa orÃ§ada Ã© de R$ 319.721.745,52 (â€”4,97%) e a despesa empenhada, de {fmt(desp_at)} (+9,80%), com execuÃ§Ã£o de 79,94%. O resultado orÃ§amentÃ¡rio Ã© deficitÃ¡rio em R$ 70.944.403,02, coberto pelo superÃ¡vit financeiro de exercÃ­Â­cios anteriores. Os restos a pagar nÃ£o processados a liquidar somam R$ 17.170.546,09 (â€”9,20%)."})
+        notas.append({"titulo": "NOTA 8 — EXECUÇí­Æ’O ORÇAMENTí­RIA DA DESPESA E RESTOS A PAGAR",
+            "texto": f"A despesa orçada é de R$ 319.721.745,52 (—4,97%) e a despesa empenhada, de {fmt(desp_at)} (+9,80%), com execução de 79,94%. O resultado orçamentário é deficitário em R$ 70.944.403,02, coberto pelo superávit financeiro de exercí­­cios anteriores. Os restos a pagar não processados a liquidar somam R$ 17.170.546,09 (—9,20%)."})
     
     # Nota 9 - DFC
-    notas.append({"titulo": "NOTA 9 â€” FLUXOS DE CAIXA",
-        "texto": "Pelo mÃ©todo direto, o fluxo operacional lÃ­Â­quido foi de R$ 33.340.393,59 (â€”9,38%); o fluxo de investimento foi de â€”R$ 16.263.602,77; e nÃ£o houve fluxo de financiamento. A geraÃ§Ã£o lÃ­Â­quida de caixa foi de R$ 17.076.790,82. A DFC Ã© elaborada pelo regime de caixa, sem considerar empenhos emitidos ou liquidados e nÃ£o pagos."})
+    notas.append({"titulo": "NOTA 9 — FLUXOS DE CAIXA",
+        "texto": "Pelo método direto, o fluxo operacional lí­­quido foi de R$ 33.340.393,59 (—9,38%); o fluxo de investimento foi de —R$ 16.263.602,77; e não houve fluxo de financiamento. A geração lí­­quida de caixa foi de R$ 17.076.790,82. A DFC é elaborada pelo regime de caixa, sem considerar empenhos emitidos ou liquidados e não pagos."})
     
     # Nota 10 - DVP
-    notas.append({"titulo": "NOTA 1 â€” CONTEXTO OPERACIONAL E BASE DE PREPARAÃ‡ÃƒO",
-        "texto": "As VariaÃ§Ã­Âµes Patrimoniais Aumentativas (VPA) somaram R$ 181.312.304,85 (â€”3,81%). As VariaÃ§Ã­Âµes Patrimoniais Diminutivas (VPD) somaram R$ 165.040.060,96 (â€”10,97%), com destaque para Pessoal e Encargos (R$ 45.949.294,00), ServiÃ§os de Terceiros (R$ 65.884.180,07) e TransferÃ­Âªncias Concedidas (R$ 30.067.473,23). O superÃ¡vit patrimonial Ã© de R$ 16.272.243,89, com margem patrimonial de 8,97%."})
+    notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇíƒO",
+        "texto": "As Variaçí­µes Patrimoniais Aumentativas (VPA) somaram R$ 181.312.304,85 (—3,81%). As Variaçí­µes Patrimoniais Diminutivas (VPD) somaram R$ 165.040.060,96 (—10,97%), com destaque para Pessoal e Encargos (R$ 45.949.294,00), Serviços de Terceiros (R$ 65.884.180,07) e Transferí­ªncias Concedidas (R$ 30.067.473,23). O superávit patrimonial é de R$ 16.272.243,89, com margem patrimonial de 8,97%."})
     
     # Nota 11 - Custo
     pct_custo = custo.get("pct_custo_total", 0)
     if pct_custo > 0:
-        notas.append({"titulo": "NOTA 1 â€” CONTEXTO OPERACIONAL E BASE DE PREPARAÃ‡ÃƒO",
-            "texto": f"A apuraÃ§Ã£o em 12 meses, nos termos da ResoluÃ§Ã£o Cofen nÂº 814/2026, resulta em custo de pessoal bruto de R$ 67.338.400,07 sobre Receita Corrente LÃ­Â­quida de R$ 226.242.979,74. O custo equivale a {pct(pct_custo)} da RCL, abaixo do limite de 50% (R$ 113.121.489,87), com margem disponÃ­Â­vel de R$ 45.783.089,80. A entidade estÃ¡ abaixo da faixa de alerta."})
+        notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇíƒO",
+            "texto": f"A apuração em 12 meses, nos termos da Resolução Cofen nº 814/2026, resulta em custo de pessoal bruto de R$ 67.338.400,07 sobre Receita Corrente Lí­­quida de R$ 226.242.979,74. O custo equivale a {pct(pct_custo)} da RCL, abaixo do limite de 50% (R$ 113.121.489,87), com margem disponí­­vel de R$ 45.783.089,80. A entidade está abaixo da faixa de alerta."})
     
-    # Nota 12 - BalanÃ§o Financeiro (NOVO)
+    # Nota 12 - Balanço Financeiro (NOVO)
     if bf:
-        notas.append({"titulo": "NOTA 1 â€” CONTEXTO OPERACIONAL E BASE DE PREPARAÃ‡ÃƒO",
-            "texto": "As receitas orÃ§amentÃ¡rias de R$ 184.635.554,82 e os recebimentos extraorÃ§amentÃ¡rios de R$ 17.241.359,90, somados ao saldo do exercÃ­Â­cio anterior de R$ 169.963.364,97, totalizam ingressos de R$ 371.840.279,69, igual ao total de dispÃ­Âªndios. As despesas orÃ§amentÃ¡rias pagas foram de R$ 151.902.488,03 (correntes: R$ 135.637.750,95; capital: R$ 16.264.737,08) e os pagamentos extraorÃ§amentÃ¡rios, de R$ 33.052.038,03. Os recebimentos extraorÃ§amentÃ¡rios caÃ­Â­ram 13,62% e os pagamentos aumentaram 5,45%."})
+        notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇíƒO",
+            "texto": "As receitas orçamentárias de R$ 184.635.554,82 e os recebimentos extraorçamentários de R$ 17.241.359,90, somados ao saldo do exercí­­cio anterior de R$ 169.963.364,97, totalizam ingressos de R$ 371.840.279,69, igual ao total de dispí­ªndios. As despesas orçamentárias pagas foram de R$ 151.902.488,03 (correntes: R$ 135.637.750,95; capital: R$ 16.264.737,08) e os pagamentos extraorçamentários, de R$ 33.052.038,03. Os recebimentos extraorçamentários caí­­ram 13,62% e os pagamentos aumentaram 5,45%."})
     
     # Nota 13 - Centro de Custos (NOVO)
     if centro:
-        notas.append({"titulo": "NOTA 1 â€” CONTEXTO OPERACIONAL E BASE DE PREPARAÃ‡ÃƒO",
-            "texto": "O custo total apropriado aos centros de custo foi de R$ 167.542.179,02 (+0,41%). O maior Ã© AF 05 â€” CoordenaÃ§Ã£o/OrientaÃ§Ã£o, com R$ 57.933.243,18 (+28,35%), seguido de AF 06 â€” Despesas Administrativas (R$ 37.055.602,36) e AF 02 â€” InscriÃ§Ã£o, Registro e Cadastro (R$ 24.264.700,14). Os demais centros apresentaram reduÃ§Ã£o entre 5,21% e 15,50%. O crescimento de AF 05 deve ser monitorado quanto Ã­  eficiÃ­Âªncia alocativa."})
+        notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇíƒO",
+            "texto": "O custo total apropriado aos centros de custo foi de R$ 167.542.179,02 (+0,41%). O maior é AF 05 — Coordenação/Orientação, com R$ 57.933.243,18 (+28,35%), seguido de AF 06 — Despesas Administrativas (R$ 37.055.602,36) e AF 02 — Inscrição, Registro e Cadastro (R$ 24.264.700,14). Os demais centros apresentaram redução entre 5,21% e 15,50%. O crescimento de AF 05 deve ser monitorado quanto í­  eficií­ªncia alocativa."})
     
-    # Nota 14 - Ã­ndices de Liquidez (NOVO)
+    # Nota 14 - í­ndices de Liquidez (NOVO)
     if liq:
-        notas.append({"titulo": "NOTA 1 â€” CONTEXTO OPERACIONAL E BASE DE PREPARAÃ‡ÃƒO",
-            "texto": "Os Ã­Â­ndices de liquidez geral e corrente foram influenciados pelo registro das cotas-partes a receber (Nota 3). Os de liquidez estÃ£o calculados sobre o passivo circulante de R$ 11.725.635,04.<br><br><table style='width:100%; border-collapse:collapse; margin-top:10px; font-size:11px;'><tr style='background:#003366; color:#fff;'><th style='padding:5px; border:1px solid #ccc;'>Indicador</th><th style='padding:5px; border:1px solid #ccc;'>Atual</th><th style='padding:5px; border:1px solid #ccc;'>Anterior</th></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Imediata</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>15,93</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,28</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Corrente</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>25,71</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,47</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Seca</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>25,70</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,46</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Geral</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>39,74</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>9,06</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Endividamento Geral</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>1,98%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>6,95%</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Part. Capital de Terceiros</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>2,03%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>7,47%</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>ImobilizaÃ§Ã£o do PL</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>21,42%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>39,13%</td></tr></table>"})
+        notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇíƒO",
+            "texto": "Os í­­ndices de liquidez geral e corrente foram influenciados pelo registro das cotas-partes a receber (Nota 3). Os de liquidez estão calculados sobre o passivo circulante de R$ 11.725.635,04.<br><br><table style='width:100%; border-collapse:collapse; margin-top:10px; font-size:11px;'><tr style='background:#003366; color:#fff;'><th style='padding:5px; border:1px solid #ccc;'>Indicador</th><th style='padding:5px; border:1px solid #ccc;'>Atual</th><th style='padding:5px; border:1px solid #ccc;'>Anterior</th></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Imediata</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>15,93</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,28</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Corrente</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>25,71</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,47</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Seca</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>25,70</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>18,46</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Liquidez Geral</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>39,74</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>9,06</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Endividamento Geral</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>1,98%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>6,95%</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Part. Capital de Terceiros</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>2,03%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>7,47%</td></tr><tr><td style='padding:5px; border:1px solid #ccc;'>Imobilização do PL</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>21,42%</td><td style='padding:5px; border:1px solid #ccc; text-align:right;'>39,13%</td></tr></table>"})
     
     # Nota 15 - Integridade (NOVO)
-    notas.append({"titulo": "NOTA 1 â€” CONTEXTO OPERACIONAL E BASE DE PREPARAÃ‡ÃƒO",
-        "texto": "A matriz de integridade cruzou Balancete, BP, BF, BO, DFC, DVP e DMPL. A conformidade foi confirmada para os grupos patrimoniais, VPA, VPD, receitas correntes, caixa e equivalentes, despesas correntes e de capital pagas e incorporaÃ§Ã£o de ativos.<br><br>Quatro itens apresentaram divergÃ­Âªncia, decorrentes de estornos de restos a pagar que o sistema contÃ¡bil (Implanta) nÃ£o tratou adequadamente; o chamado correspondente foi aberto junto ao fornecedor:<br><br>â€¢ Valores restituÃ­Â­veis â€” dispÃ­Âªndios: R$ 222.353,33<br>â€¢ RP nÃ£o processados â€” a liquidar: R$ 134.400,00<br>â€¢ RP nÃ£o proc. â€” despesas correntes canceladas: R$ 58.302,51<br>â€¢ RP nÃ£o processados pagos: R$ 7.220,00<br><br>As diferenÃ§as referem-se ao tratamento de estornos de restos a pagar e nÃ£o afetam o resultado patrimonial nem o saldo de caixa. Ficam pendentes de regularizaÃ§Ã£o e serÃ£o reavaliadas apÃ­Â³s resposta do chamado."})
+    notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇíƒO",
+        "texto": "A matriz de integridade cruzou Balancete, BP, BF, BO, DFC, DVP e DMPL. A conformidade foi confirmada para os grupos patrimoniais, VPA, VPD, receitas correntes, caixa e equivalentes, despesas correntes e de capital pagas e incorporação de ativos.<br><br>Quatro itens apresentaram divergí­ªncia, decorrentes de estornos de restos a pagar que o sistema contábil (Implanta) não tratou adequadamente; o chamado correspondente foi aberto junto ao fornecedor:<br><br>”¢ Valores restituí­­veis — dispí­ªndios: R$ 222.353,33<br>”¢ RP não processados — a liquidar: R$ 134.400,00<br>”¢ RP não proc. — despesas correntes canceladas: R$ 58.302,51<br>”¢ RP não processados pagos: R$ 7.220,00<br><br>As diferenças referem-se ao tratamento de estornos de restos a pagar e não afetam o resultado patrimonial nem o saldo de caixa. Ficam pendentes de regularização e serão reavaliadas apí­³s resposta do chamado."})
     
     return {"erro": False, "periodo": periodo, "notas": notas}
 
@@ -8083,7 +8083,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
 async def api_notas_explicativas(periodo: str):
     return _gerar_notas_por_periodo(periodo)
 
-# --- API: salvar histÃ­Â³rico ---
+# --- API: salvar histí­³rico ---
 @app.post("/salvar_notas_explicativas/{periodo}")
 async def salvar_notas_explicativas(periodo: str):
     import sqlite3, json, os
@@ -8101,7 +8101,7 @@ async def salvar_notas_explicativas(periodo: str):
     conn.close()
     return {"ok": True, "mensagem": "Notas explicativas salvas com sucesso!"}
 
-# --- API: listar histÃ­Â³rico ---
+# --- API: listar histí­³rico ---
 @app.get("/historico_notas_explicativas")
 async def historico_notas_explicativas():
     import sqlite3, os
@@ -8113,7 +8113,7 @@ async def historico_notas_explicativas():
     conn.close()
     return [{"id": r[0], "periodo": r[1], "data_geracao": r[2], "dados": r[3] if len(r) > 3 else "{}"} for r in rows]
 
-# --- API: buscar histÃ­Â³rico por id ---
+# --- API: buscar histí­³rico por id ---
 @app.get("/historico_notas_explicativas/{id}")
 async def buscar_notas_explicativas(id: int):
     import sqlite3, json, os
@@ -8124,10 +8124,10 @@ async def buscar_notas_explicativas(id: int):
     row = cur.fetchone()
     conn.close()
     if not row:
-        return {"erro": "nÃ£o encontrado"}
+        return {"erro": "não encontrado"}
     return {"periodo": row[0], "data_geracao": row[1], "dados": json.loads(row[2])}
 
-# --- API: excluir histÃ­Â³rico ---
+# --- API: excluir histí­³rico ---
 @app.delete("/excluir_notas_explicativas/{id}")
 async def excluir_notas_explicativas(id: int):
     import sqlite3, os
@@ -8141,7 +8141,7 @@ async def excluir_notas_explicativas(id: int):
     conn.close()
     return {"ok": True}
 
-# --- ObservaÃ§Ã­Âµes por item ---
+# --- Observaçí­µes por item ---
 @app.get("/api/observacoes_notas/{relatorio_id}")
 async def get_observacoes_notas(relatorio_id: int):
     import sqlite3, os
@@ -8178,7 +8178,7 @@ async def del_observacao_notas(obs_id: int):
     conn.close()
     return {"ok": True}
 
-# --- ConclusÃ£o ---
+# --- Conclusão ---
 @app.get("/api/conclusao_notas/{relatorio_id}")
 async def get_conclusao_notas(relatorio_id: int):
     import sqlite3, os
@@ -8408,7 +8408,7 @@ def gerar_pdf_notas_mcasp(periodo: str = "2026-TRIMESTRE-3"):
         if texto:
             html_itens += '<p style="text-align: justify; line-height: 1.6; font-size: 11px; margin-bottom: 15px;">' + str(texto) + '</p>'
         else:
-            html_itens += '<p style="text-align: justify; line-height: 1.6; font-size: 11px; margin-bottom: 15px; color: #999;"><i>(Sem informaÃ§Ã£o preenchida)</i></p>'
+            html_itens += '<p style="text-align: justify; line-height: 1.6; font-size: 11px; margin-bottom: 15px; color: #999;"><i>(Sem informação preenchida)</i></p>'
     
     data_geracao = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
@@ -8423,8 +8423,8 @@ def gerar_pdf_notas_mcasp(periodo: str = "2026-TRIMESTRE-3"):
     html_pdf += '.footer { margin-top: 30px; text-align: center; font-size: 10px; color: #999; }'
     html_pdf += '</style></head><body>'
     html_pdf += '<div class="capa">'
-    html_pdf += '<h1>NOTAS EXPLICATIVAS - PADRÃƒO MCASP</h1>'
-    html_pdf += '<p>PerÃ­odo: ' + periodo + '</p>'
+    html_pdf += '<h1>NOTAS EXPLICATIVAS - PADRíƒO MCASP</h1>'
+    html_pdf += '<p>Perí­odo: ' + periodo + '</p>'
     html_pdf += '<p>Conselho Federal de Enfermagem (COFEN)</p>'
     html_pdf += '<p>Gerado em: ' + data_geracao + '</p>'
     html_pdf += '</div>'
@@ -8433,9 +8433,9 @@ def gerar_pdf_notas_mcasp(periodo: str = "2026-TRIMESTRE-3"):
     html_pdf += '<p style="font-weight: bold; color: #003366;">' + nome_contador + '</p>'
     html_pdf += '<p>CRC: ' + crc_formatado + '</p>'
     html_pdf += '<p>CPF: ' + cpf_formatado + '</p>'
-    html_pdf += '<p style="margin-top: 20px; font-size: 10px; color: #666;">DeclaraÃ§Ã£o de conformidade com as normas NBC TSP e MCASP</p>'
+    html_pdf += '<p style="margin-top: 20px; font-size: 10px; color: #666;">Declaração de conformidade com as normas NBC TSP e MCASP</p>'
     html_pdf += '</div>'
-    html_pdf += '<div class="footer"><p>Documento gerado pelo Sistema de PrestaÃ§Ã£o de Contas - PC Sistema</p></div>'
+    html_pdf += '<div class="footer"><p>Documento gerado pelo Sistema de Prestação de Contas - PC Sistema</p></div>'
     html_pdf += '</body></html>'
 
     with sync_playwright() as p:
@@ -8502,8 +8502,8 @@ def gerar_pdf_notas(id: int):
 
     html_declaracao = (
         '<div style="margin-top: 40px; background: #fff; padding: 30px; border-radius: 8px; border-left: 5px solid #003366; page-break-before: always;">'
-        '<h3 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; font-size: 15px; text-transform: uppercase;">DeclaraÃ§Ã£o de Conformidade</h3>'
-        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;">Declaramos, na qualidade de responsÃ¡veis pela gestÃ£o e pela elaboraÃ§Ã£o das demonstraÃ§Ã­Âµes contÃ¡beis consolidadas do Conselho Federal de Enfermagem (COFEN), referentes ao perÃ­Â­odo de ' + periodo + ', que:</p>'
+        '<h3 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; font-size: 15px; text-transform: uppercase;">Declaração de Conformidade</h3>'
+        '<p style="text-align: justify; line-height: 1.6; font-size: 13px; margin-bottom: 12px;">Declaramos, na qualidade de responsáveis pela gestão e pela elaboração das demonstraçí­µes contábeis consolidadas do Conselho Federal de Enfermagem (COFEN), referentes ao perí­­odo de ' + periodo + ', que:</p>'
         + html_itens_declaracao
         + '<div style="margin-top: 50px; text-align: center;">'
         '<p style="margin: 0; font-size: 14px; font-weight: bold; color: #003366;">' + nome_contador + '</p>'
@@ -8545,13 +8545,13 @@ async def editar_nota(relatorio_id: int, indice: int, request: Request):
     row = cur.fetchone()
     if not row:
         conn.close()
-        return {"ok": False, "mensagem": "HistÃ­Â³rico nÃ£o encontrado."}
+        return {"ok": False, "mensagem": "Histí­³rico não encontrado."}
     
     dados_notas = json.loads(row[0])
     notas = dados_notas.get("notas", [])
     if indice < 0 or indice >= len(notas):
         conn.close()
-        return {"ok": False, "mensagem": "Ã­ndice invÃ¡lido."}
+        return {"ok": False, "mensagem": "í­ndice inválido."}
     
     notas[indice]["texto"] = novo_texto
     dados_notas["notas"] = notas
@@ -8576,7 +8576,7 @@ async def incluir_nota(relatorio_id: int, request: Request):
     row = cur.fetchone()
     if not row:
         conn.close()
-        return {"ok": False, "mensagem": "HistÃ­Â³rico nÃ£o encontrado."}
+        return {"ok": False, "mensagem": "Histí­³rico não encontrado."}
     
     dados_notas = json.loads(row[0])
     notas = dados_notas.get("notas", [])
@@ -8600,13 +8600,13 @@ async def excluir_nota(relatorio_id: int, indice: int):
     row = cur.fetchone()
     if not row:
         conn.close()
-        return {"ok": False, "mensagem": "HistÃ­Â³rico nÃ£o encontrado."}
+        return {"ok": False, "mensagem": "Histí­³rico não encontrado."}
     
     dados_notas = json.loads(row[0])
     notas = dados_notas.get("notas", [])
     if indice < 0 or indice >= len(notas):
         conn.close()
-        return {"ok": False, "mensagem": "Ã­ndice invÃ¡lido."}
+        return {"ok": False, "mensagem": "í­ndice inválido."}
     
     notas.pop(indice)
     dados_notas["notas"] = notas
@@ -8648,7 +8648,7 @@ async def api_analise_dmpl(periodo: str):
             leitor = csv.reader(f, delimiter=';')
             for linha in leitor:
                 if not linha: continue
-                if "COFEN" in linha[0].upper() or "CNPJ" in linha[0].upper() or "PerÃ­odo" in linha[0]:
+                if "COFEN" in linha[0].upper() or "CNPJ" in linha[0].upper() or "Perí­odo" in linha[0]:
                     continue
                 dados.append(linha)
         return {"dados": dados}
@@ -8675,7 +8675,7 @@ async def salvar_analise_dmpl(periodo: str):
             leitor = csv.reader(f, delimiter=';')
             for linha in leitor:
                 if not linha: continue
-                if "COFEN" in linha[0].upper() or "CNPJ" in linha[0].upper() or "PerÃ­odo" in linha[0]:
+                if "COFEN" in linha[0].upper() or "CNPJ" in linha[0].upper() or "Perí­odo" in linha[0]:
                     continue
                 dados.append(linha)
         
@@ -8729,7 +8729,7 @@ def get_historico_analise_dmpl_id(id: int):
     conn.close()
     
     if not row:
-        return Response(content=json.dumps({"erro": "Registro nÃ£o encontrado"}), media_type="application/json", status_code=404)
+        return Response(content=json.dumps({"erro": "Registro não encontrado"}), media_type="application/json", status_code=404)
         
     resultado = {
         "id": row[0],
@@ -8795,7 +8795,7 @@ async def gerar_pdf_analise_dmpl(id: int):
             nome = (linha[0] or "").strip()
             valor_str = (linha[8] or "").strip()
             
-            if not nome or nome in ("COFEN/BR", "Conselho Federal de Enfermagem") or nome.startswith("CNPJ:") or nome.startswith("Demonstra") or nome.startswith("BrasÃ­lia"):
+            if not nome or nome in ("COFEN/BR", "Conselho Federal de Enfermagem") or nome.startswith("CNPJ:") or nome.startswith("Demonstra") or nome.startswith("Brasí­lia"):
                 continue
                 
             valor_limpo = valor_str.replace('.', '').replace(',', '.')
@@ -8808,7 +8808,7 @@ async def gerar_pdf_analise_dmpl(id: int):
         # 2. Gera o grafico com matplotlib
         plt.figure(figsize=(10, 4))
         barras = plt.bar(labels_grafico, valores_grafico, color='#003366')
-        plt.title('EvoluÃ§Ã£o das Principais Contas (R$)')
+        plt.title('Evolução das Principais Contas (R$)')
         plt.xticks(rotation=45, ha='right')
         plt.tight_layout()
         
@@ -8839,7 +8839,7 @@ async def gerar_pdf_analise_dmpl(id: int):
             nome = (linha[0] or "").strip()
             valor = (linha[8] or "").strip()
             
-            if not nome or nome in ("COFEN/BR", "Conselho Federal de Enfermagem") or nome.startswith("CNPJ:") or nome.startswith("Demonstra") or nome.startswith("BrasÃ­lia"):
+            if not nome or nome in ("COFEN/BR", "Conselho Federal de Enfermagem") or nome.startswith("CNPJ:") or nome.startswith("Demonstra") or nome.startswith("Brasí­lia"):
                 continue
             
             if len(nome) > 60: nome = nome[:57] + "..."
@@ -8869,7 +8869,7 @@ async def api_relatorio_consolidado_novo(periodo: str):
     
     from .config import PG_CONFIG
     
-    # Mapeamento dos mÃ³dulos para as tabelas do PostgreSQL
+    # Mapeamento dos módulos para as tabelas do PostgreSQL
     modulos = {
         "analise_bp": "historico_analise_bp",
         "analise_dfc": "historico_analise_dfc",
@@ -8888,20 +8888,20 @@ async def api_relatorio_consolidado_novo(periodo: str):
     }
 
     nomes_amigaveis = {
-        "analise_bp": "AnÃ¡lise BP",
-        "analise_dfc": "AnÃ¡lise DFC",
-        "analise_patrimonial": "AnÃ¡lise Patrimonial (DVP)",
-        "analise_orcamentaria": "AnÃ¡lise OrÃ§amentÃ¡ria (BO)",
-        "analise_financeira_bf": "AnÃ¡lise Financeira (BF)",
+        "analise_bp": "Análise BP",
+        "analise_dfc": "Análise DFC",
+        "analise_patrimonial": "Análise Patrimonial (DVP)",
+        "analise_orcamentaria": "Análise Orçamentária (BO)",
+        "analise_financeira_bf": "Análise Financeira (BF)",
         "comparativo_receitas": "Comparativo de Receitas",
         "comparativo_despesas": "Comparativo de Despesas",
         "panorama": "Panorama de Resultados",
-        "liquidez": "Ãndices de Liquidez",
-        "integridade": "Integridade entre DemonstraÃ§Ãµes",
-        "conferencia": "ConferÃªncia das DemonstraÃ§Ãµes",
+        "liquidez": "índices de Liquidez",
+        "integridade": "Integridade entre Demonstrações",
+        "conferencia": "Conferência das Demonstrações",
         "custo_pessoal": "Custo de Pessoal",
-        "centro_custos": "AnÃ¡lise por Centro de Custos",
-        "dmpl": "DemonstraÃ§Ã£o das MutaÃ§Ãµes do PL (DMPL)"
+        "centro_custos": "Análise por Centro de Custos",
+        "dmpl": "Demonstração das Mutações do PL (DMPL)"
     }
 
     encontrados = []
@@ -8913,11 +8913,11 @@ async def api_relatorio_consolidado_novo(periodo: str):
 
         for chave, tabela in modulos.items():
             try:
-                # Verifica se a tabela existe e tem dados para o perÃ­odo
+                # Verifica se a tabela existe e tem dados para o perí­odo
                 if chave == "analise_financeira_bf":
                     cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo LIKE %s LIMIT 1", (f"%{periodo}%",))
                 elif chave == "dmpl":
-                    # O DMPL pode ter o perÃ­odo em formato ligeiramente diferente, tenta LIKE
+                    # O DMPL pode ter o perí­odo em formato ligeiramente diferente, tenta LIKE
                     cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo LIKE %s LIMIT 1", (f"%{periodo}%",))
                 else:
                     cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo = %s LIMIT 1", (periodo,))
@@ -8926,7 +8926,7 @@ async def api_relatorio_consolidado_novo(periodo: str):
                 if row:
                     encontrados.append({
                         "nome": nomes_amigaveis.get(chave, chave),
-                        "data_geracao": row[1] if len(row) > 1 else "DisponÃ­vel",
+                        "data_geracao": row[1] if len(row) > 1 else "Disponí­vel",
                         "id": row[0]
                     })
                 else:
@@ -8934,7 +8934,7 @@ async def api_relatorio_consolidado_novo(periodo: str):
                         "nome": nomes_amigaveis.get(chave, chave)
                     })
             except Exception as e:
-                # Se a tabela nÃ£o existir ou der erro, adiciona aos faltantes
+                # Se a tabela não existir ou der erro, adiciona aos faltantes
                 faltando.append({"nome": nomes_amigaveis.get(chave, chave)})
 
         cursor.close()
@@ -8953,7 +8953,7 @@ async def api_relatorio_consolidado_novo(periodo: str):
     except Exception as e:
         return {
             "status": "erro",
-            "mensagem": f"Erro de conexÃ£o com o PostgreSQL: {str(e)}"
+            "mensagem": f"Erro de conexão com o PostgreSQL: {str(e)}"
         }
 
 
