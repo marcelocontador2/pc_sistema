@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -59,8 +59,8 @@
         </div>
 
         <div class="main-content">
-            <div style="color: #0056b3; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">Análise Patrimonial</div>
-            <h2>Balanço Patrimonial — Estrutura e Evolução</h2>
+            <div style="color: #0056b3; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">AnÃ¡lise Patrimonial</div>
+            <h2>BalanÃ§o Patrimonial â€” Estrutura e EvoluÃ§Ã£o</h2>
 
             <div class="grid-bp">
                 <div>
@@ -68,8 +68,8 @@
                         <thead>
                             <tr>
                                 <th>Conta</th>
-                                <th>Período Atual (R$)</th>
-                                <th>Período Anterior (R$)</th>
+                                <th>PerÃ­odo Atual (R$)</th>
+                                <th>PerÃ­odo Anterior (R$)</th>
                                 <th>Var. (%)</th>
                             </tr>
                         </thead>
@@ -79,7 +79,7 @@
                     </table>
                 </div>
                 <div class="grafico-container">
-                    <h3>Evolução das Principais Contas (R$)</h3>
+                    <h3>EvoluÃ§Ã£o das Principais Contas (R$)</h3>
                     <canvas id="grafico-bp" style="max-height: 350px;"></canvas>
                 </div>
             </div>
@@ -144,15 +144,15 @@
             let html = '';
             html += linha('Ativo Circulante', d.ativo_circulante.atual, d.ativo_circulante.anterior);
             html += linha('Caixa e Equivalentes', d.caixa.atual, d.caixa.anterior);
-            html += linha('Créditos a Curto Prazo', d.creditos.atual, d.creditos.anterior);
-            html += linha('Ativo Não Circulante', d.ativo_nao_circulante.atual, d.ativo_nao_circulante.anterior);
-            html += linha('Ativo Realizável a Longo Prazo', d.ativo_realizavel.atual, d.ativo_realizavel.anterior);
+            html += linha('CrÃ©ditos a Curto Prazo', d.creditos.atual, d.creditos.anterior);
+            html += linha('Ativo NÃ£o Circulante', d.ativo_nao_circulante.atual, d.ativo_nao_circulante.anterior);
+            html += linha('Ativo RealizÃ¡vel a Longo Prazo', d.ativo_realizavel.atual, d.ativo_realizavel.anterior);
             html += linha('Imobilizado', d.imobilizado.atual, d.imobilizado.anterior);
             html += linha('TOTAL DO ATIVO', d.total_ativo.atual, d.total_ativo.anterior);
             html += linha('Passivo Circulante', d.passivo_circulante.atual, d.passivo_circulante.anterior);
-            html += linha('Passivo Não Circulante', d.passivo_nao_circulante.atual, d.passivo_nao_circulante.anterior);
+            html += linha('Passivo NÃ£o Circulante', d.passivo_nao_circulante.atual, d.passivo_nao_circulante.anterior);
             html += linha('Passivo Total', d.passivo_total.atual, d.passivo_total.anterior);
-            html += linha('Patrimônio Líquido', d.patrimonio_liquido.atual, d.patrimonio_liquido.anterior);
+            html += linha('PatrimÃ´nio LÃ­quido', d.patrimonio_liquido.atual, d.patrimonio_liquido.anterior);
             html += linha('TOTAL DO PASSIVO', d.total_passivo.atual, d.total_passivo.anterior);
             tb.innerHTML = html;
 
@@ -161,7 +161,7 @@
             const pl_var = pct(d.patrimonio_liquido.atual, d.patrimonio_liquido.anterior);
             const imob_var = pct(d.imobilizado.atual, d.imobilizado.anterior);
             document.getElementById('rodape-destaques').innerHTML =
-                `<strong>Destaques:</strong> Evolução do PL de ${pl_var}; variação do Imobilizado de ${imob_var}.`;
+                `<strong>Destaques:</strong> EvoluÃ§Ã£o do PL de ${pl_var}; variaÃ§Ã£o do Imobilizado de ${imob_var}.`;
         }
 
         function atualizarGrafico(d) {
@@ -170,7 +170,7 @@
             chart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Ativo Circulante', 'Ativo Não Circulante', 'Passivo Circulante', 'Patrimônio Líquido'],
+                    labels: ['Ativo Circulante', 'Ativo NÃ£o Circulante', 'Passivo Circulante', 'PatrimÃ´nio LÃ­quido'],
                     datasets: [
                         {
                             label: 'Atual',
@@ -205,7 +205,7 @@
             const periodo = btn.getAttribute('data-periodo');
             btn.innerText = "Salvando...";
             btn.disabled = true;
-            fetch('/salvar_analise_bp/' + periodo, { method: 'POST' })
+            fetch('/api/analise_bp/salvar/' + periodo, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
                     if (data.ok) { alert("Analise BP salva!"); carregarHistorico(); }
@@ -215,11 +215,16 @@
         }
 
         function carregarHistorico() {
-            fetch('/historico_analise_bp')
+            fetch('/api/analise_bp/historico')
                 .then(r => r.json())
                 .then(data => {
                     const lista = document.getElementById('historico-lista');
-                    if (!data || data.length === 0) { lista.innerHTML = 'Nenhum historico.'; return; }
+                    if (!Array.isArray(data)) {
+                        const msg = (data && data.mensagem) ? data.mensagem : 'resposta invalida';
+                        lista.innerHTML = 'Nenhum historico. (' + msg + ')';
+                        return;
+                    }
+                    if (data.length === 0) { lista.innerHTML = 'Nenhum historico.'; return; }
                     let html = '';
                     data.forEach(item => {
                         html += `<div class="hist-item">
@@ -228,9 +233,13 @@
                         </div>`;
                     });
                     lista.innerHTML = html;
+                })
+                .catch(e => {
+                    const lista = document.getElementById('historico-lista');
+                    if (lista) lista.innerHTML = 'Erro ao carregar historico.';
+                    console.error('carregarHistorico:', e);
                 });
         }
-
         async function carregarHistoricoSelecionado(elemento) {
             const checkbox = elemento.querySelector('.check-hist');
             
@@ -241,7 +250,7 @@
             const id = checkbox.value;
             
             try {
-                const r = await fetch('/historico_analise_bp/' + id);
+                const r = await fetch('/api/analise_bp/historico/' + id);
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 const dados = await r.json();
                 
@@ -265,7 +274,7 @@
 
         async function exibirHistorico(id) {
             try {
-                const r = await fetch('/historico_analise_bp/' + id);
+                const r = await fetch('/api/analise_bp/historico/' + id);
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 const dados = await r.json();
                 const d = dados.dados?.dados || dados.dados || dados;
@@ -287,7 +296,7 @@
             if (selecionados.length === 0) { alert("Selecione um item no historico."); return; }
             if (!confirm("Tem certeza que deseja excluir " + selecionados.length + " item(ns)?")) return;
             const promessas = Array.from(selecionados).map(sel =>
-                fetch('/excluir_analise_bp/' + sel.value, { method: 'DELETE' }).then(r => r.json())
+                fetch('/api/analise_bp/excluir/' + sel.value, { method: 'DELETE' }).then(r => r.json())
             );
             Promise.all(promessas).then(() => { alert("Excluido(s) com sucesso!"); carregarHistorico(); });
         }
@@ -297,7 +306,7 @@
             if (!sel) { alert("Selecione um item no historico."); return; }
             
             try {
-                const r = await fetch('/historico_analise_bp/' + sel.value);
+                const r = await fetch('/api/analise_bp/historico/' + sel.value);
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 const dados = await r.json();
                 const d = dados.dados?.dados || dados.dados || dados;
@@ -310,7 +319,7 @@
         function gerarPDF() {
         var sel = document.querySelector(".check-hist:checked");
         if (!sel) { alert("Selecione um item no historico."); return; }
-        window.open('/gerar_pdf_analise_bp/' + sel.value, '_blank');
+        window.open('/api/analise_bp/gerar_pdf/' + sel.value, '_blank');
     }
         function gerarWord() {
             alert("Geracao de Word sera implementada na proxima etapa.");
@@ -331,12 +340,12 @@ document.addEventListener("DOMContentLoaded", function() {
         tables.forEach(table => {
             const tbody = table.querySelector('tbody');
             if (tbody && tbody.rows.length > 0) {
-                if (tbody.innerHTML.includes('301.495.379,14') && !tbody.innerHTML.includes('Superávit Financeiro')) {
+                if (tbody.innerHTML.includes('301.495.379,14') && !tbody.innerHTML.includes('SuperÃ¡vit Financeiro')) {
                     
                     const trModelo = tbody.rows[tbody.rows.length - 1];
                     const novaTr = trModelo.cloneNode(true);
                     
-                    novaTr.cells[0].innerText = 'Superávit Financeiro';
+                    novaTr.cells[0].innerText = 'SuperÃ¡vit Financeiro';
                     novaTr.cells[1].innerText = '63.825.301,60';
                     novaTr.cells[2].innerText = '114.355.899,33';
                     novaTr.cells[3].innerText = '-44,18%';
@@ -361,3 +370,4 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
 </html>
+

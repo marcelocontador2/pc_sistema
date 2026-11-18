@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pc_backend.app.routers import dfc
 from pc_backend.app.routers import dvp
 from pc_backend.app.routers import dmpl
+from pc_backend.app.routers import bp
 from fastapi import Response, Request, Request, FastAPI, Request, Form
 from fastapi import FastAPI, UploadFile, File
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
@@ -989,6 +990,7 @@ async def ler_relatorio_csv(tipo: str):
 app.include_router(dfc.router)
 app.include_router(dvp.router)
 app.include_router(dmpl.router)
+app.include_router(bp.router)
 # =======================================================
 # ROTINAS DE LIQUIDEZ (CALCULO, SALVAR, HISTORICO, PDF)
 # =======================================================
@@ -9008,3 +9010,5 @@ async def serve_analise_dvp():
 # ============================================================
 from fastapi.staticfiles import StaticFiles
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend")), name="static")
+
+
