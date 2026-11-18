@@ -1,165 +1,194 @@
+# ============================================================
 # Python
+# ============================================================
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
 pc_venv/
-# Banco de dados e dados sensiveis
-pc_storage/banco_dados.db
-pc_storage/uploads_raw/*.csv
-# Backups
-*.bak_*
+env/
+
+# ============================================================
+# Backups (qualquer extensao ou padrao)
+# ============================================================
 *.bak
-# Arquivo corrompido
-pc_backend/\342\210\222
-# Scripts temporarios de correcao (rodados uma vez, ja cumpriram seu papel)
-pc_backend/aplicar_*.py
-aplicar_front_liquidez*.py
-adicionar_*.py
-ajustar_*.py
-atualizar_*.py
+*.bak_*
+*.backup
+*.backup_*
+*_backup_*
+*.ANTES_*
+*.antigo
+*.old
+*.orig
+_backup_*.py
+_backups_*/
+pc_backend.bak_*/
+quarentena_*/
+template_original_*/
+_arquivo_*/
+_backups_arquivo/
+_backups_zip/
+
+# ============================================================
+# Banco de dados / dumps / zips de backup
+# ============================================================
+*.db
+*.db.bak_*
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+backup_*.zip
+backup_*.tar.gz
+_backup_*.zip
+_backups_zip/
+
+# ============================================================
+# PDFs, imagens de teste, screenshots
+# ============================================================
+PDF_*.pdf
+PDF_*.png
+relatorio_consolidado_*.pdf
+teste_*.pdf
+teste_*.png
+teste_auditoria.pdf
+teste_pdf_*.pdf
+audit_*.png
+debug_*.png
+*.screenshot.png
+
+# ============================================================
+# Scripts auxiliares soltos na raiz e subpastas
+# ============================================================
+_ver_*.py
+_verificar_*.py
+_fix_*.py
+_teste_fumaca.py
+_test_*.py
+testar_*.py
+teste_*.py
+ver_*.py
+fix_*.py
+restaurar_*.py
+recriar_*.py
 corrigir_*.py
 criar_*.py
-injetar_*.py
+conectar_*.py
+adicionar_*.py
+ajustar_*.py
+aplicar_*.py
+comentar_*.py
+descomentar_*.py
 remover_*.py
 substituir_*.py
-restaurar_*.py
-reverter_*.py
-limpar_*.py
-auditar_*.py
-verificar_*.py
-trecho_*.txt
-auditoria_*.txt
-# Arquivos compactados de backup
-*.zip
-# Arquivo corrompido (regra alternativa)
-# Scripts soltos de trabalho
-base_legal_capa.py
-colorir_integridade.py
-esconder_botao_word.py
-estrutura_base_legal.py
-extrair_consolidado.py
-extrair_custo_pessoal.py
-liquidez_api_anterior.py
-listar_tabelas.py
-obs_sem_titulo.py
-secao9_*.py
-pc_backend/\\\\342*
-# Excecao: shim SQLite->PostgreSQL (necessario para o sistema)
-!pc_backend/sqlite_compat.py
-# Migracao PG - dumps e logs (binarios, nao versionar)
-pc_storage/*.dump
-pc_storage/*.db.*
-pc_storage/banco_dados_PRE_MIGRACAO.db
-*.log
-rewrite_ligar.py
-fix_lastval.py
-ver_sqlite.py
-teste_write.py
-uvicorn.log
-*.pdf
-_arquivo_20261031/
-_backups_arquivo/
-template_original_1011/
-_scripts_aux/
-_scripts_aux/**
-_backups_zip/
-_logs/
-_debug_txt/
-_modelos_html/
-_pdfs_teste/
-# Variaveis de ambiente
-.env
-!pc_backend/app/routers/bp.py
-
-# === Debug e scripts ad-hoc (não versionar) ===
-teste_*.py
-teste_*.png
-testar_*.py
-fix_*.py
-ver_*.py
-diag_*.py
-audit_*.py
 mapear_*.py
-comentar_*.py
-conectar_*.py
-descomentar_*.py
-recriar_*.py
-copiar_*.py
-extrair_*.py
-listar_*.py
-aplicar_*.py
-add_*.py
+mapeamento_*.tsv
+audit_*.py
+auditoria_*.py
+diag_*.py
+diagnostico_*.py
 buscar_*.py
 check_*.py
 comparar_*.py
+extrair_*.py
 final*.py
-tela_*.py
+pdf_int_fpdf.py
+pdf_modelo_oficial.py
+resolver_*.py
+resgatar_*.py
+reverter_*.py
 reconstruir_*.py
 reconectar_*.py
-registrar_*.py
-remover_*.py
-resgatar_*.py
-resolver_*.py
-forcar_*.py
-baixar_*.py
-nova_*.py
-gerar_*.py
-pdf_*.py
 readicionar_*.py
+registrar_*.py
 remove_*.py
-mudar_*.py
-substituir_*.py
+remove_try_*.py
+injetar_*.py
+forcar_*.py
+copiar_*.py
+listar_*.py
+imprimir_*.py
+sincronizar_*.py
+baixar_*.py
+resgatar_*.py
+salvar_*.py
+carregar_*.py
+processar_*.py
+teste_*.py
+testar_*.py
 
-# === Backups automáticos ===
-*.bak
-*.bak_*
-*.pre_*
-*.pre_PR*
-*.pre_env*
-*.ANTES_RESTORE_*
-main.py.pre_*
-main.py.bak_*
-
-# === Binários de debug ===
-*.dump
-debug_*.png
-audit_*.png
-teste_*.png
-PDF_FINAL_*.png
-
-# === Logos (uploads de usuários) ===
-pc_storage/uploads_logos/*.png
-
-# === Arquivos corrompidos / lixo ===
-pc_backend/−
-pc_backend/*.tmp
-
-# === Baselines e relatórios de debug ===
-*.tsv
-duplicatas_divergentes.txt
-relatorio_duplicatas.md
-relatorio_rotas.md
-mapeamento_funcoes.tsv
+# ============================================================
+# Textos / logs / temporarios
+# ============================================================
+*.log
+*.log.*
+_logs/
+_tmp/
+temp/
+tmp/
+_debug_txt/
+_pdfs_teste/
+_modelos_html/
+_scripts_aux/
+*.txt.bak
+_encoding_*.txt
+duplicatas_*.txt
+relatorio_*.md
+rotas_*.md
 offsets.tsv
+
+# ============================================================
+# Uploads de usuario
+# ============================================================
+pc_storage/uploads_logos/
+pc_storage/uploads_raw/
+pc_storage/uploads_*/
+pc_storage/temp_downloads/
+pc_storage/*.db
+pc_storage/*.dump
+pc_storage/backup_*.zip
+
+# ============================================================
+# Node / frontend build
+# ============================================================
+node_modules/
+dist/
+build/
+
+# ============================================================
+# IDE / OS
+# ============================================================
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+
+# ============================================================
+# Padroes extras (legados que ja estavam versionados)
+# ============================================================
+.env
+.env.*
+!.env.example
 requirements_venv_*.txt
-
-# === Adições finais (2026-11-18) ===
-diagnostico_fin.py
-quarentena_*/
-"\342\210\222"
-*.pre_PR*
-*.pre_env*
-# === Scripts temporarios de fix (nao versionar) ===
-_fix_*.py
-_test_*.py
-
-# === Scripts de auditoria ad-hoc ===
-auditoria_*.py
-# === Arquivos de debug do encoding (nao versionar) ===
-_encoding_duplo_*.txt
-# === Scripts de debug da refatoracao (nao versionar) ===
-_listar_rotas_*.py
-_ver_rotas_*.py
-_ver_include_router.py
-_verificar_comentadas.py
-_remover_comentadas.py
-_comparar_dfc.py
+pc_backend/routers/
+pc_backend/main_legado.py
+pc_backend/_backup_*
+pc_backend/core/pdf_utils.py
+pc_storage/temp_downloads/
+_comparar_*.py
+_listar_*.py
+_remover_*.py
+gerar_*.py
+limpar_*.py
+nova_*.py
+tela_*.py
+verificar_*.py
+auditar_*.py
+add_*.py
+injetar_*.py
