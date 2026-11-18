@@ -108,3 +108,31 @@ if __name__ == "__main__":
     print(f"DVP_PY existe?     {DVP_PY.exists()}")
     print(f"FONTS existe?      {FONTS.exists()}")
     print(f"FRONTEND existe?   {PC_FRONTEND.exists()}")
+
+# ---------------------------------------------------------------------------
+# PostgreSQL - configuracao de conexao
+# ---------------------------------------------------------------------------
+# Le do .env se disponivel, senao usa defaults do ambiente de dev.
+# Para carregar o .env automaticamente, use: pip install python-dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ENV_FILE)
+except ImportError:
+    pass  # python-dotenv nao instalado - segue com defaults
+
+
+PG_CONFIG: dict = {
+    "host":     os.environ.get("PG_HOST", "localhost"),
+    "port":     int(os.environ.get("PG_PORT", "5433")),
+    "database": os.environ.get("PG_DATABASE", "pc_database"),
+    "user":     os.environ.get("PG_USER", "postgres"),
+    "password": os.environ.get("PG_PASSWORD", ""),
+}
+
+
+# ---------------------------------------------------------------------------
+# Compatibilidade com codigo legado
+# ---------------------------------------------------------------------------
+BASE_DIR = str(PC_BACKEND)
+UPLOAD_DIR = str(UPLOADS_RAW)
+FRONTEND_DIR = str(PC_FRONTEND)
