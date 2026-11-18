@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -191,7 +191,7 @@
             btn.innerText = "Salvando...";
             btn.disabled = true;
 
-            fetch('/salvar_analise_dfc/' + periodo + '/' + periodo, { method: 'POST' })
+            fetch('/api/analise_dfc/salvar/' + periodo + '/' + periodo, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
                     if (data.ok) {
@@ -209,7 +209,7 @@
         }
 
         function carregarHistorico() {
-            fetch('/historico_analise_dfc')
+            fetch('/api/analise_dfc/historico')
                 .then(r => r.json())
                 .then(data => {
                     const lista = document.getElementById('historico-lista');
@@ -252,7 +252,7 @@
 
             // Cria uma promise para cada ID e espera todas terminarem
             const promessas = ids.map(id => 
-                fetch('/excluir_analise_dfc/' + id, { method: 'DELETE' })
+                fetch('/api/analise_dfc/excluir/' + id, { method: 'DELETE' })
                     .then(r => r.json())
                     .then(data => {
                         if (data.ok) excluidos++;
@@ -279,7 +279,7 @@
             }
 
             try {
-                const r = await fetch('/historico_analise_dfc/' + sel.value);
+                const r = await fetch('/api/analise_dfc/historico/' + sel.value);
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 const dados = await r.json();
                 const d = dados.dados?.dados || dados.dados || dados;
@@ -301,10 +301,33 @@
                 alert("Selecione um item no historico para gerar o PDF.");
                 return;
             }
-            window.open('/gerar_pdf_analise_dfc/' + sel.value, '_blank');
+            window.open('/api/analise_dfc/gerar_pdf/' + sel.value, '_blank');
         }
 
         document.addEventListener('DOMContentLoaded', carregarHistorico);
     </script>
 </body>
 </html>
+
+
+
+<!-- AUTO-LOAD POR ?id= (para o PDF) -->
+<script>
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var id = params.get('id');
+    if (!id) return;
+    console.log('[DFC-AUTO] Carregando id=' + id);
+    fetch('/api/analise_dfc/historico/' + id)
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+            if (j && j.dados && typeof render === 'function') {
+                render(j.dados, j.dados);
+                console.log('[DFC-AUTO] render() executado.');
+            } else {
+                console.error('[DFC-AUTO] Dados ou render indisponivel:', j);
+            }
+        })
+        .catch(function(e) { console.error('[DFC-AUTO] Erro:', e); });
+})();
+</script>

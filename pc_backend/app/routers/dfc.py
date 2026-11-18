@@ -1,4 +1,4 @@
-"""
+﻿"""
 Rota da DFC - Leitura por Blocos (Operacional, Investimento, Financiamento).
 """
 import csv
@@ -113,14 +113,164 @@ def processar_dfc(caminho):
     }
     return {"erro": False, "dados": dados}
 
-@router.get("/{periodo}")
-async def api_analise_dfc(periodo: str):
-    p_limpo = periodo.replace("-", "_")
-    caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
-    if not os.path.exists(caminho):
-        return {"erro": "faltando", "pecas": ["DFC"]}
+
+# ============================================================
+# Rota para servir a tela HTML do DFC
+# ============================================================
+from fastapi.responses import FileResponse
+import os
+
+@router.get("/analise_dfc")
+async def serve_analise_dfc():
+    caminho = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "pc_frontend",
+        "analise_dfc.html"
+    )
+    if os.path.exists(caminho):
+        return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    return {"erro": "Arquivo HTML nao encontrado", "caminho": caminho}
+
+# ============================================================
+# ROTAS DE SALVAR, HISTÃ“RICO E PDF (PostgreSQL)
+# ============================================================
+import json
+from datetime import datetime
+from fastapi import Response
+import psycopg2
+from pc_backend.app.config import PG_CONFIG
+
+
+@router.post("/salvar/{periodo}/{periodo_anterior}")
+async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
     try:
+        # Chama a funÃ§Ã£o de processamento do DFC
+        p_limpo = periodo.replace("-", "_")
+        caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
+        if not os.path.exists(caminho):
+            return {"ok": False, "mensagem": f"CSV nao encontrado: DFC_{p_limpo}.csv"}
+        
+        resultado = processar_dfc(caminho)
+        if resultado.get("erro"):
+            return {"ok": False, "mensagem": resultado.get("mensagem", "Erro no processamento")}
+        
+        dados_json = resultado["dados"]
+        periodo_label = f"{periodo} vs {periodo_anterior}"
+        
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO historico_analise_dfc (periodo, data_geracao, resultado_json)
+            VALUES (%s, NOW(), %s) RETURNING id
+        """, (periodo_label, json.dumps(dados_json)))
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        conn.close()
+        
+        return {"ok": True, "id": new_id, "mensagem": "Salvo com sucesso"}
+    except Exception as e:
+        print(f"[DFC] Erro ao salvar: {e}")
+        return {"ok": False, "mensagem": str(e)}
+
+
+@router.get("/historico")
+async def get_historico_dfc():
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dfc ORDER BY id DESC")
+        rows = cur.fetchall()
+        conn.close()
+        return [{"id": r[0], "periodo": r[1], "data_geracao": str(r[2])} for r in rows]
+    except Exception as e:
+        print(f"[DFC] Erro ao listar historico: {e}")
+        return []
+
+
+@router.get("/historico/{id}")
+async def get_historico_dfc_id(id: int):
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT periodo, resultado_json FROM historico_analise_dfc WHERE id = %s", (id,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return {"erro": True, "mensagem": "Nao encontrado"}
+        dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
+        return {"erro": False, "periodo": row[0], "dados": dados}
+    except Exception as e:
+        return {"erro": True, "mensagem": str(e)}
+
+
+@router.delete("/excluir/{id}")
+async def excluir_dfc(id: int):
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("DELETE FROM historico_analise_dfc WHERE id = %s", (id,))
+        conn.commit()
+        conn.close()
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "mensagem": str(e)}
+
+
+@router.get("/gerar_pdf/{id}")
+def gerar_pdf_analise_dfc(id: int):
+    import traceback
+    try:
+        from playwright.sync_api import sync_playwright
+        import time
+        
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("SELECT periodo, resultado_json FROM historico_analise_dfc WHERE id = %s", (id,))
+        row = cur.fetchone()
+        conn.close()
+        
+        if not row:
+            return Response(content=b"Registro nao encontrado", media_type="text/plain", status_code=404)
+        
+        periodo_label = row[0]
+        dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
+        
+        url = "http://127.0.0.1:994/analise_dfc?id=" + str(id) + "&_t=" + str(int(time.time()))
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.goto(url, wait_until="networkidle")
+            page.wait_for_timeout(4000)
+            page.evaluate("() => { const el = document.querySelector('.top-bar, .filtros, .sidebar, .btn'); if (el) el.style.display = 'none'; }")
+            page.add_style_tag(content="button, select, .top-bar, .filtros, .sidebar { display: none !important; }")
+            page.wait_for_timeout(1000)
+            pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "10mm", "bottom": "10mm", "left": "10mm", "right": "10mm"})
+            browser.close()
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=Analise_DFC_{id}.pdf"},
+        )
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[DFC] ERRO NO PDF: {e}\n{tb}")
+        return Response(content=f"ERRO: {e}\n\n{tb}".encode("utf-8"), media_type="text/plain", status_code=500)
+
+
+# ============================================================
+# ROTA GENÉRICA: /{periodo} (deve ficar no FINAL para não conflitar)
+# ============================================================
+@router.get("/{periodo}")
+def api_analise_dfc(periodo: str):
+    try:
+        p_limpo = periodo.replace("-", "_")
+        caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
+        if not os.path.exists(caminho):
+            return {"erro": "faltando", "mensagem": f"CSV nao encontrado: DFC_{p_limpo}.csv"}
         return processar_dfc(caminho)
     except Exception as e:
-        print(f"[DFC] ERRO: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        print(f"[DFC] ERRO: {e}\n{traceback.format_exc()}")
+        return {"erro": "interno", "mensagem": str(e)}
