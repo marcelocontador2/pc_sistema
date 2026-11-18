@@ -1,0 +1,167 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Balanço Financeiro</title>
+    <style>
+        @page { size: A4; margin: 15mm; }
+        body { 
+            font-family: 'Segoe UI', 'Roboto', Arial, sans-serif; 
+            font-size: 10px; 
+            color: #1f2937; 
+            background: #fff;
+        }
+        
+        /* Cabeçalho */
+        .header { text-align: center; margin-bottom: 25px; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; color: #1e3a8a; letter-spacing: 0.5px; }
+        .header h2 { margin: 6px 0 0 0; font-size: 12px; font-weight: 400; color: #6b7280; }
+        
+        /* Cards de Resumo */
+        .cards { 
+            display: flex; 
+            justify-content: space-between; 
+            gap: 15px; 
+            margin-bottom: 25px; 
+        }
+        .card { 
+            flex: 1; 
+            text-align: center; 
+            padding: 12px 10px; 
+            border-radius: 6px; 
+            border: 1px solid #e5e7eb; 
+            background: #f9fafb;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .card .label { 
+            font-size: 8px; 
+            color: #6b7280; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+            margin-bottom: 4px; 
+        }
+        .card .value { 
+            font-size: 15px; 
+            font-weight: 700; 
+            color: #1e3a8a; 
+        }
+        .card.despesa .value { color: #b91c1c; }
+        .card.saldo .value { color: #15803d; }
+        
+        /* Tabela */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 10px; 
+            border: 1px solid #d1d5db;
+        }
+        th { 
+            background: #1e3a8a; 
+            color: #fff; 
+            padding: 8px 10px; 
+            text-align: left; 
+            font-size: 10px; 
+            font-weight: 600;
+            border: 1px solid #1e3a8a;
+        }
+        td { 
+            padding: 6px 10px; 
+            border: 1px solid #e5e7eb; 
+            color: #1f2937;
+        }
+        
+        /* Linhas de Seção */
+        .section { background: #1e3a8a; color: #fff; font-weight: 600; font-size: 10px; }
+        .section.despesa { background: #b91c1c; }
+        .section.extra { background: #6b7280; }
+        .section.caixa { background: #15803d; }
+        
+        /* Linhas de Totais */
+        .total { font-weight: 700; background: #f3f4f6; }
+        .total-geral { background: #1e3a8a; color: #fff; font-weight: 700; }
+        .total-geral td { border: 1px solid #1e3a8a; color: #fff; }
+        
+        /* Alinhamento de valores monetários */
+        .valor { text-align: right; font-variant-numeric: tabular-nums; }
+        
+        /* Classes de variação */
+        .pos { color: #15803d; }
+        .neg { color: #b91c1c; }
+    
+        /* Correção: Garante texto branco e negrito DENTRO das tarjas coloridas */
+        .section td, 
+        .section.despesa td, 
+        .section.extra td, 
+        .section.caixa td,
+        .total-geral td,
+        .total-geral th {
+            color: #ffffff !important;
+            font-weight: 700 !important;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Balanço Financeiro</h1>
+        <h2>Período: {{PERIODO}}</h2>
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <div class="label">Total de Receitas</div>
+            <div class="value">R$ {{RECEITAS_TOTAL}}</div>
+        </div>
+        <div class="card despesa">
+            <div class="label">Total de Despesas</div>
+            <div class="value">R$ {{DESPESAS_TOTAL}}</div>
+        </div>
+        <div class="card saldo">
+            <div class="label">Saldo p/ Exerc. Seguinte</div>
+            <div class="value">R$ {{CAIXA_SEGUINTE}}</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Indicador</th>
+                <th class="valor">Período Atual</th>
+                <th class="valor">Período Anterior</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="section"><td colspan="3">RECEITAS</td></tr>
+            <tr><td>Receitas Correntes</td><td class="valor">R$ {{REC_CORRENTE}}</td><td class="valor">R$ {{REC_CORRENTE_ANT}}</td></tr>
+            <tr><td>Receitas de Capital</td><td class="valor">R$ {{REC_CAPITAL}}</td><td class="valor">R$ {{REC_CAPITAL_ANT}}</td></tr>
+            <tr class="total"><td>TOTAL DE RECEITAS</td><td class="valor">R$ {{REC_TOTAL}}</td><td class="valor">R$ {{REC_TOTAL_ANT}}</td></tr>
+
+            <tr class="section despesa"><td colspan="3">DESPESAS</td></tr>
+            <tr><td>Despesas Correntes</td><td class="valor">R$ {{DES_CORRENTE}}</td><td class="valor">R$ {{DES_CORRENTE_ANT}}</td></tr>
+            <tr><td>Despesas de Capital</td><td class="valor">R$ {{DES_CAPITAL}}</td><td class="valor">R$ {{DES_CAPITAL_ANT}}</td></tr>
+            <tr class="total"><td>TOTAL DE DESPESAS</td><td class="valor">R$ {{DES_TOTAL}}</td><td class="valor">R$ {{DES_TOTAL_ANT}}</td></tr>
+
+            <tr class="section extra"><td colspan="3">EXTRAORÇAMENTÁRIO</td></tr>
+            <tr><td>Recebimentos Extraorçamentários</td><td class="valor">R$ {{EXTRA_RECEB}}</td><td class="valor">R$ {{EXTRA_RECEB_ANT}}</td></tr>
+            <tr><td>Pagamentos Extraorçamentários</td><td class="valor">R$ {{EXTRA_PAG}}</td><td class="valor">R$ {{EXTRA_PAG_ANT}}</td></tr>
+
+            <tr class="section caixa"><td colspan="3">CAIXA E EQUIVALENTES</td></tr>
+            <tr><td>Saldo em Espécie do Exercício Anterior</td><td class="valor">R$ {{CAIXA_ANTERIOR}}</td><td class="valor">R$ {{CAIXA_ANTERIOR_ANT}}</td></tr>
+            <tr><td>Geração Líquida de Caixa</td><td class="valor">R$ {{CAIXA_GERACAO}}</td><td class="valor">R$ {{CAIXA_GERACAO_ANT}}</td></tr>
+            <tr><td>Saldo em Espécie para o Exercício Seguinte</td><td class="valor">R$ {{CAIXA_SEGUINTE}}</td><td class="valor">R$ {{CAIXA_SEGUINTE_ANT}}</td></tr>
+
+            <tr class="section"><td colspan="3">TOTAL GERAL DE INGRESSOS</td></tr>
+            <tr><td>Receitas Orçamentárias (Corrente + Capital)</td><td class="valor">R$ {{REC_TOTAL}}</td><td class="valor">R$ {{REC_TOTAL_ANT}}</td></tr>
+            <tr><td>Recebimentos Extraorçamentários</td><td class="valor">R$ {{EXTRA_RECEB}}</td><td class="valor">R$ {{EXTRA_RECEB_ANT}}</td></tr>
+            <tr><td>Saldo em Espécie do Exercício Anterior</td><td class="valor">R$ {{CAIXA_ANTERIOR}}</td><td class="valor">R$ {{CAIXA_ANTERIOR_ANT}}</td></tr>
+            <tr class="total-geral"><td>TOTAL DE INGRESSOS</td><td class="valor">R$ {{TOTAL_INGRESSOS}}</td><td class="valor">R$ {{TOTAL_INGRESSOS_ANT}}</td></tr>
+
+            <tr class="section despesa"><td colspan="3">TOTAL GERAL DE DISPÊNDIOS</td></tr>
+            <tr><td>Despesas Orçamentárias (Corrente + Capital)</td><td class="valor">R$ {{DES_TOTAL}}</td><td class="valor">R$ {{DES_TOTAL_ANT}}</td></tr>
+            <tr><td>Pagamentos Extraorçamentários</td><td class="valor">R$ {{EXTRA_PAG}}</td><td class="valor">R$ {{EXTRA_PAG_ANT}}</td></tr>
+            <tr><td>Saldo em Espécie para o Exercício Seguinte</td><td class="valor">R$ {{CAIXA_SEGUINTE}}</td><td class="valor">R$ {{CAIXA_SEGUINTE_ANT}}</td></tr>
+            <tr class="total-geral"><td>TOTAL DE DISPÊNDIOS</td><td class="valor">R$ {{TOTAL_DISPENDIOS}}</td><td class="valor">R$ {{TOTAL_DISPENDIOS_ANT}}</td></tr>
+        </tbody>
+    </table>
+</body>
+</html>
