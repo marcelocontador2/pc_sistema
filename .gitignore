@@ -141,3 +141,16 @@ relatorio_rotas.md
 mapeamento_funcoes.tsv
 offsets.tsv
 requirements_venv_*.txt
+
+# === Adições finais (2026-11-18) ===
+diagnostico_fin.py
+quarentena_*/
+"\342\210\222"
+*.pre_PR*
+*.pre_env*
+# === Scripts temporarios de fix (nao versionar) ===
+_fix_*.py
+_test_*.py
+
+# === Scripts de auditoria ad-hoc ===
+auditoria_*.py

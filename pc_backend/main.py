@@ -5326,9 +5326,9 @@ async def api_analise_bp(periodo: str):
                     pass
                 break
         estoques_at, estoques_ant = buscar_ativo("ESTOQUES")
-        creditos_at, creditos_ant = buscar_ativo("CRÃ­â€°DITOS A CURTO PRAZO")
-        ativo_nao_circ_at, ativo_nao_circ_ant = buscar_ativo("ATIVO NÃ­Æ’O CIRCULANTE")
-        ativo_realizavel_at, ativo_realizavel_ant = buscar_ativo("ATIVO REALIZÃ­VEL A LONGO PRAZO")
+        creditos_at, creditos_ant = buscar_ativo("CREDITOS A CURTO PRAZO")
+        ativo_nao_circ_at, ativo_nao_circ_ant = buscar_ativo("ATIVO NAO CIRCULANTE")
+        ativo_realizavel_at, ativo_realizavel_ant = buscar_ativo("ATIVO REALIZAVEL A LONGO PRAZO")
         imobilizado_at, imobilizado_ant = buscar_ativo("IMOBILIZADO")
 
         passivo_circ_at, passivo_circ_ant = buscar_passivo("PASSIVO CIRCULANTE")

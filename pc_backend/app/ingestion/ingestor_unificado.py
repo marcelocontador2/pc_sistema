@@ -54,36 +54,122 @@ def processar_bp_comparativo(caminho_csv):
         file_hash = hashlib.sha256(f.read()).hexdigest()
     pid_2026 = get_periodo_id(cursor, 2026, "Jan-Set")
     pid_2025 = get_periodo_id(cursor, 2025, "Jan-Set")
+    if not pid_2026 or not pid_2025:
+        print(f"ERRO: periodo 2026 ou 2025 nao encontrado no banco")
+        cursor.close(); conn.close()
+        return
+    # DELETE idempotente: limpa importacoes anteriores do BP para esses periodos
+    cursor.execute("""
+        DELETE FROM demonstracao_resumo
+        WHERE periodo_id IN (%s, %s)
+          AND grupo_demonstrativo IN (
+            'Ativo Circulante', 'Ativo Nao Circulante',
+            'Passivo Circulante', 'Passivo Nao Circulante',
+            'Patrimonio Liquido', 'Total Geral',
+            'Caixa e Equivalentes', 'Creditos a Curto Prazo',
+            'Demais Creditos Curto Prazo', 'Estoques',
+            'Variacoes Patrimoniais Antecipadas',
+            'Ativo Realizavel Longo Prazo', 'Creditos a Longo Prazo',
+            'Creditos Tributarios a Receber', 'Divida Ativa Nao Tributaria',
+            'Demais Creditos Longo Prazo', 'Imobilizado',
+            'Bens Moveis', 'Bens Imoveis', 'Intangivel', 'Softwares',
+            'Obrigacoes Trabalhistas Curto Prazo', 'Fornecedores Curto Prazo',
+            'Obrigacoes Fiscais Curto Prazo', 'Provisoes Curto Prazo',
+            'Demais Obrigacoes Curto Prazo', 'Provisoes Longo Prazo'
+          );
+    """, (pid_2026, pid_2025))
     doc_2026 = inserir_documento(cursor, pid_2026, "BALANCO_PATRIMONIAL", os.path.basename(caminho_csv), file_hash)
     doc_2025 = inserir_documento(cursor, pid_2025, "BALANCO_PATRIMONIAL", os.path.basename(caminho_csv), file_hash)
     linhas = ler_linhas(caminho_csv)
+
     mapa = {
+        # === Nivel macro (totais) ===
         "ATIVO CIRCULANTE": "Ativo Circulante",
-        "ATIVO NÃƒO CIRCULANTE": "Ativo Nao Circulante",
+        "ATIVO NAO CIRCULANTE": "Ativo Nao Circulante",
         "PASSIVO CIRCULANTE": "Passivo Circulante",
         "PASSIVO NAO-CIRCULANTE": "Passivo Nao Circulante",
-        "TOTAL DO PATRIMÃ”NIO LÃQUIDO": "Patrimonio Liquido",
-        "TOTAL": "Total Geral"
+        "TOTAL DO PATRIMONIO LIQUIDO": "Patrimonio Liquido",
+        # === Contas filhas do Ativo Circulante ===
+        "CAIXA E EQUIVALENTES DE CAIXA": "Caixa e Equivalentes",
+        "CREDITOS A CURTO PRAZO": "Creditos a Curto Prazo",
+        "DEMAIS CREDITOS E VALORES A CURTO PRAZO": "Demais Creditos Curto Prazo",
+        "ESTOQUES": "Estoques",
+        "VARIAOES PATRIMONIAIS DIMINUTIVAS PAGAS ANTECIPADAMENTE": "Variacoes Patrimoniais Antecipadas",
+        # === Contas filhas do Ativo Nao Circulante ===
+        "ATIVO REALIZAVEL A LONGO PRAZO": "Ativo Realizavel Longo Prazo",
+        "CREDITOS A LONGO PRAZO": "Creditos a Longo Prazo",
+        "CREDITOS TRIBUTARIOS A RECEBER": "Creditos Tributarios a Receber",
+        "DIVIDA ATIVA NAO TRIBUTARIA": "Divida Ativa Nao Tributaria",
+        "DEMAIS CREDITOS E VALORES A LONGO PRAZO": "Demais Creditos Longo Prazo",
+        "IMOBILIZADO": "Imobilizado",
+        "BENS MOVEIS": "Bens Moveis",
+        "BENS IMOVEIS": "Bens Imoveis",
+        "INTANGIVEL": "Intangivel",
+        "SOFTWARES": "Softwares",
+        # === Contas filhas do Passivo Circulante ===
+        "OBRIGACOES TRABALHISTAS, PREVIDENCIARIAS E ASSISTENCIAIS A PAGAR A CURTO PRAZO": "Obrigacoes Trabalhistas Curto Prazo",
+        "FORNECEDORES E CONTAS A PAGAR A CURTO PRAZO": "Fornecedores Curto Prazo",
+        "OBRIGACOES FISCAIS A CURTO PRAZO": "Obrigacoes Fiscais Curto Prazo",
+        "PROVISOES A CURTO PRAZO": "Provisoes Curto Prazo",
+        "DEMAIS OBRIGACOES A CURTO PRAZO": "Demais Obrigacoes Curto Prazo",
+        # === Contas filhas do Passivo Nao Circulante ===
+        "PROVISOES A LONGO PRAZO": "Provisoes Longo Prazo"
     }
-    for row in linhas[6:]:
-        # Ativo (2026 na coluna 1, 2025 na coluna 2)
-        if len(row) >= 3:
-            d = normalizar(row[0])
+
+    def _norm(s):
+        """Normaliza string: remove acentos, espacos extras, upper."""
+        import unicodedata
+        s = str(s).strip().upper()
+        s = unicodedata.normalize("NFKD", s)
+        s = "".join(c for c in s if not unicodedata.combining(c))
+        s = " ".join(s.split())
+        return s
+
+    # Versao normalizada do mapa (sem acento) para casar com o CSV
+    mapa_norm = {_norm(k): v for k, v in mapa.items()}
+
+    # Encontrar a linha de cabecalho (com "ESPECIFICACAO" na coluna 0)
+    idx_cabecalho = None
+    for i, row in enumerate(linhas):
+        if row and _norm(row[0]) == "ESPECIFICACAO":
+            idx_cabecalho = i
+            break
+    if idx_cabecalho is None:
+        print("AVISO: cabecalho nao encontrado, processando todas as linhas")
+        idx_cabecalho = 0
+
+    inseridos = 0
+    for row in linhas[idx_cabecalho + 1:]:
+        if not row or len(row) < 6:
+            continue
+        # Ativo: colunas 0 (conta), 1 (2026), 2 (2025)
+        d_ativo = _norm(row[0])
+        if d_ativo in mapa_norm:
+            grupo = mapa_norm[d_ativo]
             v2026 = limpar_valor(row[1]) if len(row) > 1 else 0.0
             v2025 = limpar_valor(row[2]) if len(row) > 2 else 0.0
-            if d in mapa:
-                if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, mapa[d], v2026)
-                if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, mapa[d], v2025)
-        # Passivo (2026 na coluna 4, 2025 na coluna 5)
-        if len(row) >= 6:
-            d = normalizar(row[3])
+            if v2026 != 0.0:
+                inserir_valor(cursor, doc_2026, pid_2026, grupo, v2026)
+                inseridos += 1
+            if v2025 != 0.0:
+                inserir_valor(cursor, doc_2025, pid_2025, grupo, v2025)
+                inseridos += 1
+        # Passivo: colunas 3 (conta), 4 (2026), 5 (2025)
+        d_passivo = _norm(row[3])
+        if d_passivo in mapa_norm:
+            grupo = mapa_norm[d_passivo]
             v2026 = limpar_valor(row[4]) if len(row) > 4 else 0.0
             v2025 = limpar_valor(row[5]) if len(row) > 5 else 0.0
-            if d in mapa:
-                if v2026 != 0.0: inserir_valor(cursor, doc_2026, pid_2026, mapa[d], v2026)
-                if v2025 != 0.0: inserir_valor(cursor, doc_2025, pid_2025, mapa[d], v2025)
+            if v2026 != 0.0:
+                inserir_valor(cursor, doc_2026, pid_2026, grupo, v2026)
+                inseridos += 1
+            if v2025 != 0.0:
+                inserir_valor(cursor, doc_2025, pid_2025, grupo, v2025)
+                inseridos += 1
+
     conn.commit(); cursor.close(); conn.close()
-    print(f"BP Comparativo processado (2026 e 2025): {os.path.basename(caminho_csv)}")
+    print(f"BP Comparativo processado: {os.path.basename(caminho_csv)} ({inseridos} valores)")
+
 def processar_bo(caminho_csv, ano, periodo_acumulado):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
