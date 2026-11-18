@@ -6,38 +6,57 @@ DB_CONFIG = {
     "user": "postgres",
     "password": "pc_admin_2026"
 }
-def buscar_valor(cursor, grupo):
-    cursor.execute("SELECT valor_atual FROM demonstracao_resumo WHERE grupo_demonstrativo = %s ORDER BY id DESC LIMIT 1;", (grupo,))
+def buscar_valor(cursor, grupo, periodo_id):
+    cursor.execute(
+        "SELECT valor_atual FROM demonstracao_resumo "
+        "WHERE grupo_demonstrativo = %s AND periodo_id = %s "
+        "ORDER BY id DESC LIMIT 1;",
+        (grupo, periodo_id)
+    )
     resultado = cursor.fetchone()
     return float(resultado[0]) if resultado else 0.0
+
+
+def get_periodo_id(cursor, ano):
+    cursor.execute(
+        "SELECT id FROM periodo WHERE ano = %s AND periodo_acumulado = %s;",
+        (ano, "Jan-Set")
+    )
+    res = cursor.fetchone()
+    return res[0] if res else None
 def analisar_completo():
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
+    pid_2026 = get_periodo_id(cursor, 2026)
+    if not pid_2026:
+        print("ERRO: periodo 2026 nao encontrado")
+        cursor.close(); conn.close()
+        return
     # === DADOS DO BP ===
-    ativo_circulante = buscar_valor(cursor, "Ativo Circulante")
-    ativo_nao_circulante = buscar_valor(cursor, "Ativo Nao Circulante")
-    passivo_circulante = buscar_valor(cursor, "Passivo Circulante")
-    passivo_nao_circulante = buscar_valor(cursor, "Passivo Nao Circulante")
-    patrimonio_liquido = buscar_valor(cursor, "Patrimonio Liquido")
+    ativo_circulante = buscar_valor(cursor, "Ativo Circulante", pid_2026)
+    ativo_nao_circulante = buscar_valor(cursor, "Ativo Nao Circulante", pid_2026)
+    passivo_circulante = buscar_valor(cursor, "Passivo Circulante", pid_2026)
+    passivo_nao_circulante = buscar_valor(cursor, "Passivo Nao Circulante", pid_2026)
+    patrimonio_liquido = buscar_valor(cursor, "Patrimonio Liquido", pid_2026)
     # === DADOS DO BO ===
-    receita_realizada = buscar_valor(cursor, "Receita Realizada")
-    despesa_empenhada = buscar_valor(cursor, "Despesa Empenhada")
+    receita_realizada = buscar_valor(cursor, "Receita Realizada", pid_2026)
+    despesa_empenhada = buscar_valor(cursor, "Despesa Empenhada", pid_2026)
     # === DADOS DO BF ===
-    receita_orcamentaria = buscar_valor(cursor, "Receita Orcamentaria")
-    despesa_orcamentaria = buscar_valor(cursor, "Despesa Orcamentaria")
-    saldo_inicial = buscar_valor(cursor, "Saldo Inicial")
-    saldo_final = buscar_valor(cursor, "Saldo Final")
+    receita_orcamentaria = buscar_valor(cursor, "Receita Orcamentaria", pid_2026)
+    despesa_orcamentaria = buscar_valor(cursor, "Despesa Orcamentaria", pid_2026)
+    saldo_inicial = buscar_valor(cursor, "Saldo Inicial", pid_2026)
+    saldo_final = buscar_valor(cursor, "Saldo Final", pid_2026)
     # === DADOS DA DFC ===
-    caixa_inicial = buscar_valor(cursor, "Caixa Inicial")
-    caixa_final = buscar_valor(cursor, "Caixa Final")
+    caixa_inicial = buscar_valor(cursor, "Caixa Inicial", pid_2026)
+    caixa_final = buscar_valor(cursor, "Caixa Final", pid_2026)
     # === DADOS DA DVP ===
-    variacoes_ativas = buscar_valor(cursor, "Variacoes Ativas")
-    variacoes_diminutivas = buscar_valor(cursor, "Variacoes Diminutivas")
-    superavit_patrimonial = buscar_valor(cursor, "Superavit Patrimonial")
+    variacoes_ativas = buscar_valor(cursor, "Variacoes Ativas", pid_2026)
+    variacoes_diminutivas = buscar_valor(cursor, "Variacoes Diminutivas", pid_2026)
+    superavit_patrimonial = buscar_valor(cursor, "Superavit Patrimonial", pid_2026)
     # === DADOS DO DMPL ===
-    pl_inicial = buscar_valor(cursor, "PL Inicial")
-    resultado_periodo = buscar_valor(cursor, "Resultado Periodo")
-    pl_final = buscar_valor(cursor, "PL Final")
+    pl_inicial = buscar_valor(cursor, "PL Inicial", pid_2026)
+    resultado_periodo = buscar_valor(cursor, "Resultado Periodo", pid_2026)
+    pl_final = buscar_valor(cursor, "PL Final", pid_2026)
     # === CÁLCULOS ===
     ativo_total = ativo_circulante + ativo_nao_circulante
     passivo_total = passivo_circulante + passivo_nao_circulante
