@@ -1,20 +1,18 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <meta charset="UTF-8">
-    <title>Análise DMPL</title>
-    
+    <title>Analise DMPL</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
         .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
         .btn-voltar { background: #f0ad4e; }
         .btn-salvar { background: #28a745; }
         .btn-excluir { background: #dc3545; }
         .btn-pdf { background: #0056b3; }
-        .btn-word { background: #2b579a; }
-        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; }
+        .btn-exibir { background: #17a2b8; }
+        .filtros { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
         .filtros label { font-size: 12px; font-weight: bold; color: #555; }
         .filtros select, .filtros input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
         .layout { display: flex; gap: 20px; }
@@ -23,280 +21,64 @@
         .hist-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; font-size: 14px; }
         .main-content { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         h2 { margin-top: 0; color: #003366; }
-        .grid-bp { display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th { background: #003366; color: white; padding: 12px; text-align: center; }
-        td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
-        td:first-child { text-align: left; font-weight: 500; color: #003366; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 20px; }
+        th { background: #003366; color: white; padding: 10px; text-align: left; }
+        th.right, td.right { text-align: right; }
+        td { padding: 8px; border-bottom: 1px solid #eee; }
         .pos { color: #28a745; font-weight: bold; }
         .neg { color: #dc3545; font-weight: bold; }
-        .grafico-container { background: #f8f9fa; border-radius: 8px; padding: 20px; }
-        .grafico-container h3 { margin-top: 0; color: #003366; font-size: 16px; text-align: center; }
-        .rodape { margin-top: 30px; padding: 15px; border-left: 4px solid #0056b3; background: #f4f6f9; font-size: 13px; color: #555; }
     </style>
 </head>
 <body>
-
     <div class="top-bar">
-        <button class="btn btn-voltar" onclick="window.location.href='/'">&larr; Voltar</button>
+        <button class="btn btn-voltar" onclick="window.location.href='/'">← Voltar</button>
         <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
-        <button class="btn btn-salvar" onclick="exibirSelecionado()">Exibir</button>
-        
+        <button class="btn btn-exibir" onclick="exibirSelecionado()">Exibir</button>
     </div>
 
+    <h2>Demonstração das Mutações do Patrimônio Líquido (DMPL)</h2>
+
     <div class="filtros">
-        <div><label>Ano:</label><input type="number" id="ano" value="2026" style="width: 80px;"></div>
-        <div><label>Tipo:</label><select id="tipo"><option value="TRIMESTRE" selected>Trimestral</option><option value="MES">Mensal</option></select></div>
-        <div><label>Periodo:</label><select id="val"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></div>
+        <label>Ano:</label>
+        <input type="number" id="ano" value="2026" style="width: 80px;">
+        <label>Tipo:</label>
+        <select id="tipo">
+            <option value="TRIMESTRE" selected>Trimestral</option>
+            <option value="MES">Mensal</option>
+        </select>
+        <label>Período:</label>
+        <select id="val">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+        </select>
         <button class="btn btn-pdf" onclick="carregar()">Verificar Dados</button>
     </div>
 
     <div class="layout">
         <div class="sidebar">
-            <h3>Historico Salvo</h3>
-            <div id="historico-lista">Nenhum historico.</div>
+            <h3>Histórico Salvo</h3>
+            <div id="historico-lista">Nenhum histórico.</div>
         </div>
-
         <div class="main-content">
-            <div style="color: #0056b3; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">Análise Patrimonial</div>
-            <h2>Demonstração das Mutações do Patrimônio Líquido (DMPL)</h2>
-<div id="aviso-erro" style="display:none; background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #f5c6cb; font-weight: bold;"></div>
-
-
-            <div class="grid-bp">
-                <div>
-                    <table id="tab">
-                        <thead>
-            <tr>
-                <th style="text-align:left;">Conta</th>
-                <th style="text-align:right;">Valor (R$)</th>
-                <th style="text-align:right;">% do Total</th>
-            </tr>
-        </thead>
-                        <tbody>
-                            <tr><td colspan="3" style="text-align:center;">Clique em Verificar para carregar.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="grafico-container">
-                    <h3>Evolução das Principais Contas (R$)</h3>
-                    <canvas id="graf" style="max-height: 300px; width: 100%;"></canvas></canvas></canvas>
-                </div>
-            </div>
-
-            <div class="rodape" id="rodape-destaques">
-                <strong>Destaques:</strong> Clique em Verificar para carregar.
-            </div>
+            <table id="tab">
+                <thead>
+                    <tr>
+                        <th>Conta</th>
+                        <th class="right">Valor (R$)</th>
+                        <th class="right">% do Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="3" style="text-align:center; color:#999;">Clique em Verificar para carregar os dados.</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
-    
-
-
-
-
-
-
-
-
-
-
-
-<script>
-// VERSAO NOVA DO SCRIPT
-function carregarHistorico() {
-    fetch('/historico_analise_dmpl')
-        .then(r => r.json())
-        .then(data => {
-            const lista = document.getElementById('historico-lista');
-            if (!lista) return;
-            if (!data || data.length === 0) { lista.innerHTML = '<div style="padding:10px; color:#777;">Nenhum histórico.</div>'; return; }
-            
-            let html = '';
-            data.forEach(item => {
-                html += `<div class="hist-item" style="margin-bottom:8px;">
-                    <input type="checkbox" value="${item.id}" class="check-hist" style="margin-right:8px;">
-                    <span style="font-weight:bold; color:#0056b3;">${item.periodo}</span><br>
-                    <span style="font-size:11px; color:#888;">Gerado em: ${item.data_geracao}</span>
-                </div>`;
-            });
-            lista.innerHTML = html;
-        })
-        .catch(e => console.error("Erro no historico:", e));
-}
-
-function exibirSelecionado() {
-    const check = document.querySelector(".check-hist:checked");
-    if (!check) { alert("Selecione um item no histórico primeiro."); return; }
-    
-    const id = check.value;
-    const tbody = document.querySelector('#tab tbody');
-    const thead = document.querySelector('#tab thead tr');
-    
-    if(thead) {
-        thead.innerHTML = '<th style="text-align:left;">Conta</th><th style="text-align:right;">Valor (R$)</th><th style="text-align:right;">% do Total</th>';
-    }
-    
-    if(tbody) tbody.innerHTML = '<tr><td colspan="3">Carregando dados...</td></tr>';
-
-    fetch('/historico_analise_dmpl/' + id)
-        .then(r => r.json())
-        .then(item => {
-            if (!item || item.erro) { alert("Histórico não encontrado."); return; }
-            
-            let dados = item.dados;
-            if (typeof dados === 'string') {
-                try { dados = JSON.parse(dados); } catch(e) { dados = []; }
-            }
-            
-            renderizarDados(dados?.dados || dados || []);
-        })
-        .catch(e => {
-            console.error(e);
-            if(tbody) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:red;">Erro ao carregar dados.</td></tr>';
-        });
-}
-
-
-
-// Funcao central para montar a tabela e o grafico
-
-
-document.addEventListener("DOMContentLoaded", () => {
-    carregarHistorico();
-});
-
-
-
-
-
-
-
-function carregar() {
-    const ano = document.getElementById('ano') ? document.getElementById('ano').value : '2026';
-    const tipo = document.getElementById('tipo') ? document.getElementById('tipo').value : 'TRIMESTRE';
-    const periodo = document.getElementById('val') ? document.getElementById('val').value : '3';
-    
-    const periodoFormatado = `${ano}-${tipo.toUpperCase()}-${periodo}`;
-    const tbody = document.querySelector('#tab tbody');
-    const thead = document.querySelector('#tab thead tr');
-    const aviso = document.getElementById('aviso-erro');
-
-    // 1. Limpa a tela IMEDIATAMENTE (para nao mostrar dados antigos)
-    if(thead) {
-        thead.innerHTML = '<th style="text-align:left;">Conta</th><th style="text-align:right;">Valor (R$)</th><th style="text-align:right;">% do Total</th>';
-    }
-    if(tbody) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Buscando dados...</td></tr>';
-    if(aviso) aviso.style.display = 'none'; // Esconde o aviso anterior
-    if (window._chartDMPL) { window._chartDMPL.destroy(); window._chartDMPL = null; } // Limpa o grafico
-
-    // 2. Busca os dados novos
-    fetch('/api/analise_dmpl/' + periodoFormatado)
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => {
-                    throw new Error(err.mensagem || "Arquivo não encontrado para este período.");
-                }).catch(() => {
-                    throw new Error("Erro HTTP " + response.status);
-                });
-            }
-            return response.json();
-        })
-        .then(retorno => {
-            if (retorno && retorno.erro) {
-                throw new Error(retorno.mensagem || "Nenhum dado encontrado.");
-            }
-            let dados = retorno.dados || retorno;
-            if (typeof dados === 'string') {
-                try { dados = JSON.parse(dados); } catch(e) { dados = []; }
-            }
-            renderizarDados(dados);
-        })
-        .catch(error => {
-            console.error("Falha na verificacao:", error);
-            
-            // Monta uma mensagem amigavel
-            let mensagemAmigavel = "Não há dados importados para o período " + periodoFormatado + ".";
-            if (error.message && error.message.includes("404")) {
-                mensagemAmigavel = "Não há dados importados para o período " + periodoFormatado + ". Verifique se o arquivo CSV foi enviado.";
-            } else if (error.message) {
-                mensagemAmigavel = error.message;
-            }
-
-            // Mostra a div de aviso vermelha
-            const aviso = document.getElementById('aviso-erro');
-            if(aviso) {
-                aviso.style.display = 'block';
-                aviso.innerHTML = "⚠️ <strong>Aviso:</strong> " + mensagemAmigavel;
-            }
-
-            // Limpa a tabela
-            if(tbody) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#777;">Nenhum dado para o período.</td></tr>';
-            }
-            
-            // Limpa o grafico
-            if (window._chartDMPL) {
-                window._chartDMPL.destroy();
-                window._chartDMPL = null;
-            }
-        });
-}
-
-function renderizarDados(dados) {
-    const tbody = document.querySelector('#tab tbody');
-    let html = '';
-    let labels = [];
-    let valores = [];
-    let totalGeral = 0;
-    let dadosProcessados = [];
-
-    dados.forEach(linha => {
-        if (!Array.isArray(linha)) return;
-        const nome = (linha[0] || '').trim();
-        if (!nome || nome.includes('COFEN/BR') || nome.includes('Conselho Federal') || nome.includes('CNPJ') || nome.includes('Demonstração') || nome.includes('Período:') || nome.includes('PATRIMÔNIO SOCIAL') || nome.includes('Brasília-DF')) return;
-
-        const vStr = (linha[8] || '0').trim();
-        let vTotal = parseFloat(vStr.replace(/\./g, '').replace(',', '.')) || 0;
-        
-        dadosProcessados.push({ nome, valor: vTotal });
-        totalGeral += Math.abs(vTotal);
-    });
-
-    dadosProcessados.forEach(item => {
-        let percentual = totalGeral > 0 ? (Math.abs(item.valor) / totalGeral) * 100 : 0;
-        let vFormatado = item.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        let pFormatado = percentual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-
-        html += `<tr>
-            <td style="text-align:left;">${item.nome}</td>
-            <td style="text-align:right;">${vFormatado}</td>
-            <td style="text-align:right;">${pFormatado}</td>
-        </tr>`;
-        labels.push(item.nome);
-        valores.push(item.valor);
-    });
-
-    if(tbody) tbody.innerHTML = html || '<tr><td colspan="3" style="text-align:center;">Nenhum dado válido encontrado.</td></tr>';
-
-    if (window.Chart) {
-        const canvas = document.getElementById('graf');
-        if (canvas) {
-            if (window._chartDMPL) window._chartDMPL.destroy();
-            window._chartDMPL = new Chart(canvas, {
-                type: 'bar',
-                data: { labels: labels, datasets: [{ label: 'Valor (R$)', data: valores, backgroundColor: '#0a1c3a' }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-            });
-        }
-    }
-}
-
-</script>
+    <script src="/static/dmpl_functions.js"></script>
 </body>
-
-
-
 </html>

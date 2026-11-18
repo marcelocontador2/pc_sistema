@@ -1,187 +1,158 @@
-function carregarHistorico() {
-    fetch('/historico_analise_dmpl')
-        .then(r => r.json())
-        .then(data => {
-            const lista = document.getElementById('historico-lista');
-            if (!lista) return;
-            if (!data || data.length === 0) { lista.innerHTML = '<div style="padding:10px; color:#777;">Nenhum histórico.</div>'; return; }
-            
-            let html = '';
-            data.forEach(item => {
-                html += `<div class="hist-item" style="margin-bottom:8px;">
-                    <input type="checkbox" value="${item.id}" class="check-hist" style="margin-right:8px;">
-                    <span style="font-weight:bold; color:#0056b3;">${item.periodo}</span><br>
-                    <span style="font-size:11px; color:#888;">Gerado em: ${item.data_geracao}</span>
-                </div>`;
-            });
-            lista.innerHTML = html;
-        })
-        .catch(e => console.error("Erro no historico:", e));
-}
-
-function exibirSelecionado() {
-    const check = document.querySelector(".check-hist:checked");
-    if (!check) { alert("Selecione um item no histórico primeiro."); return; }
-    
-    const id = check.value;
-    const tbody = document.querySelector('#tab tbody');
-    const thead = document.querySelector('#tab thead tr');
-    
-    if(thead) {
-        thead.innerHTML = '<th style="text-align:left;">Conta</th><th style="text-align:right;">Valor (R$)</th><th style="text-align:right;">% do Total</th>';
-    }
-    
-    if(tbody) tbody.innerHTML = '<tr><td colspan="3">Carregando dados...</td></tr>';
-
-    fetch('/historico_analise_dmpl/' + id)
-        .then(r => r.json())
-        .then(item => {
-            if (!item || item.erro) { alert("Histórico não encontrado."); return; }
-            
-            let dados = item.dados;
-            if (typeof dados === 'string') {
-                try { dados = JSON.parse(dados); } catch(e) { dados = []; }
-            }
-            
-            renderizarDados(dados?.dados || dados || []);
-        })
-        .catch(e => {
-            console.error(e);
-            if(tbody) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:red;">Erro ao carregar dados.</td></tr>';
-        });
-}
-
-
-
-// Funcao central para montar a tabela e o grafico
-
-
-document.addEventListener("DOMContentLoaded", () => {
-    carregarHistorico();
-});
-
-
-
-
-
-
+﻿// ============================================================
+// Funções do DMPL (sobrescreve as originais)
+// ============================================================
+console.log('[DMPL] Carregando funcoes...');
 
 function carregar() {
-    const ano = document.getElementById('ano') ? document.getElementById('ano').value : '2026';
-    const tipo = document.getElementById('tipo') ? document.getElementById('tipo').value : 'TRIMESTRE';
-    const periodo = document.getElementById('val') ? document.getElementById('val').value : '3';
-    
-    const periodoFormatado = `${ano}-${tipo.toUpperCase()}-${periodo}`;
-    const tbody = document.querySelector('#tab tbody');
-    const thead = document.querySelector('#tab thead tr');
-    const aviso = document.getElementById('aviso-erro');
+    var ano = document.getElementById('ano') ? document.getElementById('ano').value : '2026';
+    var tipo = document.getElementById('tipo') ? document.getElementById('tipo').value : 'TRIMESTRE';
+    var val = document.getElementById('val') ? document.getElementById('val').value : '3';
+    var periodo = ano + '-' + tipo + '-' + val;
+    console.log('[DMPL] Carregando periodo:', periodo);
 
-    // 1. Limpa a tela IMEDIATAMENTE (para nao mostrar dados antigos)
-    if(thead) {
-        thead.innerHTML = '<th style="text-align:left;">Conta</th><th style="text-align:right;">Valor (R$)</th><th style="text-align:right;">% do Total</th>';
-    }
-    if(tbody) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Buscando dados...</td></tr>';
-    if(aviso) aviso.style.display = 'none'; // Esconde o aviso anterior
-    if (window._chartDMPL) { window._chartDMPL.destroy(); window._chartDMPL = null; } // Limpa o grafico
-
-    // 2. Busca os dados novos
-    fetch('/api/analise_dmpl/' + periodoFormatado)
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => {
-                    throw new Error(err.mensagem || "Arquivo não encontrado para este período.");
-                }).catch(() => {
-                    throw new Error("Erro HTTP " + response.status);
-                });
+    fetch('/api/analise_dmpl/' + periodo)
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function(data) {
+            if (data.erro) {
+                document.querySelector('#tab tbody').innerHTML = '<tr><td colspan="3" style="color:red;text-align:center;">' + (data.mensagem || 'CSV nao encontrado') + '</td></tr>';
+                return;
             }
-            return response.json();
+            renderizarDados(data);
+            var btn = document.getElementById('btn-salvar');
+            if (btn) {
+                btn.style.display = 'inline-block';
+                btn.setAttribute('data-periodo', periodo);
+            }
         })
-        .then(retorno => {
-            if (retorno && retorno.erro) {
-                throw new Error(retorno.mensagem || "Nenhum dado encontrado.");
-            }
-            let dados = retorno.dados || retorno;
-            if (typeof dados === 'string') {
-                try { dados = JSON.parse(dados); } catch(e) { dados = []; }
-            }
-            renderizarDados(dados);
-        })
-        .catch(error => {
-            console.error("Falha na verificacao:", error);
-            
-            // Monta uma mensagem amigavel
-            let mensagemAmigavel = "Não há dados importados para o período " + periodoFormatado + ".";
-            if (error.message && error.message.includes("404")) {
-                mensagemAmigavel = "Não há dados importados para o período " + periodoFormatado + ". Verifique se o arquivo CSV foi enviado.";
-            } else if (error.message) {
-                mensagemAmigavel = error.message;
-            }
-
-            // Mostra a div de aviso vermelha
-            const aviso = document.getElementById('aviso-erro');
-            if(aviso) {
-                aviso.style.display = 'block';
-                aviso.innerHTML = "⚠️ <strong>Aviso:</strong> " + mensagemAmigavel;
-            }
-
-            // Limpa a tabela
-            if(tbody) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#777;">Nenhum dado para o período.</td></tr>';
-            }
-            
-            // Limpa o grafico
-            if (window._chartDMPL) {
-                window._chartDMPL.destroy();
-                window._chartDMPL = null;
-            }
+        .catch(function(e) {
+            console.error('[DMPL] Erro:', e);
+            document.querySelector('#tab tbody').innerHTML = '<tr><td colspan="3" style="color:red;text-align:center;">Erro: ' + e.message + '</td></tr>';
         });
 }
 
 function renderizarDados(dados) {
-    const tbody = document.querySelector('#tab tbody');
-    let html = '';
-    let labels = [];
-    let valores = [];
-    let totalGeral = 0;
-    let dadosProcessados = [];
+    var payload = dados;
+    if (dados && dados.dados && dados.dados.linhas) payload = dados.dados;
+    else if (dados && dados.linhas) payload = dados;
 
-    dados.forEach(linha => {
-        if (!Array.isArray(linha)) return;
-        const nome = (linha[0] || '').trim();
-        if (!nome || nome.includes('COFEN/BR') || nome.includes('Conselho Federal') || nome.includes('CNPJ') || nome.includes('Demonstração') || nome.includes('Período:') || nome.includes('PATRIMÔNIO SOCIAL') || nome.includes('Brasília-DF')) return;
+    var linhas = payload.linhas || [];
+    var tbody = document.querySelector('#tab tbody') || document.querySelector('table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
-        const vStr = (linha[8] || '0').trim();
-        let vTotal = parseFloat(vStr.replace(/\./g, '').replace(',', '.')) || 0;
-        
-        dadosProcessados.push({ nome, valor: vTotal });
-        totalGeral += Math.abs(vTotal);
-    });
-
-    dadosProcessados.forEach(item => {
-        let percentual = totalGeral > 0 ? (Math.abs(item.valor) / totalGeral) * 100 : 0;
-        let vFormatado = item.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        let pFormatado = percentual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-
-        html += `<tr>
-            <td style="text-align:left;">${item.nome}</td>
-            <td style="text-align:right;">${vFormatado}</td>
-            <td style="text-align:right;">${pFormatado}</td>
-        </tr>`;
-        labels.push(item.nome);
-        valores.push(item.valor);
-    });
-
-    if(tbody) tbody.innerHTML = html || '<tr><td colspan="3" style="text-align:center;">Nenhum dado válido encontrado.</td></tr>';
-
-    if (window.Chart) {
-        const canvas = document.getElementById('graf');
-        if (canvas) {
-            if (window._chartDMPL) window._chartDMPL.destroy();
-            window._chartDMPL = new Chart(canvas, {
-                type: 'bar',
-                data: { labels: labels, datasets: [{ label: 'Valor (R$)', data: valores, backgroundColor: '#0a1c3a' }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-            });
-        }
+    if (!linhas.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#999;">Nenhum dado para o periodo.</td></tr>';
+        return;
     }
+
+    // Encontra o total geral (última linha com valor não zero)
+    var totalGeral = 0;
+    for (var i = linhas.length - 1; i >= 0; i--) {
+        var vals = linhas[i].valores || [];
+        var t = vals[vals.length - 1] || 0;
+        if (t !== 0) { totalGeral = t; break; }
+    }
+
+    linhas.forEach(function(linha) {
+        var tr = document.createElement('tr');
+        var desc = linha.descricao || '';
+        var valores = linha.valores || [];
+        var total = valores[valores.length - 1] || 0;
+
+        var negrito = desc.toLowerCase().indexOf('saldos') !== -1 ||
+                      desc.toLowerCase().indexOf('resultado') !== -1 ||
+                      desc.toLowerCase().indexOf('total') !== -1;
+        if (negrito) tr.style.fontWeight = 'bold';
+
+        var tdDesc = document.createElement('td');
+        tdDesc.innerText = desc;
+        tr.appendChild(tdDesc);
+
+        var tdValor = document.createElement('td');
+        tdValor.className = 'right';
+        tdValor.innerText = 'R$ ' + (total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        tr.appendChild(tdValor);
+
+        var tdPct = document.createElement('td');
+        tdPct.className = 'right';
+        if (totalGeral !== 0 && total !== 0) {
+            var pct = (total / totalGeral) * 100;
+            tdPct.innerText = pct.toFixed(2).replace('.', ',') + '%';
+            tdPct.className += pct >= 0 ? ' pos' : ' neg';
+        } else {
+            tdPct.innerText = '-';
+        }
+        tr.appendChild(tdPct);
+
+        tbody.appendChild(tr);
+    });
 }
+
+function carregarHistorico() {
+    fetch('/api/analise_dmpl/historico')
+        .then(function(r) { return r.json(); })
+        .then(function(hist) {
+            var div = document.getElementById('historico-lista');
+            if (!div) return;
+            div.innerHTML = '';
+            if (!hist.length) {
+                div.innerHTML = '<p style="font-size:13px;color:#999;">Nenhum historico.</p>';
+                return;
+            }
+            hist.forEach(function(h) {
+                var d = document.createElement('div');
+                d.className = 'hist-item';
+                d.innerHTML = '<input type="checkbox" value="' + h.id + '"> <span>' + h.periodo + '</span>';
+                div.appendChild(d);
+            });
+        })
+        .catch(function(e) { console.error('[DMPL] Erro historico:', e); });
+}
+
+function exibirSelecionado() {
+    var sel = document.querySelector('.hist-item input:checked');
+    if (!sel) { alert('Selecione um item no historico.'); return; }
+    fetch('/api/analise_dmpl/historico/' + sel.value)
+        .then(function(r) { return r.json(); })
+        .then(function(j) { if (j.dados) renderizarDados({dados: j.dados}); });
+}
+
+function salvar() {
+    var btn = document.getElementById('btn-salvar');
+    var periodo = btn ? btn.getAttribute('data-periodo') : null;
+    if (!periodo) { alert('Verifique os dados primeiro.'); return; }
+    var partes = periodo.split('-');
+    var anterior = (parseInt(partes[0]) - 1) + '-' + partes[1] + '-' + partes[2];
+    fetch('/api/analise_dmpl/salvar/' + periodo + '/' + anterior, { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(j) { if (j.ok) { alert('Salvo com ID ' + j.id); carregarHistorico(); } else alert('Erro: ' + j.mensagem); });
+}
+
+function excluirSelecionado() {
+    var sel = document.querySelector('.hist-item input:checked');
+    if (!sel) { alert('Selecione um item.'); return; }
+    if (!confirm('Excluir?')) return;
+    fetch('/api/analise_dmpl/excluir/' + sel.value, { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(j) { if (j.ok) carregarHistorico(); });
+}
+
+function gerarPDF() {
+    var sel = document.querySelector('.hist-item input:checked');
+    if (!sel) { alert('Selecione um item no historico.'); return; }
+    window.open('/api/analise_dmpl/gerar_pdf/' + sel.value, '_blank');
+}
+
+// Auto-load por ?id=
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var id = params.get('id');
+    if (!id) return;
+    console.log('[DMPL-AUTO] Carregando id=' + id);
+    fetch('/api/analise_dmpl/historico/' + id)
+        .then(function(r) { return r.json(); })
+        .then(function(j) { if (j.dados) renderizarDados({dados: j.dados}); });
+})();
+
+// Carrega historico ao abrir
+document.addEventListener('DOMContentLoaded', carregarHistorico);

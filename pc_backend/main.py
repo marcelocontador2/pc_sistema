@@ -5,6 +5,7 @@ from pc_backend import sqlite_compat
 from fastapi.staticfiles import StaticFiles
 from pc_backend.app.routers import dfc
 from pc_backend.app.routers import dvp
+from pc_backend.app.routers import dmpl
 from fastapi import Response, Request, Request, FastAPI, Request, Form
 from fastapi import FastAPI, UploadFile, File
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Response, Form
@@ -987,6 +988,7 @@ async def ler_relatorio_csv(tipo: str):
 # --- CONEXAO DA MATRIZ DE INTEGRIDADE ---
 app.include_router(dfc.router)
 app.include_router(dvp.router)
+app.include_router(dmpl.router)
 # =======================================================
 # ROTINAS DE LIQUIDEZ (CALCULO, SALVAR, HISTORICO, PDF)
 # =======================================================
@@ -8998,3 +9000,11 @@ async def serve_analise_dvp():
     if os.path.exists(caminho):
         return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
     return {"erro": "Arquivo nao encontrado", "caminho": caminho}
+
+
+
+# ============================================================
+# ROTA PARA SERVIR ARQUIVOS ESTATICOS (JS do DMPL)
+# ============================================================
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend")), name="static")
