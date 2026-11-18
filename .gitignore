@@ -156,3 +156,10 @@ _test_*.py
 auditoria_*.py
 # === Arquivos de debug do encoding (nao versionar) ===
 _encoding_duplo_*.txt
+# === Scripts de debug da refatoracao (nao versionar) ===
+_listar_rotas_*.py
+_ver_rotas_*.py
+_ver_include_router.py
+_verificar_comentadas.py
+_remover_comentadas.py
+_comparar_dfc.py
