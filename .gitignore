@@ -154,3 +154,5 @@ _test_*.py
 
 # === Scripts de auditoria ad-hoc ===
 auditoria_*.py
+# === Arquivos de debug do encoding (nao versionar) ===
+_encoding_duplo_*.txt
