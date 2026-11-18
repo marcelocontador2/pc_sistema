@@ -45,15 +45,33 @@ function renderizarDados(dados) {
         return;
     }
 
+    // Filtra apenas linhas de cabeçalho (COFEN/BR, CNPJ, etc.)
+    var linhasFiltradas = linhas.filter(function(linha) {
+        var desc = (linha.descricao || '').trim().toUpperCase();
+        // Remove linhas vazias, COFEN, CNPJ, "DEMONSTRA", "BRASILIA"
+        if (!desc) return false;
+        if (desc.indexOf('COFEN') !== -1) return false;
+        if (desc.indexOf('CNPJ') !== -1) return false;
+        if (desc.indexOf('DEMONSTRA') !== -1) return false;
+        if (desc.indexOf('BRASILIA') !== -1) return false;
+        if (desc.indexOf('CONSELHO FEDERAL') !== -1) return false;
+        return true;
+    });
+
+    if (!linhasFiltradas.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#999;">Nenhum dado para o periodo.</td></tr>';
+        return;
+    }
+
     // Encontra o total geral (última linha com valor não zero)
     var totalGeral = 0;
-    for (var i = linhas.length - 1; i >= 0; i--) {
-        var vals = linhas[i].valores || [];
+    for (var i = linhasFiltradas.length - 1; i >= 0; i--) {
+        var vals = linhasFiltradas[i].valores || [];
         var t = vals[vals.length - 1] || 0;
         if (t !== 0) { totalGeral = t; break; }
     }
 
-    linhas.forEach(function(linha) {
+    linhasFiltradas.forEach(function(linha) {
         var tr = document.createElement('tr');
         var desc = linha.descricao || '';
         var valores = linha.valores || [];
