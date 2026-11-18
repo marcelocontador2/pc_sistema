@@ -192,3 +192,11 @@ verificar_*.py
 auditar_*.py
 add_*.py
 injetar_*.py
+
+# Scripts avulsos da raiz
+/_*.py
+/_*.ps1
+/_*.sh
+
+# Diretorio local de banco/PDFs (nunca versionar)
+pc_backend/pc_storage/
