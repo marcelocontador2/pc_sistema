@@ -1,5 +1,5 @@
 """
-Serviços de renderização de PDF para o DVP.
+ServiÃ§os de renderizaÃ§Ã£o de PDF para o DVP.
 """
 from __future__ import annotations
 from typing import Any
@@ -11,7 +11,7 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Formatação
+# FormataÃ§Ã£o
 # ---------------------------------------------------------------------------
 def fmt_brl(valor: float | int | None) -> str:
     """Formata valor como moeda brasileira: 1234.5 -> '1.234,50'."""
@@ -54,7 +54,7 @@ ITENS_DVP: list[tuple[str, str, bool, bool]] = [
 
 
 # ---------------------------------------------------------------------------
-# Renderização da tabela
+# RenderizaÃ§Ã£o da tabela
 # ---------------------------------------------------------------------------
 def desenhar_tabela_dvp(
     pdf: "FPDF",
@@ -66,15 +66,15 @@ def desenhar_tabela_dvp(
 ) -> float:
     """
     Desenha a tabela de indicadores DVP no PDF.
-    Retorna o y final (após a tabela).
+    Retorna o y final (apÃ³s a tabela).
     """
     y = y_inicial
 
-    # Cabeçalho
+    # CabeÃ§alho
     pdf.set_fill_color(*COR_HEADER_BG)
     pdf.rect(x0, y, largura, 9, style="F")
     pdf.set_text_color(*COR_HEADER_TXT)
-    pdf.set_font("Arial", "B", 9)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.set_xy(x0 + 3, y + 2.5)
     pdf.cell(90, 4, "Indicador")
     pdf.set_xy(x0 + 95, y + 2.5)
@@ -104,10 +104,10 @@ def desenhar_tabela_dvp(
         pdf.line(x0, y + 8, x0 + largura, y + 8)
 
         if negrito:
-            pdf.set_font("Arial", "B", 9)
+            pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(*COR_TOTAL_TXT)
         else:
-            pdf.set_font("Arial", "", 9)
+            pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(0, 0, 0)
 
         pdf.set_xy(x0 + 3, y + 2)
