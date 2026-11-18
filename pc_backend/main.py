@@ -20,7 +20,6 @@ from fastapi.responses import HTMLResponse
 import os
 import hashlib, shutil, io, glob, csv
 import psycopg2
-# [REMOVIDO - import quebrado] from app.core.database import DB_CONFIG
 
 def _corrigir_encoding(txt):
     """Corrige encoding duplo (UTF-8 lido como latin-1)."""
@@ -194,7 +193,6 @@ async def obter_analise():
 @app.get("/periodos")
 async def obter_periodos():
     try:
-# [REMOVIDO - dependente de import quebrado]         conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
         cur.execute("""
 
             SELECT DISTINCT p.ano, p.periodo_acumulado
@@ -246,7 +244,6 @@ def _ler_csv_generico(filepath):
 def _buscar_dados(tipo, ano, periodo):
     if tipo.startswith("BALANCO") or tipo == "BALANCETE":
         return [{"grupo": "Demonstrativo", "valor": 0}]
-# [REMOVIDO - dependente de import quebrado]     conn = psycopg2.connect(**DB_CONFIG); cur = conn.cursor()
     cur.execute(f"""
         SELECT b.codigo_conta, b.descricao_conta, b.saldo_atual, b.natureza_saldo
         FROM balancete_linha b
@@ -2010,7 +2007,6 @@ async def serve_composicao():
 #         from fpdf import FPDF
 #         from fpdf.enums import XPos, YPos
 #         from fastapi.responses import Response
-# # [REMOVIDO - import quebrado]         from app.routers.balanco_financeiro import processar_bf
 #         import sqlite3, os
 #         from datetime import datetime
 
@@ -2031,7 +2027,6 @@ async def serve_composicao():
 #         if not os.path.exists(caminho_csv):
 #             raise Exception(f"Arquivo do Balanco Financeiro nao encontrado para {periodo}")
 
-# # [REMOVIDO - dependente de import quebrado]         resultado = processar_bf(caminho_csv)
 #         d = resultado["dados"]
 
 #         pdf = FPDF()
@@ -2286,8 +2281,6 @@ async def serve_composicao():
     # Chama a API da DFC para obter os dados
 # [DFC-LEGADO]     try:
 # [DFC-LEGADO]         pass
-# [REMOVIDO - import quebrado]         from app.routers.dfc import api_analise_dfc
-# [REMOVIDO - dependente de import quebrado]         dados = await api_analise_dfc(periodo)
 # [DFC-LEGADO]     except Exception as e:
 # [DFC-LEGADO]         return {"ok": False, "mensagem": f"Erro ao calcular DFC: {e}"}
 # [DFC-LEGADO]     data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2917,7 +2910,6 @@ async def gerar_pdf_analise_patrimonial(id: int):
         from fpdf import FPDF
         from fpdf.enums import XPos, YPos
         from fastapi.responses import Response
-# [REMOVIDO - import quebrado]         from app.routers.dvp import processar_dvp
         import sqlite3, os
         # 1. Busca o periodo no historico (ou usa fallback)
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -2932,7 +2924,6 @@ async def gerar_pdf_analise_patrimonial(id: int):
         caminho_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", f"DVP_{p_limpo}.csv")
         if not os.path.exists(caminho_csv):
             raise Exception(f"Arquivo DVP nao encontrado para {periodo}")
-# [REMOVIDO - dependente de import quebrado]         resultado = processar_dvp(caminho_csv)
         d = resultado["dados"]
         # 3. Monta o PDF Moderno
         pdf = FPDF()
@@ -3738,14 +3729,13 @@ def salvar_custo_pessoal_rota(periodo: str):
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 # === ROUTER DO PANORAMA (registrado por ultimo para vencer a rota antiga) ===
-# [REMOVIDO - import quebrado] from app.routers.panorama import router as panorama_router
-# [REMOVIDO - dependente de import quebrado] app.include_router(panorama_router)
+from pc_backend.app.routers.panorama import router as panorama_router
+app.include_router(panorama_router)
 # === ROUTER DO DVP ===
-# [REMOVIDO - import quebrado] from app.routers.dvp import router as dvp_router
-# [REMOVIDO - dependente de import quebrado] app.include_router(dvp_router)
+# dvp.router ja registrado na linha 987
 # === ROUTER DO BALANCO FINANCEIRO ===
-# [REMOVIDO - import quebrado] from app.routers.balanco_financeiro import router as bf_router
-# [REMOVIDO - dependente de import quebrado] app.include_router(bf_router)
+from pc_backend.app.routers.balanco_financeiro import router as bf_router
+app.include_router(bf_router)
 @app.get("/custo_pessoal_pdf_completo", response_class=HTMLResponse)
 def serve_custo_pessoal_pdf_completo(entidade: str = "COFEN"):
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "custo_pessoal_pdf_completo.html")
@@ -8284,7 +8274,6 @@ async def api_gerar_auto_mcasp(request: Request):
     
     t_bo = f"A Receita Realizada no periodo foi de {brl(bo.get('receita_realizada'))}, enquanto a Despesa Empenhada atingiu {brl(bo.get('despesa_empenhada'))}. O Resultado Orcamentario apresentou um {'superavit' if bo.get('superavit', 0) >= 0 else 'deficit'} de {brl(abs(bo.get('superavit', 0)))}."
     
-# [REMOVIDO - dependente de import quebrado]     t_dfc = f"As atividades operacionais geraram um fluxo liquido de caixa positivo de {brl(dfc.get('operacional', {}).get('liquido', {}).get('atual'))}."
     
     textos = {
         "3.1": "As demonstracoes contabeis foram elaboradas com base nos registros oficiais da entidade.",
