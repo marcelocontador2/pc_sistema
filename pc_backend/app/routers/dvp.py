@@ -1,5 +1,5 @@
-"""
-Rota do DVP (Análise Patrimonial) — reescrita do zero em 31/10/2026.
+﻿"""
+Rota do DVP (AnÃ¡lise Patrimonial) â€” reescrita do zero em 31/10/2026.
 """
 import csv
 import os
@@ -42,100 +42,82 @@ def processar_dvp(caminho):
         "tipo_resultado": {"atual": "", "anterior": ""},
         "margem_resultado": {"atual": 0.0, "anterior": 0.0},
     }
-    with open(caminho, "r", encoding="latin-1", errors="ignore") as f:
-        leitor = csv.reader(f, delimiter=";")
-        for row in leitor:
-            if len(row) < 8:
-                continue
-            col_a = row[0].strip().upper()
-            col_d = row[4].strip().upper()
-            v_aum = limpar(row[2])
-            va_aum = limpar(row[3])
-            v_dim = limpar(row[6])
-            va_dim = limpar(row[7])
-            # TOTAIS
-            if "VARIAÇÃO PATRIMONIAL AUMENTATIVA" in col_a:
-                dados["total_vpa"]["atual"] = v_aum
-                dados["total_vpa"]["anterior"] = va_aum
-            if "VARIAÇÃO PATRIMONIAL DIMINUTIVA" in col_d:
-                dados["total_vpd"]["atual"] = v_dim
-                dados["total_vpd"]["anterior"] = va_dim
-            # VPA FINANCEIRAS
-            if "VARIAÇÕES PATRIMONIAIS AUMENTATIVAS FINANCEIRAS" in col_a:
-                dados["vpa_financeiras"]["atual"] = v_aum
-                dados["vpa_financeiras"]["anterior"] = va_aum
-            # TRANSFERENCIAS RECEBIDAS
-            if "TRANSFERÊNCIAS E DELEGAÇÕES RECEBIDAS" in col_a:
-                dados["transf_recebidas"]["atual"] = v_aum
-                dados["transf_recebidas"]["anterior"] = va_aum
-            # OUTRAS VPA
-            if "OUTRAS VARIAÇÕES PATRIMONIAIS AUMENTATIVAS" in col_a:
-                dados["outras_vpa"]["atual"] = v_aum
-                dados["outras_vpa"]["anterior"] = va_aum
-            # REVERSAO DE PROVISOES
-            if "REVERSÃO DE PROVISÕES E AJUSTES DE PERDAS" in col_a:
-                dados["reversao_provisoes"]["atual"] = v_aum
-                dados["reversao_provisoes"]["anterior"] = va_aum
-            # VPD FINANCEIRAS
-            if "VARIAÇÕES PATRIMONIAIS DIMINUTIVAS FINANCEIRAS" in col_d:
-                dados["vpd_financeiras"]["atual"] = v_dim
-                dados["vpd_financeiras"]["anterior"] = va_dim
-            # PESSOAL E ENCARGOS
-            if "PESSOAL E ENCARGOS" in col_d:
-                dados["pessoal_encargos"]["atual"] = v_dim
-                dados["pessoal_encargos"]["anterior"] = va_dim
-            # USO DE MATERIAL DE CONSUMO
-            if "USO DE MATERIAL DE CONSUMO" in col_d or "CONSUMO DE MATERIAL" in col_d:
-                dados["uso_material_consumo"]["atual"] = v_dim
-                dados["uso_material_consumo"]["anterior"] = va_dim
-            # SERVICOS (linha 21)
-            if col_d.strip() == "SERVIÇOS" or col_d.strip() == "SERVICOS":
-                dados["servicos"]["atual"] = v_dim
-                dados["servicos"]["anterior"] = va_dim
-            # DEPRECIACAO (linha 27)
-            if "DEPRECIAÇÃO" in col_d and "AMORTIZAÇÃO" not in col_d:
-                dados["depreciacao"]["atual"] = v_dim
-                dados["depreciacao"]["anterior"] = va_dim
-            # AMORTIZACAO (linha 28)
-            if "AMORTIZAÇÃO" in col_d and "DEPRECIAÇÃO" not in col_d:
-                dados["amortizacao"]["atual"] = v_dim
-                dados["amortizacao"]["anterior"] = va_dim
-            # TRANSFERENCIAS CONCEDIDAS (linha 32)
-            if "TRANSFERÊNCIAS E DELEGAÇÕES CONCEDIDAS" in col_d:
-                dados["transf_concedidas"]["atual"] = v_dim
-                dados["transf_concedidas"]["anterior"] = va_dim
-            # OUTRAS VPD (linha 44)
-            if "OUTRAS VARIAÇÕES PATRIMONIAIS DIMINUTIVAS" in col_d and "FINANCEIRAS" not in col_d:
-                dados["outras_vpd"]["atual"] = v_dim
-                dados["outras_vpd"]["anterior"] = va_dim
-            # TRIBUTARIAS
-            if "TRIBUTÁRIAS" in col_d or "TRIBUTARIAS" in col_d:
-                dados["tributarias"]["atual"] = v_dim
-                dados["tributarias"]["anterior"] = va_dim
-    # RESULTADO = TOTAL VPA - TOTAL VPD
-    dados["resultado"]["atual"] = dados["total_vpa"]["atual"] - dados["total_vpd"]["atual"]
-    dados["resultado"]["anterior"] = dados["total_vpa"]["anterior"] - dados["total_vpd"]["anterior"]
-    dados["tipo_resultado"]["atual"] = "Superávit Patrimonial" if dados["resultado"]["atual"] >= 0 else "Déficit Patrimonial"
-    dados["tipo_resultado"]["anterior"] = "Superávit Patrimonial" if dados["resultado"]["anterior"] >= 0 else "Déficit Patrimonial"
-    if dados["total_vpa"]["atual"] > 0:
-        dados["margem_resultado"]["atual"] = round((dados["resultado"]["atual"] / dados["total_vpa"]["atual"]) * 100, 2)
-    if dados["total_vpa"]["anterior"] > 0:
-        dados["margem_resultado"]["anterior"] = round((dados["resultado"]["anterior"] / dados["total_vpa"]["anterior"]) * 100, 2)
-    return {"dados": dados}
-@router.get("/{periodo}")
-async def api_analise_patrimonial(periodo: str):
-    p_limpo = periodo.replace("-", "_")
-    caminho = os.path.join(UPLOADS_DIR, f"DVP_{p_limpo}.csv")
-    if not os.path.exists(caminho):
-        return {"erro": "faltando", "pecas": ["DVP"]}
+
     try:
-        return processar_dvp(caminho)
+        with open(caminho, "r", encoding="latin-1") as f:
+            linhas = f.readlines()
+
+        for linha in linhas:
+            partes = linha.strip().split(";")
+            if len(partes) < 7:
+                continue
+            
+            # O formato tem: Descricao VPA;;VPA_Atual;VPA_Anterior;Descricao VPD;;VPD_Atual;VPD_Anterior
+            # Ou seja, as colunas 2 e 3 são os valores atuais e anteriores do VPA
+            # E as colunas 6 e 7 são os valores atuais e anteriores do VPD
+            # Mas alguns itens são apenas de um lado.
+            
+            col_a = partes[0].strip().upper() if len(partes) > 0 else ""
+            val_a = limpar(partes[2]) if len(partes) > 2 else 0.0
+            val_a_ant = limpar(partes[3]) if len(partes) > 3 else 0.0
+            
+            col_d = partes[4].strip().upper() if len(partes) > 4 else ""
+            val_d = limpar(partes[6]) if len(partes) > 6 else 0.0
+            val_d_ant = limpar(partes[7]) if len(partes) > 7 else 0.0
+
+            # --- VPA ---
+            if "VARIAÇÃO PATRIMONIAL AUMENTATIVA" in col_a:
+                dados["total_vpa"] = {"atual": val_a, "anterior": val_a_ant}
+            elif "FINANCEIRAS" in col_a:
+                dados["vpa_financeiras"] = {"atual": val_a, "anterior": val_a_ant}
+            elif "TRANSFERÊNCIAS" in col_a or "TRANSFERENCIAS" in col_a:
+                dados["transf_recebidas"] = {"atual": val_a, "anterior": val_a_ant}
+            elif "OUTRAS VARIAÇÕES" in col_a:
+                dados["outras_vpa"] = {"atual": val_a, "anterior": val_a_ant}
+            
+            # --- VPD ---
+            if "VARIAÇÃO PATRIMONIAL DIMINUTIVA" in col_d:
+                dados["total_vpd"] = {"atual": val_d, "anterior": val_d_ant}
+            elif "PESSOAL E ENCARGOS" in col_d:
+                dados["pessoal_encargos"] = {"atual": val_d, "anterior": val_d_ant}
+            elif "SERVIÇOS" in col_d or "SERVICOS" in col_d:
+                dados["servicos"] = {"atual": val_d, "anterior": val_d_ant}
+            elif "DEPRECIAÇÃO" in col_d or "DEPRECIACAO" in col_d:
+                dados["depreciacao"] = {"atual": val_d, "anterior": val_d_ant}
+            elif "TRANSFERÊNCIAS" in col_d or "TRANSFERENCIAS" in col_d:
+                dados["transf_concedidas"] = {"atual": val_d, "anterior": val_d_ant}
+            elif "OUTRAS VARIAÇÕES" in col_d:
+                dados["outras_vpd"] = {"atual": val_d, "anterior": val_d_ant}
+
+        # Calcula o Resultado
+        vpa = dados["total_vpa"]["atual"]
+        vpd = dados["total_vpd"]["atual"]
+        resultado = vpa - vpd
+        dados["resultado"] = {"atual": resultado, "anterior": 0.0}
+        
+        if resultado > 0:
+            dados["tipo_resultado"]["atual"] = "Superávit Patrimonial"
+        elif resultado < 0:
+            dados["tipo_resultado"]["atual"] = "Déficit Patrimonial"
+        else:
+            dados["tipo_resultado"]["atual"] = "Nulo"
+            
+        if vpa > 0:
+            dados["margem_resultado"]["atual"] = round((resultado / vpa) * 100, 2)
+
+        return {"dados": dados}
     except Exception as e:
-        print(f"[DVP] ERRO: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print("[DVP] Erro ao processar CSV:", e)
+        return {"erro": str(e)}
+
+
+# ==============================================================================
+# ROTA GENERICA /{periodo} - DEVE FICAR POR ULTIMO
+# ==============================================================================
+
 
 # ============================================================
-# ROTAS DE SALVAR, HISTÓRICO E PDF (PostgreSQL)
+# ROTAS DE SALVAR, HISTÃ“RICO E PDF (PostgreSQL)
 # ============================================================
 import json
 from datetime import datetime
@@ -219,44 +201,183 @@ def excluir_dvp(id: int):
         return {"ok": False, "mensagem": str(e)}
 
 
-@router.get("/gerar_pdf/{id}")
+@router.get("/gerar_pdf_novo/{id}")
 def gerar_pdf_analise_dvp(id: int):
+    """Gera PDF do DVP com acentos corretos (usa novo_pdf)."""
+    import json
     import traceback
+    import psycopg2
+    from fastapi import Response
+    from pc_backend.app.config import PG_CONFIG
+    from pc_backend.core.pdf_utils import novo_pdf, fmt_brl, NOVA_LINHA
+
     try:
-        from playwright.sync_api import sync_playwright
-        import time
-        
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("SELECT periodo, resultado_json FROM historico_analise_dvp WHERE id = %s", (id,))
+        cur.execute(
+            "SELECT periodo, resultado_json FROM historico_analise_dvp WHERE id = %s",
+            (id,),
+        )
         row = cur.fetchone()
         conn.close()
-        
         if not row:
-            return Response(content=b"Registro nao encontrado", media_type="text/plain", status_code=404)
-        
+            return Response(content="Registro nao encontrado",
+                            media_type="text/plain", status_code=404)
+
         periodo_label = row[0]
         dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
-        
-        url = "http://127.0.0.1:994/analise_dvp?id=" + str(id) + "&_t=" + str(int(time.time()))
-        
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            page = browser.new_page()
-            page.goto(url, wait_until="networkidle")
-            page.wait_for_timeout(4000)
-            page.evaluate("() => { const el = document.querySelector('.top-bar, .filtros, .sidebar, .btn'); if (el) el.style.display = 'none'; }")
-            page.add_style_tag(content="button, select, .top-bar, .filtros, .sidebar { display: none !important; }")
-            page.wait_for_timeout(1000)
-            pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "10mm", "bottom": "10mm", "left": "10mm", "right": "10mm"})
-            browser.close()
-        
+
+        pdf = novo_pdf(orientation="P", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        W = pdf.w
+
+        # Cabecalho
+        pdf.set_fill_color(0, 51, 102)
+        pdf.rect(0, 0, W, 30, style="F")
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 16)
+        pdf.set_xy(15, 8)
+        pdf.cell(0, 8, "DVP - Demonstração das Variações Patrimoniais")
+        pdf.set_font("Arial", "", 10)
+        pdf.set_xy(15, 18)
+        pdf.cell(0, 6, f"Período: {periodo_label}")
+
+        # Valores
+        vpa = (dados.get("total_vpa") or {}).get("atual", 0)
+        vpd = (dados.get("total_vpd") or {}).get("atual", 0)
+        res = (dados.get("resultado") or {}).get("atual", 0)
+
+        # Caixa VPA
+        pdf.set_fill_color(227, 242, 253)
+        pdf.rect(15, 40, 85, 15, style="F")
+        pdf.set_text_color(0, 51, 102)
+        pdf.set_font("Arial", "B", 12)
+        pdf.set_xy(20, 43)
+        pdf.cell(0, 6, fmt_brl(vpa))
+        pdf.set_font("Arial", "", 9)
+        pdf.set_text_color(102, 102, 102)
+        pdf.set_xy(20, 50)
+        pdf.cell(0, 4, "Total VPA (Variações Aumentativas)")
+
+        # Caixa VPD
+        pdf.set_fill_color(255, 235, 238)
+        pdf.rect(110, 40, 85, 15, style="F")
+        pdf.set_text_color(220, 53, 69)
+        pdf.set_font("Arial", "B", 12)
+        pdf.set_xy(115, 43)
+        pdf.cell(0, 6, fmt_brl(vpd))
+        pdf.set_font("Arial", "", 9)
+        pdf.set_text_color(102, 102, 102)
+        pdf.set_xy(115, 50)
+        pdf.cell(0, 4, "Total VPD (Variações Diminutivas)")
+
+        # Caixa Superavit
+        pdf.set_fill_color(232, 245, 233)
+        pdf.rect(15, 62, 180, 18, style="F")
+        pdf.set_text_color(0, 51, 102)
+        pdf.set_font("Arial", "B", 14)
+        pdf.set_xy(20, 66)
+        pdf.cell(0, 7, fmt_brl(res))
+        pdf.set_font("Arial", "B", 10)
+        pdf.set_xy(20, 73)
+        pdf.cell(0, 5, "Superávit Patrimonial")
+
+        # ------------------------------------------------------------------
+        # TABELA MELHORADA
+        # ------------------------------------------------------------------
+        y = 92
+
+        # Cabecalho da tabela
+        pdf.set_fill_color(0, 51, 102)
+        pdf.rect(15, y, 180, 9, style="F")
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 9)
+        pdf.set_xy(18, y + 2.5)
+        pdf.cell(90, 4, "Indicador")
+        pdf.set_xy(110, y + 2.5)
+        pdf.cell(40, 4, "Periodo Atual", align="R")
+        pdf.set_xy(160, y + 2.5)
+        pdf.cell(30, 4, "Periodo Anterior", align="R")
+        y += 9
+
+        # Linhas
+        itens = [
+            ("vpa_financeiras",    "VPA Financeiras",            False, False),
+            ("transf_recebidas",   "Transferencias Recebidas",   False, False),
+            ("outras_vpa",         "Outras VPA",                 False, False),
+            ("total_vpa",          "TOTAL VPA",                  True,  False),
+            ("vpd_financeiras",    "VPD Financeiras",            False, True),
+            ("pessoal_encargos",   "Pessoal e Encargos",         False, True),
+            ("servicos",           "Servicos",                   False, True),
+            ("total_vpd",          "TOTAL VPD",                  True,  True),
+        ]
+
+        for i, (chave, nome, negrito, is_vpd) in enumerate(itens):
+            bloco = dados.get(chave) or {}
+            val = bloco.get("atual", 0)
+            ant = bloco.get("anterior", 0)
+
+            # Fundo zebrado (alternado)
+            if negrito:
+                pdf.set_fill_color(227, 242, 253)  # azul claro para totais
+            elif i % 2 == 0:
+                pdf.set_fill_color(245, 245, 245)  # cinza muito claro
+            else:
+                pdf.set_fill_color(255, 255, 255)  # branco
+
+            pdf.rect(15, y, 180, 8, style="F")
+
+            # Linha inferior (borda)
+            pdf.set_draw_color(200, 200, 200)
+            pdf.set_line_width(0.1)
+            pdf.line(15, y + 8, 195, y + 8)
+
+            # Texto da linha
+            if negrito:
+                pdf.set_font("Arial", "B", 9)
+                pdf.set_text_color(0, 51, 102)  # azul escuro
+            else:
+                pdf.set_font("Arial", "", 9)
+                pdf.set_text_color(0, 0, 0)
+
+            pdf.set_xy(18, y + 2)
+            pdf.cell(90, 4, nome)
+
+            # Valores alinhados a direita
+            pdf.set_xy(110, y + 2)
+            pdf.cell(40, 4, fmt_brl(val), align="R")
+
+            pdf.set_xy(160, y + 2)
+            pdf.cell(30, 4, fmt_brl(ant), align="R")
+
+            y += 8
+
+        # Espaco antes do rodape
+        y += 6
+        pdf_bytes = bytes(pdf.output())
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"inline; filename=Analise_DVP_{id}.pdf"},
+            headers={"Content-Disposition": f"inline; filename=DVP_{id}.pdf"},
         )
     except Exception as e:
-        tb = traceback.format_exc()
-        print(f"[DVP] ERRO NO PDF: {e}\n{tb}")
-        return Response(content=f"ERRO: {e}\n\n{tb}".encode("utf-8"), media_type="text/plain", status_code=500)
+        print("[DVP] PDF erro:", e)
+        print(traceback.format_exc())
+        return Response(content=f"ERRO: {e}", media_type="text/plain", status_code=500)
+
+
+# ==============================================================================
+# ROTA GENERICA /{periodo} - DEVE FICAR POR ULTIMO
+# ==============================================================================
+@router.get("/{periodo}")
+async def api_analise_patrimonial(periodo: str):
+    p_limpo = periodo.replace("-", "_")
+    caminho = os.path.join(UPLOADS_DIR, f"DVP_{p_limpo}.csv")
+    if not os.path.exists(caminho):
+        return {"erro": "faltando", "pecas": ["DVP"]}
+    try:
+        return processar_dvp(caminho)
+    except Exception as e:
+        print(f"[DVP] ERRO: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

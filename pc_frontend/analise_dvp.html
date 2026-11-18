@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Analise DVP - Demonstracao das Variacoes Patrimoniais</title>
+    <title>Analise DVP - Demonstração das Variações Patrimoniais</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
         .top-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
@@ -41,6 +41,8 @@
     </style>
 </head>
 <body>
+
+
     <div class="top-bar">
         <button class="btn btn-voltar" onclick="window.location.href='/panorama'">← Voltar</button>
         <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
@@ -131,7 +133,7 @@
                         document.querySelector('#tab tbody').innerHTML = '<tr><td colspan="4" style="color:red; text-align:center;">' + (data.mensagem || 'Arquivo CSV nao encontrado.') + '</td></tr>';
                         return;
                     }
-                    render(data.dados, data.dados);
+                    render(data.dados ? data.dados : data, data.dados ? data.dados : data);
                     const btn = document.getElementById('btn-salvar');
                     btn.style.display = 'inline-block';
                     btn.setAttribute('data-periodo', periodoAtual);
@@ -147,27 +149,27 @@
             tbody.innerHTML = '';
 
             const secoes = [
-                { titulo: 'VARIACOES PATRIMONIAIS AUMENTATIVAS (VPA)', cor: 'bg-vpa', campos: [
+                { titulo: 'VARIAÇÕES PATRIMONIAIS AUMENTATIVAS (VPA)', cor: 'bg-vpa', campos: [
                     { nome: 'VPA Financeiras', path: 'vpa_financeiras' },
-                    { nome: 'Transferencias Recebidas', path: 'transf_recebidas' },
+                    { nome: 'Transferências Recebidas', path: 'transf_recebidas' },
                     { nome: 'Outras VPA', path: 'outras_vpa' },
-                    { nome: 'Reversao de Provisoes', path: 'reversao_provisoes' },
+                    { nome: 'Reversao de Provisões', path: 'reversao_provisoes' },
                     { nome: 'TOTAL VPA', path: 'total_vpa', negrito: true }
                 ]},
-                { titulo: 'VARIACOES PATRIMONIAIS DIMINUTIVAS (VPD)', cor: 'bg-vpd', campos: [
+                { titulo: 'VARIAÇÕES PATRIMONIAIS DIMINUTIVAS (VPD)', cor: 'bg-vpd', campos: [
                     { nome: 'VPD Financeiras', path: 'vpd_financeiras' },
                     { nome: 'Pessoal e Encargos', path: 'pessoal_encargos' },
                     { nome: 'Uso de Material de Consumo', path: 'uso_material_consumo' },
-                    { nome: 'Servicos', path: 'servicos' },
-                    { nome: 'Depreciacao', path: 'depreciacao' },
-                    { nome: 'Amortizacao', path: 'amortizacao' },
-                    { nome: 'Transferencias Concedidas', path: 'transf_concedidas' },
+                    { nome: 'Serviços', path: 'servicos' },
+                    { nome: 'Depreciação', path: 'depreciacao' },
+                    { nome: 'Amortização', path: 'amortizacao' },
+                    { nome: 'Transferências Concedidas', path: 'transf_concedidas' },
                     { nome: 'Outras VPD', path: 'outras_vpd' },
-                    { nome: 'Tributarias', path: 'tributarias' },
+                    { nome: 'Tributárias', path: 'tributarias' },
                     { nome: 'TOTAL VPD', path: 'total_vpd', negrito: true }
                 ]},
                 { titulo: 'RESULTADO PATRIMONIAL', cor: 'bg-resultado', campos: [
-                    { nome: 'Resultado do Periodo', path: 'resultado', negrito: true },
+                    { nome: 'Resultado do Período', path: 'resultado', negrito: true },
                     { nome: 'Tipo de Resultado', path: 'tipo_resultado', texto: true },
                     { nome: 'Margem (%)', path: 'margem_resultado', sufixo: '%' }
                 ]}
@@ -264,7 +266,7 @@
         function gerarPDF() {
             const sel = document.querySelector('.hist-item input:checked');
             if (!sel) { alert('Selecione um item no histórico.'); return; }
-            window.open('/api/analise_patrimonial/gerar_pdf/' + sel.value, '_blank');
+            window.open('/api/analise_patrimonial/gerar_pdf_novo/' + sel.value, '_blank');
         }
 
         // Auto-load por ?id=
@@ -283,4 +285,9 @@
     </script>
 </body>
 </html>
+
+
+
+
+
 
