@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import importlib
 import os
 import sys
@@ -40,6 +40,8 @@ ROUTERS = [
     "pc_backend.app.routers.receitas",
     "pc_backend.app.routers.relatorio_consolidado",
     "pc_backend.app.routers.notas_itens",
+    "pc_backend.app.routers.configuracoes",
+    "pc_backend.app.routers.usuarios",
 ]
 
 for mod_name in ROUTERS:
