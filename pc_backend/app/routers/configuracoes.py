@@ -290,3 +290,18 @@ def migrar_logo():
     cur.close()
     conn.close()
     return {"ok": True, "mensagem": "Coluna logo_path verificada/adicionada em configuracoes_entidade."}
+
+
+@router.get("/static_logos/{nome_arq}")
+def servir_logo_estatico(nome_arq: str):
+    nome_limpo = Path(nome_arq).name
+    candidatos = [
+        Path(PC_STORAGE) / "uploads_logos" / nome_limpo,
+        Path(PC_FRONTEND) / nome_limpo,
+    ]
+    for arq in candidatos:
+        if arq.exists() and arq.is_file():
+            ext = arq.suffix.lower()
+            media = "image/png" if ext == ".png" else ("image/jpeg" if ext in (".jpg", ".jpeg") else "application/octet-stream")
+            return FileResponse(str(arq.resolve()), media_type=media, headers={"Cache-Control": "no-cache"})
+    raise HTTPException(status_code=404, detail="Logo nao encontrada")
