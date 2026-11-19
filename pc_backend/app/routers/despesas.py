@@ -1,3 +1,5 @@
+from pc_backend.app.config import PG_CONFIG
+import psycopg2
 # -*- coding: utf-8 -*-
 """
 Rotas de Comparativo de Despesas.
@@ -6,176 +8,171 @@ Extraído do main.py para refatoração.
 import os
 import json
 import datetime
-import sqlite3
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse
 
 # Caminhos absolutos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 UPLOAD_DIR = os.path.join(BASE_DIR, "pc_storage", "uploads_raw")
-DB_PATH = os.path.join(BASE_DIR, "pc_storage", "banco_dados.db")
 
 router = APIRouter()
 
-def api_comparativo_despesas_v2(periodo: str):
-    import os, unicodedata
-    upload_dir = UPLOAD_DIR
+from pc_backend.app.db_memoria import salvar_contas_memoria, carregar_contas_memoria, _slug_conta
 
-    partes = periodo.split("-")
-    if len(partes) == 3:
-        ano = int(partes[0]); tipo = partes[1]; valor = partes[2]
-        periodo_anterior = f"{ano - 1}-{tipo}-{valor}"
-    else:
-        periodo_anterior = None
+def _persistir_despesas_memoria(periodo: str, dados: dict) -> None:
+    if not periodo or not isinstance(dados, dict):
+        return
+    itens = [{
+        "chave": "despesa_total",
+        "descricao": "DESPESA TOTAL",
+        "valor": float(dados.get("empenhado_total") or dados.get("liquidado_total") or 0.0),
+        "extra": {
+            "tipo": "total",
+            "orcado": float(dados.get("orcado_total") or 0.0),
+            "empenhado": float(dados.get("empenhado_total") or 0.0),
+            "liquidado": float(dados.get("liquidado_total") or 0.0),
+            "percentual": float(dados.get("percentual_total") or 0.0),
+        },
+    }]
+    for idx, g in enumerate(dados.get("grupos") or []):
+        if isinstance(g, dict):
+            nome = str(g.get("nome") or f"grupo_{idx+1}").strip()
+            val = g.get("empenhado") if g.get("empenhado") is not None else (g.get("liquidado") or 0.0)
+            itens.append({
+                "chave": f"grupo_{_slug_conta(nome)}",
+                "descricao": nome,
+                "valor": float(val or 0.0),
+                "extra": {
+                    "tipo": "grupo",
+                    "nome": nome,
+                    "orcado": float(g.get("orcado") or 0.0),
+                    "empenhado": float(g.get("empenhado") or 0.0),
+                    "liquidado": float(g.get("liquidado") or 0.0),
+                    "percentual": float(g.get("percentual") or 0.0),
+                },
+            })
+    try:
+        salvar_contas_memoria("COMPARATIVO_DESPESAS", periodo, itens)
+    except Exception as e:
+        print(f"[DESPESAS] Aviso ao salvar memoria PG: {e}")
 
-    def parse_valor(s):
-        if not s: return 0.0
-        s = s.strip().strip('"').replace(".", "").replace(",", ".").replace("R$", "").strip()
-        try: return float(s)
-        except: return 0.0
-
-    def parse_pct(s):
-        if not s: return 0.0
-        s = s.strip().strip('"').replace("%", "").replace(",", ".").strip()
-        try: return float(s)
-        except: return 0.0
-
-    def normalizar(txt):
-        return unicodedata.normalize('NFKD', txt).encode('ASCII', 'ignore').decode('utf-8').strip().upper()
-
-    def ler_csv(periodo):
-        if not periodo: return None
-        periodo_formatado = periodo.replace("-", "_")
-        arquivo = os.path.join(upload_dir, f"COMPARATIVO_DESPESAS_{periodo_formatado}.csv")
-
-        if not os.path.exists(arquivo):
-            for f in os.listdir(upload_dir):
-                if periodo_formatado in f and "COMPARATIVO_DESPESAS" in f:
-                    arquivo = os.path.join(upload_dir, f)
-                    break
-
-        if not os.path.exists(arquivo):
-            return None
-
-        try:
-            try:
-                with open(arquivo, "r", encoding="utf-8-sig") as f: linhas = f.readlines()
-            except UnicodeDecodeError:
-                with open(arquivo, "r", encoding="latin-1") as f: linhas = f.readlines()
-
-            dados = {
-                "orcado_total": 0.0, "empenhado_total": 0.0, "liquidado_total": 0.0,
-                "percentual_total": 0.0, "grupos": [], "detalhes": []
-            }
-
-            # Lista fixa de cabeçalhos que NíƒO são contas analí­ticas
-            cabecalhos = [
-                "CREDITO DISPONIVEL", "CREDITO DISPONIVEL - DESPESA CORRENTE",
-                "CREDITO DISPONIVEL - DESPESA CAPITAL",
-                "PESSOAL E ENCARGOS SOCIAIS", "JUROS E ENCARGOS DA DIVIDA",
-                "OUTRAS DESPESAS CORRENTES", "INVESTIMENTOS",
-                "INVERSOES FINANCEIRAS", "AMORTIZACAO DA DIVIDA",
-                "APLICACOES DIRETAS", "APLICACOES INDIRETAS",
-                "OUTROS SERVICOS DE TERCEIROS - PESSOA JURIDICA",
-                "DEMAIS SERVICOS - PESSOAS JURIDICAS",
-                "APOSENTADORIAS DO RPPS", "PROVENTOS - PESSOAL CIVIL",
-                "VENCIMENTOS E VANTAGENS FIXAS - PESSOAL CIVIL",
-                "OUTRAS DESPESAS VARIAVEIS - PESSOAL CIVIL - RGPS",
-                "RESSARCIMENTO DE DESPESAS DE PESSOAL REQUISITADO",
-                "JUROS SOBRE A DIVIDA POR CONTRATO",
-                "JUROS DE SOBRE FORNECIMENTO DE BENS",
-                "JUROS DE SERVICOS DE TERCEIROS - PESSOA JURIDICA",
-                "JUROS DE SERVICOS DE TERCEIROS - PESSOA FISICA",
-                "OUTROS JUROS E ENCARGOS DE MORA",
-                "DESPESAS DE EXERCICIOS ANTERIORES (JUROS E ENCARGOS DAS DIVIDAS)",
-                "OUTRAS DESPESAS DE PESSOAL DECORRENTES DE CONTRATOS DE TERCEIROS",
-                "OUTRAS DESPESAS CORRENTES - APLICACOES DIRETAS",
-                "INVESTIMENTOS - APLICACOES DIRETAS",
-                "INVERSOES FINANCEIRAS - APLICACOES DIRETAS",
-                "AMORTIZACAO DA DIVIDA - APLICACOES DIRETAS",
-                "TOTAL", "TOTAL GERAL"
-            ]
-            cabecalhos_norm = [normalizar(cg) for cg in cabecalhos]
-
-            detalhes_temp = []
-
-            for linha in linhas:
-                if ";" not in linha: continue
-                partes_linha = linha.strip().split(";")
-                if len(partes_linha) < 4: continue
-
-                nome_original = partes_linha[0].strip().strip('"')
-                nome_norm = normalizar(nome_original)
-
-                if not nome_original or len(nome_original) < 3: continue
-
-                # Total Global
-                if nome_norm == "CREDITO DISPONIVEL":
-                    dados["orcado_total"] = parse_valor(partes_linha[1])
-                    dados["empenhado_total"] = parse_valor(partes_linha[2])
-                    dados["liquidado_total"] = parse_valor(partes_linha[2])
-                    dados["percentual_total"] = parse_pct(partes_linha[3])
-
-                # Grupos contábeis
-                grupos_alvo_norm = [
-                    "PESSOAL E ENCARGOS SOCIAIS",
-                    "JUROS E ENCARGOS DA DIVIDA",
-                    "OUTRAS DESPESAS CORRENTES",
-                    "INVESTIMENTOS",
-                    "INVERSOES FINANCEIRAS",
-                    "AMORTIZACAO DA DIVIDA"
-                ]
-                if nome_norm in grupos_alvo_norm:
-                    if not any(g["nome"] == nome_original for g in dados["grupos"]):
-                        dados["grupos"].append({
-                            "nome": nome_original,
-                            "orcado": parse_valor(partes_linha[1]),
-                            "empenhado": parse_valor(partes_linha[2]),
-                            "liquidado": parse_valor(partes_linha[2]),
-                            "percentual": parse_pct(partes_linha[3])
-                        })
-
-                # Detalhes: exclui cabeçalhos e pega o resto com valor > 0
-                valor_emp = parse_valor(partes_linha[2])
-                if valor_emp > 0 and nome_norm not in cabecalhos_norm:
-                    # Exclui também linhas com "TOTAL" no nome (são somatí³rios)
-                    if "TOTAL" not in nome_norm and "SUBTOTAL" not in nome_norm:
-                        detalhes_temp.append({
-                            "nome": nome_original,
-                            "orcado": parse_valor(partes_linha[1]),
-                            "empenhado": valor_emp,
-                            "percentual": parse_pct(partes_linha[3])
-                        })
-
-            # Ordena por empenhado desc e pega top 10
-            detalhes_temp.sort(key=lambda x: x["empenhado"], reverse=True)
-            dados["detalhes"] = detalhes_temp[:10]
-
-            return dados
-        except Exception as e:
-            print(f"[ERRO] Falha ao ler CSV: {e}")
-            return None
-
-    atual = ler_csv(periodo)
-    anterior = ler_csv(periodo_anterior)
-
-    if not atual:
-        return {"erro": True, "mensagem": "Dados nao encontrados para o periodo atual."}
-
-    return {
-        "erro": False,
-        "periodo": periodo,
-        "periodo_anterior": periodo_anterior,
-        "atual": atual,
-        "anterior": anterior or {
-            "orcado_total": 0.0, "empenhado_total": 0.0, "liquidado_total": 0.0,
-            "percentual_total": 0.0, "grupos": [], "detalhes": []
-        }
+def _carregar_despesas_memoria(periodo: str) -> dict | None:
+    mem = carregar_contas_memoria("COMPARATIVO_DESPESAS", periodo)
+    if not mem:
+        return None
+    dados = {
+        "orcado_total": 0.0,
+        "empenhado_total": 0.0,
+        "liquidado_total": 0.0,
+        "percentual_total": 0.0,
+        "grupos": [],
     }
+    for item in mem:
+        extra = item.get("dados_json") if isinstance(item.get("dados_json"), dict) else {}
+        tipo = extra.get("tipo")
+        if tipo == "total" or item.get("chave") == "despesa_total":
+            dados["orcado_total"] = float(extra.get("orcado") or 0.0)
+            dados["empenhado_total"] = float(extra.get("empenhado") if extra.get("empenhado") is not None else (item.get("valor") or 0.0))
+            dados["liquidado_total"] = float(extra.get("liquidado") if extra.get("liquidado") is not None else (item.get("valor") or 0.0))
+            dados["percentual_total"] = float(extra.get("percentual") or 0.0)
+        elif tipo == "grupo":
+            dados["grupos"].append({
+                "nome": extra.get("nome") or item.get("descricao"),
+                "orcado": float(extra.get("orcado") or 0.0),
+                "empenhado": float(extra.get("empenhado") if extra.get("empenhado") is not None else (item.get("valor") or 0.0)),
+                "liquidado": float(extra.get("liquidado") if extra.get("liquidado") is not None else (item.get("valor") or 0.0)),
+                "percentual": float(extra.get("percentual") or 0.0),
+            })
+    return dados
+
+
+def _buscar_despesas_pg(periodo_str: str) -> dict | None:
+    if not periodo_str:
+        return None
+    mem = _carregar_despesas_memoria(periodo_str)
+    if mem and (mem.get("empenhado_total") or mem.get("liquidado_total") or mem.get("orcado_total") or mem.get("grupos")):
+        return mem
+
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT dados_json FROM historico_comparativo_despesas WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            (periodo_str,),
+        )
+        row = cur.fetchone()
+        if not row:
+            cur.execute(
+                "SELECT dados_json FROM historico_comparativo_despesas WHERE periodo ILIKE %s ORDER BY id DESC LIMIT 1",
+                (f"%{periodo_str}%",),
+            )
+            row = cur.fetchone()
+        if not row or not row[0]:
+            return None
+        dj = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        if not isinstance(dj, dict):
+            return None
+        src = dj.get("atual") if isinstance(dj.get("atual"), dict) else dj
+        dados = {
+            "orcado_total": float(src.get("orcado_total") or 0.0),
+            "empenhado_total": float(src.get("empenhado_total") or 0.0),
+            "liquidado_total": float(src.get("liquidado_total") or 0.0),
+            "percentual_total": float(src.get("percentual_total") or 0.0),
+            "grupos": src.get("grupos") or [],
+            "detalhes": src.get("detalhes") or [],
+            "anterior": dj.get("anterior") if isinstance(dj.get("anterior"), dict) else src.get("anterior"),
+        }
+        _persistir_despesas_memoria(periodo_str, dados)
+        return dados
+    except Exception as e:
+        print(f"[DESPESAS] Erro ao consultar PostgreSQL ({periodo_str}): {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def api_comparativo_despesas_v2(periodo: str):
+    atual = _buscar_despesas_pg(periodo)
+    if not atual:
+        return {"erro": True, "mensagem": f"Dados de despesas n?o encontrados no PostgreSQL para o per?odo {periodo}."}
+
+    anterior = atual.get("anterior")
+    if not anterior:
+        partes = periodo.split("-")
+        if len(partes) == 3:
+            try:
+                periodo_anterior = f"{int(partes[0]) - 1}-{partes[1]}-{partes[2]}"
+                anterior = _buscar_despesas_pg(periodo_anterior)
+            except Exception:
+                anterior = None
+
+    retorno = {
+        "orcado_total": atual.get("orcado_total", 0.0),
+        "empenhado_total": atual.get("empenhado_total", 0.0),
+        "liquidado_total": atual.get("liquidado_total", 0.0),
+        "percentual_total": atual.get("percentual_total", 0.0),
+        "grupos": atual.get("grupos", []),
+        "detalhes": atual.get("detalhes", []),
+    }
+
+    if isinstance(anterior, dict):
+        retorno["anterior"] = {
+            "orcado_total": anterior.get("orcado_total", 0.0),
+            "empenhado_total": anterior.get("empenhado_total", 0.0),
+            "liquidado_total": anterior.get("liquidado_total", 0.0),
+            "percentual_total": anterior.get("percentual_total", 0.0),
+            "grupos": anterior.get("grupos", []),
+            "detalhes": anterior.get("detalhes", []),
+        }
+    else:
+        retorno["anterior"] = None
+
+    return retorno
+
 
 @router.get("/historico_comparativo_despesas")
 def get_historico_comparativo_despesas():
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
     cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
     rows = cur.fetchall()
@@ -196,9 +193,9 @@ def get_historico_comparativo_despesas():
 
 @router.get("/historico_comparativo_despesas/{id}")
 def get_historico_comparativo_despesas_id(id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("SELECT periodo, data_geracao, dados_json FROM historico_comparativo_despesas WHERE id = ?", (id,))
+    cur.execute("SELECT periodo, data_geracao, dados_json FROM historico_comparativo_despesas WHERE id = %s", (id,))
     row = cur.fetchone()
     conn.close()
     if not row:
@@ -217,7 +214,7 @@ async def excluir_multiplos_comparativo_despesas(request: Request):
     import psycopg2
     from psycopg2.extras import RealDictCursor
     
-    from .config import PG_CONFIG
+    from pc_backend.app.config import PG_CONFIG
     
     try:
         body = await request.json()
@@ -240,14 +237,18 @@ async def excluir_multiplos_comparativo_despesas(request: Request):
         return {"ok": False, "mensagem": str(e)}
 
 @router.get("/gerar_pdf_comparativo_despesas")
-def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+def gerar_pdf_comparativo_despesas(request: Request, periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+    base_url = str(request.base_url).rstrip("/")
+    if "testserver" in base_url:
+        base_url = os.getenv("PC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
     from playwright.sync_api import sync_playwright
+    from fastapi import Request
     from fastapi.responses import Response
     import time, os
     if historico_id:
-        url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
+        url = f"{base_url}/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
+        url = f"{base_url}/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(bypass_csp=True)
@@ -261,5 +262,5 @@ def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_
 
 
 @router.get("/gerar_pdf_comparativo_despesas/{historico_id}")
-def gerar_pdf_comparativo_despesas_por_id(historico_id: int, periodo: str = "2026-TRIMESTRE-3"):
-    return gerar_pdf_comparativo_despesas(periodo=periodo, historico_id=historico_id)
+def gerar_pdf_comparativo_despesas_por_id(request: Request, historico_id: int, periodo: str = "2026-TRIMESTRE-3"):
+    return gerar_pdf_comparativo_despesas(request=request, periodo=periodo, historico_id=historico_id)

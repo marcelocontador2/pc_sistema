@@ -1,13 +1,22 @@
-﻿"""
-Rota da DFC - Leitura por Blocos (Operacional, Investimento, Financiamento).
+# -*- coding: utf-8 -*-
+"""
+Rota da DFC - PostgreSQL-first (com fallback opcional para CSV).
 """
 import csv
+import json
 import os
-from fastapi import APIRouter, HTTPException
+import time
+import traceback
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import FileResponse
+import psycopg2
+from pc_backend.app.config import PG_CONFIG
 
 router = APIRouter(prefix="/api/analise_dfc", tags=["dfc"])
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "..", "..", "..", "pc_storage", "uploads_raw")
+
 
 def limpar(v):
     if not v:
@@ -24,150 +33,100 @@ def limpar(v):
     except Exception:
         return 0.0
 
-def processar_dfc(caminho):
-    linhas = []
-    with open(caminho, "r", encoding="latin-1", errors="ignore") as f:
-        leitor = csv.reader(f, delimiter=";")
-        for row in leitor:
-            linhas.append(row)
 
-    # Funcao para achar o indice de um termo na coluna 0 ou 3
-    def achar_idx(termo, inicio=0):
-        termo = termo.upper().strip()
-        for i in range(inicio, len(linhas)):
-            p = linhas[i]
-            if len(p) > 0 and termo in str(p[0]).upper():
-                return i
-            if len(p) > 3 and termo in str(p[3]).upper():
-                return i
-        return -1
+def buscar_dfc_postgresql(periodo: str | None = None):
+    """
+    Busca dados da DFC diretamente no PostgreSQL (historico_analise_dfc).
+    """
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+        row = None
+        if periodo:
+            cur.execute(
+                """
+                SELECT periodo, resultado_json
+                FROM historico_analise_dfc
+                WHERE periodo ILIKE %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (f"%{periodo}%",),
+            )
+            row = cur.fetchone()
 
-    def val(p, idx):
-        if p and len(p) > idx:
-            return limpar(p[idx])
-        return 0.0
+        if not row:
+            cur.execute(
+                """
+                SELECT periodo, resultado_json
+                FROM historico_analise_dfc
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            )
+            row = cur.fetchone()
 
-    # --- ENCONTRA OS MARCOS (BLOCOS) ---
-    idx_oper = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DAS OPERA")
-    idx_invest = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DE INVESTIMENTO")
-    idx_financ = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DE FINANCIAMENTO")
-    idx_apuracao = achar_idx("APURA")
-
-    if idx_oper == -1 or idx_invest == -1 or idx_financ == -1 or idx_apuracao == -1:
-        return {"erro": "estrutura", "mensagem": "Nao foi possivel localizar os blocos da DFC no CSV."}
-
-    # --- BLOCO OPERACIONAL ---
-    linhas_oper = linhas[idx_oper:idx_invest]
-    def buscar_no_bloco(bloco, termo):
-        termo = termo.upper().strip()
-        for p in bloco:
-            if len(p) > 0 and termo in str(p[0]).upper():
-                return p
-            if len(p) > 3 and termo in str(p[3]).upper():
-                return p
+        if row and row[1]:
+            dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
+            return {
+                "erro": False,
+                "fonte": "postgresql:historico_analise_dfc",
+                "periodo": row[0],
+                "dados": dados,
+            }
         return None
-
-    l_ing_oper = buscar_no_bloco(linhas_oper, "INGRESSOS")
-    l_desemb_oper = buscar_no_bloco(linhas_oper, "DESEMBOLSOS")
-    l_liq_oper = buscar_no_bloco(linhas_oper, "FLUXO DE CAIXA L")
-
-    # --- BLOCO INVESTIMENTO ---
-    linhas_invest = linhas[idx_invest:idx_financ]
-    l_ing_invest = buscar_no_bloco(linhas_invest, "INGRESSOS")
-    l_desemb_invest = buscar_no_bloco(linhas_invest, "DESEMBOLSOS")
-    l_liq_invest = buscar_no_bloco(linhas_invest, "FLUXO DE CAIXA L")
-
-    # --- BLOCO FINANCIAMENTO ---
-    linhas_financ = linhas[idx_financ:idx_apuracao]
-    l_ing_financ = buscar_no_bloco(linhas_financ, "INGRESSOS")
-    l_desemb_financ = buscar_no_bloco(linhas_financ, "DESEMBOLSOS")
-    l_liq_financ = buscar_no_bloco(linhas_financ, "FLUXO DE CAIXA L")
-
-    # --- APURACAO ---
-    linhas_apuracao = linhas[idx_apuracao:]
-    l_geracao = buscar_no_bloco(linhas_apuracao, "GERA")
-    l_caixa_inicial = buscar_no_bloco(linhas_apuracao, "CAIXA E EQUIVALENTES DE CAIXA INICIAL")
-    l_caixa_final = buscar_no_bloco(linhas_apuracao, "CAIXA E EQUIVALENTES DE CAIXA FINAL")
-
-    dados = {
-        "operacional": {
-            "ingressos": {"atual": val(l_ing_oper, 3), "anterior": val(l_ing_oper, 4)},
-            "desembolsos": {"atual": val(l_desemb_oper, 3), "anterior": val(l_desemb_oper, 4)},
-            "liquido": {"atual": val(l_liq_oper, 3), "anterior": val(l_liq_oper, 4)},
-        },
-        "investimento": {
-            "ingressos": {"atual": val(l_ing_invest, 3), "anterior": val(l_ing_invest, 4)},
-            "desembolsos": {"atual": val(l_desemb_invest, 3), "anterior": val(l_desemb_invest, 4)},
-            "liquido": {"atual": val(l_liq_invest, 3), "anterior": val(l_liq_invest, 4)},
-        },
-        "financiamento": {
-            "ingressos": {"atual": val(l_ing_financ, 3), "anterior": val(l_ing_financ, 4)},
-            "desembolsos": {"atual": val(l_desemb_financ, 3), "anterior": val(l_desemb_financ, 4)},
-            "liquido": {"atual": val(l_liq_financ, 3), "anterior": val(l_liq_financ, 4)},
-        },
-        "caixa": {
-            "geracao": {"atual": val(l_geracao, 3), "anterior": val(l_geracao, 4)},
-            "inicial": {"atual": val(l_caixa_inicial, 3), "anterior": val(l_caixa_inicial, 4)},
-            "final": {"atual": val(l_caixa_final, 3), "anterior": val(l_caixa_final, 4)},
-        }
-    }
-    return {"erro": False, "dados": dados}
+    finally:
+        conn.close()
 
 
-# ============================================================
-# Rota para servir a tela HTML do DFC
-# ============================================================
-from fastapi.responses import FileResponse
-import os
+def processar_dfc(caminho=None, periodo: str | None = None):
+    res_pg = buscar_dfc_postgresql(periodo)
+    if res_pg:
+        return res_pg
+    return {"erro": "faltando", "mensagem": "Dados da DFC nao encontrados no PostgreSQL."}
+
 
 @router.get("/analise_dfc")
 async def serve_analise_dfc():
     caminho = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
         "pc_frontend",
-        "analise_dfc.html"
+        "analise_dfc.html",
     )
     if os.path.exists(caminho):
         return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
     return {"erro": "Arquivo HTML nao encontrado", "caminho": caminho}
 
-# ============================================================
-# ROTAS DE SALVAR, HISTí“RICO E PDF (PostgreSQL)
-# ============================================================
-import json
-from datetime import datetime
-from fastapi import Response
-import psycopg2
-from pc_backend.app.config import PG_CONFIG
-
 
 @router.post("/salvar/{periodo}/{periodo_anterior}")
 async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
     try:
-        # Chama a função de processamento do DFC
-        p_limpo = periodo.replace("-", "_")
-        caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
-        if not os.path.exists(caminho):
-            return {"ok": False, "mensagem": f"CSV nao encontrado: DFC_{p_limpo}.csv"}
-        
-        resultado = processar_dfc(caminho)
-        if resultado.get("erro"):
-            return {"ok": False, "mensagem": resultado.get("mensagem", "Erro no processamento")}
-        
-        dados_json = resultado["dados"]
+        res_pg = buscar_dfc_postgresql(periodo)
+        if not res_pg:
+            p_limpo = periodo.replace("-", "_")
+            caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
+            res_pg = processar_dfc(caminho, periodo=periodo)
+
+        if not res_pg or res_pg.get("erro"):
+            return {"ok": False, "mensagem": (res_pg or {}).get("mensagem", "Dados da DFC n?o encontrados no PostgreSQL")}
+
+        dados_json = res_pg["dados"]
         periodo_label = f"{periodo} vs {periodo_anterior}"
-        
+
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO historico_analise_dfc (periodo, data_geracao, resultado_json)
             VALUES (%s, NOW(), %s) RETURNING id
-        """, (periodo_label, json.dumps(dados_json)))
+            """,
+            (periodo_label, json.dumps(dados_json)),
+        )
         new_id = cur.fetchone()[0]
         conn.commit()
         conn.close()
-        
-        return {"ok": True, "id": new_id, "mensagem": "Salvo com sucesso"}
+
+        return {"ok": True, "id": new_id, "fonte": res_pg.get("fonte", "postgresql"), "mensagem": "Salvo com sucesso"}
     except Exception as e:
         print(f"[DFC] Erro ao salvar: {e}")
         return {"ok": False, "mensagem": str(e)}
@@ -218,25 +177,20 @@ async def excluir_dfc(id: int):
 
 @router.get("/gerar_pdf/{id}")
 def gerar_pdf_analise_dfc(id: int):
-    import traceback
     try:
         from playwright.sync_api import sync_playwright
-        import time
-        
+
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
         cur.execute("SELECT periodo, resultado_json FROM historico_analise_dfc WHERE id = %s", (id,))
         row = cur.fetchone()
         conn.close()
-        
+
         if not row:
             return Response(content=b"Registro nao encontrado", media_type="text/plain", status_code=404)
-        
-        periodo_label = row[0]
-        dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
-        
+
         url = "http://127.0.0.1:994/analise_dfc?id=" + str(id) + "&_t=" + str(int(time.time()))
-        
+
         with sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page()
@@ -247,7 +201,7 @@ def gerar_pdf_analise_dfc(id: int):
             page.wait_for_timeout(1000)
             pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "10mm", "bottom": "10mm", "left": "10mm", "right": "10mm"})
             browser.close()
-        
+
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -259,18 +213,20 @@ def gerar_pdf_analise_dfc(id: int):
         return Response(content=f"ERRO: {e}\n\n{tb}".encode("utf-8"), media_type="text/plain", status_code=500)
 
 
-# ============================================================
-# ROTA GENÉRICA: /{periodo} (deve ficar no FINAL para não conflitar)
-# ============================================================
 @router.get("/{periodo}")
 def api_analise_dfc(periodo: str):
     try:
+        res_pg = buscar_dfc_postgresql(periodo)
+        if res_pg:
+            return res_pg
+
         p_limpo = periodo.replace("-", "_")
         caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
-        if not os.path.exists(caminho):
-            return {"erro": "faltando", "mensagem": f"CSV nao encontrado: DFC_{p_limpo}.csv"}
-        return processar_dfc(caminho)
+        if os.path.exists(caminho):
+            return processar_dfc(caminho, periodo=periodo)
+
+        return {"erro": "faltando", "mensagem": f"Dados da DFC n?o encontrados no PostgreSQL nem em CSV ({p_limpo})"}
     except Exception as e:
-        import traceback
-        print(f"[DFC] ERRO: {e}\n{traceback.format_exc()}")
+        tb = traceback.format_exc()
+        print(f"[DFC] ERRO: {e}\n{tb}")
         return {"erro": "interno", "mensagem": str(e)}

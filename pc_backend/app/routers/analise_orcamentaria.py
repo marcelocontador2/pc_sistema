@@ -1,3 +1,4 @@
+from pc_backend.app.db_memoria import salvar_contas_memoria, carregar_contas_memoria, _slug_conta
 # -*- coding: utf-8 -*-
 """
 Rotas de Análise Orçamentária.
@@ -6,7 +7,6 @@ Extraído do main.py para refatoração.
 import os
 import json
 import datetime
-import sqlite3
 from fastapi import APIRouter, Request, Response, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pc_backend.app.config import PG_CONFIG
@@ -15,7 +15,6 @@ import psycopg2
 # Caminhos absolutos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 UPLOAD_DIR = os.path.join(BASE_DIR, "pc_storage", "uploads_raw")
-DB_PATH = os.path.join(BASE_DIR, "pc_storage", "banco_dados.db")
 FRONTEND_DIR = os.path.join(BASE_DIR, "pc_frontend")
 
 router = APIRouter()
@@ -26,7 +25,7 @@ router = APIRouter()
 
 @router.get("/historico_analise_orcamentaria")
 def get_historico_analise_orcamentaria():
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
     cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_orcamentaria ORDER BY id DESC")
     rows = cur.fetchall()
@@ -45,9 +44,9 @@ def get_historico_analise_orcamentaria():
 
 @router.get("/historico_analise_orcamentaria/{id}")
 async def get_analise_orcamentaria_id(id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id=?", (id,))
+    cur.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id=%s", (id,))
     row = cur.fetchone(); conn.close()
     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
     return json.loads(row[1])
@@ -62,22 +61,22 @@ async def salvar_analise_orcamentaria(periodo: str):
     anterior = await api_analise_orcamentaria_bo(periodo_anterior)
     dados = {"periodo_anterior": periodo_anterior, "periodo": periodo,
              "atual": atual, "anterior": anterior if not anterior.get("erro") else {}}
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_orcamentaria (
 
-        id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
+        id SERIAL PRIMARY KEY, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
     data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    cur.execute("INSERT INTO historico_analise_orcamentaria (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
+    cur.execute("INSERT INTO historico_analise_orcamentaria (periodo, data_geracao, resultado_json) VALUES (%s,%s,%s)",
                 (periodo, data_agora, json.dumps(dados)))
     conn.commit(); conn.close()
     return {"mensagem": "Salvo"}
 
 @router.delete("/excluir_analise_orcamentaria/{id}")
 async def excluir_analise_orcamentaria(id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("DELETE FROM historico_analise_orcamentaria WHERE id=?", (id,))
+    cur.execute("DELETE FROM historico_analise_orcamentaria WHERE id=%s", (id,))
     conn.commit(); conn.close()
     return {"mensagem": "Excluido"}
 
@@ -209,6 +208,8 @@ def gerar_pdf_analise_orcamentaria(id: int):
         return Response(content=pdf_bytes, media_type="application/pdf", headers={
             "Content-Disposition": f"inline; filename=analise_orcamentaria_{id}.pdf"
         })
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -220,41 +221,57 @@ async def serve_analise_orcamentaria():
 
 
 # === ROTA RESGATADA: CÁLCULO DO BALANÇO ORÇAMENTÁRIO ===
+def _buscar_orcamentaria_pg(periodo_str: str) -> dict | None:
+    if not periodo_str:
+        return None
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT resultado_json FROM historico_analise_orcamentaria WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            (periodo_str,),
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            rj = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            if isinstance(rj, dict):
+                bloco = rj.get("atual") if isinstance(rj.get("atual"), dict) else rj
+                if isinstance(bloco, dict) and ("receita_realizada" in bloco or "despesa_empenhada" in bloco):
+                    out = dict(bloco)
+                    out["erro"] = False
+                    return out
+
+        cur.execute(
+            "SELECT resultado_json FROM historico_analise_orcamentaria WHERE resultado_json LIKE %s ORDER BY id DESC LIMIT 1",
+            (f'%"{periodo_str}"%',),
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            rj = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            if isinstance(rj, dict):
+                if rj.get("periodo") == periodo_str and isinstance(rj.get("atual"), dict):
+                    out = dict(rj["atual"])
+                    out["erro"] = False
+                    return out
+                if rj.get("periodo_anterior") == periodo_str and isinstance(rj.get("anterior"), dict):
+                    out = dict(rj["anterior"])
+                    out["erro"] = False
+                    return out
+
+        return None
+    except Exception as e:
+        print(f"[ORCAMENTARIA] Erro ao consultar PostgreSQL ({periodo_str}): {e}")
+        return None
+    finally:
+        conn.close()
+
+
 @router.get("/api/analise_orcamentaria_bo/{periodo}")
 async def api_analise_orcamentaria_bo(periodo: str):
     try:
-        # === REGRA DE INTEGRIDADE ===
-        from pc_backend.matriz_integridade import _get_csv
-        caminho_check = _get_csv("BALANCO_ORCAMENTARIO", periodo)
-        if not caminho_check or not os.path.exists(caminho_check):
-            return {"erro": "faltando", "pecas": ["Balanço Orçamentário"]}
-        from pc_backend.matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
-        caminho = _get_csv("BALANCO_ORCAMENTARIO", periodo)
-        if not caminho or not os.path.exists(caminho):
-            return {"erro": True, "mensagem": f"BO do perí­odo {periodo} não foi importado."}
-        linhas = _ler_linhas(caminho)
-        def buscar(termo, col, apos=0):
-            for i, p in enumerate(linhas):
-                if i < apos or not p: continue
-                if termo.upper() in p[0].strip().upper() and len(p) > col:
-                    return abs(_limpar_valor(p[col]))
-            return 0.0
-        receita = buscar("SUB-TOTAL DAS RECEITAS", 6)
-        receita_orc = buscar("SUB-TOTAL DAS RECEITAS", 5)
-        empenhada = buscar("SUB-TOTAL DAS DESPESAS", 4)
-        despesa_orc = buscar("SUB-TOTAL DAS DESPESAS", 3)
-        idx_desp = next((i for i, p in enumerate(linhas) if p and "SUB-TOTAL DAS DESPESAS" in p[0].upper()), 0)
-        restos = buscar("TOTAL:", 6, apos=idx_desp)
-        return {
-            "erro": False,
-            "receita_realizada": receita,
-            "despesa_empenhada": empenhada,
-            "superavit": receita - empenhada,
-            "restos_pagar": restos,
-            "receita_orcada": receita_orc,
-            "despesa_orcada": despesa_orc,
-            "pct_receita": round(receita / receita_orc * 100, 2) if receita_orc else 0,
-            "pct_despesa": round(empenhada / despesa_orc * 100, 2) if despesa_orc else 0,
-        }
+        dados = _buscar_orcamentaria_pg(periodo)
+        if not dados:
+            return {"erro": True, "mensagem": f"Dados or?ament?rios do per?odo {periodo} n?o encontrados no PostgreSQL."}
+        return dados
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}

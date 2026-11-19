@@ -125,19 +125,20 @@ def get_historico_bp():
 @router.get("/{periodo}")
 def api_analise_bp(periodo: str):
     try:
-        p_limpo = periodo.replace("-", "_")
-        # Extrair o ano do periodo (ex: "2026_3" -> "2026")
-        ano = p_limpo.split("_")[0]
-        # Buscar por glob: BALANCO_PATRIMONIAL_{ano}*.csv
-        import glob as glob_module
-        padrao = os.path.join(UPLOADS_DIR, f"BALANCO_PATRIMONIAL_{ano}*.csv")
-        candidatos = glob_module.glob(padrao)
-        if not candidatos:
-            return {"erro": "faltando", "mensagem": f"CSV nao encontrado: {padrao}"}
-        # Escolher o mais recente (se houver mais de um)
-        candidatos.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-        caminho = candidatos[0]
-        return processar_bp(caminho)
+        conn = psycopg2.connect(**PG_CONFIG)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT resultado_json FROM historico_analise_bp WHERE periodo = %s OR periodo LIKE %s ORDER BY id DESC LIMIT 1",
+                (periodo, f"{periodo}%"),
+            )
+            row = cur.fetchone()
+            if not row or not row[0]:
+                return {"erro": "faltando", "mensagem": f"Analise de BP nao encontrada no PostgreSQL para {periodo}"}
+            rj = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            return {"erro": False, "fonte": "postgresql", "dados": rj}
+        finally:
+            conn.close()
     except Exception as e:
         print(f"[BP] ERRO: {e}\n{traceback.format_exc()}")
         return {"erro": "interno", "mensagem": str(e)}
@@ -146,29 +147,27 @@ def api_analise_bp(periodo: str):
 @router.post("/salvar/{periodo}/{periodo_anterior}")
 def salvar_analise_bp(periodo: str, periodo_anterior: str):
     try:
-        p_limpo = periodo.replace("-", "_")
-        caminho = os.path.join(UPLOADS_DIR, f"BALANCO_PATRIMONIAL_{p_limpo}.csv")
-        if not os.path.exists(caminho):
-            return {"ok": False, "mensagem": f"CSV nao encontrado: BALANCO_PATRIMONIAL_{p_limpo}.csv"}
-        
-        resultado = processar_bp(caminho)
-        if resultado.get("erro"):
-            return {"ok": False, "mensagem": resultado.get("mensagem", "Erro no processamento")}
-        
-        dados_json = resultado["dados"]
-        periodo_label = f"{periodo} vs {periodo_anterior}"
-        
         conn = psycopg2.connect(**PG_CONFIG)
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO historico_analise_bp (periodo, data_geracao, resultado_json)
-            VALUES (%s, NOW(), %s) RETURNING id
-        """, (periodo_label, json.dumps(dados_json, ensure_ascii=False)))
-        new_id = cur.fetchone()[0]
-        conn.commit()
-        conn.close()
-        
-        return {"ok": True, "id": new_id, "mensagem": "Salvo com sucesso"}
+        try:
+            cur = conn.cursor()
+            periodo_label = f"{periodo} vs {periodo_anterior}"
+            cur.execute(
+                "SELECT resultado_json FROM historico_analise_bp WHERE periodo = %s OR periodo LIKE %s ORDER BY id DESC LIMIT 1",
+                (periodo_label, f"{periodo}%"),
+            )
+            row = cur.fetchone()
+            if not row or not row[0]:
+                return {"ok": False, "mensagem": f"Dados de BP nao encontrados no PostgreSQL para {periodo}"}
+            dados_json = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            cur.execute(
+                "INSERT INTO historico_analise_bp (periodo, data_geracao, resultado_json) VALUES (%s, NOW(), %s) RETURNING id",
+                (periodo_label, json.dumps(dados_json, ensure_ascii=False)),
+            )
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            return {"ok": True, "id": new_id, "mensagem": "Salvo com sucesso"}
+        finally:
+            conn.close()
     except Exception as e:
         print(f"[BP] Erro ao salvar: {e}\n{traceback.format_exc()}")
         return {"ok": False, "mensagem": str(e)}

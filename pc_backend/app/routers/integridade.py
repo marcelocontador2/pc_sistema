@@ -1,23 +1,24 @@
+from pc_backend.app.db_memoria import carregar_contas_memoria
+import json
+import psycopg2
+from fastapi import HTTPException
+from pc_backend.app.config import PG_CONFIG
 # -*- coding: utf-8 -*-
 """
 Rotas de Integridade (Matriz de Integridade).
 Extraído do main.py para refatoração.
 """
 import os
-import json
 import datetime
-import sqlite3
 from fastapi import APIRouter, Request, Response, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 
 # Caminhos absolutos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 UPLOAD_DIR = os.path.join(BASE_DIR, "pc_storage", "uploads_raw")
-DB_PATH = os.path.join(BASE_DIR, "pc_storage", "banco_dados.db")
 FRONTEND_DIR = os.path.join(BASE_DIR, "pc_frontend")
 
 
-from pc_backend.app.config import PG_CONFIG
 
 router = APIRouter()
 
@@ -28,7 +29,7 @@ router = APIRouter()
 @router.get("/historico_integridade")
 async def listar_historico():
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
         cursor.execute('''
 
@@ -43,6 +44,8 @@ async def listar_historico():
         for r in rows:
             historico.append({"id": r[0], "periodo": r[1], "data_geracao": r[2]})
         return historico
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 # Rota que abre um histí³rico especifico pelo ID
@@ -50,14 +53,16 @@ async def listar_historico():
 @router.get("/historico_integridade/{id}")
 async def buscar_historico(id: int):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
-        cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = ?''', (id,))
+        cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = %s''', (id,))
         row = cursor.fetchone()
         conn.close()
         if not row:
             raise HTTPException(status_code=404, detail="Historico nao encontrado")
         return json.loads(row[0])
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -66,38 +71,83 @@ async def serve_integridade():
     caminho = os.path.join(FRONTEND_DIR, "integridade.html")
     return FileResponse(caminho)
 
+def _parse_json_pg(val):
+    if val is None:
+        return None
+    if isinstance(val, dict):
+        return val
+    try:
+        return json.loads(val)
+    except Exception:
+        return None
+
+
+def _buscar_integridade_matriz_pg(periodo: str) -> dict | None:
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+
+        cur.execute(
+            "SELECT resultado_json FROM historico_integridade_matriz WHERE periodo = %s ORDER BY id DESC LIMIT 5",
+            (periodo,),
+        )
+        for (raw,) in cur.fetchall():
+            rj = _parse_json_pg(raw)
+            if isinstance(rj, dict) and rj.get("matriz"):
+                return rj
+
+        cur.execute(
+            "SELECT resultado_json FROM historico_matriz_integridade WHERE periodo = %s ORDER BY id DESC LIMIT 5",
+            (periodo,),
+        )
+        for (raw,) in cur.fetchall():
+            rj = _parse_json_pg(raw)
+            if isinstance(rj, dict) and rj.get("matriz"):
+                return {
+                    "periodo": periodo,
+                    "matriz": rj.get("matriz", []),
+                    "justificativas": rj.get("justificativas", {}),
+                }
+
+        cur.execute(
+            "SELECT resultado_json FROM historico_integridade_matriz WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            (periodo,),
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            rj = _parse_json_pg(row[0])
+            if isinstance(rj, dict):
+                return rj
+
+        cur.execute(
+            "SELECT resultado_json FROM historico_integridade WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            (periodo,),
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            rj = _parse_json_pg(row[0])
+            if isinstance(rj, dict):
+                return rj
+
+        return None
+    finally:
+        conn.close()
+
+
 @router.get("/api/integridade_matriz/{periodo}")
 async def api_integridade_matriz_calcular(periodo: str):
-    import json
-    import psycopg2
-    
-    # Definição local para garantir que a variável exista no escopo
-        
     try:
-        # Tenta primeiro buscar o último histórico salvo no PostgreSQL
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute("SELECT resultado_json FROM historico_integridade_matriz ORDER BY id DESC LIMIT 1")
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        if row:
-            # Se encontrou histórico, retorna exatamente o JSON salvo
-            return json.loads(row[0])
-            
-        # Se não encontrou, tenta calcular via CSVs (fallback)
-        from .matriz_integridade import gerar_matriz
-        dados = gerar_matriz(periodo)
-        return dados
+        dados = _buscar_integridade_matriz_pg(periodo)
+        if dados:
+            return dados
+        return {"erro": True, "mensagem": f"Dados de integridade n?o encontrados no PostgreSQL para {periodo}."}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 
+
 @router.post("/api/integridade_matriz/{periodo}/salvar")
 async def salvar_integridade_matriz(periodo: str, request: Request):
-    import json
     from datetime import datetime
-    import psycopg2
     
     # Definição local para garantir que a variável exista no escopo
         
@@ -212,8 +262,6 @@ async def salvar_integridade_matriz(periodo: str, request: Request):
 
 @router.get("/historico_integridade_matriz")
 def listar_integridade_matriz():
-    import json
-    import psycopg2
     
         
     try:
@@ -241,8 +289,6 @@ def listar_integridade_matriz():
 
 @router.get("/historico_integridade_matriz/{id}")
 async def buscar_integridade_matriz(id: int):
-    import json
-    import psycopg2
     
     # Definição local para garantir que a variável exista
         
@@ -289,7 +335,6 @@ def gerar_pdf_integridade_matriz(check_id: int):
     from fpdf import FPDF
     from fpdf.enums import XPos, YPos
     import psycopg2, json
-    from pc_backend.app.config import PG_CONFIG
 
     try:
         conn = psycopg2.connect(**PG_CONFIG)

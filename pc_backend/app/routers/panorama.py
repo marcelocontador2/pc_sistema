@@ -1,3 +1,5 @@
+from pc_backend.app.config import PG_CONFIG
+import psycopg2
 """
 Rota do Panorama — versão final (31/10/2026).
 Calcula Ativo, Passivo, PL, Receitas, Despesas, Superávit Orçamentário,
@@ -5,7 +7,6 @@ Superávit Patrimonial (DVP) e Superávit Financeiro (BP).
 """
 import json
 import os
-import sqlite3
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from fpdf import FPDF
@@ -24,7 +25,6 @@ except ImportError:
 router = APIRouter(prefix="/api/panorama", tags=["panorama"])
 DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", "..", "pc_storage", "banco_dados.db"
 )
 def buscar_valor(linhas, termo, coluna):
     termo = termo.upper().strip()
@@ -148,52 +148,48 @@ def calcular_superavit_financeiro(linhas_bp):
     if superavit_direto > 0:
         return superavit_direto
     return ativo_fin - passivo_fin
-def buscar_arquivo(periodo, tipo):
-    nome = f"{tipo}_{periodo.replace('-', '_')}.csv"
-    conn = sqlite3.connect(DB_PATH)
+def _buscar_panorama_pg(periodo: str) -> dict | None:
+    if not periodo:
+        return None
+    conn = psycopg2.connect(**PG_CONFIG)
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT dados_json FROM arquivos_importados WHERE nome_arquivo = ?",
-            (nome,)
+            "SELECT resultado_json FROM historico_panorama WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            (periodo,),
         )
         row = cursor.fetchone()
-        return json.loads(row[0]) if row else []
+        if not row or not row[0]:
+            return None
+        return row[0] if isinstance(row[0], dict) else json.loads(row[0])
     finally:
         conn.close()
+
+
 @router.get("/{periodo}")
 async def api_panorama(periodo: str):
     try:
-        linhas_bp = buscar_arquivo(periodo, "BALANCO_PATRIMONIAL")
-        if not linhas_bp:
-            raise HTTPException(status_code=404, detail=f"Balanco Patrimonial nao encontrado para {periodo}")
-        bp = calcular_bp(linhas_bp)
-        caixa = buscar_valor(linhas_bp, "CAIXA E EQUIVALENTES", 1) or buscar_valor(linhas_bp, "CAIXA", 1)
-        linhas_bo = buscar_arquivo(periodo, "BALANCO_ORCAMENTARIO")
-        bo = calcular_bo(linhas_bo)
-        superavit_orc = bo["receita_realizada"] - bo["despesa_empenhada"]
-        linhas_dvp = buscar_arquivo(periodo, "DVP")
-        superavit_patrimonial = calcular_dvp(linhas_dvp)
-        superavit_financeiro = calcular_superavit_financeiro(linhas_bp)
-        print(f"[PANORAMA] ativo={bp['ativo_total']}, passivo={bp['passivo_total']}, pl={bp['patrimonio_liquido']}")
-        print(f"[PANORAMA] receita={bo['receita_realizada']}, despesa={bo['despesa_empenhada']}, superavit={superavit_orc}")
-        print(f"[PANORAMA] superavit_patrimonial={superavit_patrimonial}, superavit_financeiro={superavit_financeiro}")
+        dados = _buscar_panorama_pg(periodo)
+        if not dados:
+            raise HTTPException(status_code=404, detail=f"Panorama nao encontrado no PostgreSQL para {periodo}")
         return {
-            "ativo_total": bp["ativo_total"],
-            "passivo_total": bp["passivo_total"],
-            "patrimonio_liquido": bp["patrimonio_liquido"],
-            "caixa_bp": caixa,
-            "receita_realizada": bo["receita_realizada"],
-            "despesa_empenhada": bo["despesa_empenhada"],
-            "superavit_orcamentario": superavit_orc,
-            "superavit_patrimonial": superavit_patrimonial,
-            "superavit_financeiro": superavit_financeiro,
+            "ativo_total": float(dados.get("ativo_total", 0.0) or 0.0),
+            "passivo_total": float(dados.get("passivo_total", 0.0) or 0.0),
+            "patrimonio_liquido": float(dados.get("patrimonio_liquido", 0.0) or 0.0),
+            "caixa_bp": float(dados.get("caixa_bp", 0.0) or 0.0),
+            "receita_realizada": float(dados.get("receita_realizada", 0.0) or 0.0),
+            "despesa_empenhada": float(dados.get("despesa_empenhada", 0.0) or 0.0),
+            "superavit_orcamentario": float(dados.get("superavit_orcamentario", 0.0) or 0.0),
+            "superavit_patrimonial": float(dados.get("superavit_patrimonial", 0.0) or 0.0),
+            "superavit_financeiro": float(dados.get("superavit_financeiro", 0.0) or 0.0),
         }
     except HTTPException:
         raise
     except Exception as e:
         print(f"[PANORAMA] ERRO: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/gerar_pdf_panorama_v2/{id}")
 async def gerar_pdf_panorama(id: str):
     """Gera PDF do Panorama com visual moderno."""
@@ -202,27 +198,33 @@ async def gerar_pdf_panorama(id: str):
         from fpdf.enums import XPos, YPos
         from fastapi.responses import Response
         if id.isdigit():
-            conn = sqlite3.connect(DB_PATH)
+            conn = psycopg2.connect(**PG_CONFIG)
             cursor = conn.cursor()
-            cursor.execute("SELECT periodo FROM historico_panorama WHERE id = ?", (int(id),))
+            cursor.execute("SELECT periodo, resultado_json FROM historico_panorama WHERE id = %s", (int(id),))
             row = cursor.fetchone()
             conn.close()
             if not row:
                 raise HTTPException(status_code=404, detail=f"Historico com ID {id} nao encontrado")
             periodo = row[0]
+            dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
         else:
             periodo = id
-        linhas_bp = buscar_arquivo(periodo, "BALANCO_PATRIMONIAL")
-        if not linhas_bp:
-            raise HTTPException(status_code=404, detail=f"Balanco Patrimonial nao encontrado para {periodo}")
-        bp = calcular_bp(linhas_bp)
-        caixa = buscar_valor(linhas_bp, "CAIXA E EQUIVALENTES", 1) or buscar_valor(linhas_bp, "CAIXA", 1)
-        linhas_bo = buscar_arquivo(periodo, "BALANCO_ORCAMENTARIO")
-        bo = calcular_bo(linhas_bo)
-        superavit_orc = bo["receita_realizada"] - bo["despesa_empenhada"]
-        linhas_dvp = buscar_arquivo(periodo, "DVP")
-        superavit_patrimonial = calcular_dvp(linhas_dvp)
-        superavit_financeiro = calcular_superavit_financeiro(linhas_bp)
+            dados = _buscar_panorama_pg(periodo)
+        if not dados:
+            raise HTTPException(status_code=404, detail=f"Panorama nao encontrado no PostgreSQL para {periodo}")
+        caixa = float(dados.get("caixa_bp", 0.0) or 0.0)
+        bp = {
+            "ativo_total": float(dados.get("ativo_total", 0.0) or 0.0),
+            "passivo_total": float(dados.get("passivo_total", 0.0) or 0.0),
+            "patrimonio_liquido": float(dados.get("patrimonio_liquido", 0.0) or 0.0),
+        }
+        bo = {
+            "receita_realizada": float(dados.get("receita_realizada", 0.0) or 0.0),
+            "despesa_empenhada": float(dados.get("despesa_empenhada", 0.0) or 0.0),
+        }
+        superavit_orc = float(dados.get("superavit_orcamentario", bo["receita_realizada"] - bo["despesa_empenhada"]) or 0.0)
+        superavit_patrimonial = float(dados.get("superavit_patrimonial", 0.0) or 0.0)
+        superavit_financeiro = float(dados.get("superavit_financeiro", 0.0) or 0.0)
         # PDF moderno
         pdf = FPDF()
         pdf.add_page()

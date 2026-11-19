@@ -28,136 +28,53 @@ def _parse_val(v):
 
 
 
-def _ler_balanco(periodo_str):
-    periodo_formatado = periodo_str.replace("-", "_")
-    padrao = os.path.join(UPLOAD_DIR, "*BALANCO_FINANCEIRO*" + periodo_formatado + "*.csv")
-    arquivos = sorted(glob.glob(padrao))
-    if not arquivos:
+def _buscar_balanco_pg(periodo_str: str, periodo_ant: str | None = None) -> dict | None:
+    if not periodo_str:
         return None
-    arquivo = arquivos[0]
-    
-    res = {
-        "receitas": {"corrente": 0.0, "capital": 0.0, "total": 0.0},
-        "despesas": {"corrente": 0.0, "capital": 0.0, "total": 0.0},
-        "extra": {"recebimentos": 0.0, "pagamentos": 0.0},
-        "caixa": {"saldo_anterior": 0.0, "geracao_liquida": 0.0, "saldo_seguinte": 0.0},
-    }
-    # Dicionário auxiliar para o período anterior (coluna 2 do CSV)
-    res_ant = {
-        "receitas": {"corrente": 0.0, "capital": 0.0, "total": 0.0},
-        "despesas": {"corrente": 0.0, "capital": 0.0, "total": 0.0},
-        "extra": {"recebimentos": 0.0, "pagamentos": 0.0},
-        "caixa": {"saldo_anterior": 0.0, "geracao_liquida": 0.0, "saldo_seguinte": 0.0},
-    }
-    
-    with open(arquivo, "r", encoding="latin-1") as f:
-        linhas = list(csv.reader(f, delimiter=";"))
-    
-    for linha in linhas:
-        if not linha:
-            continue
-        
-        cols = [c.strip() for c in linha]
-        if len(cols) < 3:
-            continue
-        
-        # Limpa quebras de linha e acentos
-        nome_esq = " ".join(cols[0].upper().split())
-        val_esq = _parse_val(cols[1]) if len(cols) > 1 else 0.0
-        val_esq_ant = _parse_val(cols[2]) if len(cols) > 2 else 0.0  # COLUNA 2 = EXERCÍCIO ANTERIOR
-        
-        # --- RECEITAS E CAIXA (Coluna Esquerda) ---
-        if nome_esq == "RECEITAS CORRENTE":
-            res["receitas"]["corrente"] = val_esq
-            res_ant["receitas"]["corrente"] = val_esq_ant
-        elif nome_esq == "RECEITAS DE CAPITAL":
-            res["receitas"]["capital"] = val_esq
-            res_ant["receitas"]["capital"] = val_esq_ant
-        elif "SALDO EM ESPÉCIE" in nome_esq and "ANTERIOR" in nome_esq:
-            res["caixa"]["saldo_anterior"] = val_esq
-            res_ant["caixa"]["saldo_anterior"] = val_esq_ant
-        elif nome_esq == "RECEBIMENTOS EXTRAORÇAMENTÁRIOS":
-            res["extra"]["recebimentos"] = val_esq
-            res_ant["extra"]["recebimentos"] = val_esq_ant
-        
-        # --- DESPESAS E CAIXA (Coluna Direita, cols 3 e 4) ---
-        if len(cols) >= 6:
-            nome_dir = " ".join(cols[3].upper().split())
-            val_dir = _parse_val(cols[4])
-            val_dir_ant = _parse_val(cols[5]) if len(cols) > 5 else 0.0  # COLUNA 5 = EXERCÍCIO ANTERIOR
-            
-            if nome_dir == "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CORRENTE":
-                res["despesas"]["corrente"] = val_dir
-                res_ant["despesas"]["corrente"] = val_dir_ant
-            elif nome_dir == "CREDITO EMPENHADO LIQUIDADO PAGO - DESPESA CAPITAL":
-                res["despesas"]["capital"] = val_dir
-                res_ant["despesas"]["capital"] = val_dir_ant
-            elif nome_dir == "PAGAMENTOS EXTRAORÇAMENTÁRIOS":
-                res["extra"]["pagamentos"] = val_dir
-                res_ant["extra"]["pagamentos"] = val_dir_ant
-            elif "SALDO EM ESPÉCIE" in nome_dir and "SEGUINTE" in nome_dir:
-                res["caixa"]["saldo_seguinte"] = val_dir
-                res_ant["caixa"]["saldo_seguinte"] = val_dir_ant
-    
-    # Calcula totais (atual)
-    res["receitas"]["total"] = res["receitas"]["corrente"] + res["receitas"]["capital"]
-    res["despesas"]["total"] = res["despesas"]["corrente"] + res["despesas"]["capital"]
-    res["caixa"]["geracao_liquida"] = res["caixa"]["saldo_seguinte"] - res["caixa"]["saldo_anterior"]
-    
-    # Calcula totais (anterior)
-    res_ant["receitas"]["total"] = res_ant["receitas"]["corrente"] + res_ant["receitas"]["capital"]
-    res_ant["despesas"]["total"] = res_ant["despesas"]["corrente"] + res_ant["despesas"]["capital"]
-    res_ant["caixa"]["geracao_liquida"] = res_ant["caixa"]["saldo_seguinte"] - res_ant["caixa"]["saldo_anterior"]
-    
-    return res, res_ant
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+        if periodo_ant:
+            label = f"{periodo_str} vs {periodo_ant}"
+            cur.execute(
+                "SELECT resultado_json FROM historico_analise_financeira_bf WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+                (label,),
+            )
+            row = cur.fetchone()
+            if row and row[0]:
+                return row[0] if isinstance(row[0], dict) else json.loads(row[0])
 
-
-def _montar_json_aninhado(dados_atual, dados_anterior):
-    return {
-        "receitas": {
-            "corrente": {"atual": dados_atual["receitas"]["corrente"], "anterior": dados_anterior["receitas"]["corrente"]},
-            "capital":  {"atual": dados_atual["receitas"]["capital"],  "anterior": dados_anterior["receitas"]["capital"]},
-            "total":    {"atual": dados_atual["receitas"]["total"],    "anterior": dados_anterior["receitas"]["total"]},
-        },
-        "despesas": {
-            "corrente": {"atual": dados_atual["despesas"]["corrente"], "anterior": dados_anterior["despesas"]["corrente"]},
-            "capital":  {"atual": dados_atual["despesas"]["capital"],  "anterior": dados_anterior["despesas"]["capital"]},
-            "total":    {"atual": dados_atual["despesas"]["total"],    "anterior": dados_anterior["despesas"]["total"]},
-        },
-        "extra": {
-            "recebimentos": {"atual": dados_atual["extra"]["recebimentos"], "anterior": dados_anterior["extra"]["recebimentos"]},
-            "pagamentos":   {"atual": dados_atual["extra"]["pagamentos"],   "anterior": dados_anterior["extra"]["pagamentos"]},
-        },
-        "caixa": {
-            "saldo_anterior":  {"atual": dados_atual["caixa"]["saldo_anterior"],  "anterior": dados_anterior["caixa"]["saldo_anterior"]},
-            "geracao_liquida": {"atual": dados_atual["caixa"]["geracao_liquida"], "anterior": dados_anterior["caixa"]["geracao_liquida"]},
-            "saldo_seguinte":  {"atual": dados_atual["caixa"]["saldo_seguinte"],  "anterior": dados_anterior["caixa"]["saldo_seguinte"]},
-        },
-    }
-
-
-
+        cur.execute(
+            "SELECT resultado_json FROM historico_analise_financeira_bf WHERE periodo = %s OR periodo LIKE %s ORDER BY id DESC LIMIT 1",
+            (periodo_str, f"{periodo_str} vs %"),
+        )
+        row = cur.fetchone()
+        if not row or not row[0]:
+            return None
+        return row[0] if isinstance(row[0], dict) else json.loads(row[0])
+    except Exception:
+        logger.exception("Erro ao consultar historico_analise_financeira_bf no PostgreSQL")
+        return None
+    finally:
+        conn.close()
 
 
 @router.get("/api/analise_financeira_bf/{periodo}")
-@router.get("/api/analise_financeira_bf/{periodo}/{periodo_anterior_ignorado}")
-def api_analise_financeira_bf(periodo: str, periodo_anterior_ignorado: str = None):
+@router.get("/api/analise_financeira_bf/{periodo}/{periodo_anterior}")
+def api_analise_financeira_bf(periodo: str, periodo_anterior: str = None):
     try:
-        # O período anterior agora vem do MESMO CSV (coluna Exercício Anterior)
-        # O parâmetro da URL é ignorado (mantido por compatibilidade)
         partes = periodo.split(" vs ")
         periodo_atual = partes[0].strip() if partes else periodo
+        ant = periodo_anterior or (partes[1].strip() if len(partes) > 1 else None)
 
-        resultado = _ler_balanco(periodo_atual)
-        if not resultado:
-            return {"erro": True, "mensagem": "Balanco Financeiro nao encontrado para " + periodo_atual}
-        
-        dados_atual, dados_anterior = resultado
-        return {"erro": False, "dados": _montar_json_aninhado(dados_atual, dados_anterior)}
+        dados = _buscar_balanco_pg(periodo_atual, ant)
+        if not dados:
+            return {"erro": True, "mensagem": "Balanco Financeiro nao encontrado no PostgreSQL para " + periodo_atual}
+
+        return {"erro": False, "dados": dados}
     except Exception as e:
         logger.exception("Erro em api_analise_financeira_bf")
         return {"erro": True, "mensagem": str(e)}
-
 
 
 @router.post("/salvar_analise_financeira_bf/{periodo}/{periodo_anterior}")

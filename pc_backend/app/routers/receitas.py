@@ -1,3 +1,5 @@
+from pc_backend.app.config import PG_CONFIG
+import psycopg2
 # -*- coding: utf-8 -*-
 """
 Rotas de Comparativo de Receitas.
@@ -7,148 +9,172 @@ Extraído do main.py para refatoração.
 import os
 import json
 import datetime
-import sqlite3
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse
 
 # Caminhos absolutos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 UPLOAD_DIR = os.path.join(BASE_DIR, "pc_storage", "uploads_raw")
-DB_PATH = os.path.join(BASE_DIR, "pc_storage", "banco_dados.db")
 FRONTEND_DIR = os.path.join(BASE_DIR, "pc_frontend")
 
 router = APIRouter()
 
+from pc_backend.app.db_memoria import salvar_contas_memoria, carregar_contas_memoria, _slug_conta
+
+def _persistir_receitas_memoria(periodo: str, dados: dict) -> None:
+    if not periodo or not isinstance(dados, dict):
+        return
+    itens = []
+    itens.append({
+        "chave": "receita_realizada_total",
+        "descricao": "RECEITA REALIZADA",
+        "valor": float(dados.get("realizado_total") or 0.0),
+        "extra": {
+            "tipo": "total",
+            "orcado": float(dados.get("orcado_total") or 0.0),
+            "realizado": float(dados.get("realizado_total") or 0.0),
+            "percentual": float(dados.get("percentual_total") or 0.0),
+        },
+    })
+    for idx, g in enumerate(dados.get("grupos") or []):
+        if isinstance(g, dict):
+            nome = str(g.get("nome") or f"grupo_{idx+1}").strip()
+            itens.append({
+                "chave": f"grupo_{_slug_conta(nome)}",
+                "descricao": nome,
+                "valor": float(g.get("realizado") or 0.0),
+                "extra": {"tipo": "grupo", "nome": nome, "orcado": float(g.get("orcado") or 0.0), "realizado": float(g.get("realizado") or 0.0), "percentual": float(g.get("percentual") or 0.0)},
+            })
+    for idx, c in enumerate(dados.get("cores") or []):
+        if isinstance(c, dict):
+            nome = str(c.get("nome") or f"coren_{idx+1}").strip()
+            itens.append({
+                "chave": f"coren_{_slug_conta(nome)}",
+                "descricao": f"COREN {nome}",
+                "valor": float(c.get("realizado") or 0.0),
+                "extra": {"tipo": "coren", "nome": nome, "orcado": float(c.get("orcado") or 0.0), "realizado": float(c.get("realizado") or 0.0), "percentual": float(c.get("percentual") or 0.0)},
+            })
+    try:
+        salvar_contas_memoria("COMPARATIVO_RECEITAS", periodo, itens)
+    except Exception as e:
+        print(f"[RECEITAS] Aviso ao salvar memoria PG: {e}")
+
+def _carregar_receitas_memoria(periodo: str) -> dict | None:
+    mem = carregar_contas_memoria("COMPARATIVO_RECEITAS", periodo)
+    if not mem:
+        return None
+    dados = {
+        "orcado_total": 0.0,
+        "realizado_total": 0.0,
+        "percentual_total": 0.0,
+        "grupos": [],
+        "cores": [],
+    }
+    for item in mem:
+        extra = item.get("dados_json") if isinstance(item.get("dados_json"), dict) else {}
+        tipo = extra.get("tipo")
+        if tipo == "total" or item.get("chave") == "receita_realizada_total":
+            dados["orcado_total"] = float(extra.get("orcado") or 0.0)
+            dados["realizado_total"] = float(extra.get("realizado") if extra.get("realizado") is not None else (item.get("valor") or 0.0))
+            dados["percentual_total"] = float(extra.get("percentual") or 0.0)
+        elif tipo == "grupo":
+            dados["grupos"].append({
+                "nome": extra.get("nome") or item.get("descricao"),
+                "orcado": float(extra.get("orcado") or 0.0),
+                "realizado": float(extra.get("realizado") if extra.get("realizado") is not None else (item.get("valor") or 0.0)),
+                "percentual": float(extra.get("percentual") or 0.0),
+            })
+        elif tipo == "coren":
+            dados["cores"].append({
+                "nome": extra.get("nome") or item.get("descricao"),
+                "orcado": float(extra.get("orcado") or 0.0),
+                "realizado": float(extra.get("realizado") if extra.get("realizado") is not None else (item.get("valor") or 0.0)),
+                "percentual": float(extra.get("percentual") or 0.0),
+            })
+    return dados
+
+
 # =========================================================
 # FUNÇÃO AUXILIAR
 # =========================================================
+def _buscar_receitas_pg(p: str) -> dict | None:
+    if not p:
+        return None
+    mem = _carregar_receitas_memoria(p)
+    if mem and (mem.get("realizado_total") or mem.get("orcado_total") or mem.get("grupos") or mem.get("cores")):
+        return mem
+
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT dados_json FROM historico_comparativo_receitas WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            (p,),
+        )
+        row = cur.fetchone()
+        if not row:
+            cur.execute(
+                "SELECT dados_json FROM historico_comparativo_receitas WHERE periodo ILIKE %s ORDER BY id DESC LIMIT 1",
+                (f"%{p}%",),
+            )
+            row = cur.fetchone()
+        if not row or not row[0]:
+            return None
+        dj = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        if not isinstance(dj, dict):
+            return None
+        dados = {
+            "orcado_total": float(dj.get("orcado_total") or 0.0),
+            "realizado_total": float(dj.get("realizado_total") or 0.0),
+            "percentual_total": float(dj.get("percentual_total") or 0.0),
+            "grupos": dj.get("grupos") or [],
+            "cores": dj.get("cores") or [],
+            "anterior": dj.get("anterior"),
+        }
+        _persistir_receitas_memoria(p, dados)
+        return dados
+    except Exception as e:
+        print(f"[RECEITAS] Erro ao consultar PostgreSQL ({p}): {e}")
+        return None
+    finally:
+        conn.close()
+
+
 def api_comparativo_receitas_v2(periodo: str):
-    import os
-
-    upload_dir = UPLOAD_DIR
-
-    def parse_valor(s):
-        s = s.strip().strip('"').replace(".", "").replace(",", ".").replace("R$", "").strip()
-        try:
-            return float(s)
-        except:
-            return 0.0
-
-    def parse_pct(s):
-        s = s.strip().strip('"').replace("%", "").replace(",", ".").strip()
-        try:
-            return float(s)
-        except:
-            return 0.0
-
-    def ler_csv(p):
-        if not p:
-            return None
-        periodo_formatado = p.replace("-", "_")
-        arquivo = os.path.join(upload_dir, f"COMPARATIVO_RECEITAS_{periodo_formatado}.csv")
-
-        if not os.path.exists(arquivo):
-            for f in os.listdir(upload_dir):
-                if periodo_formatado in f and "COMPARATIVO_RECEITAS" in f:
-                    arquivo = os.path.join(upload_dir, f)
-                    break
-
-        if not os.path.exists(arquivo):
-            return None
-
-        try:
-            try:
-                with open(arquivo, "r", encoding="utf-8-sig") as f:
-                    linhas = f.readlines()
-            except UnicodeDecodeError:
-                with open(arquivo, "r", encoding="latin-1") as f:
-                    linhas = f.readlines()
-
-            dados = {
-                "orcado_total": 0.0,
-                "realizado_total": 0.0,
-                "percentual_total": 0.0,
-                "grupos": [],
-                "cores": []
-            }
-
-            grupos_nomes = ["RECEITAS DE CONTRIBUIÇÕES", "RECEITAS PATRIMONIAIS", "RECEITAS DE SERVIÇOS", "TRANSFERÊNCIAS CORRENTES", "OUTRAS RECEITAS CORRENTES", "RECEITAS DE CAPITAL"]
-
-            for linha in linhas:
-                if ";" not in linha:
-                    continue
-                partes_linha = linha.strip().split(";")
-                if len(partes_linha) < 4:
-                    continue
-
-                nome = partes_linha[0].strip().strip('"')
-                if not nome:
-                    continue
-
-                if nome == "RECEITA REALIZADA":
-                    dados["orcado_total"] = parse_valor(partes_linha[1])
-                    dados["realizado_total"] = parse_valor(partes_linha[2])
-                    dados["percentual_total"] = parse_pct(partes_linha[3])
-
-                elif nome in grupos_nomes:
-                    orc_v = parse_valor(partes_linha[1])
-                    real_v = parse_valor(partes_linha[2])
-                    pct_v = parse_pct(partes_linha[3])
-                    # Inclui TODOS os grupos, mesmo zerados
-                    dados["grupos"].append({
-                        "nome": nome,
-                        "orcado": orc_v,
-                        "realizado": real_v,
-                        "percentual": pct_v
-                    })
-
-                elif nome.upper().startswith("COREN "):
-                    dados["cores"].append({
-                        "nome": nome.replace("COREN ", "").strip(),
-                        "orcado": parse_valor(partes_linha[1]),
-                        "realizado": parse_valor(partes_linha[2]),
-                        "percentual": parse_pct(partes_linha[3])
-                    })
-
-            return dados
-        except Exception as e:
-            print(f"[ERRO] Falha ao ler CSV {arquivo}: {e}")
-            return None
-
-    partes = periodo.split("-")
-    if len(partes) == 3:
-        ano = int(partes[0])
-        tipo = partes[1]
-        valor = partes[2]
-        periodo_anterior = f"{ano - 1}-{tipo}-{valor}"
-    else:
-        periodo_anterior = None
-
-    atual = ler_csv(periodo)
-    anterior = ler_csv(periodo_anterior)
-
+    atual = _buscar_receitas_pg(periodo)
     if not atual:
-        return {"erro": True, "mensagem": f"Dados não encontrados para o período {periodo}."}
+        return {"erro": True, "mensagem": f"Dados de receitas n?o encontrados no PostgreSQL para o per?odo {periodo}."}
+
+    anterior = atual.get("anterior")
+    if not anterior:
+        partes = periodo.split("-")
+        if len(partes) == 3:
+            try:
+                periodo_anterior = f"{int(partes[0]) - 1}-{partes[1]}-{partes[2]}"
+                anterior = _buscar_receitas_pg(periodo_anterior)
+            except Exception:
+                anterior = None
 
     retorno = {
-        "orcado_total": atual["orcado_total"],
-        "realizado_total": atual["realizado_total"],
-        "percentual_total": atual["percentual_total"],
-        "grupos": atual["grupos"],
-        "cores": atual["cores"]
+        "orcado_total": atual.get("orcado_total", 0.0),
+        "realizado_total": atual.get("realizado_total", 0.0),
+        "percentual_total": atual.get("percentual_total", 0.0),
+        "grupos": atual.get("grupos", []),
+        "cores": atual.get("cores", []),
     }
 
-    if anterior:
+    if isinstance(anterior, dict):
         retorno["anterior"] = {
-            "orcado_total": anterior["orcado_total"],
-            "realizado_total": anterior["realizado_total"],
-            "percentual_total": anterior["percentual_total"],
-            "grupos": anterior["grupos"]
+            "orcado_total": anterior.get("orcado_total", 0.0),
+            "realizado_total": anterior.get("realizado_total", 0.0),
+            "percentual_total": anterior.get("percentual_total", 0.0),
+            "grupos": anterior.get("grupos", []),
         }
     else:
         retorno["anterior"] = None
 
     return retorno
+
 
 # =========================================================
 
@@ -164,7 +190,7 @@ def api_comparativo_receitas(periodo: str):
 
 @router.get("/historico_comparativo_receitas")
 def get_historico_comparativo_receitas():
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
     cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_receitas ORDER BY id DESC")
     rows = cur.fetchall()
@@ -182,9 +208,9 @@ def get_historico_comparativo_receitas():
 
 @router.get("/historico_comparativo_receitas/{id}")
 def get_historico_comparativo_receitas_id(id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("SELECT periodo, data_geracao, dados_json FROM historico_comparativo_receitas WHERE id = ?", (id,))
+    cur.execute("SELECT periodo, data_geracao, dados_json FROM historico_comparativo_receitas WHERE id = %s", (id,))
     row = cur.fetchone()
     conn.close()
     if not row:
@@ -202,12 +228,12 @@ def salvar_comparativo_receitas(periodo: str):
         dados = api_comparativo_receitas_v2(periodo)
         if dados.get("erro"):
             return dados
-        conn = sqlite3.connect(DB_PATH)
+        conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
         cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_receitas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
+            id SERIAL PRIMARY KEY, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)",
+        cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (%s, %s, %s)",
                     (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
         conn.commit()
         conn.close()
@@ -224,9 +250,9 @@ async def excluir_multiplos_comparativo_receitas(request: Request):
         ids = body.get("ids", [])
         if not ids:
             return {"ok": False, "mensagem": "Nenhum ID fornecido."}
-        conn = sqlite3.connect(DB_PATH)
+        conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        placeholders = ",".join(["?"] * len(ids))
+        placeholders = ",".join(["%s"] * len(ids))
         cur.execute(f"DELETE FROM historico_comparativo_receitas WHERE id IN ({placeholders})", ids)
         excluidos = cur.rowcount
         conn.commit()
@@ -237,15 +263,17 @@ async def excluir_multiplos_comparativo_receitas(request: Request):
 
 
 @router.get("/gerar_pdf_comparativo_receitas")
-def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+def gerar_pdf_comparativo_receitas(request: Request, periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+    base_url = str(request.base_url).rstrip("/")
     from playwright.sync_api import sync_playwright
+    from fastapi import Request
     from fastapi.responses import Response
     import time, os
 
     if historico_id:
-        url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
+        url = f"{base_url}/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
-        url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
+        url = f"{base_url}/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -290,5 +318,5 @@ def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_
 
 
 @router.get("/gerar_pdf_comparativo_receitas/{historico_id}")
-def gerar_pdf_comparativo_receitas_por_id(historico_id: int, periodo: str = "2026-TRIMESTRE-3"):
-    return gerar_pdf_comparativo_receitas(periodo=periodo, historico_id=historico_id)
+def gerar_pdf_comparativo_receitas_por_id(request: Request, historico_id: int, periodo: str = "2026-TRIMESTRE-3"):
+    return gerar_pdf_comparativo_receitas(request=request, periodo=periodo, historico_id=historico_id)
