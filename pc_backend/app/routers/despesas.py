@@ -238,26 +238,32 @@ async def excluir_multiplos_comparativo_despesas(request: Request):
 
 @router.get("/gerar_pdf_comparativo_despesas")
 def gerar_pdf_comparativo_despesas(request: Request, periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+    import os
+    import time
+    from fastapi import HTTPException
+    from fastapi.responses import Response
+    from playwright.sync_api import sync_playwright
+
     base_url = str(request.base_url).rstrip("/")
     if "testserver" in base_url:
         base_url = os.getenv("PC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-    from playwright.sync_api import sync_playwright
-    from fastapi import Request
-    from fastapi.responses import Response
-    import time, os
     if historico_id:
         url = f"{base_url}/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
     else:
         url = f"{base_url}/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(bypass_csp=True)
-        page = context.new_page()
-        page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-        page.goto(url, wait_until="networkidle")
-        page.wait_for_timeout(3000)
-        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
-        browser.close()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            context = browser.new_context(bypass_csp=True)
+            page = context.new_page()
+            page.set_default_timeout(10000)
+            page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
+            page.goto(url, wait_until="domcontentloaded", timeout=10000)
+            page.wait_for_timeout(1500)
+            pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+            browser.close()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Falha ao gerar PDF via Playwright ({base_url}): {e}")
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_despesas_{periodo}.pdf"})
 
 

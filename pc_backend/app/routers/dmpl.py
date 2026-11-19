@@ -179,15 +179,7 @@ def api_analise_dmpl(periodo: str):
         if res_pg:
             return res_pg
 
-        p_limpo = periodo.replace("-", "_")
-        caminho = os.path.join(UPLOADS_DIR, f"DMPL_{p_limpo}.csv")
-        if os.path.exists(caminho):
-            res = processar_dmpl(caminho)
-            if isinstance(res, dict) and isinstance(res.get("dados"), dict):
-                _persistir_dmpl_memoria(periodo, res["dados"])
-            return res
-
-        return {"erro": "faltando", "mensagem": f"Dados do DMPL n?o encontrados no PostgreSQL nem em CSV para: {periodo}"}
+        return {"erro": "faltando", "mensagem": f"Dados do DMPL n?o encontrados no PostgreSQL para: {periodo}"}
     except Exception as e:
         print(f"[DMPL] ERRO: {e}\n{traceback.format_exc()}")
         return {"erro": "interno", "mensagem": str(e)}
@@ -201,16 +193,7 @@ def salvar_analise_dmpl(periodo: str, periodo_anterior: str):
             dados_json = res_pg["dados"]
             fonte = res_pg.get("fonte", "postgresql")
         else:
-            p_limpo = periodo.replace("-", "_")
-            caminho = os.path.join(UPLOADS_DIR, f"DMPL_{p_limpo}.csv")
-            if not os.path.exists(caminho):
-                return {"ok": False, "mensagem": f"Dados do DMPL n?o encontrados no PostgreSQL nem em CSV para: {periodo}"}
-            resultado = processar_dmpl(caminho)
-            if resultado.get("erro"):
-                return {"ok": False, "mensagem": resultado.get("mensagem", "Erro no processamento")}
-            dados_json = resultado["dados"]
-            _persistir_dmpl_memoria(periodo, dados_json)
-            fonte = "csv_fallback"
+            return {"ok": False, "mensagem": f"Dados do DMPL n?o encontrados no PostgreSQL para: {periodo}"}
 
         periodo_label = f"{periodo} vs {periodo_anterior}"
 

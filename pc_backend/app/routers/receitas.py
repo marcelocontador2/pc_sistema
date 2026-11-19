@@ -275,40 +275,43 @@ def gerar_pdf_comparativo_receitas(request: Request, periodo: str = "2026-TRIMES
     else:
         url = f"{base_url}/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(bypass_csp=True)
-        page = context.new_page()
-        page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
-        page.goto(url, wait_until="networkidle")
-        # Espera o texto "Carregando..." desaparecer
-        try:
-            page.wait_for_selector("text=Carregando...", state="detached", timeout=10000)
-        except:
-            pass
-        page.wait_for_timeout(2000)
-        
-        # Força a impressão de tela para não cortar os gráficos
-        page.emulate_media(media="screen")
-        
-        # Espera até 10 segundos para os elementos com valores carregarem
-        try:
-            page.wait_for_function("() => { const els = document.querySelectorAll('div, span, td'); return Array.from(els).some(e => e.innerText.includes('R$') && !e.innerText.includes('0,00')); }", timeout=10000)
-        except:
-            pass
-        page.wait_for_timeout(2000)
-        page.evaluate("""() => {
-            document.querySelectorAll('canvas').forEach(canvas => {
-                const img = document.createElement('img');
-                img.src = canvas.toDataURL('image/png');
-                img.className = 'canvas-img';
-                img.style.cssText = 'display: block; max-width: 100%; max-height: 240px; margin: 0 auto;';
-                canvas.parentNode.insertBefore(img, canvas.nextSibling);
-            });
-        }""")
-        page.screenshot(path="debug_receitas.png", full_page=True)
-        pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
-        browser.close()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            context = browser.new_context(bypass_csp=True)
+            page = context.new_page()
+            page.set_default_timeout(8000)
+            page.set_extra_http_headers({"Cache-Control": "no-cache, no-store, must-revalidate"})
+            page.goto(url, wait_until="domcontentloaded", timeout=8000)
+            try:
+                page.wait_for_selector("text=Carregando...", state="detached", timeout=5000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1000)
+            page.emulate_media(media="screen")
+            try:
+                page.wait_for_function("() => { const els = document.querySelectorAll('div, span, td'); return Array.from(els).some(e => e.innerText.includes('R$') && !e.innerText.includes('0,00')); }", timeout=5000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1000)
+            page.evaluate("""() => {
+                document.querySelectorAll('canvas').forEach(canvas => {
+                    const img = document.createElement('img');
+                    img.src = canvas.toDataURL('image/png');
+                    img.className = 'canvas-img';
+                    img.style.cssText = 'display: block; max-width: 100%; max-height: 240px; margin: 0 auto;';
+                    canvas.parentNode.insertBefore(img, canvas.nextSibling);
+                });
+            }""")
+            try:
+                page.screenshot(path="debug_receitas.png", full_page=True)
+            except Exception:
+                pass
+            pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
+            browser.close()
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail=f"Falha ao gerar PDF via Playwright ({base_url}): {e}")
 
     return Response(
         content=pdf_bytes,

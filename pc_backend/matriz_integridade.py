@@ -1,41 +1,44 @@
 import os
 import csv
-import glob
+
 
 def _get_csv(tipo, periodo):
-    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
-    
-    # Cria as duas variações do período: com hífen e com underscore
-    periodo_hifen = periodo  # ex: "2026-TRIMESTRE-3"
-    periodo_underscore = periodo.replace("-", "_")  # ex: "2026_TRIMESTRE_3"
-    
-    # Tenta primeiro com o formato original (hífen)
-    padrao = os.path.join(base, f"*{tipo}*{periodo_hifen}*.csv")
-    arquivos = glob.glob(padrao)
-    if arquivos:
-        return arquivos[0]
-    
-    # Tenta com o formato underscore
-    padrao = os.path.join(base, f"*{tipo}*{periodo_underscore}*.csv")
-    arquivos = glob.glob(padrao)
-    if arquivos:
-        return arquivos[0]
-    
-    # SEM FALLBACK: se não encontrou, retorna None
+    """Compatibilidade legada sem leitura de CSV em disco (100% PostgreSQL)."""
     return None
 
+
 def _ler_linhas(caminho):
-    linhas = []
-    if not caminho or not os.path.exists(caminho):
-        return linhas
+    """Compatibilidade legada sem leitura de CSV em disco."""
+    return []
+
+
+def _buscar_registros_pg(periodo):
+    """Busca registros financeiros do periodo no PostgreSQL."""
     try:
-        with open(caminho, "r", encoding="latin-1") as f:
-            leitor = csv.reader(f, delimiter=';')
-            for linha in leitor:
-                linhas.append(linha)
+        import json
+        import psycopg2
+        from pc_backend.app.config import PG_CONFIG
+
+        conn = psycopg2.connect(**PG_CONFIG)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT tabela_origem, payload_json FROM demonstracoes_pg WHERE periodo = %s",
+                (periodo,),
+            )
+            rows = cur.fetchall()
+            cur.close()
+            resultado = {}
+            for origem, payload in rows or []:
+                resultado[str(origem or "").upper()] = (
+                    payload if isinstance(payload, (dict, list)) else json.loads(payload)
+                )
+            return resultado
+        finally:
+            conn.close()
     except Exception:
-        pass
-    return linhas
+        return {}
+
 
 def _limpar_valor(valor):
     if not valor or not isinstance(valor, str):
@@ -79,20 +82,8 @@ def _buscar_valor_bo(linhas, termo, coluna):
 
 def gerar_matriz(periodo):
     try:
-        csv_bp = _get_csv("BALANCO_PATRIMONIAL", periodo)
-        csv_bo = _get_csv("BALANCO_ORCAMENTARIO", periodo)
-        csv_bf = _get_csv("BALANCO_FINANCEIRO", periodo)
-        csv_dvp = _get_csv("DVP", periodo)
-        csv_dfc = _get_csv("DFC", periodo)
-        csv_balancete = _get_csv("BALANCETE", periodo)
 
-        linhas_bp = _ler_linhas(csv_bp)
-        linhas_bo = _ler_linhas(csv_bo)
-        linhas_bf = _ler_linhas(csv_bf)
-        linhas_dvp = _ler_linhas(csv_dvp)
-        linhas_dfc = _ler_linhas(csv_dfc)
-        linhas_balancete = _ler_linhas(csv_balancete)
-
+                        
         # Extrai os valores do Balancete
         ativo = _buscar_valor_balancete(linhas_balancete, "1")
         ativo_circ = _buscar_valor_balancete(linhas_balancete, "1.1")

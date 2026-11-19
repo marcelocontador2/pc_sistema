@@ -9,6 +9,13 @@ import psycopg2
 
 from pc_backend.app.config import PG_CONFIG
 
+
+def fmt_sem_rs(v):
+    if v is None: return "-"
+    if isinstance(v, (int, float)):
+        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return str(v).replace("R$", "").strip()
+
 router = APIRouter(tags=["relatorio_consolidado"])
 
 
@@ -633,11 +640,6 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     html_parts.append("<div class='alerta-info'>1. Os itens de conformidade em vermelho, de 1 a 4, são por estornos de restos a pagar.<br>2. Incorporação de Ativos: SOMA = 16.271.957,08.</div>")
                 
                 elif nome_interno == "Análise BP":
-                    def fmt_sem_rs(v):
-                        if v is None: return "-"
-                        if isinstance(v, (int, float)):
-                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                        return str(v).replace("R$", "").strip()
                     
                     dados_bp = mod_dados.get("dados", {})
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Comparativo das contas do Balanço Patrimonial (perÍ­odo atual x anterior).</p>")
@@ -671,11 +673,6 @@ def gerar_pdf_relatorio_consolidado(id: int):
                 
                 # 3. ANÍLISE ORÇAMENTÍRIA (BO)
                 elif nome_interno == "Análise Orçamentária (BO)":
-                    def fmt_sem_rs(v):
-                        if v is None: return "-"
-                        if isinstance(v, (int, float)):
-                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                        return str(v).replace("R$", "").strip()
                     
                     atual = mod_dados.get("atual", {})
                     anterior = mod_dados.get("anterior", {})
@@ -743,11 +740,6 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     html_parts.append("</script>")
                 
                 elif nome_interno == "Análise Financeira (BF)":
-                    def fmt_sem_rs(v):
-                        if v is None: return "-"
-                        if isinstance(v, (int, float)):
-                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                        return str(v).replace("R$", "").strip()
                     
                     dados_bf = mod_dados.get("dados") if isinstance(mod_dados.get("dados"), dict) else {}
                     if not dados_bf or "receitas" not in dados_bf:
@@ -820,11 +812,6 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append("</script>")
                 
                 elif nome_interno == "Análise DFC":
-                    def fmt_sem_rs(v):
-                        if v is None: return "-"
-                        if isinstance(v, (int, float)):
-                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                        return str(v).replace("R$", "").strip()
                     
                     dados_dfc = mod_dados.get("dados", {})
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração do Fluxo de Caixa (método direto).</p>")
@@ -889,11 +876,6 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append("</script>")
                 
                 elif nome_interno == "Análise Patrimonial (DVP)":
-                    def fmt_sem_rs(v):
-                        if v is None: return "-"
-                        if isinstance(v, (int, float)):
-                            return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                        return str(v).replace("R$", "").strip()
                     
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração das Variações Patrimoniais.</p>")
                     html_parts.append("<table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")

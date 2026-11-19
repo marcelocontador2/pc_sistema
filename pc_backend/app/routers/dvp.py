@@ -228,9 +228,7 @@ def salvar_analise_dvp(periodo: str, periodo_anterior: str):
     try:
         res_pg = buscar_dvp_postgresql(periodo)
         if not res_pg:
-            p_limpo = periodo.replace("-", "_")
-            caminho = os.path.join(UPLOADS_DIR, f"DVP_{p_limpo}.csv")
-            res_pg = processar_dvp(caminho)
+            return {"ok": False, "mensagem": f"Dados do DVP n?o encontrados no PostgreSQL para {periodo}"}
 
         if not res_pg or res_pg.get("erro"):
             return {"ok": False, "mensagem": (res_pg or {}).get("mensagem", "Dados do DVP n?o encontrados no PostgreSQL")}
@@ -390,10 +388,7 @@ async def api_analise_patrimonial(periodo: str):
         if res_pg:
             return res_pg
 
-        p_limpo = periodo.replace("-", "_")
-        caminho = os.path.join(UPLOADS_DIR, f"DVP_{p_limpo}.csv")
-        if os.path.exists(caminho):
-            return processar_dvp(caminho)
+        # 100% PostgreSQL: sem fallback em arquivo CSV
 
         return {"erro": "faltando", "pecas": ["DVP"]}
     except Exception as e:

@@ -78,10 +78,6 @@ async def api_balanco_financeiro_periodo(periodo: str):
         res_db = _buscar_no_banco(periodo)
         if res_db is not None:
             return res_db
-        p_limpo = periodo.replace("-", "_")
-        caminho = os.path.join(UPLOADS_DIR, f"BALANCO_FINANCEIRO_{p_limpo}.csv")
-        if os.path.exists(caminho):
-            return processar_bf(caminho)
-        return {"erro": "nao_encontrado", "periodo": periodo}
+        return {"erro": "nao_encontrado", "origem": "postgresql", "periodo": periodo}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

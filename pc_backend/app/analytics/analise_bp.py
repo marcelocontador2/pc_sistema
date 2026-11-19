@@ -6,18 +6,21 @@ DB_CONFIG = {
     "user": "postgres",
     "password": "pc_admin_2026"
 }
-def buscar_valor(cursor, grupo):
-    cursor.execute("SELECT valor_atual FROM demonstracao_resumo WHERE grupo_demonstrativo = %s ORDER BY id DESC LIMIT 1;", (grupo,))
-    resultado = cursor.fetchone()
-    return float(resultado[0]) if resultado else 0.0
-def buscar_valor(cursor, grupo, periodo_id):
-    """Busca o valor de uma conta num periodo especifico."""
-    cursor.execute(
-        "SELECT valor_atual FROM demonstracao_resumo "
-        "WHERE grupo_demonstrativo = %s AND periodo_id = %s "
-        "ORDER BY id DESC LIMIT 1;",
-        (grupo, periodo_id)
-    )
+def buscar_valor(cursor, grupo, periodo_id=None):
+    """Busca o valor de uma conta no PostgreSQL (geral ou por periodo_id)."""
+    if periodo_id is not None:
+        cursor.execute(
+            "SELECT valor_atual FROM demonstracao_resumo "
+            "WHERE grupo_demonstrativo = %s AND periodo_id = %s "
+            "ORDER BY id DESC LIMIT 1;",
+            (grupo, periodo_id),
+        )
+    else:
+        cursor.execute(
+            "SELECT valor_atual FROM demonstracao_resumo "
+            "WHERE grupo_demonstrativo = %s ORDER BY id DESC LIMIT 1;",
+            (grupo,),
+        )
     resultado = cursor.fetchone()
     return float(resultado[0]) if resultado else 0.0
 

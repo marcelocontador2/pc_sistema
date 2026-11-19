@@ -103,9 +103,7 @@ async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
     try:
         res_pg = buscar_dfc_postgresql(periodo)
         if not res_pg:
-            p_limpo = periodo.replace("-", "_")
-            caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
-            res_pg = processar_dfc(caminho, periodo=periodo)
+            return {"ok": False, "mensagem": f"Dados da DFC n?o encontrados no PostgreSQL para {periodo}"}
 
         if not res_pg or res_pg.get("erro"):
             return {"ok": False, "mensagem": (res_pg or {}).get("mensagem", "Dados da DFC n?o encontrados no PostgreSQL")}
@@ -220,12 +218,7 @@ def api_analise_dfc(periodo: str):
         if res_pg:
             return res_pg
 
-        p_limpo = periodo.replace("-", "_")
-        caminho = os.path.join(UPLOADS_DIR, f"DFC_{p_limpo}.csv")
-        if os.path.exists(caminho):
-            return processar_dfc(caminho, periodo=periodo)
-
-        return {"erro": "faltando", "mensagem": f"Dados da DFC n?o encontrados no PostgreSQL nem em CSV ({p_limpo})"}
+        return {"erro": "faltando", "mensagem": f"Dados da DFC n?o encontrados no PostgreSQL para {periodo}"}
     except Exception as e:
         tb = traceback.format_exc()
         print(f"[DFC] ERRO: {e}\n{tb}")
