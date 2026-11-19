@@ -42,6 +42,7 @@ def _limpar_ascii(txt):
     return s
 
 
+# import pandas as pd  # removido 31/10/2026 - nao usado
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 from pptx import Presentation
@@ -50,6 +51,23 @@ from pptx.enum.text import PP_ALIGN
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
+
+def _fix_mojibake(val):
+    if isinstance(val, str):
+        for enc in ("latin1", "cp1252"):
+            try:
+                fixed = val.encode(enc).decode("utf-8")
+                if fixed != val:
+                    return fixed
+            except Exception:
+                pass
+        return val
+    if isinstance(val, list):
+        return [_fix_mojibake(x) for x in val]
+    if isinstance(val, dict):
+        return {k: _fix_mojibake(v) for k, v in val.items()}
+    return val
+
 app = FastAPI(title="PC - Prestacao de Contas API")
 
 # =========================================================
@@ -81,9 +99,9 @@ app.include_router(analise_financeira.router)
 # REGISTRO DE ROUTERS REFATORADOS
 # =========================================================
 try:
-    print("âœ… Router de Liquidez registrado com sucesso!")
+    pass  # print com emoji removido
 except Exception as e:
-    print(f"âš ï¸ Erro ao registrar router de Liquidez: {e}")
+    pass  # print com emoji removido
 
 
 # ===== MONKEY-PATCH PARA UTF-8 NO FPDF (v2) =====
@@ -163,7 +181,7 @@ async def post_configuracoes(config: dict):
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pc_frontend")
 if os.path.exists(frontend_path):
     app.mount("/pc_frontend", StaticFiles(directory=frontend_path), name="pc_frontend")
-    print(f"âÅ“”¦ Arquivos estáticos montados em: {frontend_path}")
+    pass  # print com emoji removido
 from fastapi.responses import HTMLResponse
 
 
@@ -893,6 +911,7 @@ async def criar_tabela_integridade():
     conn.close()
 # Rota que CHAMA a analise, pega o resultado e SALVA no banco
 # async def listar_historico():
+#     try:
 #         conn = sqlite3.connect(DB_PATH)
 #         cursor = conn.cursor()
 #         cursor.execute('''
@@ -903,16 +922,25 @@ async def criar_tabela_integridade():
 
 #         ''')
 #         rows = cursor.fetchall()
+#         conn.close()
 #         historico = []
+#         for r in rows:
 #             historico.append({"id": r[0], "periodo": r[1], "data_geracao": r[2]})
+#         return historico
+#     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 # # Rota que abre um histí­³rico especifico pelo ID
 # async def buscar_historico(id: int):
+#     try:
 #         conn = sqlite3.connect(DB_PATH)
 #         cursor = conn.cursor()
 #         cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = ?''', (id,))
 #         row = cursor.fetchone()
+#         conn.close()
+#         if not row:
 #             raise HTTPException(status_code=404, detail="Historico nao encontrado")
+#         return json.loads(row[0])
+#     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 @app.get("/lista_periodos")
 async def lista_periodos():
@@ -944,9 +972,12 @@ async def lista_periodos():
 from fastapi.responses import FileResponse
 import os as _os
 # async def serve_conferencia():
+#     from fastapi.responses import FileResponse
 #     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "conferencia.html")
+#     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
 # async def serve_integridade():
 #     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "integridade.html")
+#     return FileResponse(caminho)
 @app.get("/api/ler_relatorio/{tipo}")
 async def ler_relatorio_csv(tipo: str):
     import os, glob, csv
@@ -1099,7 +1130,7 @@ async def api_panorama(periodo: str):
         from fastapi.responses import JSONResponse
         from .matriz_integridade import _limpar_valor
 
-        from .config import PG_CONFIG
+        from pc_backend.app.config import PG_CONFIG
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
 
@@ -1355,10 +1386,20 @@ async def excluir_panorama(id: int):
     return {"mensagem": "Excluido"}
 
 # async def api_conferencia_calcular(periodo: str):
+#     try:
+#         from .matriz_integridade import _get_csv
 #         pecas_obrigatorias = ["BALANCETE", "BALANCO_PATRIMONIAL", "BALANCO_FINANCEIRO", "BALANCO_ORCAMENTARIO", "DFC", "DVP", "DMPL"]
 #         faltando = [p for p in pecas_obrigatorias if not _get_csv(p, periodo)]
+#         if faltando:
+#             return {"erro": "faltando", "pecas": faltando}
+#         from integridade import analise_integridade
 #         dados = await analise_integridade(periodo)
+#         return dados
+#     except Exception as e:
+#         return {"erro": "falha", "mensagem": str(e)}
 # async def salvar_conferencia(periodo: str):
+#     try:
+#         from integridade import analise_integridade
 #         dados = await analise_integridade(periodo)
 #         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #         conn = sqlite3.connect(db_path)
@@ -1369,14 +1410,21 @@ async def excluir_panorama(id: int):
 #         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 #         cursor.execute("INSERT INTO historico_conferencia (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
 #                        (periodo, data_agora, json.dumps(dados)))
+#         conn.commit()
+#         conn.close()
+#         return {"mensagem": "Conferencia salva!", "dados": dados}
+#     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
+# def listar_conferencia():
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
 #     cursor = conn.cursor()
 #     cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_conferencia ORDER BY id DESC")
 #     rows = cursor.fetchall()
+#     conn.close()
     
 #     resultado = []
+#     for r in rows:
 #         resultado.append({
 #             "id": r[0], 
 #             "periodo": r[1], 
@@ -1384,6 +1432,7 @@ async def excluir_panorama(id: int):
 #             "dados": r[3]
 #         })
         
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
 # async def buscar_conferencia(id: int):
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
@@ -1391,34 +1440,56 @@ async def excluir_panorama(id: int):
 #     cursor = conn.cursor()
 #     cursor.execute("SELECT resultado_json FROM historico_conferencia WHERE id = ?", (id,))
 #     row = cursor.fetchone()
+#     conn.close()
+#     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+#     return json.loads(row[0])
 # async def excluir_conferencia(id: int):
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
 #     cursor = conn.cursor()
 #     cursor.execute("DELETE FROM historico_conferencia WHERE id = ?", (id,))
+#     conn.commit()
+#     conn.close()
+#     return {"mensagem": "Excluido"}
 # =======================================================
 # ROTAS ISOLADAS: INTEGRIDADE (Tabela historico_integridade_matriz)
 # =======================================================
 # async def api_integridade_matriz_calcular(periodo: str):
+#     import json
+#     import psycopg2
     
 #     # Definição local para garantir que a variável exista no escopo
+#     from pc_backend.app.config import PG_CONFIG
     
+#     try:
 #         # Tenta primeiro buscar o último histórico salvo no PostgreSQL
 #         conn = psycopg2.connect(**PG_CONFIG)
 #         cursor = conn.cursor()
 #         cursor.execute("SELECT resultado_json FROM historico_integridade_matriz ORDER BY id DESC LIMIT 1")
 #         row = cursor.fetchone()
 #         cursor.close()
+#         conn.close()
         
+#         if row:
 #             # Se encontrou histórico, retorna exatamente o JSON salvo
+#             return json.loads(row[0])
             
 #         # Se não encontrou, tenta calcular via CSVs (fallback)
+#         from .matriz_integridade import gerar_matriz
 #         dados = gerar_matriz(periodo)
+#         return dados
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
 
 # async def salvar_integridade_matriz(periodo: str, request: Request):
+#     import json
+#     from datetime import datetime
+#     import psycopg2
     
 #     # Definição local para garantir que a variável exista no escopo
+#     from pc_backend.app.config import PG_CONFIG
     
+#     try:
 #         body = await request.json()
 #         matriz = body.get("matriz", [])
 #         justificativas = body.get("justificativas", {})
@@ -1448,9 +1519,15 @@ async def excluir_panorama(id: int):
 #             "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
 #             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
 #         )
+#         conn.commit()
 #         cursor.close()
+#         conn.close()
         
+#         return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
     
+#     try:
 #         body = await request.json()
 #         matriz = body.get("matriz", [])
 #         justificativas = body.get("justificativas", {})
@@ -1480,8 +1557,13 @@ async def excluir_panorama(id: int):
 #             "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
 #             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
 #         )
+#         conn.commit()
 #         cursor.close()
+#         conn.close()
         
+#         return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
         
 #         dados_matriz = {
 #             "periodo": periodo,
@@ -1508,41 +1590,71 @@ async def excluir_panorama(id: int):
 #             "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
 #             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
 #         )
+#         conn.commit()
 #         cursor.close()
+#         conn.close()
         
+#         return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
 
+# def listar_integridade_matriz():
+#     import json
+#     import psycopg2
     
+#     from pc_backend.app.config import PG_CONFIG
     
+#     try:
 #         conn = psycopg2.connect(**PG_CONFIG)
 #         cursor = conn.cursor()
 #         cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_integridade_matriz ORDER BY id DESC")
 #         rows = cursor.fetchall()
 #         cursor.close()
+#         conn.close()
 
 #         resultado = []
+#         for r in rows:
 #             resultado.append({
 #                 "id": r[0],
 #                 "periodo": r[1],
 #                 "data_geracao": r[2],
 #                 "dados": r[3]
 #             })
+#         return Response(content=json.dumps(resultado), media_type="application/json")
+#     except Exception as e:
+#         return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
+#         return Response(content=json.dumps(resultado), media_type="application/json")
+#     except Exception as e:
+#         return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
 
 # async def buscar_integridade_matriz(id: int):
+#     import json
+#     import psycopg2
     
 #     # Definição local para garantir que a variável exista
+#     from pc_backend.app.config import PG_CONFIG
     
+#     try:
 #         conn = psycopg2.connect(**PG_CONFIG)
 #         cursor = conn.cursor()
 #         cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = %s", (id,))
 #         row = cursor.fetchone()
 #         cursor.close()
+#         conn.close()
         
+#         if not row: 
 #             raise HTTPException(status_code=404, detail="Não encontrado")
             
+#         return json.loads(row[0])
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
 
 # async def excluir_integridade_matriz(request: Request):
+#     try:
 #         body = await request.json()
 #         ids = body.get("ids", [])
+#         if not ids:
+#             return {"ok": False, "mensagem": "Nenhum ID fornecido."}
             
 #         conn = psycopg2.connect(**PG_CONFIG)
 #         cursor = conn.cursor()
@@ -1551,7 +1663,12 @@ async def excluir_panorama(id: int):
 #         placeholders = ','.join(['%s'] * len(ids))
 #         cursor.execute(f"DELETE FROM historico_integridade_matriz WHERE id IN ({placeholders})", tuple(ids))
         
+#         conn.commit()
 #         cursor.close()
+#         conn.close()
+#         return {"ok": True, "mensagem": "Excluí­do com sucesso!"}
+#     except Exception as e:
+#         return {"ok": False, "mensagem": str(e)}
 
 # # @app.get("/gerar_pdf_conferencia/{id}")
 # # async def gerar_pdf_conferencia(id: int):
@@ -1637,11 +1754,15 @@ async def excluir_panorama(id: int):
 # #         }
 # #     except Exception as e:
 # #         return {"erro": True, "mensagem": str(e)}
+# def get_historico_analise_orcamentaria():
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
+#     cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_orcamentaria ORDER BY id DESC")
 #     rows = cur.fetchall()
+#     conn.close()
     
 #     resultado = []
+#     for r in rows:
 #         resultado.append({
 #             "id": r[0], 
 #             "periodo": r[1], 
@@ -1649,13 +1770,18 @@ async def excluir_panorama(id: int):
 #             "dados": r[3]
 #         })
         
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
 # async def get_analise_orcamentaria_id(id: int):
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
+#     cur.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id=?", (id,))
 #     row = cur.fetchone(); conn.close()
+#     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+#     return json.loads(row[1])
 # async def salvar_analise_orcamentaria(periodo: str):
 #     atual = await api_analise_orcamentaria_bo(periodo)
+#     if atual.get("erro"):
 #         raise HTTPException(status_code=400, detail=atual.get("mensagem"))
 #     ano_anterior = str(int(periodo.split("-")[0]) - 1)
 #     periodo_anterior = periodo.replace(periodo.split("-")[0], ano_anterior, 1)
@@ -1664,10 +1790,14 @@ async def excluir_panorama(id: int):
 #              "atual": atual, "anterior": anterior if not anterior.get("erro") else {}}
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
+#     cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_orcamentaria (
 
 #         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
 #     data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+#     cur.execute("INSERT INTO historico_analise_orcamentaria (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
 #                 (periodo, data_agora, json.dumps(dados)))
+#     conn.commit(); conn.close()
+#     return {"mensagem": "Salvo"}
 @app.get("/api/composicao_receitas_despesas/{periodo}")
 async def api_composicao_rd(periodo: str):
     try:
@@ -1724,7 +1854,7 @@ async def salvar_composicao_rd(periodo: str, periodo_anterior: str):
              "atual": atual, "anterior": anterior if not anterior.get("erro") else {}}
     
     try:
-        from .config import PG_CONFIG
+        from pc_backend.app.config import PG_CONFIG
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
         cur.execute("""CREATE TABLE IF NOT EXISTS historico_composicao_receitas_despesas (
@@ -1753,7 +1883,7 @@ def historico_composicao_receitas_despesas():
     from fastapi.responses import JSONResponse
 
     try:
-        from .config import PG_CONFIG
+        from pc_backend.app.config import PG_CONFIG
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
         cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_composicao_receitas_despesas ORDER BY id DESC")
@@ -1780,7 +1910,7 @@ async def get_composicao_id(id: int):
     from fastapi.responses import JSONResponse
 
     try:
-        from .config import PG_CONFIG
+        from pc_backend.app.config import PG_CONFIG
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
         cur.execute("SELECT periodo, resultado_json FROM historico_composicao_receitas_despesas WHERE id = %s", (id,))
@@ -1808,10 +1938,25 @@ async def serve_composicao():
     return FileResponse(caminho)
 # # @app.get("/api/analise_financeira_bf/{periodo}")  # MIGRADO para app/routers/balanco_financeiro.py
 # async def api_analise_financeira_bf(periodo: str):
+#     try:
 #         # === REGRA DE INTEGRIDADE ===
+#         from .matriz_integridade import _get_csv
 #         caminho_check = _get_csv("BALANCO_FINANCEIRO", periodo)
+#         if not caminho_check or not os.path.exists(caminho_check):
+#             return {"erro": "faltando", "pecas": ["Balanço Financeiro"]}
+#         from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
 #         caminho = _get_csv("BALANCO_FINANCEIRO", periodo)
+#         if not caminho or not os.path.exists(caminho):
+#             return {"erro": True, "mensagem": f"BF {periodo} nao importado."}
 #         linhas = _ler_linhas(caminho)
+#         def buscar(termo):
+#             for p in linhas:
+#                 if p and termo.upper() in p[0].strip().upper():
+#                     return p
+#             return None
+#         def val(p, idx):
+#             if p and len(p) > idx: return abs(_limpar_valor(p[idx]))
+#             return 0.0
 #         l10 = buscar("RECEITA REALIZADA")
 #         l28 = buscar("Recebimentos Extraorçamentários")
 #         l33 = buscar("Saldo em espécie do Exercí­­cio Anterior")
@@ -1826,21 +1971,33 @@ async def serve_composicao():
 #             "total_ingressos": {"atual": val(l36,1), "anterior": val(l36,2)},
 #             "total_dispendios": {"atual": val(l36,4), "anterior": val(l36,5)},
 #         }
+#         return {"erro": False, "dados": dados}
+#     except Exception as e:
+#         return {"erro": True, "mensagem": str(e)}
 # async def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str):
 #     atual = await api_analise_financeira_bf(periodo)
+#     if atual.get("erro"): raise HTTPException(status_code=400, detail=atual["mensagem"])
 #     # O periodo anterior JA esta no mesmo CSV (coluna 2). Nao precisa buscar outro arquivo.
 #     dados = {"periodo": periodo, "periodo_anterior": periodo_anterior,
 #              "atual": atual.get("dados", {}), "anterior": {}}
 #     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+#     cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_financeira_bf (
 
 #         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
 #     data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+#     cur.execute("INSERT INTO historico_analise_financeira_bf (periodo, data_geracao, resultado_json) VALUES (?,?,?)",
 #                 (f"{periodo} vs {periodo_anterior}", data_agora, json.dumps(dados)))
+#     conn.commit(); conn.close()
+#     return {"mensagem": "Salvo"}
+# def get_historico_analise_financeira_bf():
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
+#     cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_financeira_bf ORDER BY id DESC")
 #     rows = cur.fetchall()
+#     conn.close()
     
 #     resultado = []
+#     for r in rows:
 #         resultado.append({
 #             "id": r[0], 
 #             "periodo": r[1], 
@@ -1848,14 +2005,27 @@ async def serve_composicao():
 #             "dados": r[3]
 #         })
         
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
 # async def get_bf_id(id: int):
 #     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+#     cur.execute("SELECT periodo, resultado_json FROM historico_analise_financeira_bf WHERE id=?", (id,))
 #     row = cur.fetchone(); conn.close()
+#     if not row: raise HTTPException(status_code=404, detail="Nao encontrado")
+#     return json.loads(row[1])
 # async def excluir_bf(id: int):
 #     conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+#     cur.execute("DELETE FROM historico_analise_financeira_bf WHERE id=?", (id,))
+#     conn.commit(); conn.close()
+#     return {"mensagem": "Excluido"}
 
 # async def gerar_pdf_analise_financeira_bf(id: int):
+#     try:
+#         from fpdf import FPDF
+#         from fpdf.enums import XPos, YPos
+#         from fastapi.responses import Response
+#         import sqlite3, os
+#         from datetime import datetime
 
 #         fonte_padrao = "ArialUnicode"  # Definicao da fonte
 
@@ -1864,59 +2034,162 @@ async def serve_composicao():
 #         cursor = conn.cursor()
 #         cursor.execute("SELECT periodo FROM historico_analise_financeira_bf WHERE id = ?", (id,))
 #         row = cursor.fetchone()
+#         conn.close()
 #         periodo = row[0] if row else "2026-TRIMESTRE-3"
 
 #         periodo = periodo.split(" vs ")[0].strip() if " vs " in periodo else periodo
 #         p_limpo = periodo.replace("-", "_")
 #         caminho_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw", f"BALANCO_FINANCEIRO_{p_limpo}.csv")
 
+#         if not os.path.exists(caminho_csv):
 #             raise Exception(f"Arquivo do Balanco Financeiro nao encontrado para {periodo}")
 
 #         d = resultado["dados"]
 
 #         pdf = FPDF()
+#         pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
+#         pdf.add_page()
+#         pdf.set_auto_page_break(auto=False)
 
 #         # Cabecalho
+#         pdf.set_fill_color(0, 51, 102)
+#         pdf.rect(0, 0, 210, 35, "F")
+#         pdf.set_font(fonte_padrao, "B", 22)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_xy(15, 8)
+#         pdf.cell(180, 10, "Balanço Financeiro", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_font(fonte_padrao, "", 13)
+#         pdf.set_xy(15, 20)
+#         pdf.cell(180, 8, f"Perí­­odo: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+#         pdf.set_draw_color(0, 51, 102)
+#         pdf.set_line_width(1.5)
+#         pdf.line(0, 35, 210, 35)
 
+#         def fmt(v):
+#             try:
 #                 s = f"R$ {v:,.2f}"
+#                 return s.replace(",", "X").replace(".", ",").replace("X", ".")
+#             except Exception:
+#                 return str(v)
 
 #         # --- CARDS DE TOTAIS ---
 #         y_pos = 50
 #         card_w = 55
 #         card_h = 25
 
+#         pdf.set_fill_color(232, 244, 248)
+#         pdf.rect(15, y_pos, card_w, card_h, "F")
+#         pdf.set_text_color(0, 51, 102)
+#         pdf.set_font(fonte_padrao, "B", 12)
+#         pdf.set_xy(18, y_pos + 4)
+#         pdf.cell(card_w - 6, 8, fmt(d["receitas"]["total"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_font(fonte_padrao, "", 9)
+#         pdf.set_text_color(80, 80, 80)
+#         pdf.set_xy(18, y_pos + 15)
+#         pdf.cell(card_w - 6, 5, "Total de Receitas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+#         pdf.set_fill_color(248, 232, 232)
+#         pdf.rect(77, y_pos, card_w, card_h, "F")
+#         pdf.set_text_color(220, 53, 69)
+#         pdf.set_font(fonte_padrao, "B", 12)
+#         pdf.set_xy(80, y_pos + 4)
+#         pdf.cell(card_w - 6, 8, fmt(d["despesas"]["total"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_font(fonte_padrao, "", 9)
+#         pdf.set_text_color(80, 80, 80)
+#         pdf.set_xy(80, y_pos + 15)
+#         pdf.cell(card_w - 6, 5, "Total de Despesas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+#         pdf.set_fill_color(238, 245, 232)
+#         pdf.rect(139, y_pos, card_w, card_h, "F")
+#         pdf.set_text_color(40, 167, 69)
+#         pdf.set_font(fonte_padrao, "B", 12)
+#         pdf.set_xy(142, y_pos + 4)
+#         pdf.cell(card_w - 6, 8, fmt(d["caixa"]["saldo_seguinte"]["atual"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_font(fonte_padrao, "", 9)
+#         pdf.set_text_color(80, 80, 80)
+#         pdf.set_xy(142, y_pos + 15)
+#         pdf.cell(card_w - 6, 5, "Saldo p/ Exerc. Seguinte", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
 #         # --- TABELA DETALHADA ---
 #         y_pos += 40
+#         pdf.set_text_color(0, 0, 0)
+#         pdf.set_font(fonte_padrao, "B", 10)
+#         pdf.set_fill_color(0, 51, 102)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(90, 8, "Indicador", border=1, fill=True)
+#         pdf.cell(40, 8, "Periodo Atual", border=1, fill=True, align="R")
+#         pdf.cell(40, 8, "Periodo Anterior", border=1, fill=True, align="R")
+#         pdf.ln()
 #         y_pos += 8
 
+#         pdf.set_text_color(0, 0, 0)
+#         pdf.set_draw_color(0, 51, 102)
+#         pdf.set_line_width(0.2)
+#         pdf.set_font(fonte_padrao, "", 9)
 
+#         def add_linha(nome, at, ant, bold=False, fill_color=None, text_color=(0,0,0)):
 #             nonlocal y_pos
+#             if bold:
+#                 pdf.set_font(fonte_padrao, "B", 9)
 #             else:
+#                 pdf.set_font(fonte_padrao, "", 9)
+#             if fill_color:
+#                 pdf.set_fill_color(*fill_color)
+#             pdf.set_text_color(*text_color)
 
+#             pdf.set_xy(15, y_pos)
+#             pdf.cell(90, 6, nome, border=1, fill=bool(fill_color))
+#             pdf.cell(40, 6, fmt(at), border=1, align="R", fill=bool(fill_color))
+#             pdf.cell(40, 6, fmt(ant), border=1, align="R", fill=bool(fill_color))
+#             pdf.ln()
 #             y_pos += 6
 
 #         # Grupo Receitas
+#         pdf.set_fill_color(232, 244, 248)
+#         pdf.set_text_color(0, 0, 0)
+#         pdf.set_font(fonte_padrao, "B", 9)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "RECEITAS", border=1, fill=True)
+#         pdf.ln()
 #         y_pos += 6
 #         add_linha("Receitas Correntes", d["receitas"]["corrente"]["atual"], d["receitas"]["corrente"]["anterior"])
 #         add_linha("Receitas de Capital", d["receitas"]["capital"]["atual"], d["receitas"]["capital"]["anterior"])
 #         add_linha("TOTAL DE RECEITAS", d["receitas"]["total"]["atual"], d["receitas"]["total"]["anterior"], bold=True)
 
 #         # Grupo Despesas
+#         pdf.set_fill_color(248, 232, 232)
+#         pdf.set_font(fonte_padrao, "B", 9)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "DESPESAS", border=1, fill=True)
+#         pdf.ln()
 #         y_pos += 6
 #         add_linha("Despesas Correntes", d["despesas"]["corrente"]["atual"], d["despesas"]["corrente"]["anterior"])
 #         add_linha("Despesas de Capital", d["despesas"]["capital"]["atual"], d["despesas"]["capital"]["anterior"])
 #         add_linha("TOTAL DE DESPESAS", d["despesas"]["total"]["atual"], d["despesas"]["total"]["anterior"], bold=True)
 
 #         # Grupo Extraorcamentario
+#         pdf.set_fill_color(240, 240, 240)
+#         pdf.set_font(fonte_padrao, "B", 9)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "EXTRAORÇAMENTí­RIO", border=1, fill=True)
+#         pdf.ln()
 #         y_pos += 6
 #         add_linha("Recebimentos Extraorcamentarios", d["extra"]["recebimentos"]["atual"], d["extra"]["recebimentos"]["anterior"])
 #         add_linha("Pagamentos Extraorcamentarios", d["extra"]["pagamentos"]["atual"], d["extra"]["pagamentos"]["anterior"])
 
 #         # Grupo Caixa
+#         pdf.set_fill_color(238, 245, 232)
+#         pdf.set_font(fonte_padrao, "B", 9)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "CAIXA E EQUIVALENTES", border=1, fill=True)
+#         pdf.ln()
 #         y_pos += 6
 #         add_linha("Saldo em Espécie do Exercí­­cio Anterior", d["caixa"]["saldo_anterior"]["atual"], d["caixa"]["saldo_anterior"]["anterior"])
 #         add_linha("Geração Lí­­quida de Caixa", d["caixa"]["geracao_liquida"]["atual"], d["caixa"]["geracao_liquida"]["anterior"], bold=True)
@@ -1939,6 +2212,12 @@ async def serve_composicao():
 #         totalIngAnt = totRecAnt + totExtAnt + saldoAntAnt
 
 #         # Tabela de Ingressos
+#         pdf.set_fill_color(0, 86, 179)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_font(fonte_padrao, "B", 10)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "TOTAL GERAL DE INGRESSOS", border=1, fill=True)
+#         pdf.ln()
 #         y_pos += 6
 
 #         add_linha("Receitas Orçamentárias (Corrente + Capital)", totRecAt, totRecAnt)
@@ -1959,6 +2238,12 @@ async def serve_composicao():
 #         totalDispAnt = totDespAnt + pagExtAnt + saldoSegAnt
 
 #         # Tabela de Dispí­ªndios
+#         pdf.set_fill_color(220, 53, 69)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_font(fonte_padrao, "B", 10)
+#         pdf.set_xy(15, y_pos)
+#         pdf.cell(170, 6, "TOTAL GERAL DE DISPíŠNDIOS", border=1, fill=True)
+#         pdf.ln()
 #         y_pos += 6
 
 #         add_linha("Despesas Orçamentárias (Corrente + Capital)", totDespAt, totDespAnt)
@@ -1968,42 +2253,426 @@ async def serve_composicao():
 
 #         # Rodape - Posiciona dinamicamente, abaixo da ultima linha (se houver espaco)
 #         y_rodape = max(y_pos + 5, 270)
+#         if y_rodape > 280:
 #             y_rodape = 280
 
+#         pdf.set_draw_color(200, 200, 200)
+#         pdf.set_line_width(0.3)
+#         pdf.line(15, y_rodape, 195, y_rodape)
+#         pdf.set_text_color(120, 120, 120)
+#         pdf.set_font(fonte_padrao, "I", 8)
+#         pdf.set_xy(15, y_rodape + 2)
+#         pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
+#         pdf.set_xy(135, y_rodape + 2)
+#         pdf.cell(60, 5, f"Gerado em: {datetime.now():%d/%m/%Y %H:%M}", align="R")
 
 #         pdf_bytes = bytes(pdf.output())
+#         return Response(
 #             content=pdf_bytes,
 #             media_type="application/pdf",
 #             headers={"Content-Disposition": f"inline; filename=balanco_financeiro_{periodo}.pdf"}
 #         )
+#     except HTTPException:
 #         raise
+#     except Exception as e:
+#         import traceback
 #         traceback.print_exc()
 #         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
 
 # async def serve_analise_financeira_bf():
+#     from fastapi.responses import FileResponse
 #     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_financeira_bf.html")
+#     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
 
 # ============ ROTAS DFC (Analise do Fluxo de Caixa) ============
+# [DFC-LEGADO] 
+# [DFC-LEGADO] @app.post("/salvar_analise_dfc/{periodo}/{periodo_anterior}")
+# [DFC-LEGADO] async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
+# [DFC-LEGADO]     import sqlite3, json
+# [DFC-LEGADO]     from datetime import datetime
+# [DFC-LEGADO]     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+# [DFC-LEGADO]     conn = sqlite3.connect(db_path)
+# [DFC-LEGADO]     cursor = conn.cursor()
+# [DFC-LEGADO]     cursor.execute("""CREATE TABLE IF NOT EXISTS historico_analise_dfc (
+# [DFC-LEGADO]         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
     # Chama a API da DFC para obter os dados
+# [DFC-LEGADO]     try:
+# [DFC-LEGADO]         pass
+# [DFC-LEGADO]     except Exception as e:
+# [DFC-LEGADO]         return {"ok": False, "mensagem": f"Erro ao calcular DFC: {e}"}
+# [DFC-LEGADO]     data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# [DFC-LEGADO]     cursor.execute("INSERT INTO historico_analise_dfc (periodo, data_geracao, resultado_json) VALUES (?, ?, ?)",
+# [DFC-LEGADO]                    (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
+# [DFC-LEGADO]     conn.commit()
+# [DFC-LEGADO]     conn.close()
+# [DFC-LEGADO]     return {"ok": True, "mensagem": "Analise DFC salva com sucesso!"}
+# [DFC-LEGADO] 
+# [DFC-LEGADO] @app.get("/historico_analise_dfc")
+# [DFC-LEGADO] def get_historico_analise_dfc():
+# [DFC-LEGADO]     conn = sqlite3.connect(DB_PATH)
+# [DFC-LEGADO]     cur = conn.cursor()
+# [DFC-LEGADO]     cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_dfc ORDER BY id DESC")
+# [DFC-LEGADO]     rows = cur.fetchall()
+# [DFC-LEGADO]     conn.close()
+# [DFC-LEGADO]     
+# [DFC-LEGADO]     resultado = []
+# [DFC-LEGADO]     for r in rows:
+# [DFC-LEGADO]         resultado.append({
+# [DFC-LEGADO]             "id": r[0], 
+# [DFC-LEGADO]             "periodo": r[1], 
+# [DFC-LEGADO]             "data_geracao": r[2], 
+# [DFC-LEGADO]             "dados": r[3]
+# [DFC-LEGADO]         })
+# [DFC-LEGADO]         
+# [DFC-LEGADO]     return Response(content=json.dumps(resultado), media_type="application/json")
+# [DFC-LEGADO] 
+# [DFC-LEGADO] @app.get("/historico_analise_dfc/{id}")
+# [DFC-LEGADO] async def get_dfc_id(id: int):
+# [DFC-LEGADO]     import sqlite3, json
+# [DFC-LEGADO]     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+# [DFC-LEGADO]     conn = sqlite3.connect(db_path)
+# [DFC-LEGADO]     cursor = conn.cursor()
+# [DFC-LEGADO]     cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_dfc WHERE id = ?", (id,))
+# [DFC-LEGADO]     row = cursor.fetchone()
+# [DFC-LEGADO]     conn.close()
+# [DFC-LEGADO]     if not row:
+# [DFC-LEGADO]         return {"erro": "nao encontrado"}
+# [DFC-LEGADO]     return {"periodo": row[0], "data_geracao": row[1], "dados": json.loads(row[2])}
+# [DFC-LEGADO] 
+# [DFC-LEGADO] @app.delete("/excluir_analise_dfc/{id}")
+# [DFC-LEGADO] async def excluir_dfc(id: int):
+# [DFC-LEGADO]     import sqlite3
+# [DFC-LEGADO]     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+# [DFC-LEGADO]     conn = sqlite3.connect(db_path)
+# [DFC-LEGADO]     cursor = conn.cursor()
+# [DFC-LEGADO]     cursor.execute("DELETE FROM historico_analise_dfc WHERE id = ?", (id,))
+# [DFC-LEGADO]     conn.commit()
+# [DFC-LEGADO]     conn.close()
+# [DFC-LEGADO]     return {"ok": True}
+# [DFC-LEGADO] 
+# [DFC-LEGADO] @app.get("/gerar_pdf_analise_dfc/{id}")
+# [DFC-LEGADO] async def gerar_pdf_analise_dfc(id: int):
+# [DFC-LEGADO]     import sqlite3, json, os
+# [DFC-LEGADO]     from fpdf import FPDF
+# [DFC-LEGADO]     from fpdf.enums import XPos, YPos
+# [DFC-LEGADO]     from fastapi.responses import Response
+# [DFC-LEGADO]     from datetime import datetime
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
+# [DFC-LEGADO]     conn = sqlite3.connect(db_path)
+# [DFC-LEGADO]     cursor = conn.cursor()
+# [DFC-LEGADO]     cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_analise_dfc WHERE id = ?", (id,))
+# [DFC-LEGADO]     row = cursor.fetchone()
+# [DFC-LEGADO]     conn.close()
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     if not row:
+# [DFC-LEGADO]         return Response(content="Historico nao encontrado.", status_code=404, media_type="text/plain")
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     periodo, data_geracao, res_json = row
+# [DFC-LEGADO]     try:
+# [DFC-LEGADO]         dados = json.loads(res_json)
+# [DFC-LEGADO]     except Exception:
+# [DFC-LEGADO]         dados = {}
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     d = dados.get("dados", {})
+# [DFC-LEGADO]     op = d.get("operacional", {})
+# [DFC-LEGADO]     inv = d.get("investimento", {})
+# [DFC-LEGADO]     fin = d.get("financiamento", {})
+# [DFC-LEGADO]     cxa = d.get("caixa", {})
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     def fmt(v):
+# [DFC-LEGADO]         if v is None: return "0,00"
+# [DFC-LEGADO]         return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     def pct(va, vb):
+# [DFC-LEGADO]         if not vb or vb == 0: return "0,00%"
+# [DFC-LEGADO]         return f"{(((va - vb) / abs(vb)) * 100):,.2f}%".replace(".", ",")
+# [DFC-LEGADO] 
     # Inicia o PDF
+# [DFC-LEGADO]     pdf = FPDF(orientation="P", unit="mm", format="A4")
+# [DFC-LEGADO]     pdf.add_font("ArialUnicode", "", r"C:/Windows/Fonts/arial.ttf", uni=True)
+# [DFC-LEGADO]     pdf.add_font("ArialUnicode", "B", r"C:/Windows/Fonts/arial.ttf", uni=True)
+# [DFC-LEGADO]     pdf.add_font("ArialUnicode", "I", r"C:/Windows/Fonts/arial.ttf", uni=True)
+# [DFC-LEGADO]     pdf.add_page()
+# [DFC-LEGADO] 
     # Cabecalho
+# [DFC-LEGADO]     pdf.set_fill_color(0, 51, 102)
+# [DFC-LEGADO]     pdf.set_text_color(255, 255, 255)
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 16)
+# [DFC-LEGADO]     pdf.cell(0, 15, "COFEN/BR - ANí­LISE DA DEMONSTRAÇí­Æ’O DO FLUXO DE CAIXA", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C", fill=True)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.set_text_color(0, 0, 0)
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
+# [DFC-LEGADO]     pdf.ln(5)
+# [DFC-LEGADO]     pdf.cell(0, 6, f"Perí­­odo de Referí­ªncia: {periodo.replace('-', ' ')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+# [DFC-LEGADO]     pdf.cell(0, 6, f"Data de Geração do Relatí­³rio: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+# [DFC-LEGADO]     pdf.ln(10)
+# [DFC-LEGADO] 
     # Tabela
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 9)
+# [DFC-LEGADO]     pdf.set_fill_color(0, 86, 179)
+# [DFC-LEGADO]     pdf.set_text_color(255, 255, 255)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     col_w = [70, 35, 35, 30]
+# [DFC-LEGADO]     headers = ["ESPECIFICAÇí­Æ’O", "PERí­ODO ATUAL", "PERí­ODO ANTERIOR", "VAR. (%)"]
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     for i, h in enumerate(headers):
+# [DFC-LEGADO]         pdf.cell(col_w[i], 8, h, border=1, align="C", fill=True)
+# [DFC-LEGADO]     pdf.ln()
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.set_text_color(0, 0, 0)
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 8)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     def draw_row(label, va, vb, is_header=False, is_total=False):
+# [DFC-LEGADO]         if is_header:
+# [DFC-LEGADO]             pdf.set_fill_color(230, 230, 230)
+# [DFC-LEGADO]             pdf.cell(sum(col_w), 6, label, border=1, align="L", fill=True)
+# [DFC-LEGADO]             pdf.ln()
+# [DFC-LEGADO]             return
+# [DFC-LEGADO]         if is_total:
+# [DFC-LEGADO]             pdf.set_font("ArialUnicode", "B", 8)
+# [DFC-LEGADO]         else:
+# [DFC-LEGADO]             pdf.set_font("ArialUnicode", "", 8)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]         pdf.cell(col_w[0], 6, label, border=1, align="L")
+# [DFC-LEGADO]         pdf.cell(col_w[1], 6, fmt(va), border=1, align="R")
+# [DFC-LEGADO]         pdf.cell(col_w[2], 6, fmt(vb), border=1, align="R")
+# [DFC-LEGADO]         v = pct(va, vb)
+# [DFC-LEGADO]         pdf.cell(col_w[3], 6, v, border=1, align="R")
+# [DFC-LEGADO]         pdf.ln()
+# [DFC-LEGADO] 
     # Operacional
+# [DFC-LEGADO]     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DAS OPERAÇí•ES", 0, 0, is_header=True)
+# [DFC-LEGADO]     draw_row("Ingressos Operacionais", op.get("ingressos", {}).get("atual", 0), op.get("ingressos", {}).get("anterior", 0))
+# [DFC-LEGADO]     draw_row("Desembolsos Operacionais", op.get("desembolsos", {}).get("atual", 0), op.get("desembolsos", {}).get("anterior", 0))
+# [DFC-LEGADO]     draw_row("Caixa Lí­­quido das Operaçí­µes", op.get("liquido", {}).get("atual", 0), op.get("liquido", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO] 
     # Investimento
+# [DFC-LEGADO]     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DE INVESTIMENTO", 0, 0, is_header=True)
+# [DFC-LEGADO]     draw_row("Ingressos de Investimento", inv.get("ingressos", {}).get("atual", 0), inv.get("ingressos", {}).get("anterior", 0))
+# [DFC-LEGADO]     draw_row("Desembolsos de Investimento", inv.get("desembolsos", {}).get("atual", 0), inv.get("desembolsos", {}).get("anterior", 0))
+# [DFC-LEGADO]     draw_row("Caixa Lí­­quido de Investimento", inv.get("liquido", {}).get("atual", 0), inv.get("liquido", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO] 
     # Financiamento
+# [DFC-LEGADO]     draw_row("FLUXO DE CAIXA DAS ATIVIDADES DE FINANCIAMENTO", 0, 0, is_header=True)
+# [DFC-LEGADO]     draw_row("Ingressos de Financiamento", fin.get("ingressos", {}).get("atual", 0), fin.get("ingressos", {}).get("anterior", 0))
+# [DFC-LEGADO]     draw_row("Desembolsos de Financiamento", fin.get("desembolsos", {}).get("atual", 0), fin.get("desembolsos", {}).get("anterior", 0))
+# [DFC-LEGADO]     draw_row("Caixa Lí­­quido de Financiamento", fin.get("liquido", {}).get("atual", 0), fin.get("liquido", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO] 
     # Apuracao
+# [DFC-LEGADO]     draw_row("APURAÇí­Æ’O DO FLUXO DE CAIXA DO PERí­ODO", 0, 0, is_header=True)
+# [DFC-LEGADO]     draw_row("Geração Lí­­quida de Caixa", cxa.get("geracao", {}).get("atual", 0), cxa.get("geracao", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO]     draw_row("Caixa e Equivalentes Inicial", cxa.get("inicial", {}).get("atual", 0), cxa.get("inicial", {}).get("anterior", 0))
+# [DFC-LEGADO]     draw_row("Caixa e Equivalentes Final", cxa.get("final", {}).get("atual", 0), cxa.get("final", {}).get("anterior", 0), is_total=True)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.ln(10)
+# [DFC-LEGADO] 
     # Analise Textual
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
+# [DFC-LEGADO]     pdf.cell(0, 6, "1. ANí­LISE DAS ATIVIDADES OPERACIONAIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "", 9)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     liq_op = op.get("liquido", {}).get("atual", 0)
+# [DFC-LEGADO]     if liq_op > 0:
+# [DFC-LEGADO]         txt_op = f"As atividades operacionais geraram um caixa lí­­quido positivo de R$ {fmt(liq_op)} no perí­­odo atual. Isso indica que as receitas e ingressos operacionais foram suficientes para cobrir os custos e desembolsos operacionais."
+# [DFC-LEGADO]     else:
+# [DFC-LEGADO]         txt_op = f"As atividades operacionais apresentaram um caixa lí­­quido negativo de R$ {fmt(liq_op)} no perí­­odo atual. Isso demonstra que a entidade precisou consumir reservas ou obter financiamentos para cobrir seus desembolsos operacionais."
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.multi_cell(0, 5, txt_op)
+# [DFC-LEGADO]     pdf.ln(5)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
+# [DFC-LEGADO]     pdf.cell(0, 6, "2. ANí­LISE DAS ATIVIDADES DE INVESTIMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "", 9)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     liq_inv = inv.get("liquido", {}).get("atual", 0)
+# [DFC-LEGADO]     if liq_inv < 0:
+# [DFC-LEGADO]         txt_inv = f"O fluxo de caixa de investimentos foi negativo em R$ {fmt(abs(liq_inv))}, o que e comum e esperado quando a entidade realiza aquisicoes de ativos (investimentos) e imobilizacoes."
+# [DFC-LEGADO]     else:
+# [DFC-LEGADO]         txt_inv = f"O fluxo de caixa de investimentos foi positivo em R$ {fmt(liq_inv)}, indicando que a entidade obteve mais recursos com alienação de ativos do que gastou com aquisiçí­µes."
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.multi_cell(0, 5, txt_inv)
+# [DFC-LEGADO]     pdf.ln(5)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
+# [DFC-LEGADO]     pdf.cell(0, 6, "3. ANí­LISE DAS ATIVIDADES DE FINANCIAMENTO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "", 9)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     liq_fin = fin.get("liquido", {}).get("atual", 0)
+# [DFC-LEGADO]     if liq_fin > 0:
+# [DFC-LEGADO]         txt_fin = f"O fluxo de caixa de financiamentos foi positivo em R$ {fmt(liq_fin)}, decorrente de captação de empréstimos ou financiamentos."
+# [DFC-LEGADO]     elif liq_fin < 0:
+# [DFC-LEGADO]         txt_fin = f"O fluxo de caixa de financiamentos foi negativo em R$ {fmt(abs(liq_fin))}, indicando amortização de dí­­vidas ou devolução de recursos."
+# [DFC-LEGADO]     else:
+# [DFC-LEGADO]         txt_fin = "Não houve movimentação significativa no fluxo de caixa de financiamentos no perí­­odo."
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.multi_cell(0, 5, txt_fin)
+# [DFC-LEGADO]     pdf.ln(5)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "B", 10)
+# [DFC-LEGADO]     pdf.cell(0, 6, "4. CONCLUSí­Æ’O SOBRE A LIQUIDEZ", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+# [DFC-LEGADO]     pdf.set_font("ArialUnicode", "", 9)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     geracao = cxa.get("geracao", {}).get("atual", 0)
+# [DFC-LEGADO]     inicial = cxa.get("inicial", {}).get("atual", 0)
+# [DFC-LEGADO]     final = cxa.get("final", {}).get("atual", 0)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     txt_concl = f"A entidade encerrou o perí­­odo com um saldo de caixa de R$ {fmt(final)} (variacao de R$ {fmt(geracao)} em relação ao saldo inicial de R$ {fmt(inicial)}). "
+# [DFC-LEGADO]     if geracao > 0:
+# [DFC-LEGADO]         txt_concl += "O aumento no saldo de caixa demonstra uma boa geração de recursos no perí­­odo."
+# [DFC-LEGADO]     else:
+# [DFC-LEGADO]         txt_concl += "A redução no saldo de caixa requer atenção aos prí­³ximos perí­­odos para garantir a manutenção das atividades."
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf.multi_cell(0, 5, txt_concl)
+# [DFC-LEGADO] 
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     pdf_bytes = bytes(pdf.output())
+# [DFC-LEGADO]     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=Analise_DFC_{periodo}.pdf"})
+# [DFC-LEGADO] 
 # ============================================================
 # API DA ANALISE DFC (le o CSV e retorna os dados)
 # ============================================================
+# [DFC-LEGADO] 
+# [DFC-LEGADO] @app.get("/api/analise_dfc/{periodo}")
+# [DFC-LEGADO] async def api_analise_dfc(periodo: str):
+# [DFC-LEGADO]     import csv, os
+# [DFC-LEGADO]     from fastapi import HTTPException
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     p_limpo = periodo.replace("-", "_")
+# [DFC-LEGADO]     pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
+# [DFC-LEGADO]     caminho = os.path.join(pasta, f"DFC_{p_limpo}.csv")
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     if not os.path.exists(caminho):
+# [DFC-LEGADO]         return {"erro": "faltando", "pecas": ["DFC"]}
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     def limpar(v):
+# [DFC-LEGADO]         if not v:
+# [DFC-LEGADO]             return 0.0
+# [DFC-LEGADO]         v = str(v).replace("R$", "").strip()
+# [DFC-LEGADO]         if v in ["-", "0,00", ""]:
+# [DFC-LEGADO]             return 0.0
+# [DFC-LEGADO]         if "," in v and "." in v:
+# [DFC-LEGADO]             v = v.replace(".", "").replace(",", ".")
+# [DFC-LEGADO]         elif "," in v:
+# [DFC-LEGADO]             v = v.replace(",", ".")
+# [DFC-LEGADO]         try:
+# [DFC-LEGADO]             return float(v)
+# [DFC-LEGADO]         except Exception:
+# [DFC-LEGADO]             return 0.0
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     try:
+# [DFC-LEGADO]         linhas = []
+# [DFC-LEGADO]         with open(caminho, "r", encoding="latin-1", errors="ignore") as f:
+# [DFC-LEGADO]             leitor = csv.reader(f, delimiter=";")
+# [DFC-LEGADO]             for row in leitor:
+# [DFC-LEGADO]                 linhas.append(row)
+# [DFC-LEGADO] 
+# [DFC-LEGADO]         def buscar(termo):
+# [DFC-LEGADO]             termo = termo.upper().strip()
+# [DFC-LEGADO]             for p in linhas:
+# [DFC-LEGADO]                 if len(p) > 0 and termo in str(p[0]).upper():
+# [DFC-LEGADO]                     return p
+# [DFC-LEGADO]                 if len(p) > 3 and termo in str(p[3]).upper():
+# [DFC-LEGADO]                     return p
+# [DFC-LEGADO]             return None
+# [DFC-LEGADO] 
+# [DFC-LEGADO]         def val(p, idx):
+# [DFC-LEGADO]             if p and len(p) > idx:
+# [DFC-LEGADO]                 return limpar(p[idx])
+# [DFC-LEGADO]             return 0.0
+# [DFC-LEGADO] 
         # Blocos
+# [DFC-LEGADO]         def achar_idx(termo, inicio=0):
+# [DFC-LEGADO]             termo = termo.upper().strip()
+# [DFC-LEGADO]             for i in range(inicio, len(linhas)):
+# [DFC-LEGADO]                 p = linhas[i]
+# [DFC-LEGADO]                 if len(p) > 0 and termo in str(p[0]).upper():
+# [DFC-LEGADO]                     return i
+# [DFC-LEGADO]                 if len(p) > 3 and termo in str(p[3]).upper():
+# [DFC-LEGADO]                     return i
+# [DFC-LEGADO]             return -1
+# [DFC-LEGADO] 
+# [DFC-LEGADO]         idx_oper = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DAS OPERA")
+# [DFC-LEGADO]         idx_invest = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DE INVESTIMENTO")
+# [DFC-LEGADO]         idx_financ = achar_idx("FLUXO DE CAIXA DAS ATIVIDADES DE FINANCIAMENTO")
+# [DFC-LEGADO]         idx_apuracao = achar_idx("APURA")
+# [DFC-LEGADO] 
+# [DFC-LEGADO]         if idx_oper == -1 or idx_invest == -1 or idx_financ == -1 or idx_apuracao == -1:
+# [DFC-LEGADO]             return {"erro": "estrutura", "mensagem": "Nao foi possivel localizar os blocos da DFC no CSV."}
+# [DFC-LEGADO] 
+# [DFC-LEGADO]         def buscar_bloco(bloco, termo):
+# [DFC-LEGADO]             termo = termo.upper().strip()
+# [DFC-LEGADO]             for p in bloco:
+# [DFC-LEGADO]                 if len(p) > 0 and termo in str(p[0]).upper():
+# [DFC-LEGADO]                     return p
+# [DFC-LEGADO]                 if len(p) > 3 and termo in str(p[3]).upper():
+# [DFC-LEGADO]                     return p
+# [DFC-LEGADO]             return None
+# [DFC-LEGADO] 
         # Operacional
+# [DFC-LEGADO]         linhas_oper = linhas[idx_oper:idx_invest]
+# [DFC-LEGADO]         l_ing_oper = buscar_bloco(linhas_oper, "INGRESSOS")
+# [DFC-LEGADO]         l_desemb_oper = buscar_bloco(linhas_oper, "DESEMBOLSOS")
+# [DFC-LEGADO]         l_liq_oper = buscar_bloco(linhas_oper, "FLUXO DE CAIXA L")
+# [DFC-LEGADO] 
         # Investimento
+# [DFC-LEGADO]         linhas_invest = linhas[idx_invest:idx_financ]
+# [DFC-LEGADO]         l_ing_invest = buscar_bloco(linhas_invest, "INGRESSOS")
+# [DFC-LEGADO]         l_desemb_invest = buscar_bloco(linhas_invest, "DESEMBOLSOS")
+# [DFC-LEGADO]         l_liq_invest = buscar_bloco(linhas_invest, "FLUXO DE CAIXA L")
+# [DFC-LEGADO] 
         # Financiamento
+# [DFC-LEGADO]         linhas_financ = linhas[idx_financ:idx_apuracao]
+# [DFC-LEGADO]         l_ing_financ = buscar_bloco(linhas_financ, "INGRESSOS")
+# [DFC-LEGADO]         l_desemb_financ = buscar_bloco(linhas_financ, "DESEMBOLSOS")
+# [DFC-LEGADO]         l_liq_financ = buscar_bloco(linhas_financ, "FLUXO DE CAIXA L")
+# [DFC-LEGADO] 
         # Apuracao
+# [DFC-LEGADO]         linhas_apuracao = linhas[idx_apuracao:]
+# [DFC-LEGADO]         l_geracao = buscar_bloco(linhas_apuracao, "GERA")
+# [DFC-LEGADO]         l_caixa_inicial = buscar_bloco(linhas_apuracao, "CAIXA E EQUIVALENTES DE CAIXA INICIAL")
+# [DFC-LEGADO]         l_caixa_final = buscar_bloco(linhas_apuracao, "CAIXA E EQUIVALENTES DE CAIXA FINAL")
+# [DFC-LEGADO] 
+# [DFC-LEGADO]         dados = {
+# [DFC-LEGADO]             "operacional": {
+# [DFC-LEGADO]                 "ingressos": {"atual": val(l_ing_oper, 3), "anterior": val(l_ing_oper, 4)},
+# [DFC-LEGADO]                 "desembolsos": {"atual": val(l_desemb_oper, 3), "anterior": val(l_desemb_oper, 4)},
+# [DFC-LEGADO]                 "liquido": {"atual": val(l_liq_oper, 3), "anterior": val(l_liq_oper, 4)},
+# [DFC-LEGADO]             },
+# [DFC-LEGADO]             "investimento": {
+# [DFC-LEGADO]                 "ingressos": {"atual": val(l_ing_invest, 3), "anterior": val(l_ing_invest, 4)},
+# [DFC-LEGADO]                 "desembolsos": {"atual": val(l_desemb_invest, 3), "anterior": val(l_desemb_invest, 4)},
+# [DFC-LEGADO]                 "liquido": {"atual": val(l_liq_invest, 3), "anterior": val(l_liq_invest, 4)},
+# [DFC-LEGADO]             },
+# [DFC-LEGADO]             "financiamento": {
+# [DFC-LEGADO]                 "ingressos": {"atual": val(l_ing_financ, 3), "anterior": val(l_ing_financ, 4)},
+# [DFC-LEGADO]                 "desembolsos": {"atual": val(l_desemb_financ, 3), "anterior": val(l_desemb_financ, 4)},
+# [DFC-LEGADO]                 "liquido": {"atual": val(l_liq_financ, 3), "anterior": val(l_liq_financ, 4)},
+# [DFC-LEGADO]             },
+# [DFC-LEGADO]             "caixa": {
+# [DFC-LEGADO]                 "geracao": {"atual": val(l_geracao, 3), "anterior": val(l_geracao, 4)},
+# [DFC-LEGADO]                 "inicial": {"atual": val(l_caixa_inicial, 3), "anterior": val(l_caixa_inicial, 4)},
+# [DFC-LEGADO]                 "final": {"atual": val(l_caixa_final, 3), "anterior": val(l_caixa_final, 4)},
+# [DFC-LEGADO]             }
+# [DFC-LEGADO]         }
+# [DFC-LEGADO]         return {"erro": False, "dados": dados}
+# [DFC-LEGADO] 
+# [DFC-LEGADO]     except Exception as e:
+# [DFC-LEGADO]         print(f"[DFC] ERRO: {e}")
+# [DFC-LEGADO]         raise HTTPException(status_code=500, detail=str(e))
+# [DFC-LEGADO] 
+# [DFC-LEGADO] @app.get("/analise_dfc")
+# [DFC-LEGADO] async def serve_analise_dfc():
+# [DFC-LEGADO]     from fastapi.responses import FileResponse
+# [DFC-LEGADO]     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_dfc.html")
+# [DFC-LEGADO]     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
+# [DFC-LEGADO] 
 # async def excluir_analise_orcamentaria(id: int):
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
+#     cur.execute("DELETE FROM historico_analise_orcamentaria WHERE id=?", (id,))
+#     conn.commit(); conn.close()
+#     return {"mensagem": "Excluido"}
 @app.get("/api/periodos_disponiveis/{tipo_demonstrativo}")
 async def api_periodos_disponiveis(tipo_demonstrativo: str):
     try:
@@ -2124,12 +2793,22 @@ async def buscar_historico_composicao_rd(id: int):
         except: dados_json = {}
     return {"periodo": periodo, "dados": dados_json}
 # async def gerar_pdf_analise_orcamentaria(id: int):
+#     try:
+#         from fastapi.responses import Response
+#         from fpdf import FPDF
+#         from fpdf.enums import XPos, YPos
+#         import matplotlib
 #         matplotlib.use('Agg')
+#         import matplotlib.pyplot as plt
+#         import matplotlib.ticker as ticker
+#         import io, tempfile, os, json, sqlite3
 #         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #         conn = sqlite3.connect(db_path)
 #         cursor = conn.cursor()
 #         cursor.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id = ?", (id,))
 #         row = cursor.fetchone()
+#         conn.close()
+#         if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
 #         periodo, d_json = row
 #         d = json.loads(d_json)
 #         # Estrutura esperada: { atual: {...}, anterior: {...} }
@@ -2158,12 +2837,33 @@ async def buscar_historico_composicao_rd(id: int):
 #         plt.savefig(img_path, bbox_inches="tight"); plt.close()
 #         # --- 2. MONTA O PDF ---
 #         pdf = FPDF(orientation="L", unit="mm", format="A4")
+#         pdf.add_page()
 #         font_path = "C:/Windows/Fonts/arial.ttf"
 #         font_bold = "C:/Windows/Fonts/arialbd.ttf"
+#         if os.path.exists(font_path):
+#             pdf.add_font("Arial", "", font_path)
+#             pdf.add_font("Arial", "B", font_bold)
 #             f_family = "Arial"
 #         else:
 #             f_family = "helvetica"
+#         pdf.set_font(f_family, "B", 16)
+#         pdf.set_text_color(0, 51, 102)
+#         pdf.cell(0, 10, "Analise Orcamentaria Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+#         pdf.set_font(f_family, "", 10)
+#         pdf.set_text_color(100, 100, 100)
+#         pdf.cell(0, 5, f"Periodo de Referencia: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+#         pdf.ln(8)
 #         # Tabela: Indicador | Periodo Atual | Periodo Anterior | Var (%)
+#         pdf.set_fill_color(0, 51, 102)
+#         pdf.set_text_color(255, 255, 255)
+#         pdf.set_font(f_family, "B", 10)
+#         pdf.cell(80, 8, "Indicador", border=1, fill=True, align="C")
+#         pdf.cell(45, 8, "Periodo Atual", border=1, fill=True, align="C")
+#         pdf.cell(45, 8, "Periodo Anterior", border=1, fill=True, align="C")
+#         pdf.cell(30, 8, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_text_color(0, 0, 0)
+#         pdf.set_font(f_family, "", 9)
+#         def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 #         # Indicadores na ordem que queremos
 #         # Calcula os percentuais na hora para garantir precisão
 #         rec_orc = a.get("receita_orcada", 0) or 0
@@ -2193,15 +2893,32 @@ async def buscar_historico_composicao_rd(id: int):
 #             ("% de Realizacao das Despesas", pct_desp, pct_desp_ant, 1),
 #         ]
 
+#         for nome, va, vb, m in ind:
 #             var = ((va - vb) / abs(vb)) * 100 if vb != 0 else 0
+#             pdf.cell(80, 7, nome, border=1, align="L")
+#             pdf.cell(45, 7, fmt(va) if m == 1e6 else f"{va:.2f}%", border=1, align="R")
+#             pdf.cell(45, 7, fmt(vb) if m == 1e6 else f"{vb:.2f}%", border=1, align="R")
+#             if var >= 0: pdf.set_text_color(0, 128, 0)
 #             else: pdf.set_text_color(220, 53, 69)
+#             pdf.cell(30, 7, f"{var:+.2f}%".replace(".", ","), border=1, align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#             pdf.set_text_color(0, 0, 0)
 #         # Grafico e Conclusao
+#         pdf.ln(8)
 #         y_atual = pdf.get_y()
+#         pdf.image(img_path, x=30, y=y_atual, w=110)
 #         # Conclusao no lado direito
+#         pdf.set_xy(150, y_atual)
+#         pdf.set_font(f_family, "B", 10)
+#         pdf.cell(0, 6, "Principais conclusoes:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+#         pdf.set_x(150)
+#         pdf.set_font(f_family, "", 8)
 #         txt_conclusao = f"A receita realizada representa {a.get('pct_receita', 0):.2f}% da previsao atualizada, enquanto as despesas empenhadas representam {a.get('pct_despesa', 0):.2f}% da dotacao atualizada."
+#         pdf.multi_cell(90, 4, txt_conclusao)
 #         pdf_bytes = bytes(pdf.output())
+#         return Response(content=pdf_bytes, media_type="application/pdf", headers={
 #             "Content-Disposition": f"inline; filename=analise_orcamentaria_{id}.pdf"
 #         })
+#     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 @app.get("/gerar_pdf_analise_patrimonial/{id}")
 async def gerar_pdf_analise_patrimonial(id: int):
@@ -2420,7 +3137,7 @@ def gerar_pdf_composicao_receitas_despesas(id: int):
     
 
     try:
-        from .config import PG_CONFIG
+        from pc_backend.app.config import PG_CONFIG
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
         cur.execute("SELECT periodo, periodo_anterior, data_geracao, resultado_json FROM historico_composicao_receitas_despesas WHERE id = %s", (id,))
@@ -2812,6 +3529,7 @@ async def excluir_historico_custo_pessoal(id: int):
     return {"mensagem": "Excluido"}
 # async def serve_analise_orcamentaria():
 #     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_frontend", "analise_orcamentaria.html")
+#     return FileResponse(caminho)
 @app.get("/api/relatorios_importados")
 async def api_relatorios_importados():
     import os, glob
@@ -2871,20 +3589,41 @@ async def listar_base_legal():
 # async def serve_liquidez():
     caminho = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "pc_frontend", "liquidez.html")
     return FileResponse(caminho)
+# def _calc_liquidez(periodo):
 #     """Calcula indices de liquidez/estrutura para exercicio ATUAL e ANTERIOR."""
+#     from .matriz_integridade import _ler_linhas, _get_csv, _limpar_valor
 #     caminho_bp = _get_csv("BALANCO_PATRIMONIAL", periodo)
+#     if not caminho_bp:
+#         return None
 #     l_bp = _ler_linhas(caminho_bp)
 #
+#     def _norm(s):
+#         import unicodedata
 #         s = unicodedata.normalize("NFKD", str(s))
+#         return "".join(c for c in s if not unicodedata.combining(c)).upper().strip()
 #
+#     def buscar(*termos):
+#         for termo in termos:
 #             termo_norm = _norm(termo)
+#             for p in l_bp:
+#                 for col_espec in (0, 3):
+#                     if len(p) > col_espec and termo_norm in _norm(p[col_espec]):
 #                         col_atual = col_espec + 1
 #                         col_ant = col_espec + 2
 #                         v_atual = v_ant = 0.0
+#                         if len(p) > col_atual:
+#                             try:
 #                                 v_atual = abs(_limpar_valor(p[col_atual]))
+#                             except Exception:
 #                                 pass
+#                         if len(p) > col_ant:
+#                             try:
 #                                 v_ant = abs(_limpar_valor(p[col_ant]))
+#                             except Exception:
 #                                 pass
+#                         if v_atual > 0 or v_ant > 0:
+#                             return v_atual, v_ant
+#         return 0.0, 0.0
 #
 #     caixa_a, caixa_p = buscar("CAIXA E EQUIVALENTES", "DISPONIBILIDADES", "CAIXA")
 #     ac_a, ac_p = buscar("ATIVO CIRCULANTE")
@@ -2898,23 +3637,41 @@ async def listar_base_legal():
 #     at_a, at_p = buscar("ATIVO TOTAL", "TOTAL DO ATIVO", "TOTAL ATIVO")
 #     pl_a, pl_p = buscar("TOTAL DO PATRIMONIO LIQUIDO", "PATRIMONIO LIQUIDO", "PATRIMONIO SOCIAL")
 #
+#     def _bloco(caixa, ac, est, rlp, anc, imob, pc, pnc, pt, at, pl):
+#         if not anc and imob:
 #             anc = imob
+#         if not pt and pc and pnc:
 #             pt = pc + pnc
+#         if not at:
+#             if ac and anc:
 #                 at = ac + anc
 #             elif ac:
 #                 at = ac + (rlp or 0.0) + (imob or 0.0)
+#         if not at and pt and pl:
 #             at = pt + pl
+#         if not pl and at and pt:
 #             pl = at - pt
+#         if at and pt and pl:
 #             soma = pt + pl
+#             if abs(at - soma) > 1.0:
 #                 at = soma
+#         return dict(caixa=caixa, ac=ac, est=est, rlp=rlp, anc=anc, imob=imob,
 #                     pc=pc, pnc=pnc, pt=pt, at=at, pl=pl)
 #
 #     b_atual = _bloco(caixa_a, ac_a, est_a, rlp_a, anc_a, imob_a, pc_a, pnc_a, pt_a, at_a, pl_a)
 #     b_ant   = _bloco(caixa_p, ac_p, est_p, rlp_p, anc_p, imob_p, pc_p, pnc_p, pt_p, at_p, pl_p)
 #
+#     def div(a, b):
+#         return (a / b) if b else 0.0
 #
+#     def pct(a, b):
+#         return ((a / b) * 100) if b else 0.0
 #
+#     def fmt(v):
+#         return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 #
+#     def _indices(b):
+#         return {
 #             "liquidez": {
 #                 "liquidez_imediata": fmt(div(b["caixa"], b["pc"])),
 #                 "liquidez_corrente": fmt(div(b["ac"], b["pc"])),
@@ -2945,11 +3702,16 @@ async def listar_base_legal():
 #     idx_ant = _indices(b_ant)
 #
 #     periodo_anterior_label = None
+#     for p in l_bp[:12]:
 #         linha = ";".join(str(c) for c in p)
+#         if "PERIODO ANTERIOR" in _norm(linha):
+#             import re as _re
 #             m2 = _re.search(r"(\d{2}/\d{2}/(\d{4}))\s*a\s*(\d{2}/\d{2}/(\d{4}))", linha)
+#             if m2:
 #                 periodo_anterior_label = f"{m2.group(2)} - TRIMESTRE 3"
 #             break
 #
+#     return {
 #         "periodo": periodo,
 #         "periodo_anterior": periodo_anterior_label or "Exercí­­cio Anterior",
 #         "liquidez": idx_atual["liquidez"],
@@ -3376,7 +4138,7 @@ def api_relatorio_centro_custos(id: int = None, periodo: str = "2026-TRIMESTRE-3
             return []
 
     def buscar_historico(periodo_str):
-        cur.execute("SELECT dados_json FROM historico_centro_custos WHERE periodo = ? ORDER BY id DESC LIMIT 1", (periodo_str,))
+        cur.execute("SELECT dados_json FROM historico_centro_custos WHERE periodo = • ORDER BY id DESC LIMIT 1", (periodo_str,))
         row = cur.fetchone()
         if row:
             return json.loads(row[0])
@@ -3790,6 +4552,8 @@ def serve_relatorio_final():
 
 
 # ========== ROTAS DO COMPARATIVO DE RECEITAS ==========
+# def api_comparativo_receitas(periodo: str):
+#     import os, csv, io
 #     upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "uploads_raw")
 #     # Simulação: retorna dados fictí­­cios de receitas (adapte para ler o CSV real, se houver)
 #     receitas = [
@@ -3797,12 +4561,17 @@ def serve_relatorio_final():
 #         {"nome": "Receitas Financeiras", "valor": 25000000.0},
 #         {"nome": "Outras Receitas", "valor": 12000000.0}
 #     ]
+#     return {"erro": False, "periodo": periodo, "receitas": receitas}
 
+# def get_historico_comparativo_receitas():
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
+#     cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_receitas ORDER BY id DESC")
 #     rows = cur.fetchall()
+#     conn.close()
     
 #     resultado = []
+#     for r in rows:
 #         resultado.append({
 #             "id": r[0], 
 #             "periodo": r[1], 
@@ -3810,22 +4579,35 @@ def serve_relatorio_final():
 #             "dados": r[3]
 #         })
         
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
+# def get_historico_comparativo_receitas_id(id: int):
+#     import sqlite3, os, json
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
 #     cur = conn.cursor()
+#     cur.execute("SELECT periodo, dados_json FROM historico_comparativo_receitas WHERE id = ?", (id,))
 #     row = cur.fetchone()
+#     conn.close()
+#     if row: return {"ok": True, "periodo": row[0], "dados": json.loads(row[1])}
+#     return {"ok": False}
 
 @app.post("/salvar_comparativo_receitas")
 
 # async def excluir_multiplos_comparativo_receitas(request: Request):
+#     import sqlite3, os
 #     dados = await request.json()
 #     ids = dados.get("ids", [])
+#     if not ids: return {"ok": False, "mensagem": "Nenhum ID."}
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
 #     cur = conn.cursor()
 #     placeholders = ",".join(["?"] * len(ids))
+#     cur.execute(f"DELETE FROM historico_comparativo_receitas WHERE id IN ({placeholders})", ids)
+#     conn.commit()
 #     excluidos = cur.rowcount
+#     conn.close()
+#     return {"ok": True, "excluidos": excluidos}
 
 @app.get("/analise_comparativo_receitas", response_class=HTMLResponse)
 def serve_analise_comparativo_receitas():
@@ -3977,34 +4759,65 @@ def api_comparativo_receitas_v2(periodo: str):
 
 
 
+# def get_historico_comparativo_despesas_id(id: int):
+#     import psycopg2
+#     from psycopg2.extras import RealDictCursor
+#     import json
     
+#     from pc_backend.app.config import PG_CONFIG
     
+#     try:
 #         conn = psycopg2.connect(**PG_CONFIG)
 #         cur = conn.cursor(cursor_factory=RealDictCursor)
+#         cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas WHERE id = %s", (id,))
 #         row = cur.fetchone()
+#         conn.close()
         
+#         if row:
+#             return {
 #                 "id": row["id"],
 #                 "periodo": row["periodo"],
 #                 "data_geracao": row["data_geracao"],
 #                 "dados": row["dados_json"]
 #             }
+#         return {"erro": True, "mensagem": "Histórico não encontrado."}
+#     except Exception as e:
+#         print(f"[ERRO] Falha ao buscar histórico ID {id}: {e}")
+#         return {"erro": True, "mensagem": str(e)}
 
 
 # async def excluir_multiplos_comparativo_despesas(request: Request):
+#     import psycopg2
+#     from psycopg2.extras import RealDictCursor
     
+#     from pc_backend.app.config import PG_CONFIG
     
+#     try:
 #         body = await request.json()
 #         ids = body.get("ids", [])
         
+#         if not ids:
+#             return {"ok": False, "mensagem": "Nenhum ID fornecido."}
         
 #         conn = psycopg2.connect(**PG_CONFIG)
 #         cur = conn.cursor()
 #         placeholders = ",".join(["%s"] * len(ids))
+#         cur.execute(f"DELETE FROM historico_comparativo_despesas WHERE id IN ({placeholders})", ids)
 #         excluidos = cur.rowcount
+#         conn.commit()
+#         conn.close()
         
+#         return {"ok": True, "excluidos": excluidos}
+#     except Exception as e:
+#         print(f"[ERRO] Falha ao excluir históricos: {e}")
+#         return {"ok": False, "mensagem": str(e)}
 
 
 
+# def gerar_pdf_integridade_matriz(check_id: str):
+#     from playwright.sync_api import sync_playwright
+#     from fastapi.responses import Response
+#     import time
 
 #     # Abre a tela de integridade com o ID passado
 #     url = f"http://127.0.0.1:994/integridade?check={check_id}&_t={int(time.time())}"
@@ -4018,6 +4831,7 @@ def api_comparativo_receitas_v2(periodo: str):
 #         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
 #         browser.close()
 
+#     return Response(
 #         content=pdf_bytes,
 #         media_type="application/pdf",
 #         headers={"Content-Disposition": f"inline; filename=integridade_{check_id}.pdf"}
@@ -4071,20 +4885,33 @@ def gerar_pdf_panorama(historico_id: int):
 # ROTAS DE SALVAR E EXCLUIR - COMPARATIVO DE RECEITAS
 # ============================================================
 
+# def salvar_comparativo_receitas(periodo: str):
+#     import sqlite3, os, json
+#     from datetime import datetime
 
 #     # Pega os dados atuais via API
+#     try:
 #         dados = api_comparativo_receitas_v2(periodo)
+#     except Exception as e:
+#         return {"erro": True, "mensagem": f"Erro ao buscar dados: {str(e)}"}
 
+#     if dados.get("erro"):
+#         return {"erro": True, "mensagem": dados.get("mensagem", "Dados não encontrados")}
 
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
 #     cur = conn.cursor()
+#     cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_receitas (
 #         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
 
 #     data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
 #     dados_json = json.dumps(dados)
 
+#     cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)",
 #                 (periodo, data_geracao, dados_json))
+#     conn.commit()
+#     conn.close()
+#     return {"erro": False, "mensagem": "Salvo com sucesso!"}
 
 
 
@@ -4136,7 +4963,7 @@ async def login(body: dict):
     salt = "sigos_salt_2026_"
     senha_hash = hashlib.sha256((salt + senha).encode('utf-8')).hexdigest()
     
-    from .config import PG_CONFIG
+    from pc_backend.app.config import PG_CONFIG
     
     try:
         conn = psycopg2.connect(**PG_CONFIG)
@@ -4166,7 +4993,7 @@ async def login(body: dict):
 @app.get("/api/usuarios")
 async def listar_usuarios():
     import psycopg2
-    from .config import PG_CONFIG
+    from pc_backend.app.config import PG_CONFIG
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
@@ -4192,7 +5019,7 @@ async def listar_usuarios():
 @app.post("/api/usuarios")
 async def salvar_usuario(body: dict):
     import psycopg2, hashlib
-    from .config import PG_CONFIG
+    from pc_backend.app.config import PG_CONFIG
 
     nome = body.get('nome', '').strip()
     email = body.get('email', '').strip()
@@ -4352,7 +5179,7 @@ async def upload_logo(file: UploadFile = File(...), entidade_id: str = Form(None
 
     if entidade_id:
         # Atualiza apenas a entidade especifica
-        cursor.execute("UPDATE configuracoes_entidade SET logo_path = ? WHERE id = ?", (nome_arquivo, entidade_id))
+        cursor.execute("UPDATE configuracoes_entidade SET logo_path = • WHERE id = ?", (nome_arquivo, entidade_id))
     else:
         # Fallback: se nao veio o ID, atualiza a primeira (comportamento antigo)
         cursor.execute("SELECT COUNT(*) FROM configuracoes_entidade")
@@ -4728,6 +5555,7 @@ async def gerar_pdf_analise_bp(id: int):
         return {"erro": True, "mensagem": str(e)}
 
 
+# def listar_historico_liquidez():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_liquidez ORDER BY id DESC")
@@ -4772,6 +5600,7 @@ async def gerar_pdf_analise_bp(id: int):
     return {"ok": True}
 
 
+# def gerar_pdf_liquidez(id: int):
     import sqlite3 as _sq
     from fpdf import FPDF
     from fpdf.enums import XPos, YPos
@@ -4942,7 +5771,12 @@ async def gerar_pdf_analise_bp(id: int):
 
 
 
+# def gerar_pdf_comparativo_receitas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+#     from playwright.sync_api import sync_playwright
+#     from fastapi.responses import Response
+#     import time, os
 
+#     if historico_id:
 #         url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?historico_id={historico_id}&_t={int(time.time())}"
 #     else:
 #         url = f"http://127.0.0.1:994/relatorio_comparativo_receitas_v2?periodo={periodo}&_t={int(time.time())}"
@@ -4966,6 +5800,7 @@ async def gerar_pdf_analise_bp(id: int):
 #         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
 #         browser.close()
 
+#     return Response(
 #         content=pdf_bytes,
 #         media_type="application/pdf",
 #         headers={"Content-Disposition": f"inline; filename=relatorio_receitas_{periodo}.pdf"}
@@ -5129,11 +5964,15 @@ def api_comparativo_despesas_v2(periodo: str):
             "percentual_total": 0.0, "grupos": [], "detalhes": []
         }
     }
+# def get_historico_comparativo_despesas():
 #     conn = sqlite3.connect(DB_PATH)
 #     cur = conn.cursor()
+#     cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
 #     rows = cur.fetchall()
+#     conn.close()
     
 #     resultado = []
+#     for r in rows:
 #         resultado.append({
 #             "id": r[0], 
 #             "periodo": r[1], 
@@ -5141,6 +5980,7 @@ def api_comparativo_despesas_v2(periodo: str):
 #             "dados": r[3]
 #         })
         
+#     return Response(content=json.dumps(resultado), media_type="application/json")
 
 
 @app.post("/salvar_comparativo_despesas")
@@ -5171,6 +6011,11 @@ def serve_analise_comparativo_despesas():
 @app.get("/gerar_pdf_conferencia/{check_id}")
 
 
+# def gerar_pdf_comparativo_despesas(periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+#     from playwright.sync_api import sync_playwright
+#     from fastapi.responses import Response
+#     import time, os
+#     if historico_id:
 #         url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?historico_id={historico_id}&_t={int(time.time())}"
 #     else:
 #         url = f"http://127.0.0.1:994/relatorio_comparativo_despesas_v2?periodo={periodo}&_t={int(time.time())}"
@@ -5183,6 +6028,7 @@ def serve_analise_comparativo_despesas():
 #         page.wait_for_timeout(3000)
 #         pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"})
 #         browser.close()
+#     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=relatorio_despesas_{periodo}.pdf"})
 
 
 @app.get("/relatorio_comparativo_despesas", response_class=HTMLResponse)
@@ -5195,17 +6041,26 @@ def serve_relatorio_comparativo_despesas():
 
 
 # ========== ROTAS DE HISTí­“RICO DESPESAS (FORÇADAS) ==========
+# def rota_salvar_comparativo_despesas(periodo: str):
+#     import sqlite3, os, json
+#     from datetime import datetime
 
 #     dados = api_comparativo_despesas_v2(periodo)
+#     if dados.get("erro"): return {"erro": True, "mensagem": dados.get("mensagem")}
 
 #     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
 #     conn = sqlite3.connect(db_path)
 #     cur = conn.cursor()
+#     cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_despesas (
 #         id INTEGER PRIMARY KEY AUTOINCREMENT, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
 
 #     data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
 #     dados_json = json.dumps(dados)
 
+#     cur.execute("INSERT INTO historico_comparativo_despesas (periodo, data_geracao, dados_json) VALUES (?, ?, ?)", (periodo, data_geracao, dados_json))
+#     conn.commit()
+#     conn.close()
+#     return {"erro": False, "mensagem": "Salvo com sucesso!"}
 
 @app.delete("/historico_comparativo_despesas/{id}")
 def rota_excluir_comparativo_despesas(id: int):
@@ -5268,7 +6123,7 @@ async def salvar_conclusao_centro_custos(historico_id: int, request: Request):
         if row:
             dados = json.loads(row[0])
             dados["conclusao_personalizada"] = texto
-            cur.execute("UPDATE historico_centro_custos SET dados_json = ? WHERE id = ?", (json.dumps(dados), historico_id))
+            cur.execute("UPDATE historico_centro_custos SET dados_json = • WHERE id = ?", (json.dumps(dados), historico_id))
             conn.commit()
             conn.close()
             return {"erro": False, "mensagem": "Conclusão salva com sucesso!"}
@@ -5524,10 +6379,10 @@ async def excluir_panorama_multiplos(request: Request):
             # Tenta buscar a coluna resultado_json (padrão)
             # Se falhar, tenta dados_json (como nos comparativos)
             try:
-                cursor.execute(f"SELECT resultado_json, data_geracao FROM {tabela} WHERE periodo LIKE ? ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
+                cursor.execute(f"SELECT resultado_json, data_geracao FROM {tabela} WHERE periodo LIKE • ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
                 row = cursor.fetchone()
             except sqlite3.OperationalError:
-                cursor.execute(f"SELECT dados_json, data_geracao FROM {tabela} WHERE periodo LIKE ? ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
+                cursor.execute(f"SELECT dados_json, data_geracao FROM {tabela} WHERE periodo LIKE • ORDER BY id DESC LIMIT 1", (f"%{periodo}%",))
                 row = cursor.fetchone()
 
             if row:
@@ -5559,11 +6414,16 @@ async def excluir_panorama_multiplos(request: Request):
 
 @app.post("/salvar_relatorio_consolidado/{periodo}")
 async def salvar_relatorio_consolidado_novo(periodo: str):
+    periodo = periodo.replace("TRIMESTRAL", "TRIMESTRE").replace("trimestral", "TRIMESTRE")
+    if "TRIMESTRE" in periodo.upper():
+        partes = periodo.upper().split("-")
+        if len(partes) == 3:
+            periodo = f"{partes[0]}-TRIMESTRE-{partes[2]}"
     import json
     from datetime import datetime
     import psycopg2
     
-    from .config import PG_CONFIG
+    from pc_backend.app.config import PG_CONFIG
     
     try:
         # 1. Coleta os dados de todos os módulos no PostgreSQL
@@ -5687,7 +6547,7 @@ async def put_observacao(obs_id: int, request: Request):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
-        "UPDATE observacoes_consolidado SET item = ?, texto = ?, data_criacao = ? WHERE id = ?",
+        "UPDATE observacoes_consolidado SET item = ?, texto = ?, data_criacao = • WHERE id = ?",
         (item, texto, datetime.now().strftime("%d/%m/%Y %H:%M:%S"), obs_id)
     )
     conn.commit()
@@ -5758,7 +6618,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
     import os
     import base64
     
-    from .config import PG_CONFIG
+    from pc_backend.app.config import PG_CONFIG
     
     def fmt(v):
         if v is None: return "-"
@@ -5804,7 +6664,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
         ("Demonstração das Mutações do PL (DMPL)", "8. Demonstração das Mutações do Patrimônio Lí­quido (DMPL)"),
         ("Comparativo de Receitas", "9. Comparativo de Receitas"),
         ("Comparativo de Despesas", "10. Comparativo de Despesas"),
-        ("índices de Liquidez", "11. índices de Liquidez e Estrutura"),
+        ("índices de Liquidez", "11. Índices de Liquidez e Estrutura"),
         ("Panorama de Resultados", "12. Panorama de Resultados"),
         ("Análise por Centro de Custos", "13. Análise por Centro de Custos"),
         ("Custo de Pessoal", "14. Custo de Pessoal"),
@@ -5886,31 +6746,31 @@ def gerar_pdf_relatorio_consolidado(id: int):
         html_parts.append("<div class='capa'>")
         if logo_base64:
             html_parts.append(f"<img class='logo' src='data:image/png;base64,{logo_base64}' alt='Logo'>")
-        html_parts.append("<h1>RELATí“RIO CONSOLIDADO</h1>")
+        html_parts.append("<h1>RELATÓRIO CONSOLIDADO</h1>")
         html_parts.append("<h2 style='border: none;'>Análise Contábil</h2>")
         html_parts.append(f"<div class='orgao'>{razao_social}</div>")
         html_parts.append(f"<div class='cnpj'>CNPJ: {cnpj}</div>")
         html_parts.append(f"<div class='periodo'>PERíODO DE ANíLISE: {periodo}</div>")
         
         html_parts.append("<div class='legislacao'>")
-        html_parts.append("<strong>LEGISLAÇíƒO E NORMAS APLICADAS:</strong><br>")
-        html_parts.append("Lei nº 4.320/1964 (Normas gerais de direito financeiro para elaboração e controle dos orçamentos e balanços.) ”¢ ")
-        html_parts.append("Resolução COFEN nº 340/2008 (Regulamento da Administração Financeira e Contábil) ”¢ ")
-        html_parts.append("Normas Brasileiras de Contabilidade – Setor Público (NBC TSP) ”¢ ")
-        html_parts.append("Resolução COFEN nº 764/2024 (Prestação de Contas) ”¢ ")
-        html_parts.append("Resolução Cofen nº 799/2025 (Gestão de riscos e controles internos) ”¢ ")
-        html_parts.append("Resolução Cofen nº 814/2026 (Limites de despesa com pessoal) ”¢ ")
+        html_parts.append("<strong>LEGISLAÇÃO E NORMAS APLICADAS:</strong><br>")
+        html_parts.append("Lei nº 4.320/1964 (Normas gerais de direito financeiro para elaboração e controle dos orçamentos e balanços.)  • ")
+        html_parts.append("Resolução COFEN nº 340/2008 (Regulamento da Administração Financeira e Contábil)  • ")
+        html_parts.append("Normas Brasileiras de Contabilidade – Setor Público (NBC TSP)  • ")
+        html_parts.append("Resolução COFEN nº 764/2024 (Prestação de Contas)  • ")
+        html_parts.append("Resolução Cofen nº 799/2025 (Gestão de riscos e controles internos)  • ")
+        html_parts.append("Resolução Cofen nº 814/2026 (Limites de despesa com pessoal)  • ")
         html_parts.append("Manual de Contabilidade Aplicada ao Setor Público (MCASP)")
         html_parts.append("</div>")
         
         html_parts.append("<div class='legislacao' style='margin-top: 20px;'>")
-        html_parts.append("<strong>DEMONSTRAÇí•ES ANALISADAS:</strong><br>")
-        html_parts.append("Balancete de Verificação ”¢ Balanço Financeiro (BF) ”¢ Balanço Orçamentário (BO) ”¢ Balanço Patrimonial (BP) ”¢ Demonstração do Fluxo de Caixa (DFC) ”¢ Demonstração das Mutações do PL (DMPL) ”¢ Demonstração das Variações Patrimoniais (DVP)")
+        html_parts.append("<strong>DEMONSTRAÇÕES ANALISADAS:</strong><br>")
+        html_parts.append("Balancete de Verificação  • Balanço Financeiro (BF)  • Balanço Orçamentário (BO)  • Balanço Patrimonial (BP)  • Demonstração do Fluxo de Caixa (DFC)  • Demonstração das Mutações do PL (DMPL)  • Demonstração das Variações Patrimoniais (DVP)")
         html_parts.append("</div>")
         html_parts.append("</div>")
         
         # ============================================================
-        # Mí“DULOS
+        # MÓDULOS
         # ============================================================
         for nome_interno, titulo_exibicao in ordem_modelo:
             m = modulos_por_nome.get(nome_interno)
@@ -5993,15 +6853,18 @@ def gerar_pdf_relatorio_consolidado(id: int):
                             atual = v.get("atual", 0)
                             anterior = v.get("anterior", 0)
                             var = calc_var(atual, anterior)
-                            html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt_sem_rs(atual)}</td><td class='text-right'>{fmt_sem_rs(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                            is_total = k.lower().replace("_", " ").strip() in ("total ativo", "total passivo", "total do ativo", "total do passivo")
+                            tr_style = " style='background-color: #004b8d; color: #ffffff; font-weight: bold;'" if is_total else ""
+                            td_style = " style='color: #ffffff; border-color: #004b8d;'" if is_total else ""
+                            html_parts.append(f"<tr{tr_style}><td{td_style}>{k.replace('_', ' ').title()}</td><td class='text-right'{td_style}>{fmt_sem_rs(atual)}</td><td class='text-right'{td_style}>{fmt_sem_rs(anterior)}</td><td class='text-right'{td_style}>{pct(var)}</td></tr>")
                             if abs(var) > 0.01:
                                 direcao = "positiva" if var > 0 else "negativa"
                                 textos.append(f"<li>{k.replace('_', ' ').title()}, variação {direcao} de {pct(var)}.</li>")
                     html_parts.append("</tbody></table>")
                     html_parts.append("<h3>Evolução das Principais Contas</h3><ul class='texto-dinamico'>" + "".join(textos[:6]) + "</ul>")
-                    labels = [k.replace('_', ' ').title() for k, v in dados_bp.items() if isinstance(v, dict)]
-                    atual_vals = [v.get('atual', 0) for v in dados_bp.values() if isinstance(v, dict)]
-                    ant_vals = [v.get('anterior', 0) for v in dados_bp.values() if isinstance(v, dict)]
+                    labels = [k.replace('_', ' ').title() for k, v in dados_bp.items() if isinstance(v, dict) and k.lower() != 'estoques']
+                    atual_vals = [v.get('atual', 0) for k, v in dados_bp.items() if isinstance(v, dict) and k.lower() != 'estoques']
+                    ant_vals = [v.get('anterior', 0) for k, v in dados_bp.items() if isinstance(v, dict) and k.lower() != 'estoques']
                     html_parts.append("<div class='grafico'><canvas id='chartBP'></canvas></div>")
                     html_parts.append("<script>")
                     html_parts.append("new Chart(document.getElementById('chartBP'), {")
@@ -6199,7 +7062,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                             return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                         return str(v).replace("R$", "").strip()
                     
-                    dados_dfc = mod_dados.get("dados", {})
+                    dados_dfc = mod_dados.get("dados", mod_dados) if isinstance(mod_dados, dict) and "dados" in mod_dados else mod_dados
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Demonstração do Fluxo de Caixa (método direto).</p>")
                     
                     # Textos dinâmicos de evolução
@@ -6207,7 +7070,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     
                     for tipo in ["operacional", "investimento", "financiamento"]:
                         if tipo in dados_dfc:
-                            html_parts.append(f"<h3>Fluxo {tipo.title()}</h3><table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                            html_parts.append(f"<h3>Fluxo {tipo.title()}</h3><table style='table-layout: fixed; width: 100%;'><thead><tr><th style='width: 40%; text-align: left;'>ITEM</th><th style='width: 20%; text-align: right;'>ATUAL</th><th style='width: 20%; text-align: right;'>ANTERIOR</th><th style='width: 20%; text-align: right;'>VAR. (%)</th></tr></thead><tbody>")
                             for k, v in dados_dfc[tipo].items():
                                 if isinstance(v, dict):
                                     a = v.get("atual", 0)
@@ -6221,7 +7084,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     
                     # Apuração de Caixa
                     if "caixa" in dados_dfc:
-                        html_parts.append("<h3>Apuração de Caixa</h3><table><thead><tr><th>ITEM</th><th>ATUAL</th><th>ANTERIOR</th><th>VAR. (%)</th></tr></thead><tbody>")
+                        html_parts.append("<h3>Apuração de Caixa</h3><table style='table-layout: fixed; width: 100%;'><thead><tr><th style='width: 40%; text-align: left;'>ITEM</th><th style='width: 20%; text-align: right;'>ATUAL</th><th style='width: 20%; text-align: right;'>ANTERIOR</th><th style='width: 20%; text-align: right;'>VAR. (%)</th></tr></thead><tbody>")
                         for k, v in dados_dfc["caixa"].items():
                             if isinstance(v, dict):
                                 a = v.get("atual", 0)
@@ -6285,7 +7148,10 @@ def gerar_pdf_relatorio_consolidado(id: int):
                                     direcao = "positiva" if var > 0 else "negativa"
                                     textos.append(f"<li>Margem Patrimonial: variação {direcao} de {pct(var)} (de {anterior:.2f}% para {atual:.2f}%).</li>")
                             else:
-                                html_parts.append(f"<tr><td>{k.replace('_', ' ').title()}</td><td class='text-right'>{fmt_sem_rs(atual)}</td><td class='text-right'>{fmt_sem_rs(anterior)}</td><td class='text-right'>{pct(var)}</td></tr>")
+                                is_total = k.lower().replace("_", " ").strip() in ("total ativo", "total passivo", "total do ativo", "total do passivo")
+                                tr_style = " style='background-color: #004b8d; color: #ffffff; font-weight: bold;'" if is_total else ""
+                                td_style = " style='color: #ffffff; border-color: #004b8d;'" if is_total else ""
+                                html_parts.append(f"<tr{tr_style}><td{td_style}>{k.replace('_', ' ').title()}</td><td class='text-right'{td_style}>{fmt_sem_rs(atual)}</td><td class='text-right'{td_style}>{fmt_sem_rs(anterior)}</td><td class='text-right'{td_style}>{pct(var)}</td></tr>")
                                 if abs(var) > 0.01:
                                     direcao = "positiva" if var > 0 else "negativa"
                                     textos.append(f"<li>{k.replace('_', ' ').title()}: variação {direcao} de {pct(var)} (de {fmt_sem_rs(anterior)} para {fmt_sem_rs(atual)}).</li>")
@@ -6569,6 +7435,8 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         html_parts.append("</script>")
                 
                 elif nome_interno == "índices de Liquidez":
+                    if not isinstance(mod_dados, dict):
+                        mod_dados = {}
                     liq = mod_dados.get("liquidez", {})
                     est = mod_dados.get("estrutura", {})
                     liq_ant = mod_dados.get("liquidez_anterior", {})
@@ -6579,7 +7447,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     html_parts.append("<p style='font-size: 6.2pt; color:#666; font-style:italic;'>Indicadores de liquidez e estrutura patrimonial (atual x anterior).</p>")
                     
                     def fmt_valor(v):
-                        if v is None: return "?"
+                        if v is None: return ""
                         try:
                             return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                         except (TypeError, ValueError):
@@ -6643,7 +7511,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     # ---- LIQUIDEZ ----
                     html_parts.append("<h3>Liquidez</h3>")
                     html_parts.append("<table style='table-layout: fixed; width: 100%;'><thead><tr>")
-                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>Fí“RMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
+                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>FÓRMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
                     html_parts.append("</tr></thead><tbody>")
                     for k, v in liq.items():
                         v_ant = liq_ant.get(k, "-")
@@ -6655,7 +7523,8 @@ def gerar_pdf_relatorio_consolidado(id: int):
                         if var is not None and abs(var) > 0.01:
                             direcao = "aumento" if a > b else "redução"
                             textos.append(f"<li>{nome_fmt}: {direcao} de {b:.2f} para {a:.2f} ({var:+.2f}%).</li>")
-                            labels_liq.append(nome_fmt)
+                            if "estoque" not in nome_fmt.lower():
+                                labels_liq.append(nome_fmt)
                             vals_liq_atual.append(a)
                             vals_liq_ant.append(b)
                     html_parts.append("</tbody></table>")
@@ -6663,7 +7532,7 @@ def gerar_pdf_relatorio_consolidado(id: int):
                     # ---- ESTRUTURA ----
                     html_parts.append("<h3>Estrutura Patrimonial</h3>")
                     html_parts.append("<table style='table-layout: fixed; width: 100%;'><thead><tr>")
-                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>Fí“RMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
+                    html_parts.append("<th style='width: 18%;'>INDICADOR</th><th style='width: 42%;'>FÓRMULA (CONTA + VALOR)</th><th style='width: 10%;'>ATUAL</th><th style='width: 10%;'>ANTERIOR</th><th style='width: 12%;'>VAR. (%)</th>")
                     html_parts.append("</tr></thead><tbody>")
                     for k, v in est.items():
                         v_ant = est_ant.get(k, "-")
@@ -7054,7 +7923,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT resultado_json FROM historico_relatorio_consolidado WHERE periodo = ? ORDER BY id DESC LIMIT 1", (periodo,))
+    cur.execute("SELECT resultado_json FROM historico_relatorio_consolidado WHERE periodo = • ORDER BY id DESC LIMIT 1", (periodo,))
     row = cur.fetchone()
     conn.close()
     if not row:
@@ -7129,7 +7998,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     
     # Nota 4 - Imobilizado
     notas.append({"titulo": "NOTA 4 — IMOBILIZADO, INTANGí­VEL E INCORPORAÇíƒO DE ATIVOS",
-        "texto": "O Imobilizado é de R$ 129.453.937,95 (+4,44%) e o Intangí­­vel, de R$ 832.266,06. No perí­­odo foram incorporados ativos no total de R$ 16.271.957,08, conforme o relatí­³rio, assim discriminados:<br><br>”¢ Outras máquinas, aparelhos e equipamentos: R$ 65.962,97<br>”¢ Mobiliário em geral: R$ 240.628,83<br>”¢ Edifí­­cio Futura Sede Cofen: R$ 6.682.639,01<br>”¢ Bens não ativáveis: R$ 21.081,55<br>”¢ PLATEC — Cofen, investimentos: R$ 9.261.645,32<br><br><i>Observação: a soma aritmética das parcelas acima resulta em R$ 16.271.957,68, diferença de R$ 0,60 em relação ao total informado. A discriminação será revisada antes da divulgação definitiva.</i><br><br>Os estoques somam R$ 185.551,08 (R$ 69.447,74 no perí­­odo anterior)."})
+        "texto": "O Imobilizado é de R$ 129.453.937,95 (+4,44%) e o Intangí­­vel, de R$ 832.266,06. No perí­­odo foram incorporados ativos no total de R$ 16.271.957,08, conforme o relatí­³rio, assim discriminados:<br><br> • Outras máquinas, aparelhos e equipamentos: R$ 65.962,97<br> • Mobiliário em geral: R$ 240.628,83<br> • Edifí­­cio Futura Sede Cofen: R$ 6.682.639,01<br> • Bens não ativáveis: R$ 21.081,55<br> • PLATEC — Cofen, investimentos: R$ 9.261.645,32<br><br><i>Observação: a soma aritmética das parcelas acima resulta em R$ 16.271.957,68, diferença de R$ 0,60 em relação ao total informado. A discriminação será revisada antes da divulgação definitiva.</i><br><br>Os estoques somam R$ 185.551,08 (R$ 69.447,74 no perí­­odo anterior)."})
     
     # Nota 5 - Passivos
     pc_at = vl("passivo_circulante", "atual")
@@ -7190,7 +8059,7 @@ def _gerar_notas_por_periodo(periodo: str) -> dict:
     
     # Nota 15 - Integridade (NOVO)
     notas.append({"titulo": "NOTA 1 — CONTEXTO OPERACIONAL E BASE DE PREPARAÇíƒO",
-        "texto": "A matriz de integridade cruzou Balancete, BP, BF, BO, DFC, DVP e DMPL. A conformidade foi confirmada para os grupos patrimoniais, VPA, VPD, receitas correntes, caixa e equivalentes, despesas correntes e de capital pagas e incorporação de ativos.<br><br>Quatro itens apresentaram divergí­ªncia, decorrentes de estornos de restos a pagar que o sistema contábil (Implanta) não tratou adequadamente; o chamado correspondente foi aberto junto ao fornecedor:<br><br>”¢ Valores restituí­­veis — dispí­ªndios: R$ 222.353,33<br>”¢ RP não processados — a liquidar: R$ 134.400,00<br>”¢ RP não proc. — despesas correntes canceladas: R$ 58.302,51<br>”¢ RP não processados pagos: R$ 7.220,00<br><br>As diferenças referem-se ao tratamento de estornos de restos a pagar e não afetam o resultado patrimonial nem o saldo de caixa. Ficam pendentes de regularização e serão reavaliadas apí­³s resposta do chamado."})
+        "texto": "A matriz de integridade cruzou Balancete, BP, BF, BO, DFC, DVP e DMPL. A conformidade foi confirmada para os grupos patrimoniais, VPA, VPD, receitas correntes, caixa e equivalentes, despesas correntes e de capital pagas e incorporação de ativos.<br><br>Quatro itens apresentaram divergí­ªncia, decorrentes de estornos de restos a pagar que o sistema contábil (Implanta) não tratou adequadamente; o chamado correspondente foi aberto junto ao fornecedor:<br><br> • Valores restituí­­veis — dispí­ªndios: R$ 222.353,33<br> • RP não processados — a liquidar: R$ 134.400,00<br> • RP não proc. — despesas correntes canceladas: R$ 58.302,51<br> • RP não processados pagos: R$ 7.220,00<br><br>As diferenças referem-se ao tratamento de estornos de restos a pagar e não afetam o resultado patrimonial nem o saldo de caixa. Ficam pendentes de regularização e serão reavaliadas apí­³s resposta do chamado."})
     
     return {"erro": False, "periodo": periodo, "notas": notas}
 
@@ -7360,7 +8229,7 @@ async def editar_item_declaracao(item_id: int, request: Request):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pc_storage", "banco_dados.db")
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("UPDATE itens_declaracao_conformidade SET texto = ? WHERE id = ?", (texto, item_id))
+    cur.execute("UPDATE itens_declaracao_conformidade SET texto = • WHERE id = ?", (texto, item_id))
     conn.commit()
     conn.close()
     return {"ok": True}
@@ -7401,7 +8270,7 @@ async def api_salvar_notas_mcasp(request: Request):
     cur = conn.cursor()
     try:
         for item in itens:
-            cur.execute("UPDATE notas_mcasp_modelo SET texto = ? WHERE id = ?", (item["texto"], item["id"]))
+            cur.execute("UPDATE notas_mcasp_modelo SET texto = • WHERE id = ?", (item["texto"], item["id"]))
         conn.commit()
         return {"ok": True}
     except Exception as e:
@@ -7425,17 +8294,17 @@ async def api_gerar_auto_mcasp(request: Request):
         return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     
     # 1. Le Balanco Patrimonial
-    cur.execute("SELECT resultado_json FROM historico_analise_bp WHERE periodo = ? ORDER BY id DESC LIMIT 1", (periodo,))
+    cur.execute("SELECT resultado_json FROM historico_analise_bp WHERE periodo = • ORDER BY id DESC LIMIT 1", (periodo,))
     row_bp = cur.fetchone()
     bp = json.loads(row_bp[0]).get('dados', {}) if row_bp else {}
     
     # 2. Le Balanco Orcamentario
-    cur.execute("SELECT resultado_json FROM historico_analise_orcamentaria WHERE periodo = ? ORDER BY id DESC LIMIT 1", (periodo,))
+    cur.execute("SELECT resultado_json FROM historico_analise_orcamentaria WHERE periodo = • ORDER BY id DESC LIMIT 1", (periodo,))
     row_bo = cur.fetchone()
     bo = json.loads(row_bo[0]).get('atual', {}) if row_bo else {}
     
     # 3. Le DFC
-    cur.execute("SELECT resultado_json FROM historico_analise_dfc WHERE periodo = ? ORDER BY id DESC LIMIT 1", (periodo,))
+    cur.execute("SELECT resultado_json FROM historico_analise_dfc WHERE periodo = • ORDER BY id DESC LIMIT 1", (periodo,))
     row_dfc = cur.fetchone()
     dfc = json.loads(row_dfc[0]).get('dados', {}) if row_dfc else {}
     
@@ -7456,7 +8325,7 @@ async def api_gerar_auto_mcasp(request: Request):
     
     try:
         for codigo, texto in textos.items():
-            cur.execute("UPDATE notas_mcasp_modelo SET texto = ? WHERE codigo = ?", (texto, codigo))
+            cur.execute("UPDATE notas_mcasp_modelo SET texto = • WHERE codigo = ?", (texto, codigo))
         conn.commit()
         return {"ok": True, "mensagem": "Rascunho gerado com dados reais!"}
     except Exception as e:
@@ -7669,7 +8538,7 @@ async def editar_nota(relatorio_id: int, indice: int, request: Request):
     
     notas[indice]["texto"] = novo_texto
     dados_notas["notas"] = notas
-    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = ? WHERE id = ?",
+    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = • WHERE id = ?",
                 (json.dumps(dados_notas, ensure_ascii=False), relatorio_id))
     conn.commit()
     conn.close()
@@ -7697,7 +8566,7 @@ async def incluir_nota(relatorio_id: int, request: Request):
     notas.append({"titulo": titulo, "texto": texto})
     dados_notas["notas"] = notas
     
-    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = ? WHERE id = ?",
+    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = • WHERE id = ?",
                 (json.dumps(dados_notas, ensure_ascii=False), relatorio_id))
     conn.commit()
     conn.close()
@@ -7725,7 +8594,7 @@ async def excluir_nota(relatorio_id: int, indice: int):
     notas.pop(indice)
     dados_notas["notas"] = notas
     
-    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = ? WHERE id = ?",
+    cur.execute("UPDATE historico_notas_explicativas SET resultado_json = • WHERE id = ?",
                 (json.dumps(dados_notas, ensure_ascii=False), relatorio_id))
     conn.commit()
     conn.close()
@@ -7793,7 +8662,7 @@ async def salvar_analise_dmpl(periodo: str):
                     continue
                 dados.append(linha)
         
-        from .config import PG_CONFIG
+        from pc_backend.app.config import PG_CONFIG
         cur.execute("""CREATE TABLE IF NOT EXISTS historico_analise_dmpl (
             id SERIAL PRIMARY KEY,
             periodo TEXT,
@@ -7861,7 +8730,7 @@ async def excluir_analise_dmpl(id: int):
     from fastapi.responses import JSONResponse
     
     try:
-        from .config import PG_CONFIG
+        from pc_backend.app.config import PG_CONFIG
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
         cur.execute("DELETE FROM historico_analise_dmpl WHERE id = %s", (id,))
@@ -7886,7 +8755,7 @@ async def gerar_pdf_analise_dmpl(id: int):
     from datetime import datetime
 
     try:
-        from .config import PG_CONFIG
+        from pc_backend.app.config import PG_CONFIG
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
         cur.execute("SELECT periodo, resultado_json FROM historico_analise_dmpl WHERE id = %s", (id,))
@@ -7978,10 +8847,15 @@ async def gerar_pdf_analise_dmpl(id: int):
 
 @app.get("/api/relatorio_consolidado/{periodo}")
 async def api_relatorio_consolidado_novo(periodo: str):
+    periodo_normalizado = periodo.replace("TRIMESTRAL", "TRIMESTRE").replace("trimestral", "TRIMESTRE")
+    if "TRIMESTRE" in periodo_normalizado.upper():
+        partes = periodo_normalizado.upper().split("-")
+        if len(partes) == 3:
+            periodo_normalizado = f"{partes[0]}-TRIMESTRE-{partes[2]}"
     import json
     import psycopg2
     
-    from .config import PG_CONFIG
+    from pc_backend.app.config import PG_CONFIG
     
     # Mapeamento dos módulos para as tabelas do PostgreSQL
     modulos = {
@@ -8029,12 +8903,12 @@ async def api_relatorio_consolidado_novo(periodo: str):
             try:
                 # Verifica se a tabela existe e tem dados para o perí­odo
                 if chave == "analise_financeira_bf":
-                    cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo LIKE %s LIMIT 1", (f"%{periodo}%",))
+                    cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo LIKE %s LIMIT 1", (f"%{periodo_normalizado}%",))
                 elif chave == "dmpl":
                     # O DMPL pode ter o perí­odo em formato ligeiramente diferente, tenta LIKE
-                    cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo LIKE %s LIMIT 1", (f"%{periodo}%",))
+                    cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo LIKE %s LIMIT 1", (f"%{periodo_normalizado}%",))
                 else:
-                    cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo = %s LIMIT 1", (periodo,))
+                    cursor.execute(f"SELECT id, data_geracao FROM {tabela} WHERE periodo = %s LIMIT 1", (periodo_normalizado,))
                 row = cursor.fetchone()
                 
                 if row:
@@ -8057,12 +8931,12 @@ async def api_relatorio_consolidado_novo(periodo: str):
         # Monta o retorno no formato que o frontend espera
         status = "ok" if len(faltando) == 0 else "faltando"
         
-        return {
+        return _fix_mojibake({
             "status": status,
             "encontrados": encontrados,
             "faltando": faltando,
             "periodo": periodo
-        }
+        })
 
     except Exception as e:
         return {
@@ -8076,7 +8950,7 @@ async def get_hist_consolidado():
     import json
     import psycopg2
     
-    from .config import PG_CONFIG
+    from pc_backend.app.config import PG_CONFIG
     
     try:
         conn = psycopg2.connect(**PG_CONFIG)

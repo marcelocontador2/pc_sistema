@@ -3,301 +3,260 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório Consolidado de Análise Contábil</title>
+    <title>Relatorio Consolidado de Analise Contabil</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; color: #333; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; display: flex; gap: 20px; }
-        .sidebar { width: 280px; flex-shrink: 0; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; height: fit-content; }
-        .sidebar h3 { color: #003366; font-size: 16px; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .historico-lista { list-style: none; }
-        .historico-lista li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
-        .historico-lista input { margin-top: 3px; }
-        .main-content { flex-grow: 1; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 30px; }
-        h1 { color: #003366; font-size: 24px; margin-bottom: 20px; border-bottom: 2px solid #004b8d; padding-bottom: 10px; }
-        .barra-botoes { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; color: white; transition: 0.2s; }
-        .btn-voltar { background-color: #ff9800; }
-        .btn-exibir { background-color: #00b894; }
-        .btn-excluir { background-color: #e53935; }
-        .btn-pdf { background-color: #1976d2; }
-        .btn-salvar { background-color: #2e7d32; }
-        .btn-obs { background-color: #0d6efd; }
-        .btn-concl { background-color: #0d6efd; }
-        .btn-verificar { background-color: #004b8d; }
-        button:hover { opacity: 0.9; }
-        .filtros { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e9ecef; }
-        .filtros label { font-weight: bold; color: #555; font-size: 14px; }
-        .filtros select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .alerta { padding: 15px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
-        .alerta-amarelo { background-color: #fff3cd; border: 1px solid #ffecb5; color: #664d03; }
-        .alerta-verde { background-color: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; }
-        .alerta-erro { background-color: #f8d7da; border: 1px solid #f5c2c7; color: #842029; }
-        .modulo-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
-        .modulo-ok { color: #198754; font-weight: bold; }
-        .modulo-faltando { color: #dc3545; font-weight: bold; }
-        .loading { text-align: center; padding: 20px; color: #666; font-style: italic; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; color: #333; padding: 20px; }
+        .container { display: flex; gap: 20px; max-width: 1400px; margin: 0 auto; }
+        .sidebar { flex: 0 0 300px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; }
+        .main { flex: 1; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; }
+        h2 { color: #1a237e; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h3 { font-size: 16px; margin-bottom: 10px; color: #333; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: #fff; font-size: 14px; transition: 0.2s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-verificar { background: #1565c0; }
+        .btn-salvar { background: #2e7d32; }
+        .btn-pdf { background: #1565c0; }
+        .btn-excluir { background: #c62828; }
+        .btn-excluir-multiplos { background: #d32f2f; }
+        .btn-voltar { background: #e65100; }
+        .btn-exibir { background: #00897b; }
+        .form-group { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
+        select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .historico-lista { list-style: none; max-height: 500px; overflow-y: auto; }
+        .historico-lista li { padding: 10px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+        .historico-lista input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .historico-lista small { color: #777; }
+        .botoes-acao { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .status-box { margin-top: 20px; padding: 15px; border-radius: 4px; background: #e8f5e9; color: #2e7d32; display: none; }
+        .status-box.erro { background: #ffebee; color: #c62828; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     </style>
-
-    <style>
-        .toast-producao {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background-color: #28a745;
-            color: white;
-            padding: 15px 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            font-weight: bold;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            animation: slideIn 0.3s ease-out;
-        }
-        .toast-producao .spinner {
-            border: 3px solid rgba(255,255,255,0.3);
-            border-top: 3px solid white;
-            border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-    </head>
+</head>
 <body>
     <div class="container">
-        <!-- BARRA LATERAL (HISTÓRICO) -->
+        <!-- SIDEBAR: Historico -->
         <div class="sidebar">
-            <h3>Histórico Salvo</h3>
+            <h3>Historico Salvo</h3>
+            <div style="margin-bottom: 15px;">
+                <label style="cursor:pointer; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="marcar-todos"> Marcar Todos
+                </label>
+            </div>
             <ul id="lista-historico" class="historico-lista">
-                <li style="color: #666;">Nenhum histórico salvo.</li>
+                <li style="color:#666;">Carregando...</li>
             </ul>
         </div>
 
-        <!-- CONTEÚDO PRINCIPAL -->
-        <div class="main-content">
-            <h1>Relatório Consolidado de Análise Contábil</h1>
-
-            <div class="barra-botoes">
-                <button class="btn-voltar" onclick="window.history.back()">← Voltar</button>
-                <button class="btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
-                <button class="btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
-                <button class="btn-pdf" onclick="gerarPDF()">Gerar PDF</button>
-                <button class="btn-salvar" onclick="salvarRelatorioConsolidado()">Confirmar e Salvar</button>
-                <button class="btn-obs" onclick="alert('Em desenvolvimento')">Observações</button>
-                <button class="btn-concl" onclick="alert('Em desenvolvimento')">Conclusão</button>
+        <!-- MAIN: Relatorio -->
+        <div class="main">
+            <div class="top-bar">
+                <h2>Relatorio Consolidado de Analise Contabil</h2>
             </div>
 
-            <div class="filtros">
-                <label>Ano:</label>
-                <select id="ano">
-                    <option value="2026" selected>2026</option>
-                    <option value="2025">2025</option>
-                </select>
-                <label>Tipo:</label>
-                <select id="tipo_periodo">
-                    <option value="TRIMESTRE" selected>Trimestral</option>
-                    <option value="SEMESTRE">Semestral</option>
-                    <option value="ANO">Anual</option>
-                </select>
-                <label>Período:</label>
-                <select id="trimestre">
-                    <option value="1">1º</option>
-                    <option value="2">2º</option>
-                    <option value="3" selected>3º</option>
-                    <option value="4">4º</option>
-                </select>
-                <button class="btn-verificar" onclick="verificarDados()">Verificar Dados</button>
+            <div class="botoes-acao">
+                <button class="btn btn-voltar" onclick="window.history.back()">← Voltar</button>
+                <button class="btn btn-exibir" id="btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+                <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+                <button class="btn btn-excluir-multiplos" id="btn-excluir-multiplos" onclick="excluirSelecionados()" disabled>Excluir Selecionados</button>
+                <button class="btn btn-pdf" id="btn-gerar-pdf" onclick="gerarPDF()">Gerar PDF</button>
+                <button class="btn btn-salvar" id="btn-salvar" onclick="salvarRelatorio()">Confirmar e Salvar</button>
+                <button class="btn btn-voltar" onclick="alert('Em breve')">Observacoes</button>
+                <button class="btn btn-voltar" onclick="alert('Em breve')">Conclusao</button>
             </div>
 
-            <div id="mensagem-consolidado"></div>
-            <div id="status-modulos"></div>
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <div class="form-group">
+                <label><strong>Ano:</strong></label>
+                <select id="ano"><option>2026</option></select>
+                <label><strong>Tipo:</strong></label>
+                <select id="tipo"><option>Trimestral</option></select>
+                <label><strong>Periodo:</strong></label>
+                <select id="periodo"><option>3</option></select>
+                <button class="btn btn-verificar" id="btn-verificar" onclick="verificarDados()">Verificar Dados</button>
+            </div>
+
+            <div id="status-box" class="status-box"></div>
         </div>
     </div>
 
     <script>
-        // ============================================================
-        // FUNÇÃO 1: VERIFICAR DADOS (API)
-        // ============================================================
-        async function verificarDados() {
-            const ano = document.getElementById('ano').value;
-            const tipo = document.getElementById('tipo_periodo').value;
-            const trimestre = document.getElementById('trimestre').value;
-            const periodo = ano + '-' + tipo + '-' + trimestre;
-
-            const divMsg = document.getElementById('mensagem-consolidado');
-            const divStatus = document.getElementById('status-modulos');
-            
-            divMsg.innerHTML = '<div class="loading">Buscando dados no PostgreSQL...</div>';
-            divStatus.innerHTML = '';
-
-            try {
-                const res = await fetch('/api/relatorio_consolidado/' + periodo + '?_t=' + Date.now());
-                const data = await res.json();
-
-                if (data.status === 'erro') {
-                    divMsg.innerHTML = '<div class="alerta alerta-erro">Erro: ' + (data.mensagem || 'Erro desconhecido') + '</div>';
-                    return;
-                }
-
-                if (data.faltando && data.faltando.length > 0) {
-                    divMsg.innerHTML = '<div class="alerta alerta-amarelo"><strong>⚠ Faltam ' + data.faltando.length + ' módulo(s) para consolidar.</strong><br>Realize os cálculos dos módulos pendentes.</div>';
-                } else {
-                    divMsg.innerHTML = '<div class="alerta alerta-verde"><strong>✅ Todos os módulos estão prontos para consolidar!</strong></div>';
-                }
-
-                let html = '<h3>Status dos Módulos:</h3>';
-                
-                if (data.encontrados && data.encontrados.length > 0) {
-                    html += '<h4 style="color: #198754; margin: 10px 0;">✓ Encontrados:</h4>';
-                    data.encontrados.forEach(function(m, i) {
-                        html += '<div class="modulo-item"><span>' + (i+1) + '. ' + m.nome + '</span><span class="modulo-ok">✓ ' + (m.data_geracao || 'Disponível') + '</span></div>';
-                    });
-                }
-
-                if (data.faltando && data.faltando.length > 0) {
-                    html += '<h4 style="color: #dc3545; margin: 10px 0;">✗ Faltando:</h4>';
-                    data.faltando.forEach(function(m, i) {
-                        html += '<div class="modulo-item"><span>' + (i+1) + '. ' + m.nome + '</span><span class="modulo-faltando">✗ Faltando</span></div>';
-                    });
-                }
-
-                divStatus.innerHTML = html;
-
-            } catch (err) {
-                divMsg.innerHTML = '<div class="alerta alerta-erro">Erro de conexão: ' + err.message + '</div>';
-            }
+        // FUNCOES AUXILIARES
+        function getPeriodoFormatado() {
+            var ano = document.getElementById('ano').value;
+            var tipo = document.getElementById('tipo').value.toUpperCase();
+            var periodo = document.getElementById('periodo').value;
+            return ano + '-' + tipo + '-' + periodo;
         }
 
-        // ============================================================
-        // FUNÇÃO 2: SALVAR RELATÓRIO CONSOLIDADO
-        // ============================================================
-        async function salvarRelatorioConsolidado() {
-            const ano = document.getElementById('ano').value;
-            const tipo = document.getElementById('tipo_periodo').value;
-            const trimestre = document.getElementById('trimestre').value;
-            const periodo = ano + '-' + tipo + '-' + trimestre;
-
-            if (!confirm("Deseja realmente salvar este relatório consolidado no histórico?")) return;
-
-            try {
-                const res = await fetch('/salvar_relatorio_consolidado/' + periodo, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+        // CARREGAR HISTORICO
+        function carregarHistorico() {
+            var lista = document.getElementById('lista-historico');
+            fetch('/historico_relatorio_consolidado')
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        lista.innerHTML = data.map(h => `
+                            <li>
+                                <input type="checkbox" class="chk-historico" value="${h.id}" onchange="atualizarBotaoExcluir()">
+                                <span>Periodo: ${h.periodo}<br><small>${h.data_geracao || 'N/A'}</small></span>
+                            </li>
+                        `).join('');
+                    } else {
+                        lista.innerHTML = '<li style="color:#666;">Nenhum historico salvo.</li>';
+                    }
+                    atualizarBotaoExcluir();
+                })
+                .catch(e => {
+                    lista.innerHTML = '<li style="color:red;">Erro ao carregar.</li>';
                 });
-                
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                
-                const data = await res.json();
-                
+        }
+
+        // MARCAR TODOS
+        function marcarTodos(checkbox) {
+            var checkboxes = document.querySelectorAll('.chk-historico');
+            checkboxes.forEach(cb => cb.checked = checkbox.checked);
+            atualizarBotaoExcluir();
+        }
+
+        // ATUALIZAR BOTAO EXCLUIR MULTIPLOS
+        function atualizarBotaoExcluir() {
+            var btn = document.getElementById('btn-excluir-multiplos');
+            var checkboxes = document.querySelectorAll('.chk-historico:checked');
+            btn.disabled = (checkboxes.length === 0);
+        }
+
+        // EXIBIR SELECIONADO
+        function exibirSelecionado() {
+            var checkbox = document.querySelector('.chk-historico:checked');
+            if (!checkbox) {
+                alert("Selecione um historico na lista lateral.");
+                return;
+            }
+            window.open('/gerar_pdf_relatorio_consolidado/' + checkbox.value, '_blank');
+        }
+
+        // EXCLUIR SELECIONADO (UM)
+        function excluirSelecionado() {
+            var checkbox = document.querySelector('.chk-historico:checked');
+            if (!checkbox) {
+                alert("Selecione um historico na lista lateral.");
+                return;
+            }
+            if (!confirm("Excluir o historico selecionado?")) return;
+            fetch('/excluir_relatorio_consolidado/' + checkbox.value, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok || data.erro === false) {
+                        alert("Excluido!");
+                        carregarHistorico();
+                    } else {
+                        alert("Erro ao excluir.");
+                    }
+                })
+                .catch(e => alert("Erro: " + e));
+        }
+
+        // EXCLUIR SELECIONADOS (MULTIPLOS)
+        function excluirSelecionados() {
+            var checkboxes = document.querySelectorAll('.chk-historico:checked');
+            var ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            if (ids.length === 0) {
+                alert("Nenhum item selecionado.");
+                return;
+            }
+            if (!confirm("Excluir " + ids.length + " item(ns) selecionado(s)?")) return;
+            
+            fetch('/excluir_multiplos_relatorio_consolidado', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ids: ids})
+            })
+            .then(r => r.json())
+            .then(data => {
                 if (data.ok) {
-                    alert("Relatório salvo com sucesso no PostgreSQL!");
+                    alert("Excluido com sucesso!");
                     carregarHistorico();
                 } else {
-                    alert("Erro ao salvar: " + (data.mensagem || "Erro desconhecido"));
+                    alert("Erro: " + (data.mensagem || "desconhecido"));
                 }
-            } catch (err) {
-                alert("Erro de conexão ao salvar: " + err.message);
-            }
+            })
+            .catch(e => alert("Erro na requisicao: " + e));
         }
 
-        // ============================================================
-        // FUNÇÃO 3: CARREGAR HISTÓRICO (SIDEBAR)
-        // ============================================================
-        async function carregarHistorico() {
-            try {
-                const res = await fetch('/historico_relatorio_consolidado?_t=' + Date.now());
-                const data = await res.json();
-                
-                const lista = document.getElementById('lista-historico');
-                if (!lista) return;
-                
-                if (Array.isArray(data) && data.length > 0) {
-                    lista.innerHTML = data.map(function(h) {
-                        return '<li><input type="checkbox" value="' + h.id + '"><span>Período: ' + h.periodo + '<br><small style="color: #999;">' + (h.data_geracao || 'N/A') + '</small></span></li>';
-                    }).join('');
-                } else {
-                    lista.innerHTML = '<li style="color: #666;">Nenhum histórico salvo.</li>';
-                }
-            } catch (err) {
-                document.getElementById('lista-historico').innerHTML = '<li style="color: red;">Erro ao carregar histórico.</li>';
-            }
-        }
-
-        // ============================================================
-        // FUNÇÕES AUXILIARES (EXIBIR, EXCLUIR, PDF)
-        // ============================================================
-        function exibirSelecionado() {
-            const checkbox = document.querySelector('#lista-historico input[type="checkbox"]:checked');
-            if (!checkbox) { alert("Selecione um histórico na lista lateral."); return; }
-            alert("Funcionalidade de exibição do relatório ID " + checkbox.value + " (a implementar).");
-        }
-
-        function excluirSelecionado() {
-            const checkbox = document.querySelector('#lista-historico input[type="checkbox"]:checked');
-            if (!checkbox) { alert("Selecione um histórico na lista lateral."); return; }
-            if (!confirm("Excluir o histórico selecionado?")) return;
-            
-            fetch('/excluir_relatorio_consolidado/' + checkbox.value, { method: 'DELETE' })
-                .then(function(res) { return res.json(); })
-                .then(function(data) {
-                    if (data.ok) { carregarHistorico(); }
-                    else { alert("Erro: " + (data.mensagem || "Erro desconhecido")); }
-                })
-                .catch(function(err) { alert("Erro: " + err.message); });
-        }
-
+        // GERAR PDF
         function gerarPDF() {
-        const checkbox = document.querySelector('#lista-historico input[type="checkbox"]:checked');
-        if (!checkbox) { alert("Selecione um histórico na lista lateral."); return; }
-        
-        const id = checkbox.value;
-        const url = '/gerar_pdf_relatorio_consolidado/' + id;
-        
-        // Remove toast anterior, se existir
-        const toastAntigo = document.getElementById('toast-producao');
-        if (toastAntigo) toastAntigo.remove();
-        
-        // Cria o toast verde
-        const toast = document.createElement('div');
-        toast.id = 'toast-producao';
-        toast.className = 'toast-producao';
-        toast.innerHTML = '<div class="spinner"></div> Relatório em Produção...';
-        document.body.appendChild(toast);
-        
-        // Cria um link temporário para forçar o download
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'relatorio_consolidado_' + id + '.pdf';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        
-        // Remove o link e o toast após um tempo
-        setTimeout(() => {
-            document.body.removeChild(link);
-            if (toast) toast.remove();
-        }, 6000);
-    }
+            var checkbox = document.querySelector('.chk-historico:checked');
+            if (!checkbox) {
+                alert("Selecione um historico na lista lateral.");
+                return;
+            }
+            window.open('/gerar_pdf_relatorio_consolidado/' + checkbox.value, '_blank');
+        }
 
-        // ============================================================
-        // INICIALIZAÇÃO
-        // ============================================================
-        document.addEventListener('DOMContentLoaded', function() {
+        // SALVAR RELATORIO
+        function salvarRelatorio() {
+            var periodo = getPeriodoFormatado();
+            var btn = document.getElementById('btn-salvar');
+            btn.disabled = true;
+            btn.innerText = "Salvando...";
+            
+            fetch('/salvar_relatorio_consolidado/' + periodo, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        alert("Relatorio salvo com sucesso!");
+                        carregarHistorico();
+                    } else {
+                        alert("Erro ao salvar: " + (data.mensagem || "desconhecido"));
+                    }
+                    btn.disabled = false;
+                    btn.innerText = "Confirmar e Salvar";
+                })
+                .catch(e => {
+                    alert("Erro: " + e);
+                    btn.disabled = false;
+                    btn.innerText = "Confirmar e Salvar";
+                });
+        }
+
+        // VERIFICAR DADOS
+        function verificarDados() {
+            var periodo = getPeriodoFormatado();
+            var statusBox = document.getElementById('status-box');
+            statusBox.style.display = 'block';
+            statusBox.className = 'status-box';
+            statusBox.innerHTML = "Verificando...";
+            
+            fetch('/api/relatorio_consolidado/' + periodo)
+                .then(r => r.json())
+                .then(data => {
+                    var totalEncontrados = (data.encontrados || []).length;
+                    var totalFaltando = (data.faltando || []).length;
+                    if (totalFaltando === 0) {
+                        statusBox.className = 'status-box';
+                        statusBox.innerHTML = "<strong>Todos os modulos estao prontos para consolidar!</strong><br>Encontrados: " + totalEncontrados + " / " + (totalEncontrados + totalFaltando);
+                    } else {
+                        statusBox.className = 'status-box erro';
+                        statusBox.innerHTML = "<strong>Atencao:</strong> " + totalFaltando + " modulo(s) faltando.";
+                    }
+                })
+                .catch(e => {
+                    statusBox.className = 'status-box erro';
+                    statusBox.innerHTML = "Erro ao verificar: " + e;
+                });
+        }
+
+        // INICIALIZACAO
+        window.onload = function() {
             carregarHistorico();
-        });
+            
+            var marcarTodosCheckbox = document.getElementById('marcar-todos');
+            if (marcarTodosCheckbox) {
+                marcarTodosCheckbox.onchange = function() { marcarTodos(this); };
+            }
+        };
     </script>
 </body>
 </html>

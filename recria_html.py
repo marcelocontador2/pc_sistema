@@ -1,0 +1,276 @@
+﻿import sys
+from pathlib import Path
+import shutil
+
+sys.stdout.reconfigure(encoding="utf-8")
+arquivo = Path("pc_frontend/relatorio_consolidado.html")
+
+# Backup de seguranca
+backup = arquivo.with_suffix(".html.bak_final")
+shutil.copy2(arquivo, backup)
+print(f"[OK] Backup criado: {backup}")
+
+html_novo = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatorio Consolidado de Analise Contabil</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; color: #333; padding: 20px; }
+        .container { display: flex; gap: 20px; max-width: 1400px; margin: 0 auto; }
+        .sidebar { flex: 0 0 300px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; }
+        .main { flex: 1; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; }
+        h2 { color: #1a237e; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h3 { font-size: 16px; margin-bottom: 10px; color: #333; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: #fff; font-size: 14px; transition: 0.2s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-verificar { background: #1565c0; }
+        .btn-salvar { background: #2e7d32; }
+        .btn-pdf { background: #1565c0; }
+        .btn-excluir { background: #c62828; }
+        .btn-excluir-multiplos { background: #d32f2f; }
+        .btn-voltar { background: #e65100; }
+        .btn-exibir { background: #00897b; }
+        .form-group { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
+        select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .historico-lista { list-style: none; max-height: 500px; overflow-y: auto; }
+        .historico-lista li { padding: 10px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+        .historico-lista input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .historico-lista small { color: #777; }
+        .botoes-acao { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .status-box { margin-top: 20px; padding: 15px; border-radius: 4px; background: #e8f5e9; color: #2e7d32; display: none; }
+        .status-box.erro { background: #ffebee; color: #c62828; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- SIDEBAR: Historico -->
+        <div class="sidebar">
+            <h3>Historico Salvo</h3>
+            <div style="margin-bottom: 15px;">
+                <label style="cursor:pointer; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="marcar-todos"> Marcar Todos
+                </label>
+            </div>
+            <ul id="lista-historico" class="historico-lista">
+                <li style="color:#666;">Carregando...</li>
+            </ul>
+        </div>
+
+        <!-- MAIN: Relatorio -->
+        <div class="main">
+            <div class="top-bar">
+                <h2>Relatorio Consolidado de Analise Contabil</h2>
+            </div>
+
+            <div class="botoes-acao">
+                <button class="btn btn-voltar" onclick="window.history.back()">← Voltar</button>
+                <button class="btn btn-exibir" id="btn-exibir" onclick="exibirSelecionado()">Exibir Selecionado</button>
+                <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
+                <button class="btn btn-excluir-multiplos" id="btn-excluir-multiplos" onclick="excluirSelecionados()" disabled>Excluir Selecionados</button>
+                <button class="btn btn-pdf" id="btn-gerar-pdf" onclick="gerarPDF()">Gerar PDF</button>
+                <button class="btn btn-salvar" id="btn-salvar" onclick="salvarRelatorio()">Confirmar e Salvar</button>
+                <button class="btn btn-voltar" onclick="alert('Em breve')">Observacoes</button>
+                <button class="btn btn-voltar" onclick="alert('Em breve')">Conclusao</button>
+            </div>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <div class="form-group">
+                <label><strong>Ano:</strong></label>
+                <select id="ano"><option>2026</option></select>
+                <label><strong>Tipo:</strong></label>
+                <select id="tipo"><option>Trimestral</option></select>
+                <label><strong>Periodo:</strong></label>
+                <select id="periodo"><option>3</option></select>
+                <button class="btn btn-verificar" id="btn-verificar" onclick="verificarDados()">Verificar Dados</button>
+            </div>
+
+            <div id="status-box" class="status-box"></div>
+        </div>
+    </div>
+
+    <script>
+        // FUNCOES AUXILIARES
+        function getPeriodoFormatado() {
+            var ano = document.getElementById('ano').value;
+            var tipo = document.getElementById('tipo').value.toUpperCase();
+            var periodo = document.getElementById('periodo').value;
+            return ano + '-' + tipo + '-' + periodo;
+        }
+
+        // CARREGAR HISTORICO
+        function carregarHistorico() {
+            var lista = document.getElementById('lista-historico');
+            fetch('/historico_relatorio_consolidado')
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        lista.innerHTML = data.map(h => `
+                            <li>
+                                <input type="checkbox" class="chk-historico" value="${h.id}" onchange="atualizarBotaoExcluir()">
+                                <span>Periodo: ${h.periodo}<br><small>${h.data_geracao || 'N/A'}</small></span>
+                            </li>
+                        `).join('');
+                    } else {
+                        lista.innerHTML = '<li style="color:#666;">Nenhum historico salvo.</li>';
+                    }
+                    atualizarBotaoExcluir();
+                })
+                .catch(e => {
+                    lista.innerHTML = '<li style="color:red;">Erro ao carregar.</li>';
+                });
+        }
+
+        // MARCAR TODOS
+        function marcarTodos(checkbox) {
+            var checkboxes = document.querySelectorAll('.chk-historico');
+            checkboxes.forEach(cb => cb.checked = checkbox.checked);
+            atualizarBotaoExcluir();
+        }
+
+        // ATUALIZAR BOTAO EXCLUIR MULTIPLOS
+        function atualizarBotaoExcluir() {
+            var btn = document.getElementById('btn-excluir-multiplos');
+            var checkboxes = document.querySelectorAll('.chk-historico:checked');
+            btn.disabled = (checkboxes.length === 0);
+        }
+
+        // EXIBIR SELECIONADO
+        function exibirSelecionado() {
+            var checkbox = document.querySelector('.chk-historico:checked');
+            if (!checkbox) {
+                alert("Selecione um historico na lista lateral.");
+                return;
+            }
+            window.open('/gerar_pdf_relatorio_consolidado/' + checkbox.value, '_blank');
+        }
+
+        // EXCLUIR SELECIONADO (UM)
+        function excluirSelecionado() {
+            var checkbox = document.querySelector('.chk-historico:checked');
+            if (!checkbox) {
+                alert("Selecione um historico na lista lateral.");
+                return;
+            }
+            if (!confirm("Excluir o historico selecionado?")) return;
+            fetch('/excluir_relatorio_consolidado/' + checkbox.value, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok || data.erro === false) {
+                        alert("Excluido!");
+                        carregarHistorico();
+                    } else {
+                        alert("Erro ao excluir.");
+                    }
+                })
+                .catch(e => alert("Erro: " + e));
+        }
+
+        // EXCLUIR SELECIONADOS (MULTIPLOS)
+        function excluirSelecionados() {
+            var checkboxes = document.querySelectorAll('.chk-historico:checked');
+            var ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            if (ids.length === 0) {
+                alert("Nenhum item selecionado.");
+                return;
+            }
+            if (!confirm("Excluir " + ids.length + " item(ns) selecionado(s)?")) return;
+            
+            fetch('/excluir_multiplos_relatorio_consolidado', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ids: ids})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    alert("Excluido com sucesso!");
+                    carregarHistorico();
+                } else {
+                    alert("Erro: " + (data.mensagem || "desconhecido"));
+                }
+            })
+            .catch(e => alert("Erro na requisicao: " + e));
+        }
+
+        // GERAR PDF
+        function gerarPDF() {
+            var checkbox = document.querySelector('.chk-historico:checked');
+            if (!checkbox) {
+                alert("Selecione um historico na lista lateral.");
+                return;
+            }
+            window.open('/gerar_pdf_relatorio_consolidado/' + checkbox.value, '_blank');
+        }
+
+        // SALVAR RELATORIO
+        function salvarRelatorio() {
+            var periodo = getPeriodoFormatado();
+            var btn = document.getElementById('btn-salvar');
+            btn.disabled = true;
+            btn.innerText = "Salvando...";
+            
+            fetch('/salvar_relatorio_consolidado/' + periodo, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        alert("Relatorio salvo com sucesso!");
+                        carregarHistorico();
+                    } else {
+                        alert("Erro ao salvar: " + (data.mensagem || "desconhecido"));
+                    }
+                    btn.disabled = false;
+                    btn.innerText = "Confirmar e Salvar";
+                })
+                .catch(e => {
+                    alert("Erro: " + e);
+                    btn.disabled = false;
+                    btn.innerText = "Confirmar e Salvar";
+                });
+        }
+
+        // VERIFICAR DADOS
+        function verificarDados() {
+            var periodo = getPeriodoFormatado();
+            var statusBox = document.getElementById('status-box');
+            statusBox.style.display = 'block';
+            statusBox.className = 'status-box';
+            statusBox.innerHTML = "Verificando...";
+            
+            fetch('/api/relatorio_consolidado/' + periodo)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        statusBox.className = 'status-box';
+                        statusBox.innerHTML = "<strong>Todos os modulos estao prontos para consolidar!</strong><br>Encontrados: " + data.total_encontrados + " / " + data.total_modulos;
+                    } else {
+                        statusBox.className = 'status-box erro';
+                        statusBox.innerHTML = "<strong>Atencao:</strong> " + data.total_faltando + " modulo(s) faltando.";
+                    }
+                })
+                .catch(e => {
+                    statusBox.className = 'status-box erro';
+                    statusBox.innerHTML = "Erro ao verificar: " + e;
+                });
+        }
+
+        // INICIALIZACAO
+        window.onload = function() {
+            carregarHistorico();
+            
+            var marcarTodosCheckbox = document.getElementById('marcar-todos');
+            if (marcarTodosCheckbox) {
+                marcarTodosCheckbox.onchange = function() { marcarTodos(this); };
+            }
+        };
+    </script>
+</body>
+</html>
+"""
+
+arquivo.write_text(html_novo, encoding="utf-8")
+print("[OK] HTML reescrito com sucesso! A tela deve funcionar agora.")
