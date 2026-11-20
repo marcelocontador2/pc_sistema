@@ -1,3 +1,4 @@
+from pathlib import Path
 from pc_backend.app.db_memoria import carregar_contas_memoria
 import json
 import psycopg2
@@ -151,7 +152,7 @@ async def api_integridade_matriz_calcular(periodo: str, request: Request = None)
         dados = _buscar_integridade_matriz_pg(periodo, request)
         if dados:
             return dados
-        return {"erro": True, "mensagem": f"Dados de integridade n?o encontrados no PostgreSQL para {periodo}."}
+        return {"erro": True, "mensagem": f"Dados de integridade não encontrados no PostgreSQL para {periodo}."}
     except Exception as e:
         return {"erro": True, "mensagem": str(e)}
 
@@ -160,117 +161,67 @@ async def api_integridade_matriz_calcular(periodo: str, request: Request = None)
 async def salvar_integridade_matriz(periodo: str, request: Request):
     __ent_id = resolver_entidade_id(request)
     from datetime import datetime
-    
-    # Definição local para garantir que a variável exista no escopo
-        
+
+    conn = None
     try:
-        body = await request.json()
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                body = {}
+        except Exception:
+            body = {}
+
         matriz = body.get("matriz", [])
         justificativas = body.get("justificativas", {})
-        
+        if not matriz:
+            _existente = _buscar_integridade_matriz_pg(periodo, request)
+            if isinstance(_existente, dict) and _existente.get("matriz"):
+                matriz = _existente.get("matriz") or []
+                if not justificativas and isinstance(_existente.get("justificativas"), dict):
+                    justificativas = _existente.get("justificativas")
+
         dados_matriz = {
             "periodo": periodo,
             "matriz": matriz,
-            "justificativas": justificativas
+            "justificativas": justificativas,
         }
-        
+
         data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
         conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
-        
-        # Garante que a tabela exista no Postgres
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
-                id SERIAL PRIMARY KEY, 
-                periodo TEXT, 
-                data_geracao TEXT, 
-                resultado_json TEXT
+                id SERIAL PRIMARY KEY,
+                periodo TEXT,
+                data_geracao TEXT,
+                resultado_json TEXT,
+                entidade_id INTEGER
             )
         """)
-        
+        cursor.execute("ALTER TABLE historico_integridade_matriz ADD COLUMN IF NOT EXISTS entidade_id INTEGER")
+
         cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
-            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
+            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s) RETURNING id",
+            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False), __ent_id),
         )
+        novo_id = cursor.fetchone()[0]
         conn.commit()
         cursor.close()
         conn.close()
-        
-        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
+        conn = None
+
+        return {"ok": True, "id": novo_id, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
     except Exception as e:
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
         return {"erro": True, "mensagem": str(e)}
-    
-    try:
-        body = await request.json()
-        matriz = body.get("matriz", [])
-        justificativas = body.get("justificativas", {})
-        
-        dados_matriz = {
-            "periodo": periodo,
-            "matriz": matriz,
-            "justificativas": justificativas
-        }
-        
-        data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        
-        # Garante que a tabela exista no Postgres
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
-                id SERIAL PRIMARY KEY, 
-                periodo TEXT, 
-                data_geracao TEXT, 
-                resultado_json TEXT
-            )
-        """)
-        
-        cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
-            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
-        
-        dados_matriz = {
-            "periodo": periodo,
-            "matriz": matriz,
-            "justificativas": justificativas
-        }
-        
-        data_agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        conn = psycopg2.connect(**PG_CONFIG)
-        cursor = conn.cursor()
-        
-        # Cria a tabela se não existir no Postgres
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS historico_integridade_matriz (
-                id SERIAL PRIMARY KEY, 
-                periodo TEXT, 
-                data_geracao TEXT, 
-                resultado_json TEXT
-            )
-        """)
-        
-        cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
-            (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return {"ok": True, "mensagem": "Matriz salva com sucesso no PostgreSQL!"}
-    except Exception as e:
-        return {"erro": True, "mensagem": str(e)}
+
 
 @router.get("/historico_integridade_matriz")
 def listar_integridade_matriz(request: Request = None):
@@ -309,7 +260,10 @@ async def buscar_integridade_matriz(id: int, request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
-        cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = %s", (id,))
+        if __ent_id is not None:
+            cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = %s AND (entidade_id = %s OR entidade_id IS NULL)", (id, __ent_id))
+        else:
+            cursor.execute("SELECT resultado_json FROM historico_integridade_matriz WHERE id = %s", (id,))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -335,7 +289,10 @@ async def excluir_integridade_matriz(request: Request):
         
         # Formata os IDs para o IN do SQL
         placeholders = ','.join(['%s'] * len(ids))
-        cursor.execute(f"DELETE FROM historico_integridade_matriz WHERE id IN ({placeholders})", tuple(ids))
+        if __ent_id is not None:
+            cursor.execute(f"DELETE FROM historico_integridade_matriz WHERE id IN ({placeholders}) AND (entidade_id = %s OR entidade_id IS NULL)", tuple(ids) + (__ent_id,))
+        else:
+            cursor.execute(f"DELETE FROM historico_integridade_matriz WHERE id IN ({placeholders})", tuple(ids))
         
         conn.commit()
         cursor.close()
@@ -355,7 +312,10 @@ def gerar_pdf_integridade_matriz(check_id: int, request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
-        cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE id = %s", (check_id,))
+        if __ent_id is not None:
+            cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE id = %s AND (entidade_id = %s OR entidade_id IS NULL)", (check_id, __ent_id))
+        else:
+            cursor.execute("SELECT periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE id = %s", (check_id,))
         row = cursor.fetchone()
         conn.close()
 
@@ -370,12 +330,23 @@ def gerar_pdf_integridade_matriz(check_id: int, request: Request = None):
         pdf = FPDF(orientation='L', unit='mm', format='A4')
         pdf.add_page()
 
+        _f_reg = Path("C:/Windows/Fonts/arial.ttf")
+        _f_bd = Path("C:/Windows/Fonts/arialbd.ttf")
+        _f_it = Path("C:/Windows/Fonts/ariali.ttf")
+        if _f_reg.exists():
+            pdf.add_font("ArialInt", "", str(_f_reg))
+            pdf.add_font("ArialInt", "B", str(_f_bd if _f_bd.exists() else _f_reg))
+            pdf.add_font("ArialInt", "I", str(_f_it if _f_it.exists() else _f_reg))
+            _fam_mat = "ArialInt"
+        else:
+            _fam_mat = "helvetica"
+
         # Cabeçalho
-        pdf.set_font("helvetica", "B", 14)
+        pdf.set_font(_fam_mat, "B", 14)
         pdf.set_text_color(0, 51, 102)
         pdf.cell(0, 10, f"Matriz de Integridade - {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         
-        pdf.set_font("helvetica", "I", 9)
+        pdf.set_font(_fam_mat, "I", 9)
         pdf.set_text_color(100, 100, 100)
         pdf.cell(0, 5, f"Gerado em: {data_geracao}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         pdf.ln(5)
@@ -384,7 +355,7 @@ def gerar_pdf_integridade_matriz(check_id: int, request: Request = None):
         w = [60, 26, 26, 26, 26, 26, 26, 26, 25]
 
         # Cabeçalho da Tabela
-        pdf.set_font("helvetica", "B", 8)
+        pdf.set_font(_fam_mat, "B", 8)
         pdf.set_fill_color(0, 51, 102)
         pdf.set_text_color(255, 255, 255)
         
@@ -394,7 +365,7 @@ def gerar_pdf_integridade_matriz(check_id: int, request: Request = None):
         pdf.ln()
 
         # Linhas da Tabela
-        pdf.set_font("helvetica", "", 8)
+        pdf.set_font(_fam_mat, "", 8)
         pdf.set_text_color(0, 0, 0)
         
         for item in matriz:
@@ -440,4 +411,4 @@ def gerar_pdf_integridade_matriz(check_id: int, request: Request = None):
 
 @router.get("/gerar_pdf_integridade/{id}")
 def gerar_pdf_integridade_espelho(id: int, request: Request = None):
-    return gerar_pdf_integridade_matriz(check_id=id)
+    return gerar_pdf_integridade_matriz(check_id=id, request=request)

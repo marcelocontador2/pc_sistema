@@ -10,7 +10,7 @@
                 if (checkId) {
                     console.log("Lendo integridade do ID:", checkId);
                     fetch(`/historico_integridade?_t=${Date.now()}`)
-                        .then(res => res.json())
+                        .then(res => lerJsonSeguro(res))
                         .then(data => {
                             const item = data.find(x => x.id == checkId);
                             if (item) {
@@ -38,7 +38,7 @@ async function verificarMatriz() {
 
     try {
         const res = await fetch(`/api/integridade_matriz/${periodo}?_t=${Date.now()}`);
-        const data = await res.json();
+        const data = await lerJsonSeguro(res);
 
         if (data.erro) {
             alert("Aviso: " + data.mensagem);
@@ -163,7 +163,7 @@ async function verificarMatriz() {
         list.innerHTML = '<li class="loading">Carregando histórico...</li>';
         
         fetch(`/historico_integridade_matriz?_t=${Date.now()}`)
-            .then(res => res.json())
+            .then(res => lerJsonSeguro(res))
             .then(data => {
                 list.innerHTML = '';
                 if (Array.isArray(data) && data.length > 0) {
@@ -217,6 +217,18 @@ async function verificarMatriz() {
         });
     }
 
+    async function lerJsonSeguro(res) {
+        const raw = await res.text();
+        if (!raw || !raw.trim()) {
+            throw new Error(`Resposta vazia do servidor (HTTP ${res.status})`);
+        }
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            throw new Error(`Resposta invalida (HTTP ${res.status}): ${raw.slice(0, 180)}`);
+        }
+    }
+
     async function verificarEGerar() {
     const ano = document.getElementById('ano').value;
     const tipo = document.getElementById('tipo_periodo').value;
@@ -229,12 +241,24 @@ async function verificarMatriz() {
     try {
         // 1. Salva a matriz (gera o histórico no formato original)
         const resSalvar = await fetch(`/api/integridade_matriz/${periodo}/salvar`, { method: 'POST' });
-        const dataSalvar = await resSalvar.json();
+        const dataSalvar = await lerJsonSeguro(resSalvar);
         
         if (dataSalvar.erro) {
             alert("Erro ao gerar matriz: " + (dataSalvar.mensagem || "Erro desconhecido"));
             if (container) container.innerHTML = '';
             return;
+        }
+
+        // Se a matriz retornada estiver vazia, tenta buscar matriz existente para o período
+        if (!dataSalvar.matriz || dataSalvar.matriz.length === 0) {
+            try {
+                const resCalc = await fetch(`/api/integridade_matriz/${encodeURIComponent(periodo)}?_t=${Date.now()}`);
+                const dataCalc = await lerJsonSeguro(resCalc);
+                if (dataCalc && Array.isArray(dataCalc.matriz) && dataCalc.matriz.length > 0) {
+                    dadosAtuais = dataCalc;
+                    if (container) renderizarMatriz(dataCalc, container);
+                }
+            } catch (_) {}
         }
 
         // 2. Recarrega a lista de históricos
@@ -269,7 +293,7 @@ async function verificarMatriz() {
         matriz = normalizarMatriz(matriz);
 
         if (matriz.length === 0) {
-            container.innerHTML = '<div class="loading">Nenhum dado encontrado.</div>';
+            container.innerHTML = `<div class="loading">Nenhum dado de matriz encontrado para o período <strong>${data.periodo || ''}</strong>. Verifique se há dados gerados/salvos no banco para este período.</div>`;
             return;
         }
 
@@ -340,7 +364,7 @@ async function verificarMatriz() {
 
         try {
             const res = await fetch(`/historico_integridade_matriz/${id}`);
-            const data = await res.json();
+            const data = await lerJsonSeguro(res);
 
             if (data.erro) { alert("Erro: " + data.mensagem); return; }
 
@@ -386,7 +410,7 @@ async function verificarMatriz() {
                 })
             });
             
-            const data = await res.json();
+            const data = await lerJsonSeguro(res);
             if (data.erro) {
                 alert("Erro ao salvar: " + data.mensagem);
             } else {
@@ -408,7 +432,7 @@ async function verificarMatriz() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ids: [parseInt(id)] })
         })
-        .then(res => res.json())
+        .then(res => lerJsonSeguro(res))
         .then(data => {
             if (data.ok) {
                 // Limpa a tela e atualiza a lista lateral
@@ -489,7 +513,7 @@ async function verificarMatriz() {
 
     try {
         const res = await fetch(`/api/integridade_matriz/${periodo}?_t=${Date.now()}`);
-        const data = await res.json();
+        const data = await lerJsonSeguro(res);
 
         if (data.erro) {
             alert("Aviso: " + data.mensagem);
