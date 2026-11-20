@@ -50,6 +50,7 @@
                     <tr>
                         <th>ID</th>
                         <th>Nome</th>
+                        <th>Usuário</th>
                         <th>E-mail</th>
                         <th>Entidade</th>
                         <th>Perfil</th>
@@ -57,7 +58,7 @@
                     </tr>
                 </thead>
                 <tbody id="tbody-usuarios">
-                    <tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>
+                    <tr><td colspan="7" style="text-align:center;">Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -130,7 +131,7 @@
 
         async function carregarUsuarios() {
             const tbody = document.getElementById('tbody-usuarios');
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Carregando...</td></tr>';
             
             try {
                 const r = await fetch('/api/usuarios');
@@ -149,6 +150,7 @@
                         <tr>
                             <td>${u.id}</td>
                             <td>${u.nome}</td>
+                            <td>${u.usuario || ""}</td>
                             <td>${u.email}</td>
                             <td>${u.entidade_nome}</td>
                             <td>${u.perfil === 'admin' ? 'Admin' : 'Usuário'}</td>
@@ -159,7 +161,7 @@
                     `;
                 });
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Erro: ${e.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Erro: ${e.message}</td></tr>`;
             }
         }
 
@@ -169,6 +171,7 @@
             document.getElementById('titulo-form').innerText = 'Novo Usuário';
             document.getElementById('user-id').value = '';
             document.getElementById('user-nome').value = '';
+            document.getElementById('user-usuario').value = '';
             document.getElementById('user-email').value = '';
             document.getElementById('user-senha').value = '';
             document.getElementById('user-perfil').value = 'user';
@@ -186,6 +189,7 @@
             document.getElementById('titulo-form').innerText = 'Editar Usuário';
             document.getElementById('user-id').value = u.id;
             document.getElementById('user-nome').value = u.nome;
+            document.getElementById('user-usuario').value = u.usuario || '';
             document.getElementById('user-email').value = u.email;
             document.getElementById('user-senha').value = '';
             document.getElementById('user-perfil').value = u.perfil;

@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login SPC - Sistema de Prestação de Contas</title>
+    <title>Login SPC - Sistema de Presta??o de Contas</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
-        body { background: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        body { background: #f4f6f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
         .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; border-top: 5px solid #003366; }
         h1 { color: #003366; text-align: center; margin-bottom: 30px; font-size: 24px; }
         .form-group { margin-bottom: 20px; }
@@ -16,7 +16,13 @@
         button { width: 100%; padding: 12px; background: #003366; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; }
         button:hover { background: #002244; }
         .erro { color: #dc3545; text-align: center; margin-bottom: 15px; font-size: 14px; display: none; }
+        .sucesso { color: #155724; background: #d4edda; padding: 10px; border-radius: 4px; text-align: center; margin-bottom: 15px; font-size: 14px; display: none; }
         .logo { text-align: center; margin-bottom: 20px; }
+        .link-esqueci { display: block; text-align: center; margin-top: 14px; color: #003366; font-size: 14px; text-decoration: none; cursor: pointer; font-weight: 600; }
+        .link-esqueci:hover { text-decoration: underline; }
+        .painel-esqueci { display: none; margin-top: 20px; padding-top: 18px; border-top: 1px solid #e5e7eb; }
+        .btn-secundario { background: #6c757d; margin-top: 8px; }
+        .btn-secundario:hover { background: #545b62; }
     </style>
 </head>
 <body>
@@ -24,73 +30,138 @@
         <div class="logo">
             <img src="/static_logos/logo-cofen.png" alt="Cofen" style="max-height: 80px; margin-bottom: 15px;">
             <h1 style="margin-bottom: 5px;">Login SPC</h1>
-            <p style="color: #888888; font-size: 14px; text-align: center; margin-bottom: 30px;">Sistema de Prestação de Contas</p>
+            <p style="color: #888888; font-size: 14px; text-align: center; margin-bottom: 30px;">Sistema de Presta??o de Contas</p>
         </div>
         <div id="mensagem-erro" class="erro"></div>
-        
-        <div class="form-group">
-            <label>E-mail</label>
-            <input type="email" id="email" placeholder="admin@cofen.gov.br">
+        <div id="mensagem-sucesso" class="sucesso"></div>
+
+        <div id="area-login">
+            <div class="form-group">
+                <label>Usu?rio</label>
+                <input type="text" id="usuario" placeholder="Digite seu usu?rio" autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label>Senha</label>
+                <input type="password" id="senha" placeholder="Sua senha" autocomplete="current-password">
+            </div>
+
+            <button onclick="fazerLogin()" id="btn-login">Entrar</button>
+            <a class="link-esqueci" onclick="alternarEsqueciSenha(true)">Esqueci a senha</a>
         </div>
-        
-        <div class="form-group">
-            <label>Senha</label>
-            <input type="password" id="senha" placeholder="Sua senha">
+
+        <div id="area-esqueci" class="painel-esqueci">
+            <p style="font-size: 13px; color: #555; margin-bottom: 12px;">
+                Informe seu usu?rio ou e-mail para receber uma nova senha enviada por <strong>spccofen@gmail.com</strong>.
+            </p>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Usu?rio ou E-mail</label>
+                <input type="text" id="identificador-recuperacao" placeholder="Ex: marcelo.medeiros ou email@cofen.gov.br">
+            </div>
+            <button onclick="solicitarRecuperacao()" id="btn-recuperar">Enviar nova senha</button>
+            <button type="button" class="btn-secundario" onclick="alternarEsqueciSenha(false)">Voltar ao login</button>
         </div>
-        
-        <button onclick="fazerLogin()" id="btn-login">Entrar</button>
     </div>
 
     <script>
-        // Se ja estiver logado, redireciona
         if (localStorage.getItem('usuario_logado')) {
             window.location.href = '/';
         }
 
+        function alternarEsqueciSenha(mostrar) {
+            document.getElementById('mensagem-erro').style.display = 'none';
+            document.getElementById('mensagem-sucesso').style.display = 'none';
+            document.getElementById('area-login').style.display = mostrar ? 'none' : 'block';
+            document.getElementById('area-esqueci').style.display = mostrar ? 'block' : 'none';
+            if (mostrar) {
+                const atual = document.getElementById('usuario').value.trim();
+                if (atual) document.getElementById('identificador-recuperacao').value = atual;
+            }
+        }
+
         async function fazerLogin() {
-            const email = document.getElementById('email').value;
+            const usuario = document.getElementById('usuario').value.trim();
             const senha = document.getElementById('senha').value;
             const btn = document.getElementById('btn-login');
             const msgErro = document.getElementById('mensagem-erro');
-            
+
             msgErro.style.display = 'none';
-            
-            if (!email || !senha) {
-                msgErro.textContent = 'Preencha e-mail e senha.';
+            document.getElementById('mensagem-sucesso').style.display = 'none';
+
+            if (!usuario || !senha) {
+                msgErro.textContent = 'Preencha usu?rio e senha.';
                 msgErro.style.display = 'block';
                 return;
             }
-            
+
             btn.textContent = 'Entrando...';
             btn.disabled = true;
-            
+
             try {
                 const r = await fetch('/api/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({email, senha})
+                    body: JSON.stringify({usuario, senha})
                 });
                 const data = await r.json();
-                
+
                 if (data.ok) {
-                    // Salva os dados do usuario no navegador
                     localStorage.setItem('usuario_logado', JSON.stringify(data.usuario));
-                    // Redireciona para o menu principal
                     window.location.href = '/';
                 } else {
-                    msgErro.textContent = data.mensagem || 'E-mail ou senha incorretos.';
+                    msgErro.textContent = data.mensagem || 'Usu?rio ou senha incorretos.';
                     msgErro.style.display = 'block';
                 }
             } catch (e) {
-                msgErro.textContent = 'Erro de conexao com o servidor.';
+                msgErro.textContent = 'Erro de conex?o com o servidor.';
                 msgErro.style.display = 'block';
             } finally {
                 btn.textContent = 'Entrar';
                 btn.disabled = false;
             }
         }
-        
-        // Permite logar apertando Enter
+
+        async function solicitarRecuperacao() {
+            const identificador = document.getElementById('identificador-recuperacao').value.trim();
+            const btn = document.getElementById('btn-recuperar');
+            const msgErro = document.getElementById('mensagem-erro');
+            const msgSucesso = document.getElementById('mensagem-sucesso');
+
+            msgErro.style.display = 'none';
+            msgSucesso.style.display = 'none';
+
+            if (!identificador) {
+                msgErro.textContent = 'Informe seu usu?rio ou e-mail.';
+                msgErro.style.display = 'block';
+                return;
+            }
+
+            btn.textContent = 'Enviando...';
+            btn.disabled = true;
+
+            try {
+                const r = await fetch('/api/esqueci-senha', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({identificador})
+                });
+                const data = await r.json();
+                if (data.ok) {
+                    msgSucesso.textContent = data.mensagem || 'Nova senha enviada por e-mail.';
+                    msgSucesso.style.display = 'block';
+                } else {
+                    msgErro.textContent = data.mensagem || 'N?o foi poss?vel processar a solicita??o.';
+                    msgErro.style.display = 'block';
+                }
+            } catch (e) {
+                msgErro.textContent = 'Erro de conex?o com o servidor.';
+                msgErro.style.display = 'block';
+            } finally {
+                btn.textContent = 'Enviar nova senha';
+                btn.disabled = false;
+            }
+        }
+
         document.getElementById('senha').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') fazerLogin();
         });
