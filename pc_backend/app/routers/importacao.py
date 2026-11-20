@@ -150,6 +150,84 @@ async def upload_arquivo(
                     "INSERT INTO arquivos_importados (nome_arquivo, dados_json, entidade_id) VALUES (%s, %s, %s)",
                     (nome_arquivo, meta_json, ent_id),
                 )
+
+            # Grava/sobrepoe no PostgreSQL para que a conferencia encontre por entidade_id e periodo
+            periodo_pg = (
+                f"{ano}-{(periodo_tipo or 'TRIMESTRE').upper()}-{periodo_valor or '3'}"
+                if (ano or periodo_tipo or periodo_valor)
+                else "2026-TRIMESTRE-3"
+            )
+            mapa_hist = {
+                "BALANCO_FINANCEIRO": "historico_analise_financeira_bf",
+                "BF": "historico_analise_financeira_bf",
+                "BALANCO_PATRIMONIAL": "historico_analise_bp",
+                "BP": "historico_analise_bp",
+                "BALANCO_ORCAMENTARIO": "historico_analise_orcamentaria",
+                "BO": "historico_analise_orcamentaria",
+                "DFC": "historico_analise_dfc",
+                "DVP": "historico_analise_dvp",
+                "DMPL": "historico_analise_dmpl",
+            }
+            tabela_hist = None
+            for k, t_nome in mapa_hist.items():
+                if k in (tipo_inf or "").upper():
+                    tabela_hist = t_nome
+                    break
+
+            if tabela_hist:
+                cur.execute(
+                    "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=%s",
+                    (tabela_hist,),
+                )
+                if cur.fetchone():
+                    cur.execute(
+                        "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=%s AND column_name='entidade_id'",
+                        (tabela_hist,),
+                    )
+                    tem_ent = cur.fetchone() is not None
+                    dt_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    res_payload = json.dumps(
+                        {
+                            "origem": "importacao_pg",
+                            "tipo": tipo_inf,
+                            "periodo": periodo_pg,
+                            "arquivo": nome_arquivo,
+                            "tamanho_bytes": len(conteudo),
+                        },
+                        ensure_ascii=False,
+                    )
+                    if tem_ent and ent_id is not None:
+                        cur.execute(
+                            f"SELECT id FROM {tabela_hist} WHERE periodo = %s AND entidade_id = %s ORDER BY id DESC LIMIT 1",
+                            (periodo_pg, ent_id),
+                        )
+                        exist_row = cur.fetchone()
+                        if exist_row:
+                            cur.execute(
+                                f"UPDATE {tabela_hist} SET data_geracao = %s, resultado_json = %s WHERE id = %s",
+                                (dt_str, res_payload, exist_row[0]),
+                            )
+                        else:
+                            cur.execute(
+                                f"INSERT INTO {tabela_hist} (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
+                                (periodo_pg, dt_str, res_payload, ent_id),
+                            )
+                    else:
+                        cur.execute(
+                            f"SELECT id FROM {tabela_hist} WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+                            (periodo_pg,),
+                        )
+                        exist_row = cur.fetchone()
+                        if exist_row:
+                            cur.execute(
+                                f"UPDATE {tabela_hist} SET data_geracao = %s, resultado_json = %s WHERE id = %s",
+                                (dt_str, res_payload, exist_row[0]),
+                            )
+                        else:
+                            cur.execute(
+                                f"INSERT INTO {tabela_hist} (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+                                (periodo_pg, dt_str, res_payload),
+                            )
         conn.commit()
     finally:
         conn.close()

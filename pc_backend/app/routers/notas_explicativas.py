@@ -116,6 +116,166 @@ def obter_historico_nota(item_id: int):
         conn.close()
 
 
+def _montar_notas_do_consolidado(conn, periodo: str, ent_id):
+    notas_geradas = []
+    obs_texto = ""
+    concl_texto = ""
+
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # 1. Busca último relatório consolidado do período (e entidade, se houver)
+        try:
+            if ent_id is not None:
+                cur.execute(
+                    """
+                    SELECT id, periodo, data_geracao, resultado_json
+                    FROM historico_relatorio_consolidado
+                    WHERE (periodo = %s OR periodo LIKE %s) AND entidade_id = %s
+                    ORDER BY id DESC LIMIT 1
+                    """,
+                    (periodo, f"%{periodo}%", ent_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT id, periodo, data_geracao, resultado_json
+                    FROM historico_relatorio_consolidado
+                    WHERE periodo = %s OR periodo LIKE %s
+                    ORDER BY id DESC LIMIT 1
+                    """,
+                    (periodo, f"%{periodo}%"),
+                )
+            cons_row = cur.fetchone()
+        except Exception:
+            cons_row = None
+
+        cons_id = None
+        cons_dados = {}
+        if cons_row:
+            cons_id = cons_row["id"]
+            raw_json = cons_row.get("resultado_json")
+            if isinstance(raw_json, dict):
+                cons_dados = raw_json
+            elif isinstance(raw_json, str) and raw_json.strip():
+                try:
+                    cons_dados = json.loads(raw_json)
+                except Exception:
+                    cons_dados = {}
+
+        if cons_id is not None:
+            resumo_secoes = []
+            if isinstance(cons_dados, dict) and cons_dados:
+                for chave, val in list(cons_dados.items())[:12]:
+                    if isinstance(val, dict):
+                        resumo_secoes.append(f"- {chave}: {len(val)} item(ns)/indicador(es)")
+                    elif isinstance(val, list):
+                        resumo_secoes.append(f"- {chave}: {len(val)} registro(s)")
+                    else:
+                        resumo_secoes.append(f"- {chave}: {val}")
+            detalhe_json = "\n" + "\n".join(resumo_secoes) if resumo_secoes else ""
+            notas_geradas.append({
+                "titulo": f"NOTA 1 – RELATÓRIO CONSOLIDADO ({cons_row.get('periodo') or periodo})",
+                "texto": (
+                    f"Dados base extraídos do Relatório Consolidado nº {cons_id} "
+                    f"(gerado em {cons_row.get('data_geracao') or 'data não informada'}) "
+                    f"para o período {periodo}.{detalhe_json}"
+                ),
+            })
+
+            # Observações vinculadas ao relatório consolidado
+            try:
+                cur.execute(
+                    """
+                    SELECT item, texto
+                    FROM observacoes_consolidado
+                    WHERE relatorio_id = %s
+                    ORDER BY id ASC
+                    """,
+                    (cons_id,),
+                )
+                obs_rows = cur.fetchall() or []
+                if obs_rows:
+                    partes_obs = []
+                    for idx_o, r_o in enumerate(obs_rows, start=1):
+                        item_lbl = (r_o.get("item") or f"Item {idx_o}").strip()
+                        txt_o = (r_o.get("texto") or "").strip()
+                        if txt_o:
+                            partes_obs.append(f"[{item_lbl}] {txt_o}")
+                    if partes_obs:
+                        obs_texto = "\n".join(partes_obs)
+                        notas_geradas.append({
+                            "titulo": "NOTA 2 – OBSERVAÇÕES DO RELATÓRIO CONSOLIDADO",
+                            "texto": obs_texto,
+                        })
+            except Exception:
+                pass
+
+            # Conclusão vinculada ao relatório consolidado
+            try:
+                cur.execute(
+                    """
+                    SELECT texto
+                    FROM conclusao_consolidado
+                    WHERE relatorio_id = %s
+                    ORDER BY id DESC LIMIT 1
+                    """,
+                    (cons_id,),
+                )
+                c_row = cur.fetchone()
+                if c_row and (c_row.get("texto") or "").strip():
+                    concl_texto = c_row["texto"].strip()
+                    notas_geradas.append({
+                        "titulo": f"NOTA {len(notas_geradas) + 1} – CONCLUSÃO DO RELATÓRIO CONSOLIDADO",
+                        "texto": concl_texto,
+                    })
+            except Exception:
+                pass
+
+        # 2. Complementa com observações/conclusões de registro_conclusao_observacoes do período, se existirem
+        try:
+            cur.execute(
+                """
+                SELECT item_numero, item, tipo, texto
+                FROM registro_conclusao_observacoes
+                WHERE periodo = %s
+                ORDER BY item_numero ASC, id ASC
+                """,
+                (periodo,),
+            )
+            reg_rows = cur.fetchall() or []
+            if reg_rows:
+                linhas_reg = []
+                for rr in reg_rows:
+                    t_reg = (rr.get("texto") or "").strip()
+                    if t_reg:
+                        lbl = rr.get("item") or f"Item {rr.get('item_numero') or ''}"
+                        tp = rr.get("tipo") or "observacao"
+                        linhas_reg.append(f"[{lbl} - {tp}] {t_reg}")
+                if linhas_reg:
+                    texto_reg = "\n".join(linhas_reg)
+                    if not obs_texto:
+                        obs_texto = texto_reg
+                    notas_geradas.append({
+                        "titulo": f"NOTA {len(notas_geradas) + 1} – OBSERVAÇÕES E REGISTROS DO PERÍODO",
+                        "texto": texto_reg,
+                    })
+        except Exception:
+            pass
+
+        # Se encontrou consolidado mas ainda sem observações/conclusão cadastradas, cria nota de resumo
+        if cons_id is not None and not notas_geradas:
+            notas_geradas.append({
+                "titulo": f"NOTA 1 – CONSOLIDAÇÃO DO PERÍODO {periodo}",
+                "texto": "Relatório Consolidado localizado para o período. Adicione, altere ou remova notas conforme necessário antes de salvar.",
+            })
+
+    return {
+        "notas": notas_geradas,
+        "observacoes": obs_texto,
+        "conclusao": concl_texto,
+        "origem_consolidado_id": cons_id,
+    }
+
+
 @router.get("/api/notas_explicativas/{periodo}")
 def carregar_notas_periodo(periodo: str, request: Request):
     conn = _get_conn()
@@ -157,14 +317,21 @@ def carregar_notas_periodo(periodo: str, request: Request):
                 "conclusao": ser["dados"].get("conclusao", ""),
                 "dados": ser["dados"],
             }
+        montado = _montar_notas_do_consolidado(conn, periodo, ent_id)
         return {
             "ok": True,
             "id": None,
             "periodo": periodo,
-            "notas": [],
-            "observacoes": "",
-            "conclusao": "",
-            "dados": {"notas": [], "observacoes": "", "conclusao": ""},
+            "origem": "consolidado_observacoes",
+            "consolidado_id": montado["origem_consolidado_id"],
+            "notas": montado["notas"],
+            "observacoes": montado["observacoes"],
+            "conclusao": montado["conclusao"],
+            "dados": {
+                "notas": montado["notas"],
+                "observacoes": montado["observacoes"],
+                "conclusao": montado["conclusao"],
+            },
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

@@ -171,7 +171,7 @@ def _buscar_panorama_pg(periodo: str, request: Request = None) -> dict | None:
 @router.get("/{periodo}")
 async def api_panorama(periodo: str, request: Request = None):
     try:
-        dados = _buscar_panorama_pg(periodo)
+        dados = _buscar_panorama_pg(periodo, request)
         if not dados:
             raise HTTPException(status_code=404, detail=f"Panorama nao encontrado no PostgreSQL para {periodo}")
         return {
@@ -212,7 +212,7 @@ async def gerar_pdf_panorama(id: str, request: Request = None):
             dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
         else:
             periodo = id
-            dados = _buscar_panorama_pg(periodo)
+            dados = _buscar_panorama_pg(periodo, request)
         if not dados:
             raise HTTPException(status_code=404, detail=f"Panorama nao encontrado no PostgreSQL para {periodo}")
         caixa = float(dados.get("caixa_bp", 0.0) or 0.0)

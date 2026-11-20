@@ -102,7 +102,7 @@ async def serve_analise_dfc():
 @router.post("/salvar/{periodo}/{periodo_anterior}")
 async def salvar_analise_dfc(periodo: str, periodo_anterior: str, request: Request = None):
     try:
-        res_pg = buscar_dfc_postgresql(periodo)
+        res_pg = buscar_dfc_postgresql(periodo, resolver_entidade_id(request))
         if not res_pg:
             return {"ok": False, "mensagem": f"Dados da DFC n?o encontrados no PostgreSQL para {periodo}"}
 
@@ -219,7 +219,7 @@ def gerar_pdf_analise_dfc(id: int):
 @router.get("/{periodo}")
 def api_analise_dfc(periodo: str, request: Request = None):
     try:
-        res_pg = buscar_dfc_postgresql(periodo)
+        res_pg = buscar_dfc_postgresql(periodo, resolver_entidade_id(request))
         if res_pg:
             return res_pg
 

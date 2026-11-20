@@ -390,7 +390,7 @@ def gerar_pdf_analise_dvp(id: int):
 @router.get("/{periodo}")
 async def api_analise_patrimonial(periodo: str, request: Request = None):
     try:
-        res_pg = buscar_dvp_postgresql(periodo)
+        res_pg = buscar_dvp_postgresql(periodo, resolver_entidade_id(request))
         if res_pg:
             return res_pg
 

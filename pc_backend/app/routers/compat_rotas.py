@@ -353,3 +353,68 @@ def get_historico_conferencia(request: Request):
         return []
     finally:
         conn.close()
+
+
+# --- Rotas de exclusao adicionadas para padronizacao entre modulos ---
+def _executar_delete_historico(tabela: str, item_id: int, request: Request = None):
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        with conn.cursor() as cur:
+            ent_id = None
+            try:
+                ent_id = resolver_entidade_id(request, conn=conn) if request is not None else None
+            except TypeError:
+                try:
+                    ent_id = resolver_entidade_id(request) if request is not None else None
+                except Exception:
+                    ent_id = None
+            except Exception:
+                ent_id = None
+
+            cur.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = %s AND column_name = 'entidade_id'",
+                (tabela,),
+            )
+            tem_entidade = cur.fetchone() is not None
+
+            if tem_entidade and ent_id is not None:
+                cur.execute(f"DELETE FROM {tabela} WHERE id = %s AND entidade_id = %s", (item_id, ent_id))
+            else:
+                cur.execute(f"DELETE FROM {tabela} WHERE id = %s", (item_id,))
+            removidos = cur.rowcount
+        conn.commit()
+        return {"ok": True, "removidos": removidos, "excluido": removidos > 0}
+    except Exception as exc:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"ok": False, "mensagem": str(exc)}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+@router.delete("/excluir_conferencia/{item_id}")
+@router.delete("/api/excluir_conferencia/{item_id}")
+async def excluir_conferencia_item(item_id: int, request: Request = None):
+    for tab in ("historico_conferencia", "historico_conferencia_demonstracoes", "historico_conferencias", "conferencia_historico"):
+        res = _executar_delete_historico(tab, item_id, request)
+        if res.get("ok") and res.get("removidos", 0) > 0:
+            return res
+    return _executar_delete_historico("historico_conferencia", item_id, request)
+
+@router.delete("/excluir_custo_pessoal/{item_id}")
+@router.delete("/api/excluir_custo_pessoal/{item_id}")
+async def excluir_custo_pessoal_item(item_id: int, request: Request = None):
+    return _executar_delete_historico("historico_custo_pessoal", item_id, request)
+
+@router.delete("/excluir_analise_patrimonial/{item_id}")
+@router.delete("/api/analise_patrimonial/excluir/{item_id}")
+async def excluir_analise_patrimonial_item(item_id: int, request: Request = None):
+    for tab in ("historico_analise_patrimonial", "historico_analise_dvp", "historico_analise_bp"):
+        res = _executar_delete_historico(tab, item_id, request)
+        if res.get("ok") and res.get("removidos", 0) > 0:
+            return res
+    return _executar_delete_historico("historico_analise_patrimonial", item_id, request)

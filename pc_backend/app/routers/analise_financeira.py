@@ -40,7 +40,7 @@ def _buscar_balanco_pg(periodo_str: str, periodo_ant: str | None = None, request
             label = f"{periodo_str} vs {periodo_ant}"
             cur.execute(
                 "SELECT resultado_json FROM historico_analise_financeira_bf WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-                (label,),
+                (label, __ent_id, __ent_id),
             )
             row = cur.fetchone()
             if row and row[0]:
@@ -48,7 +48,7 @@ def _buscar_balanco_pg(periodo_str: str, periodo_ant: str | None = None, request
 
         cur.execute(
             "SELECT resultado_json FROM historico_analise_financeira_bf WHERE (periodo = %s OR periodo LIKE %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-            (periodo_str, f"{periodo_str} vs %"),
+            (periodo_str, f"{periodo_str} vs %", __ent_id, __ent_id),
         )
         row = cur.fetchone()
         if not row or not row[0]:
@@ -148,7 +148,7 @@ def excluir_analise_financeira_bf(id: int, request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("DELETE FROM historico_analise_financeira_bf WHERE (id = %s) AND (%s IS NULL OR entidade_id = %s)", (id,))
+        cur.execute("DELETE FROM historico_analise_financeira_bf WHERE (id = %s) AND (%s IS NULL OR entidade_id = %s)", (id, __ent_id, __ent_id))
         conn.commit()
         conn.close()
         return {"ok": True}

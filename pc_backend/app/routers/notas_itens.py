@@ -133,7 +133,7 @@ def delete_nota_item(nota_id: int, request: Request = None):
     try:
         garantir_tabela_notas(conn)
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM registro_conclusao_observacoes WHERE id = %s AND (%s IS NULL OR entidade_id = %s) RETURNING id", (nota_id,))
+            cur.execute("DELETE FROM registro_conclusao_observacoes WHERE id = %s AND (%s IS NULL OR entidade_id = %s) RETURNING id", (nota_id, __ent_id, __ent_id))
             removido = cur.fetchone()
         if not removido:
             raise HTTPException(status_code=404, detail="Nota nao encontrada.")

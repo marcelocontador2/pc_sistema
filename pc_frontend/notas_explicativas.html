@@ -251,6 +251,11 @@ function carregarNotas(id) {
 carregarHistorico();
 
 function renderizarNotas(notas) {
+    if (!Array.isArray(notas) || notas.length === 0) {
+        document.getElementById('conteudo').innerHTML = '<p style="text-align:center; color:#666; padding:24px;">Nenhuma nota explicativa salva encontrada para este período e entidade. Use <b>Incluir Item</b>, a aba <b>MCASP</b> ou <b>Salvar</b> para registrar.</p>';
+        document.getElementById('declaracao-conformidade').style.display = 'block';
+        return;
+    }
     let html = '';
     notas.forEach((n, index) => {
         // Escapa aspas simples no título para não quebrar o JavaScript
@@ -287,9 +292,9 @@ function verificarDados() {
                 return;
             }
             notasAtuais = data.notas || [];
+            relatorioIdAtual = data.id || null;
             renderizarNotas(notasAtuais);
             carregarDadosContador();
-            relatorioIdAtual = null;
         })
         .catch(err => {
             document.getElementById('conteudo').innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar: ' + err.message + '</p>';
@@ -302,10 +307,15 @@ function salvarDados() {
     const periodo = document.getElementById('filtro-periodo').value;
     const periodoStr = ano + '-' + tipo + '-' + periodo;
     
-    fetch('/salvar_notas_explicativas/' + periodoStr, { method: 'POST' })
+    fetch('/salvar_notas_explicativas/' + periodoStr, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notas: notasAtuais })
+    })
         .then(r => r.json())
         .then(data => {
             if (data.ok) {
+                if (data.id) relatorioIdAtual = data.id;
                 alert('Notas Explicativas salvas com sucesso!');
                 carregarHistorico();
             } else {
@@ -357,10 +367,6 @@ function atualizarSelecaoCheckbox(checkbox) {
 }
 
 function abrirInclusao() {
-    if (!relatorioIdAtual) {
-        alert('Selecione um hist?rico primeiro para adicionar uma nota.');
-        return;
-    }
     document.getElementById('incluir-titulo').value = '';
     document.getElementById('incluir-texto').value = '';
     document.getElementById('modal-incluir').style.display = 'flex';
@@ -370,7 +376,14 @@ function salvarNovaNota() {
     const titulo = document.getElementById('incluir-titulo').value.trim();
     const texto = document.getElementById('incluir-texto').value.trim();
     if (!titulo || !texto) {
-        alert('Preencha o t?tulo e o texto.');
+        alert('Preencha o título e o texto.');
+        return;
+    }
+    if (!relatorioIdAtual) {
+        notasAtuais.push({ titulo, texto });
+        renderizarNotas(notasAtuais);
+        fecharModal('modal-incluir');
+        alert('Nota adicionada na verificação atual. Clique em Salvar para gravar no histórico.');
         return;
     }
     fetch('/api/incluir_nota/' + relatorioIdAtual, {
@@ -379,7 +392,7 @@ function salvarNovaNota() {
         body: JSON.stringify({ titulo, texto })
     }).then(r => r.json()).then(data => {
         if (data.ok) {
-            alert('Nota inclu?da com sucesso!');
+            alert('Nota incluída com sucesso!');
             fecharModal('modal-incluir');
             carregarNotas(relatorioIdAtual);
         } else {
@@ -389,17 +402,21 @@ function salvarNovaNota() {
 }
 
 function excluirNota(index) {
+    if (!confirm('Excluir esta nota?')) return;
     if (!relatorioIdAtual) {
-        alert('Selecione um hist?rico primeiro.');
+        if (index >= 0 && index < notasAtuais.length) {
+            notasAtuais.splice(index, 1);
+            renderizarNotas(notasAtuais);
+            alert('Nota removida da verificação atual. Clique em Salvar para gravar no histórico.');
+        }
         return;
     }
-    if (!confirm('Excluir esta nota?')) return;
 
     fetch('/api/excluir_nota/' + relatorioIdAtual + '/' + index, {
         method: 'DELETE'
     }).then(r => r.json()).then(data => {
         if (data.ok) {
-            alert('Nota exclu?da!');
+            alert('Nota excluída!');
             carregarNotas(relatorioIdAtual);
         } else {
             alert('Erro: ' + (data.mensagem || data.detail || 'Falha ao excluir nota'));

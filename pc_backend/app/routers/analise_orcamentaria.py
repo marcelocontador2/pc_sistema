@@ -81,7 +81,7 @@ async def excluir_analise_orcamentaria(id: int, request: Request = None):
     __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("DELETE FROM historico_analise_orcamentaria WHERE (id=%s) AND (%s IS NULL OR entidade_id = %s)", (id,))
+    cur.execute("DELETE FROM historico_analise_orcamentaria WHERE (id=%s) AND (%s IS NULL OR entidade_id = %s)", (id, __ent_id, __ent_id))
     conn.commit(); conn.close()
     return {"mensagem": "Excluido"}
 
@@ -236,7 +236,7 @@ def _buscar_orcamentaria_pg(periodo_str: str, request: Request = None) -> dict |
         cur = conn.cursor()
         cur.execute(
             "SELECT resultado_json FROM historico_analise_orcamentaria WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-            (periodo_str,),
+            (periodo_str, __ent_id, __ent_id),
         )
         row = cur.fetchone()
         if row and row[0]:
@@ -250,7 +250,7 @@ def _buscar_orcamentaria_pg(periodo_str: str, request: Request = None) -> dict |
 
         cur.execute(
             "SELECT resultado_json FROM historico_analise_orcamentaria WHERE (resultado_json LIKE %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-            (f'%"{periodo_str}"%',),
+            (f'%"{periodo_str}"%', __ent_id, __ent_id),
         )
         row = cur.fetchone()
         if row and row[0]:

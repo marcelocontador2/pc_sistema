@@ -100,13 +100,13 @@ def _buscar_despesas_pg(periodo_str: str, request: Request = None) -> dict | Non
         cur = conn.cursor()
         cur.execute(
             "SELECT dados_json FROM historico_comparativo_despesas WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-            (periodo_str,),
+            (periodo_str, __ent_id, __ent_id),
         )
         row = cur.fetchone()
         if not row:
             cur.execute(
                 "SELECT dados_json FROM historico_comparativo_despesas WHERE (periodo ILIKE %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-                (f"%{periodo_str}%",),
+                (f"%{periodo_str}%", __ent_id, __ent_id),
             )
             row = cur.fetchone()
         if not row or not row[0]:

@@ -32,7 +32,7 @@ def _calc_liquidez(periodo, request: Request = None):
         cur = conn.cursor()
         cur.execute(
             "SELECT resultado_json FROM historico_liquidez WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-            (periodo,),
+            (periodo, __ent_id, __ent_id),
         )
         row = cur.fetchone()
         if not row or not row[0]:
@@ -62,7 +62,7 @@ async def serve_liquidez(request: Request = None):
 
 @router.get("/api/calcular_liquidez/{periodo}")
 async def api_calcular_liquidez(periodo: str, request: Request = None):
-    dados = _calc_liquidez(periodo)
+    dados = _calc_liquidez(periodo, request)
     if not dados:
         return {"erro": True, "mensagem": "Balanco Patrimonial nao encontrado para este periodo."}
     return dados
@@ -72,7 +72,7 @@ async def api_calcular_liquidez(periodo: str, request: Request = None):
 async def salvar_liquidez_rota(periodo: str, request: Request = None):
     __ent_id = resolver_entidade_id(request)
     try:
-        dados = _calc_liquidez(periodo)
+        dados = _calc_liquidez(periodo, request)
         if not dados:
             return {"erro": True, "mensagem": "Sem dados para salvar."}
         conn = psycopg2.connect(**PG_CONFIG)
@@ -81,7 +81,7 @@ async def salvar_liquidez_rota(periodo: str, request: Request = None):
             id SERIAL PRIMARY KEY, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         cur.execute("INSERT INTO historico_liquidez (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
-                    (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
+                    (periodo, data_agora, json.dumps(dados, ensure_ascii=False), __ent_id))
         conn.commit()
         conn.close()
         return {"ok": True, "mensagem": "Liquidez salva com sucesso!"}
@@ -129,7 +129,7 @@ async def excluir_liquidez(id: int, request: Request = None):
     __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("DELETE FROM historico_liquidez WHERE (id = %s) AND (%s IS NULL OR entidade_id = %s)", (id,))
+    cur.execute("DELETE FROM historico_liquidez WHERE (id = %s) AND (%s IS NULL OR entidade_id = %s)", (id, __ent_id, __ent_id))
     conn.commit()
     conn.close()
     return {"ok": True}

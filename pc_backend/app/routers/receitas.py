@@ -111,13 +111,13 @@ def _buscar_receitas_pg(p: str, request: Request = None) -> dict | None:
         cur = conn.cursor()
         cur.execute(
             "SELECT dados_json FROM historico_comparativo_receitas WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-            (p,),
+            (p, __ent_id, __ent_id),
         )
         row = cur.fetchone()
         if not row:
             cur.execute(
                 "SELECT dados_json FROM historico_comparativo_receitas WHERE (periodo ILIKE %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-                (f"%{p}%",),
+                (f"%{p}%", __ent_id, __ent_id),
             )
             row = cur.fetchone()
         if not row or not row[0]:

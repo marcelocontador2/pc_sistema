@@ -100,7 +100,7 @@ def _buscar_integridade_matriz_pg(periodo: str, request: Request = None) -> dict
 
         cur.execute(
             "SELECT resultado_json FROM historico_integridade_matriz WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 5",
-            (periodo,),
+            (periodo, __ent_id, __ent_id),
         )
         for (raw,) in cur.fetchall():
             rj = _parse_json_pg(raw)
@@ -109,7 +109,7 @@ def _buscar_integridade_matriz_pg(periodo: str, request: Request = None) -> dict
 
         cur.execute(
             "SELECT resultado_json FROM historico_matriz_integridade WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 5",
-            (periodo,),
+            (periodo, __ent_id, __ent_id),
         )
         for (raw,) in cur.fetchall():
             rj = _parse_json_pg(raw)
@@ -122,7 +122,7 @@ def _buscar_integridade_matriz_pg(periodo: str, request: Request = None) -> dict
 
         cur.execute(
             "SELECT resultado_json FROM historico_integridade_matriz WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-            (periodo,),
+            (periodo, __ent_id, __ent_id),
         )
         row = cur.fetchone()
         if row and row[0]:
@@ -132,7 +132,7 @@ def _buscar_integridade_matriz_pg(periodo: str, request: Request = None) -> dict
 
         cur.execute(
             "SELECT resultado_json FROM historico_integridade WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
-            (periodo,),
+            (periodo, __ent_id, __ent_id),
         )
         row = cur.fetchone()
         if row and row[0]:
@@ -148,7 +148,7 @@ def _buscar_integridade_matriz_pg(periodo: str, request: Request = None) -> dict
 @router.get("/api/integridade_matriz/{periodo}")
 async def api_integridade_matriz_calcular(periodo: str, request: Request = None):
     try:
-        dados = _buscar_integridade_matriz_pg(periodo)
+        dados = _buscar_integridade_matriz_pg(periodo, request)
         if dados:
             return dados
         return {"erro": True, "mensagem": f"Dados de integridade n?o encontrados no PostgreSQL para {periodo}."}
