@@ -332,10 +332,10 @@ def gerar_pdf_analise_dvp(id: int):
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", "B", 16)
         pdf.set_xy(15, 8)
-        pdf.cell(0, 8, "DVP - Demonstra??o das Varia??es Patrimoniais")
+        pdf.cell(0, 8, "DVP - Demonstração das Variações Patrimoniais")
         pdf.set_font("Arial", "", 10)
         pdf.set_xy(15, 18)
-        pdf.cell(0, 6, f"Per?odo: {periodo_label}")
+        pdf.cell(0, 6, f"Período: {periodo_label}")
 
         vpa = (dados.get("total_vpa") or {}).get("atual", 0)
         vpd = (dados.get("total_vpd") or {}).get("atual", 0)

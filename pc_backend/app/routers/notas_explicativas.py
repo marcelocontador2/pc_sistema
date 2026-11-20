@@ -575,12 +575,12 @@ def gerar_pdf_notas(relatorio_id: int):
             )
             row = cur.fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Hist?rico n?o encontrado.")
+            raise HTTPException(status_code=404, detail="Histórico não encontrado.")
         ser = _serializar_row(dict(row))
         linhas = [
             "NOTAS EXPLICATIVAS",
-            f"Per?odo: {ser['periodo']}",
-            f"Data de gera??o: {ser['data_geracao']}",
+            f"Período: {ser['periodo']}",
+            f"Data de geração: {ser['data_geracao']}",
             "-" * 50,
         ]
         for idx, n in enumerate(ser["dados"].get("notas") or [], 1):

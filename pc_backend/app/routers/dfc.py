@@ -179,7 +179,7 @@ async def excluir_dfc(id: int):
 
 
 @router.get("/gerar_pdf/{id}")
-def gerar_pdf_analise_dfc(id: int):
+def gerar_pdf_analise_dfc(id: int, request: Request = None):
     try:
         from playwright.sync_api import sync_playwright
 
@@ -192,7 +192,7 @@ def gerar_pdf_analise_dfc(id: int):
         if not row:
             return Response(content=b"Registro nao encontrado", media_type="text/plain", status_code=404)
 
-        url = "http://127.0.0.1:994/analise_dfc?id=" + str(id) + "&_t=" + str(int(time.time()))
+        url = (str(request.base_url).rstrip("/") if request and "testserver" not in str(request.base_url) else os.getenv("PC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")) + "/analise_dfc?id=" + str(id) + "&_t=" + str(int(time.time()))
 
         with sync_playwright() as p:
             browser = p.chromium.launch()
