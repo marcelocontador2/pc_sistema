@@ -7,7 +7,8 @@ import json
 import os
 import time
 import traceback
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 import psycopg2
 from pc_backend.app.config import PG_CONFIG
 from pc_backend.app.db_memoria import salvar_contas_memoria, carregar_contas_memoria, _slug_conta
@@ -103,7 +104,7 @@ def _montar_dmpl_da_memoria(periodo: str) -> dict | None:
     }
 
 
-def buscar_dmpl_postgresql(periodo: str | None = None):
+def buscar_dmpl_postgresql(periodo: str | None = None, entidade_id: int | None = None):
     """
     Busca dados do DMPL diretamente no PostgreSQL (historico_analise_dmpl -> db_memoria).
     """
@@ -112,27 +113,51 @@ def buscar_dmpl_postgresql(periodo: str | None = None):
         cur = conn.cursor()
         row = None
         if periodo:
-            cur.execute(
-                """
-                SELECT periodo, resultado_json
-                FROM historico_analise_dmpl
-                WHERE periodo ILIKE %s
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                (f"%{periodo}%",),
-            )
+            if entidade_id is not None:
+                cur.execute(
+                    """
+                    SELECT periodo, resultado_json
+                    FROM historico_analise_dmpl
+                    WHERE periodo ILIKE %s AND entidade_id = %s
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (f"%{periodo}%", entidade_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT periodo, resultado_json
+                    FROM historico_analise_dmpl
+                    WHERE periodo ILIKE %s
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (f"%{periodo}%",),
+                )
             row = cur.fetchone()
 
         if not row:
-            cur.execute(
-                """
-                SELECT periodo, resultado_json
-                FROM historico_analise_dmpl
-                ORDER BY id DESC
-                LIMIT 1
-                """
-            )
+            if entidade_id is not None:
+                cur.execute(
+                    """
+                    SELECT periodo, resultado_json
+                    FROM historico_analise_dmpl
+                    WHERE entidade_id = %s
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (entidade_id,),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT periodo, resultado_json
+                    FROM historico_analise_dmpl
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+                )
             row = cur.fetchone()
 
         if row and row[1]:
@@ -172,10 +197,29 @@ def processar_dmpl(caminho=None, periodo: str | None = None):
     return {"erro": "faltando", "mensagem": "Dados da DMPL nao encontrados no PostgreSQL."}
 
 
-@router.get("/{periodo}")
-def api_analise_dmpl(periodo: str):
+@router.get("/historico")
+def get_historico_dmpl(request: Request = None):
     try:
-        res_pg = buscar_dmpl_postgresql(periodo)
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        ent_id = resolver_entidade_id(request, conn=conn)
+        if ent_id is not None:
+            cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dmpl WHERE entidade_id = %s ORDER BY id DESC", (ent_id,))
+        else:
+            cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dmpl ORDER BY id DESC")
+        rows = cur.fetchall()
+        conn.close()
+        return [{"id": r[0], "periodo": r[1], "data_geracao": str(r[2])} for r in rows]
+    except Exception as e:
+        print(f"[DMPL] Erro ao listar historico: {e}")
+        return []
+
+
+
+@router.get("/{periodo}")
+def api_analise_dmpl(periodo: str, request: Request = None):
+    try:
+        res_pg = buscar_dmpl_postgresql(periodo, resolver_entidade_id(request))
         if res_pg:
             return res_pg
 
@@ -185,8 +229,9 @@ def api_analise_dmpl(periodo: str):
         return {"erro": "interno", "mensagem": str(e)}
 
 
+
 @router.post("/salvar/{periodo}/{periodo_anterior}")
-def salvar_analise_dmpl(periodo: str, periodo_anterior: str):
+def salvar_analise_dmpl(periodo: str, periodo_anterior: str, request: Request = None):
     try:
         res_pg = buscar_dmpl_postgresql(periodo)
         if res_pg and isinstance(res_pg.get("dados"), dict):
@@ -199,12 +244,13 @@ def salvar_analise_dmpl(periodo: str, periodo_anterior: str):
 
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
+        __ent_id_save = resolver_entidade_id(request)
         cur.execute(
             """
-            INSERT INTO historico_analise_dmpl (periodo, data_geracao, resultado_json)
-            VALUES (%s, NOW(), %s) RETURNING id
+            INSERT INTO historico_analise_dmpl (periodo, data_geracao, resultado_json, entidade_id)
+            VALUES (%s, NOW(), %s, %s) RETURNING id
             """,
-            (periodo_label, json.dumps(dados_json, ensure_ascii=False)),
+            (periodo_label, json.dumps(dados_json, ensure_ascii=False), __ent_id_save),
         )
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -214,20 +260,6 @@ def salvar_analise_dmpl(periodo: str, periodo_anterior: str):
     except Exception as e:
         print(f"[DMPL] Erro ao salvar: {e}\n{traceback.format_exc()}")
         return {"ok": False, "mensagem": str(e)}
-
-
-@router.get("/historico")
-def get_historico_dmpl():
-    try:
-        conn = psycopg2.connect(**PG_CONFIG)
-        cur = conn.cursor()
-        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dmpl ORDER BY id DESC")
-        rows = cur.fetchall()
-        conn.close()
-        return [{"id": r[0], "periodo": r[1], "data_geracao": str(r[2])} for r in rows]
-    except Exception as e:
-        print(f"[DMPL] Erro ao listar historico: {e}")
-        return []
 
 
 @router.get("/historico/{id}")

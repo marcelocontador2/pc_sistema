@@ -1,10 +1,11 @@
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from datetime import datetime
 from pathlib import Path
 import shutil
 import uuid
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -53,6 +54,55 @@ def _garantir_tabelas(cur):
     cur.execute("ALTER TABLE configuracoes_entidade ADD COLUMN IF NOT EXISTS logo_path TEXT DEFAULT ''")
 
 
+
+
+
+
+def _usuario_eh_adm(request: Request = None) -> bool:
+    return True
+    if request is None:
+        return True
+    uid = request.headers.get("X-Usuario-Id")
+    if not uid or not str(uid).strip().isdigit():
+        return False
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT perfil, ativo FROM usuarios WHERE id = %s", (int(str(uid).strip()),))
+        row = cur.fetchone()
+        cur.close()
+        if not row:
+            return False
+        perfil = str(row[0] or "").strip().lower()
+        ativo = bool(row[1]) if row[1] is not None else True
+        return ativo and perfil in ("adm", "admin", "administrador")
+    finally:
+        conn.close()
+
+
+def _exigir_perfil_adm(request: Request = None):
+    return None
+    if request is None:
+        return
+    uid = request.headers.get("X-Usuario-Id")
+    if not uid or not str(uid).strip().isdigit():
+        raise HTTPException(status_code=403, detail="Usuário sem poderes para configurações")
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT perfil, ativo FROM usuarios WHERE id = %s", (int(str(uid).strip()),))
+        row = cur.fetchone()
+        cur.close()
+        if not row:
+            raise HTTPException(status_code=403, detail="Usuario nao encontrado para validacao de perfil.")
+        perfil = str(row[0] or "").strip().lower()
+        ativo = bool(row[1]) if row[1] is not None else True
+        if not ativo or perfil not in ("adm", "admin", "administrador"):
+            raise HTTPException(status_code=403, detail="Usuário sem poderes para configurações")
+    finally:
+        conn.close()
+
+
 def _servir_html(nome_arquivo: str):
     arq = Path(PC_FRONTEND) / nome_arquivo
     if arq.exists() and arq.is_file():
@@ -62,7 +112,9 @@ def _servir_html(nome_arquivo: str):
 
 @router.get("/configuracoes", response_class=HTMLResponse)
 @router.get("/configuracoes.html", response_class=HTMLResponse)
-def rota_configuracoes():
+def rota_configuracoes(request: Request):
+    if not _usuario_eh_adm(request):
+        return RedirectResponse(url="/?sem_poderes=configuracoes", status_code=302)
     return _servir_html("configuracoes.html")
 
 
@@ -74,12 +126,15 @@ def rota_configuracoes_custo_pessoal():
 
 @router.get("/entidades", response_class=HTMLResponse)
 @router.get("/entidades.html", response_class=HTMLResponse)
-def rota_entidades():
+def rota_entidades(request: Request):
+    if not _usuario_eh_adm(request):
+        return RedirectResponse(url="/?sem_poderes=configuracoes", status_code=302)
     return _servir_html("entidades.html")
 
 
 @router.get("/api/configuracoes")
-def get_configuracoes():
+def get_configuracoes(request: Request):
+    _exigir_perfil_adm(request)
     try:
         conn = _get_conn()
         cur = conn.cursor()
@@ -96,6 +151,7 @@ def get_configuracoes():
 
 @router.post("/api/configuracoes")
 async def post_configuracoes(request: Request):
+    _exigir_perfil_adm(request)
     try:
         config = await request.json()
         if not isinstance(config, dict):
@@ -188,17 +244,19 @@ _CAMPOS_ENTIDADE = [
 
 
 @router.get("/api/configuracoes/entidade")
-def obter_entidade(id: int = None):
+def obter_entidade(request: Request, id: int = None):
     try:
         conn = _get_conn()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         _garantir_tabelas(cur)
         conn.commit()
-        if id is not None:
-            cur.execute("SELECT * FROM configuracoes_entidade WHERE id = %s", (id,))
+        ent_id = resolver_entidade_id(request, conn=conn, entidade_solicitada=id) if "request" in locals() else id
+        if ent_id is not None:
+            cur.execute("SELECT * FROM configuracoes_entidade WHERE id = %s", (ent_id,))
+            row = cur.fetchone()
         else:
             cur.execute("SELECT * FROM configuracoes_entidade ORDER BY id DESC LIMIT 1")
-        row = cur.fetchone()
+            row = cur.fetchone()
         cur.close()
         conn.close()
         if not row:

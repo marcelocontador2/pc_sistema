@@ -40,7 +40,10 @@ ROUTERS = [
     "pc_backend.app.routers.receitas",
     "pc_backend.app.routers.relatorio_consolidado",
     "pc_backend.app.routers.notas_itens",
+    "pc_backend.app.routers.notas_explicativas",
     "pc_backend.app.routers.configuracoes",
+    "pc_backend.app.routers.compat_rotas",
+    "pc_backend.app.routers.importacao",
     "pc_backend.app.routers.usuarios",
 ]
 
@@ -51,6 +54,19 @@ for mod_name in ROUTERS:
 
 if _FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(_FRONTEND_DIR)), name="static")
+
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+
+@app.get("/js/{caminho_js:path}")
+def servir_js_frontend(caminho_js: str):
+    if ".." in caminho_js or caminho_js.startswith(("/", "\\")):
+        raise HTTPException(status_code=400, detail="Caminho inv?lido.")
+    arq = (_FRONTEND_DIR / "js" / caminho_js).resolve()
+    base_js = (_FRONTEND_DIR / "js").resolve()
+    if not str(arq).startswith(str(base_js)) or not arq.exists() or not arq.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo JS n?o encontrado.")
+    return FileResponse(str(arq), media_type="application/javascript; charset=utf-8", headers={"Cache-Control": "no-cache"})
 
 @app.get("/", response_class=HTMLResponse)
 def serve_frontend():
@@ -68,3 +84,13 @@ async def rota_relatorio_consolidado():
     if arq.exists() and arq.is_file():
         return FileResponse(str(arq.resolve()), media_type="text/html; charset=utf-8")
     raise HTTPException(status_code=404, detail="relatorio_consolidado.html nao encontrado")
+
+
+@app.get("/notas_explicativas", response_class=HTMLResponse)
+@app.get("/notas_explicativas.html", response_class=HTMLResponse)
+async def rota_notas_explicativas():
+    base_front = globals().get("_FRONTEND_DIR") or Path("pc_frontend")
+    arq = Path(base_front) / "notas_explicativas.html"
+    if arq.exists() and arq.is_file():
+        return FileResponse(str(arq.resolve()), media_type="text/html; charset=utf-8")
+    raise HTTPException(status_code=404, detail="notas_explicativas.html nao encontrado")

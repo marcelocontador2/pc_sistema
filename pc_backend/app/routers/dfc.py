@@ -8,7 +8,8 @@ import os
 import time
 import traceback
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from fastapi.responses import FileResponse
 import psycopg2
 from pc_backend.app.config import PG_CONFIG
@@ -34,7 +35,7 @@ def limpar(v):
         return 0.0
 
 
-def buscar_dfc_postgresql(periodo: str | None = None):
+def buscar_dfc_postgresql(periodo: str | None = None, entidade_id: int | None = None):
     """
     Busca dados da DFC diretamente no PostgreSQL (historico_analise_dfc).
     """
@@ -80,7 +81,7 @@ def buscar_dfc_postgresql(periodo: str | None = None):
 
 
 def processar_dfc(caminho=None, periodo: str | None = None):
-    res_pg = buscar_dfc_postgresql(periodo)
+    res_pg = buscar_dfc_postgresql(periodo, resolver_entidade_id(request))
     if res_pg:
         return res_pg
     return {"erro": "faltando", "mensagem": "Dados da DFC nao encontrados no PostgreSQL."}
@@ -99,7 +100,7 @@ async def serve_analise_dfc():
 
 
 @router.post("/salvar/{periodo}/{periodo_anterior}")
-async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
+async def salvar_analise_dfc(periodo: str, periodo_anterior: str, request: Request = None):
     try:
         res_pg = buscar_dfc_postgresql(periodo)
         if not res_pg:
@@ -115,8 +116,8 @@ async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO historico_analise_dfc (periodo, data_geracao, resultado_json)
-            VALUES (%s, NOW(), %s) RETURNING id
+            INSERT INTO historico_analise_dfc (periodo, data_geracao, resultado_json, entidade_id)
+            VALUES (%s, NOW(), %s, %s) RETURNING id
             """,
             (periodo_label, json.dumps(dados_json)),
         )
@@ -131,11 +132,15 @@ async def salvar_analise_dfc(periodo: str, periodo_anterior: str):
 
 
 @router.get("/historico")
-async def get_historico_dfc():
+async def get_historico_dfc(request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dfc ORDER BY id DESC")
+        ent_id = resolver_entidade_id(request, conn=conn)
+        if ent_id is not None:
+            cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dfc WHERE entidade_id = %s ORDER BY id DESC", (ent_id,))
+        else:
+            cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dfc ORDER BY id DESC")
         rows = cur.fetchall()
         conn.close()
         return [{"id": r[0], "periodo": r[1], "data_geracao": str(r[2])} for r in rows]
@@ -212,7 +217,7 @@ def gerar_pdf_analise_dfc(id: int):
 
 
 @router.get("/{periodo}")
-def api_analise_dfc(periodo: str):
+def api_analise_dfc(periodo: str, request: Request = None):
     try:
         res_pg = buscar_dfc_postgresql(periodo)
         if res_pg:

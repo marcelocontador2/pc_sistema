@@ -7,7 +7,8 @@ import csv
 import os
 import json
 import traceback
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 import psycopg2
 from pc_backend.app.config import PG_CONFIG
 
@@ -93,11 +94,15 @@ def processar_bp(caminho):
 
 
 @router.get("/historico/{id}")
-def get_historico_bp_id(id: int):
+def get_historico_bp_id(id: int, request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("SELECT periodo, resultado_json FROM historico_analise_bp WHERE id = %s", (id,))
+        ent_id = resolver_entidade_id(request, conn=conn)
+        if ent_id is not None:
+            cur.execute("SELECT periodo, resultado_json FROM historico_analise_bp WHERE id = %s AND (entidade_id = %s OR entidade_id IS NULL)", (id, ent_id))
+        else:
+            cur.execute("SELECT periodo, resultado_json FROM historico_analise_bp WHERE id = %s", (id,))
         row = cur.fetchone()
         conn.close()
         if not row:
@@ -109,11 +114,15 @@ def get_historico_bp_id(id: int):
 
 
 @router.get("/historico")
-def get_historico_bp():
+def get_historico_bp(request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_bp ORDER BY id DESC")
+        ent_id = resolver_entidade_id(request, conn=conn)
+        if ent_id is not None:
+            cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_bp WHERE entidade_id = %s ORDER BY id DESC", (ent_id,))
+        else:
+            cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_bp ORDER BY id DESC")
         rows = cur.fetchall()
         conn.close()
         return [{"id": r[0], "periodo": r[1], "data_geracao": str(r[2])} for r in rows]
@@ -123,15 +132,22 @@ def get_historico_bp():
 
 
 @router.get("/{periodo}")
-def api_analise_bp(periodo: str):
+def api_analise_bp(periodo: str, request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         try:
             cur = conn.cursor()
-            cur.execute(
-                "SELECT resultado_json FROM historico_analise_bp WHERE periodo = %s OR periodo LIKE %s ORDER BY id DESC LIMIT 1",
-                (periodo, f"{periodo}%"),
-            )
+            ent_id = resolver_entidade_id(request, conn=conn)
+            if ent_id is not None:
+                cur.execute(
+                    "SELECT resultado_json FROM historico_analise_bp WHERE (periodo = %s OR periodo LIKE %s) AND (entidade_id = %s OR entidade_id IS NULL) ORDER BY id DESC LIMIT 1",
+                    (periodo, f"{periodo}%", ent_id),
+                )
+            else:
+                cur.execute(
+                    "SELECT resultado_json FROM historico_analise_bp WHERE periodo = %s OR periodo LIKE %s ORDER BY id DESC LIMIT 1",
+                    (periodo, f"{periodo}%"),
+                )
             row = cur.fetchone()
             if not row or not row[0]:
                 return {"erro": "faltando", "mensagem": f"Analise de BP nao encontrada no PostgreSQL para {periodo}"}
@@ -145,7 +161,7 @@ def api_analise_bp(periodo: str):
 
 
 @router.post("/salvar/{periodo}/{periodo_anterior}")
-def salvar_analise_bp(periodo: str, periodo_anterior: str):
+def salvar_analise_bp(periodo: str, periodo_anterior: str, request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         try:
@@ -159,9 +175,10 @@ def salvar_analise_bp(periodo: str, periodo_anterior: str):
             if not row or not row[0]:
                 return {"ok": False, "mensagem": f"Dados de BP nao encontrados no PostgreSQL para {periodo}"}
             dados_json = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            ent_id = resolver_entidade_id(request, conn=conn)
             cur.execute(
-                "INSERT INTO historico_analise_bp (periodo, data_geracao, resultado_json) VALUES (%s, NOW(), %s) RETURNING id",
-                (periodo_label, json.dumps(dados_json, ensure_ascii=False)),
+                "INSERT INTO historico_analise_bp (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, NOW(), %s, %s) RETURNING id",
+                (periodo_label, json.dumps(dados_json, ensure_ascii=False), ent_id),
             )
             new_id = cur.fetchone()[0]
             conn.commit()
@@ -229,4 +246,3 @@ def gerar_pdf_analise_bp(id: int):
         tb = traceback.format_exc()
         print(f"[BP] ERRO NO PDF: {e}\n{tb}")
         return Response(content=f"ERRO: {e}\n\n{tb}".encode("utf-8"), media_type="text/plain", status_code=500)
-

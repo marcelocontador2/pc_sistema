@@ -8,7 +8,8 @@ import os
 import json
 import datetime
 import psycopg2
-from fastapi import APIRouter, Response, HTTPException
+from fastapi import APIRouter, Response, HTTPException, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from fastapi.responses import FileResponse
 
 from pc_backend.app.config import PG_CONFIG
@@ -21,7 +22,7 @@ FRONTEND_DIR = os.path.join(BASE_DIR, "pc_frontend")
 router = APIRouter()
 
 
-def _get_pg_conn():
+def _get_pg_conn(request: Request = None):
     return psycopg2.connect(**PG_CONFIG)
 
 
@@ -30,19 +31,20 @@ def _get_pg_conn():
 # =========================================================
 
 @router.get("/conferencia")
-async def serve_conferencia():
+async def serve_conferencia(request: Request = None):
     caminho = os.path.join(FRONTEND_DIR, "conferencia.html")
     return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"})
 
 
-def _buscar_conferencia_pg(periodo: str) -> dict | None:
+def _buscar_conferencia_pg(periodo: str, request: Request = None) -> dict | None:
+    __ent_id = resolver_entidade_id(request)
     if not periodo:
         return None
     conn = _get_pg_conn()
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT resultado_json FROM historico_conferencia WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            "SELECT resultado_json FROM historico_conferencia WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (periodo,),
         )
         row = cur.fetchone()
@@ -56,7 +58,7 @@ def _buscar_conferencia_pg(periodo: str) -> dict | None:
 
 
 @router.get("/api/conferencia/{periodo}")
-async def api_conferencia_calcular(periodo: str):
+async def api_conferencia_calcular(periodo: str, request: Request = None):
     try:
         dados = _buscar_conferencia_pg(periodo)
         if not dados:
@@ -67,7 +69,8 @@ async def api_conferencia_calcular(periodo: str):
 
 
 @router.get("/salvar_conferencia/{periodo}")
-async def salvar_conferencia(periodo: str):
+async def salvar_conferencia(periodo: str, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = None
     try:
         conn = _get_pg_conn()
@@ -115,7 +118,7 @@ async def salvar_conferencia(periodo: str):
         """)
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         cur.execute(
-            "INSERT INTO historico_conferencia (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+            "INSERT INTO historico_conferencia (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
             (periodo, data_agora, json.dumps(payload, ensure_ascii=False, default=str)),
         )
         conn.commit()

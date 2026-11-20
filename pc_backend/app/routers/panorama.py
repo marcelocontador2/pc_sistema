@@ -7,14 +7,15 @@ Superávit Patrimonial (DVP) e Superávit Financeiro (BP).
 """
 import json
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from fastapi.responses import Response
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 try:
     from matriz_integridade import _limpar_valor
 except ImportError:
-    def _limpar_valor(v):
+    def _limpar_valor(v, request: Request = None):
         if v is None:
             return 0.0
         s = str(v).strip().replace(".", "").replace(",", ".")
@@ -26,7 +27,7 @@ router = APIRouter(prefix="/api/panorama", tags=["panorama"])
 DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
 )
-def buscar_valor(linhas, termo, coluna):
+def buscar_valor(linhas, termo, coluna, request: Request = None):
     termo = termo.upper().strip()
     for linha in linhas:
         if len(linha) > coluna and termo in str(linha[0]).upper():
@@ -35,7 +36,7 @@ def buscar_valor(linhas, termo, coluna):
             except Exception:
                 return 0.0
     return 0.0
-def calcular_bp(linhas_bp):
+def calcular_bp(linhas_bp, request: Request = None):
     ativo_total = 0.0
     passivo_total = 0.0
     pl = 0.0
@@ -62,7 +63,7 @@ def calcular_bp(linhas_bp):
         "passivo_total": passivo_total,
         "patrimonio_liquido": pl,
     }
-def calcular_bo(linhas_bo):
+def calcular_bo(linhas_bo, request: Request = None):
     receita = 0.0
     despesa = 0.0
     for linha in linhas_bo:
@@ -85,7 +86,7 @@ def calcular_bo(linhas_bo):
                 except Exception:
                     pass
     return {"receita_realizada": receita, "despesa_empenhada": despesa}
-def calcular_dvp(linhas_dvp):
+def calcular_dvp(linhas_dvp, request: Request = None):
     """Calcula o superavit/deficit patrimonial do DVP.
     O valor esta na linha 49 (RESULTADO PATRIMONIAL) e linhas seguintes."""
     for i, linha in enumerate(linhas_dvp):
@@ -110,7 +111,7 @@ def calcular_dvp(linhas_dvp):
                         except Exception:
                             pass
     return 0.0
-def calcular_superavit_financeiro(linhas_bp):
+def calcular_superavit_financeiro(linhas_bp, request: Request = None):
     """Calcula o superavit financeiro (Ativo Financeiro - Passivo Financeiro)."""
     ativo_fin = 0.0
     passivo_fin = 0.0
@@ -148,14 +149,15 @@ def calcular_superavit_financeiro(linhas_bp):
     if superavit_direto > 0:
         return superavit_direto
     return ativo_fin - passivo_fin
-def _buscar_panorama_pg(periodo: str) -> dict | None:
+def _buscar_panorama_pg(periodo: str, request: Request = None) -> dict | None:
+    __ent_id = resolver_entidade_id(request)
     if not periodo:
         return None
     conn = psycopg2.connect(**PG_CONFIG)
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT resultado_json FROM historico_panorama WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            "SELECT resultado_json FROM historico_panorama WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (periodo,),
         )
         row = cursor.fetchone()
@@ -167,7 +169,7 @@ def _buscar_panorama_pg(periodo: str) -> dict | None:
 
 
 @router.get("/{periodo}")
-async def api_panorama(periodo: str):
+async def api_panorama(periodo: str, request: Request = None):
     try:
         dados = _buscar_panorama_pg(periodo)
         if not dados:
@@ -191,7 +193,8 @@ async def api_panorama(periodo: str):
 
 
 @router.get("/gerar_pdf_panorama_v2/{id}")
-async def gerar_pdf_panorama(id: str):
+async def gerar_pdf_panorama(id: str, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     """Gera PDF do Panorama com visual moderno."""
     try:
         from fpdf import FPDF
@@ -244,7 +247,7 @@ async def gerar_pdf_panorama(id: str):
         pdf.set_line_width(1.5)
         pdf.line(0, 35, 210, 35)
         # Funcao para formatar valor em milhoes
-        def fmt_mi(v):
+        def fmt_mi(v, request: Request = None):
             try:
                 s = f"R$ {v/1000000:,.1f} mi"
                 return s.replace(",", "X").replace(".", ",").replace("X", ".")

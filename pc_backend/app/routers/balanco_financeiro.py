@@ -5,7 +5,8 @@ com fallback opcional para CSV em uploads_raw.
 import csv
 import json
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 import psycopg2
 from pc_backend.app.config import PG_CONFIG
 
@@ -15,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "..", "..", "..", "pc_storage", "uploads_raw")
 
 
-def limpar(v):
+def limpar(v, request: Request = None):
     if v is None:
         return 0.0
     if isinstance(v, (int, float)):
@@ -33,7 +34,8 @@ def limpar(v):
         return 0.0
 
 
-def _buscar_no_banco(periodo: str):
+def _buscar_no_banco(periodo: str, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     try:
         with conn.cursor() as cur:
@@ -64,7 +66,7 @@ def _buscar_no_banco(periodo: str):
         conn.close()
 
 
-def processar_bf(caminho: str = "", periodo: str | None = None):
+def processar_bf(caminho: str = "", periodo: str | None = None, request: Request = None):
     if periodo:
         res = buscar_bf_postgresql(periodo)
         if res:
@@ -73,7 +75,7 @@ def processar_bf(caminho: str = "", periodo: str | None = None):
 
 
 @router.get("/{periodo}")
-async def api_balanco_financeiro_periodo(periodo: str):
+async def api_balanco_financeiro_periodo(periodo: str, request: Request = None):
     try:
         res_db = _buscar_no_banco(periodo)
         if res_db is not None:

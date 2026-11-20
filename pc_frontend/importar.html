@@ -79,6 +79,41 @@
             cursor: pointer !important;
         }
     </style>
+    <script src="/js/auth_entidade.js"></script>
+
+<style id="flyout-analises-style">
+.analises-flyout-wrapper { position: relative; }
+.analises-flyout-submenu {
+    display: none;
+    position: fixed;
+    left: 260px;
+    top: 220px;
+    min-width: 270px;
+    max-height: 75vh;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    padding: 8px 0;
+    z-index: 9999;
+}
+.analises-flyout-wrapper:hover .analises-flyout-submenu { display: block; }
+.analises-flyout-submenu a {
+    display: block;
+    padding: 8px 16px;
+    color: #333333;
+    text-decoration: none;
+    font-size: 13.5px;
+    white-space: nowrap;
+}
+.analises-flyout-submenu a:hover {
+    background: #f0f4f8;
+    color: #0072BA;
+    font-weight: 600;
+}
+</style>
+
 </head>
 <body>
     <!-- Menu Lateral -->
@@ -98,6 +133,27 @@
             <a class="menu-item" onclick="mudarTela('download', this, 'DVP', 'DVP')">DVP</a>
             <a class="menu-item" onclick="mudarTela('download', this, 'DMPL', 'DMPL')">DMPL</a>
             <a href="#" class="menu-top" onclick="mudarTela('importar', this)" style="margin-top: 20px; border-top: 1px solid #e0e0e0;">Importar Relatórios</a>
+            <div style="margin-top: 16px; border-top: 1px solid #e0e0e0; padding-top: 10px;">
+                <a href="/base_legal" class="menu-top" style="font-weight:bold;">Base Legal / Legislação</a>
+                <a href="/relatorio_consolidado" class="menu-top" style="font-weight:bold;">Relatório Consolidado</a>
+                <div class="analises-flyout-wrapper">
+                    <div class="menu-top" style="cursor:default; font-weight:bold;">Análises Contábeis ▸</div>
+                    <div class="analises-flyout-submenu">
+                        <a href="/conferencia">Conferência das Demonstrações</a>
+                        <a href="/integridade">Integridade entre Demonstrações</a>
+                        <a href="/analise_orcamentaria">Análise Orçamentária (BO)</a>
+                        <a href="/analise_financeira_bf">Análise Financeira (BF)</a>
+                        <a href="/analise_bp">Análise BP</a>
+                        <a href="/analise_dfc">Análise DFC</a>
+                        <a href="/analise_patrimonial">Análise Patrimonial (DVP)</a>
+                        <a href="/analise_dmpl">Análise DMPL</a>
+                        <a href="/analise_comparativo_receitas">Comparativo de Receitas</a>
+                        <a href="/analise_comparativo_despesas">Comparativo de Despesas</a>
+                        <a href="/analise_centro_custos">Análise por Centro de Custos</a>
+                        <a href="/analise_custo_pessoal">Custo de Pessoal</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <!-- Área Principal -->

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from fastapi.responses import Response
 import psycopg2
 
@@ -34,7 +35,7 @@ async def serve_relatorio_consolidado():
 
 
 @router.get("/api/relatorio_consolidado/{periodo}")
-async def api_relatorio_consolidado_novo(periodo: str):
+async def api_relatorio_consolidado_novo(periodo: str, request: Request = None):
     modulos = {
         "analise_bp": "historico_analise_bp",
         "analise_dfc": "historico_analise_dfc",
@@ -118,9 +119,9 @@ async def api_relatorio_consolidado_novo(periodo: str):
 
 
 @router.post("/salvar_relatorio_consolidado/{periodo}")
-async def salvar_relatorio_consolidado_novo(periodo: str):
+async def salvar_relatorio_consolidado_novo(periodo: str, request: Request = None):
     try:
-        dados_api = await api_relatorio_consolidado_novo(periodo)
+        dados_api = await api_relatorio_consolidado_novo(periodo, request)
         if dados_api.get("status") == "erro":
             return {"ok": False, "mensagem": dados_api.get("mensagem", "Erro ao consultar m?dulos no PostgreSQL.")}
 
@@ -142,8 +143,8 @@ async def salvar_relatorio_consolidado_novo(periodo: str):
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO historico_relatorio_consolidado (periodo, data_geracao, resultado_json)
-            VALUES (%s, %s, %s)
+            INSERT INTO historico_relatorio_consolidado (periodo, data_geracao, resultado_json, entidade_id)
+            VALUES (%s, %s, %s, %s)
             RETURNING id
             """,
             (periodo, data_agora, json.dumps(dados_consolidados, ensure_ascii=False)),
@@ -163,13 +164,15 @@ async def salvar_relatorio_consolidado_novo(periodo: str):
 
 
 @router.get("/historico_relatorio_consolidado")
-async def get_hist_consolidado():
+async def get_hist_consolidado(request: Request = None):
     try:
         conn = _get_conn()
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, periodo, data_geracao, resultado_json FROM historico_relatorio_consolidado ORDER BY id DESC"
-        )
+        ent_id = resolver_entidade_id(request, conn=conn)
+        if ent_id is not None:
+            cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_relatorio_consolidado WHERE entidade_id = %s ORDER BY id DESC", (ent_id,))
+        else:
+            cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_relatorio_consolidado ORDER BY id DESC")
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -394,7 +397,7 @@ async def post_conclusao(relatorio_id: int, request: Request):
 
 
 @router.get("/gerar_pdf_relatorio_consolidado/{id}")
-def gerar_pdf_relatorio_consolidado(id: int):
+def gerar_pdf_relatorio_consolidado(id: int, request: Request = None):
     from fastapi.responses import Response
     import json
     from playwright.sync_api import sync_playwright

@@ -124,10 +124,11 @@ body{background:var(--cofen-light-gray);color:var(--cofen-dark);display:flex;hei
             cursor: pointer !important;
         }
     </style>
+    <script src="/js/auth_entidade.js"></script>
 </head>
 <body>
 <aside class="sidebar">
-  <div class="logo-area"><img src="/pc_frontend/logo-cofen.png" alt="Logo COFEN" style="max-height: 40px; width: auto; display: block;"></div>
+  <div class="logo-area"><img src="/static/logo-cofen.png" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='/static_logos/logo-cofen.png';}" alt="Logo COFEN" style="max-height: 40px; width: auto; display: block;"></div>
   <ul style="padding-left: 60px; margin-left: 0; list-style: none;">
     <li><a href="#" onclick="mostrarTela('upload')" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Importar Relatórios</a></li>
     <li><a href="/base_legal" style="display:block; padding:10px 0px; text-decoration:none; color:#333; font-weight:bold;">Base Legal</a></li>

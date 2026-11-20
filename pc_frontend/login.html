@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login SPC - Sistema de Presta??o de Contas</title>
+    <title>Login SPC - Sistema de Prestação de Contas</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
         body { background: #f4f6f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
@@ -30,14 +30,14 @@
         <div class="logo">
             <img src="/static_logos/logo-cofen.png" alt="Cofen" style="max-height: 80px; margin-bottom: 15px;">
             <h1 style="margin-bottom: 5px;">Login SPC</h1>
-            <p style="color: #888888; font-size: 14px; text-align: center; margin-bottom: 30px;">Sistema de Presta??o de Contas</p>
+            <p style="color: #888888; font-size: 14px; text-align: center; margin-bottom: 30px;">Sistema de Prestação de Contas</p>
         </div>
         <div id="mensagem-erro" class="erro"></div>
         <div id="mensagem-sucesso" class="sucesso"></div>
 
         <div id="area-login">
             <div class="form-group">
-                <label>Usu?rio</label>
+                <label>Usuário</label>
                 <input type="text" id="usuario" placeholder="Digite seu usu?rio" autocomplete="username">
             </div>
 
@@ -55,7 +55,7 @@
                 Informe seu usu?rio ou e-mail para receber uma nova senha enviada por <strong>spccofen@gmail.com</strong>.
             </p>
             <div class="form-group" style="margin-bottom: 12px;">
-                <label>Usu?rio ou E-mail</label>
+                <label>Usuário ou E-mail</label>
                 <input type="text" id="identificador-recuperacao" placeholder="Ex: marcelo.medeiros ou email@cofen.gov.br">
             </div>
             <button onclick="solicitarRecuperacao()" id="btn-recuperar">Enviar nova senha</button>
@@ -109,7 +109,7 @@
                     localStorage.setItem('usuario_logado', JSON.stringify(data.usuario));
                     window.location.href = '/';
                 } else {
-                    msgErro.textContent = data.mensagem || 'Usu?rio ou senha incorretos.';
+                    msgErro.textContent = data.mensagem || 'Usuário ou senha incorretos.';
                     msgErro.style.display = 'block';
                 }
             } catch (e) {

@@ -1,6 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 import os, json, glob, csv, logging
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from fastapi.responses import FileResponse
 import psycopg2
 from pc_backend.app.config import PG_CONFIG
@@ -14,7 +15,7 @@ FRONTEND_DIR = os.path.join(BASE_DIR, "pc_frontend")
 router = APIRouter()
 
 
-def _parse_val(v):
+def _parse_val(v, request: Request = None):
     if not v:
         return 0.0
     v = v.replace(".", "").replace(",", ".").replace("R$", "").strip()
@@ -28,7 +29,8 @@ def _parse_val(v):
 
 
 
-def _buscar_balanco_pg(periodo_str: str, periodo_ant: str | None = None) -> dict | None:
+def _buscar_balanco_pg(periodo_str: str, periodo_ant: str | None = None, request: Request = None) -> dict | None:
+    __ent_id = resolver_entidade_id(request)
     if not periodo_str:
         return None
     conn = psycopg2.connect(**PG_CONFIG)
@@ -37,7 +39,7 @@ def _buscar_balanco_pg(periodo_str: str, periodo_ant: str | None = None) -> dict
         if periodo_ant:
             label = f"{periodo_str} vs {periodo_ant}"
             cur.execute(
-                "SELECT resultado_json FROM historico_analise_financeira_bf WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+                "SELECT resultado_json FROM historico_analise_financeira_bf WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
                 (label,),
             )
             row = cur.fetchone()
@@ -45,7 +47,7 @@ def _buscar_balanco_pg(periodo_str: str, periodo_ant: str | None = None) -> dict
                 return row[0] if isinstance(row[0], dict) else json.loads(row[0])
 
         cur.execute(
-            "SELECT resultado_json FROM historico_analise_financeira_bf WHERE periodo = %s OR periodo LIKE %s ORDER BY id DESC LIMIT 1",
+            "SELECT resultado_json FROM historico_analise_financeira_bf WHERE (periodo = %s OR periodo LIKE %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (periodo_str, f"{periodo_str} vs %"),
         )
         row = cur.fetchone()
@@ -61,7 +63,7 @@ def _buscar_balanco_pg(periodo_str: str, periodo_ant: str | None = None) -> dict
 
 @router.get("/api/analise_financeira_bf/{periodo}")
 @router.get("/api/analise_financeira_bf/{periodo}/{periodo_anterior}")
-def api_analise_financeira_bf(periodo: str, periodo_anterior: str = None):
+def api_analise_financeira_bf(periodo: str, periodo_anterior: str = None, request: Request = None):
     try:
         partes = periodo.split(" vs ")
         periodo_atual = partes[0].strip() if partes else periodo
@@ -78,7 +80,8 @@ def api_analise_financeira_bf(periodo: str, periodo_anterior: str = None):
 
 
 @router.post("/salvar_analise_financeira_bf/{periodo}/{periodo_anterior}")
-def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str):
+def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     """AGORA SALVA DE VERDADE no Postgres."""
     try:
         resultado = api_analise_financeira_bf(periodo, periodo_anterior)
@@ -107,11 +110,12 @@ def salvar_analise_financeira_bf(periodo: str, periodo_anterior: str):
 
 
 @router.get("/historico_analise_financeira_bf")
-def get_historico_analise_financeira_bf():
+def get_historico_analise_financeira_bf(request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_financeira_bf ORDER BY id DESC")
+        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_financeira_bf WHERE (%s IS NULL OR entidade_id = %s) ORDER BY id DESC", (__ent_id, __ent_id))
         rows = cur.fetchall()
         conn.close()
         return [{"id": r[0], "periodo": r[1], "data_geracao": r[2]} for r in rows]
@@ -121,7 +125,8 @@ def get_historico_analise_financeira_bf():
 
 
 @router.get("/historico_analise_financeira_bf/{id}")
-def get_historico_analise_financeira_bf_id(id: int):
+def get_historico_analise_financeira_bf_id(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
@@ -138,11 +143,12 @@ def get_historico_analise_financeira_bf_id(id: int):
 
 
 @router.delete("/excluir_analise_financeira_bf/{id}")
-def excluir_analise_financeira_bf(id: int):
+def excluir_analise_financeira_bf(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("DELETE FROM historico_analise_financeira_bf WHERE id = %s", (id,))
+        cur.execute("DELETE FROM historico_analise_financeira_bf WHERE (id = %s) AND (%s IS NULL OR entidade_id = %s)", (id,))
         conn.commit()
         conn.close()
         return {"ok": True}
@@ -151,7 +157,7 @@ def excluir_analise_financeira_bf(id: int):
 
 
 @router.get("/analise_financeira_bf")
-def serve_analise_financeira_bf():
+def serve_analise_financeira_bf(request: Request = None):
     caminho = os.path.join(FRONTEND_DIR, "analise_financeira_bf.html")
     if os.path.exists(caminho):
         return FileResponse(caminho)
@@ -162,7 +168,8 @@ def serve_analise_financeira_bf():
 
 
 @router.get("/gerar_pdf_analise_financeira_bf/{id}")
-def gerar_pdf_analise_financeira_bf(id: int):
+def gerar_pdf_analise_financeira_bf(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     from playwright.sync_api import sync_playwright
     import time
 
@@ -179,7 +186,7 @@ def gerar_pdf_analise_financeira_bf(id: int):
     dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
 
     # Função auxiliar para extrair valores
-    def get_val(path, lado="atual"):
+    def get_val(path, lado="atual", request: Request = None):
         parts = path.split(".")
         cur = dados
         for p in parts:
@@ -191,7 +198,7 @@ def gerar_pdf_analise_financeira_bf(id: int):
             return cur.get(lado, 0.0)
         return cur or 0.0
 
-    def fmt(v):
+    def fmt(v, request: Request = None):
         return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     # --- CÁLCULO DINÂMICO DOS TOTAIS (ATUAL E ANTERIOR) ---

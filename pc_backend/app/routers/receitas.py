@@ -10,6 +10,7 @@ import os
 import json
 import datetime
 from fastapi import APIRouter, Request, Response
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from fastapi.responses import FileResponse, HTMLResponse
 
 # Caminhos absolutos
@@ -21,7 +22,7 @@ router = APIRouter()
 
 from pc_backend.app.db_memoria import salvar_contas_memoria, carregar_contas_memoria, _slug_conta
 
-def _persistir_receitas_memoria(periodo: str, dados: dict) -> None:
+def _persistir_receitas_memoria(periodo: str, dados: dict, request: Request = None) -> None:
     if not periodo or not isinstance(dados, dict):
         return
     itens = []
@@ -59,7 +60,7 @@ def _persistir_receitas_memoria(periodo: str, dados: dict) -> None:
     except Exception as e:
         print(f"[RECEITAS] Aviso ao salvar memoria PG: {e}")
 
-def _carregar_receitas_memoria(periodo: str) -> dict | None:
+def _carregar_receitas_memoria(periodo: str, request: Request = None) -> dict | None:
     mem = carregar_contas_memoria("COMPARATIVO_RECEITAS", periodo)
     if not mem:
         return None
@@ -97,7 +98,8 @@ def _carregar_receitas_memoria(periodo: str) -> dict | None:
 # =========================================================
 # FUNÇÃO AUXILIAR
 # =========================================================
-def _buscar_receitas_pg(p: str) -> dict | None:
+def _buscar_receitas_pg(p: str, request: Request = None) -> dict | None:
+    __ent_id = resolver_entidade_id(request)
     if not p:
         return None
     mem = _carregar_receitas_memoria(p)
@@ -108,13 +110,13 @@ def _buscar_receitas_pg(p: str) -> dict | None:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT dados_json FROM historico_comparativo_receitas WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            "SELECT dados_json FROM historico_comparativo_receitas WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (p,),
         )
         row = cur.fetchone()
         if not row:
             cur.execute(
-                "SELECT dados_json FROM historico_comparativo_receitas WHERE periodo ILIKE %s ORDER BY id DESC LIMIT 1",
+                "SELECT dados_json FROM historico_comparativo_receitas WHERE (periodo ILIKE %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
                 (f"%{p}%",),
             )
             row = cur.fetchone()
@@ -140,7 +142,7 @@ def _buscar_receitas_pg(p: str) -> dict | None:
         conn.close()
 
 
-def api_comparativo_receitas_v2(periodo: str):
+def api_comparativo_receitas_v2(periodo: str, request: Request = None):
     atual = _buscar_receitas_pg(periodo)
     if not atual:
         return {"erro": True, "mensagem": f"Dados de receitas n?o encontrados no PostgreSQL para o per?odo {periodo}."}
@@ -183,16 +185,17 @@ def api_comparativo_receitas_v2(periodo: str):
 # =========================================================
 
 @router.get("/api/comparativo_receitas/{periodo}")
-def api_comparativo_receitas(periodo: str):
+def api_comparativo_receitas(periodo: str, request: Request = None):
     # Implementação antiga (mantida para compatibilidade)
     return {"erro": True, "mensagem": "Use /api/comparativo_receitas_v2/{periodo}"}
 
 
 @router.get("/historico_comparativo_receitas")
-def get_historico_comparativo_receitas():
+def get_historico_comparativo_receitas(request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_receitas ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_receitas WHERE (%s IS NULL OR entidade_id = %s) ORDER BY id DESC", (__ent_id, __ent_id))
     rows = cur.fetchall()
     conn.close()
     resultado = []
@@ -207,7 +210,8 @@ def get_historico_comparativo_receitas():
 
 
 @router.get("/historico_comparativo_receitas/{id}")
-def get_historico_comparativo_receitas_id(id: int):
+def get_historico_comparativo_receitas_id(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
     cur.execute("SELECT periodo, data_geracao, dados_json FROM historico_comparativo_receitas WHERE id = %s", (id,))
@@ -223,7 +227,8 @@ def get_historico_comparativo_receitas_id(id: int):
 
 
 @router.post("/api/comparativo_receitas_v2/{periodo}/salvar")
-def salvar_comparativo_receitas(periodo: str):
+def salvar_comparativo_receitas(periodo: str, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     try:
         dados = api_comparativo_receitas_v2(periodo)
         if dados.get("erro"):
@@ -233,7 +238,7 @@ def salvar_comparativo_receitas(periodo: str):
         cur.execute("""CREATE TABLE IF NOT EXISTS historico_comparativo_receitas (
             id SERIAL PRIMARY KEY, periodo TEXT, data_geracao TEXT, dados_json TEXT)""")
         data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json) VALUES (%s, %s, %s)",
+        cur.execute("INSERT INTO historico_comparativo_receitas (periodo, data_geracao, dados_json, entidade_id) VALUES (%s, %s, %s, %s)",
                     (periodo, data_agora, json.dumps(dados, ensure_ascii=False)))
         conn.commit()
         conn.close()
@@ -244,6 +249,7 @@ def salvar_comparativo_receitas(periodo: str):
 
 @router.post("/excluir_multiplos_comparativo_receitas")
 async def excluir_multiplos_comparativo_receitas(request: Request):
+    __ent_id = resolver_entidade_id(request)
     import psycopg2
     try:
         body = await request.json()
@@ -264,6 +270,7 @@ async def excluir_multiplos_comparativo_receitas(request: Request):
 
 @router.get("/gerar_pdf_comparativo_receitas")
 def gerar_pdf_comparativo_receitas(request: Request, periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+    __ent_id = resolver_entidade_id(request)
     base_url = str(request.base_url).rstrip("/")
     from playwright.sync_api import sync_playwright
     from fastapi import Request
@@ -322,4 +329,5 @@ def gerar_pdf_comparativo_receitas(request: Request, periodo: str = "2026-TRIMES
 
 @router.get("/gerar_pdf_comparativo_receitas/{historico_id}")
 def gerar_pdf_comparativo_receitas_por_id(request: Request, historico_id: int, periodo: str = "2026-TRIMESTRE-3"):
+    __ent_id = resolver_entidade_id(request)
     return gerar_pdf_comparativo_receitas(request=request, periodo=periodo, historico_id=historico_id)

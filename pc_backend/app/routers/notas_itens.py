@@ -2,7 +2,8 @@
 Endpoints REST para conclusoes, observacoes e comentarios por item, periodo e ano.
 """
 from typing import Any
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from pydantic import BaseModel, Field
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -35,7 +36,7 @@ class NotaItemUpdatePayload(BaseModel):
 
 
 @router.get("/catalogo")
-def catalogo_itens_notas():
+def catalogo_itens_notas(request: Request = None):
     return {"ok": True, "itens": ITENS_PADRAO}
 
 
@@ -61,7 +62,7 @@ def get_notas_itens(
 
 
 @router.post("")
-def post_nota_item(payload: NotaItemPayload):
+def post_nota_item(payload: NotaItemPayload, request: Request = None):
     try:
         salvo = salvar_nota_item(
             item=payload.item,
@@ -78,7 +79,8 @@ def post_nota_item(payload: NotaItemPayload):
 
 
 @router.put("/{nota_id}")
-def put_nota_item(nota_id: int, payload: NotaItemUpdatePayload):
+def put_nota_item(nota_id: int, payload: NotaItemUpdatePayload, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     try:
         garantir_tabela_notas(conn)
@@ -125,12 +127,13 @@ def put_nota_item(nota_id: int, payload: NotaItemUpdatePayload):
 
 
 @router.delete("/{nota_id}")
-def delete_nota_item(nota_id: int):
+def delete_nota_item(nota_id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     try:
         garantir_tabela_notas(conn)
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM registro_conclusao_observacoes WHERE id = %s RETURNING id", (nota_id,))
+            cur.execute("DELETE FROM registro_conclusao_observacoes WHERE id = %s AND (%s IS NULL OR entidade_id = %s) RETURNING id", (nota_id,))
             removido = cur.fetchone()
         if not removido:
             raise HTTPException(status_code=404, detail="Nota nao encontrada.")

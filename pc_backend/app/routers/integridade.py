@@ -1,7 +1,8 @@
 from pc_backend.app.db_memoria import carregar_contas_memoria
 import json
 import psycopg2
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from pc_backend.app.config import PG_CONFIG
 # -*- coding: utf-8 -*-
 """
@@ -27,17 +28,22 @@ router = APIRouter()
 # =========================================================
 
 @router.get("/historico_integridade")
-async def listar_historico():
+async def listar_historico(request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
-        cursor.execute('''
-
-            SELECT id, periodo, data_geracao FROM historico_integridade
-
-            ORDER BY id DESC
-
-        ''')
+        if __ent_id is not None:
+            cursor.execute('''
+                SELECT id, periodo, data_geracao FROM historico_integridade
+                WHERE entidade_id = %s
+                ORDER BY id DESC
+            ''', (__ent_id,))
+        else:
+            cursor.execute('''
+                SELECT id, periodo, data_geracao FROM historico_integridade
+                ORDER BY id DESC
+            ''')
         rows = cursor.fetchall()
         conn.close()
         historico = []
@@ -51,11 +57,15 @@ async def listar_historico():
 # Rota que abre um histí³rico especifico pelo ID
 
 @router.get("/historico_integridade/{id}")
-async def buscar_historico(id: int):
+async def buscar_historico(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
-        cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = %s''', (id,))
+        if __ent_id is not None:
+            cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = %s AND entidade_id = %s''', (id, __ent_id))
+        else:
+            cursor.execute('''SELECT resultado_json FROM historico_integridade WHERE id = %s''', (id,))
         row = cursor.fetchone()
         conn.close()
         if not row:
@@ -67,11 +77,11 @@ async def buscar_historico(id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/integridade")
-async def serve_integridade():
+async def serve_integridade(request: Request = None):
     caminho = os.path.join(FRONTEND_DIR, "integridade.html")
     return FileResponse(caminho)
 
-def _parse_json_pg(val):
+def _parse_json_pg(val, request: Request = None):
     if val is None:
         return None
     if isinstance(val, dict):
@@ -82,13 +92,14 @@ def _parse_json_pg(val):
         return None
 
 
-def _buscar_integridade_matriz_pg(periodo: str) -> dict | None:
+def _buscar_integridade_matriz_pg(periodo: str, request: Request = None) -> dict | None:
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     try:
         cur = conn.cursor()
 
         cur.execute(
-            "SELECT resultado_json FROM historico_integridade_matriz WHERE periodo = %s ORDER BY id DESC LIMIT 5",
+            "SELECT resultado_json FROM historico_integridade_matriz WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 5",
             (periodo,),
         )
         for (raw,) in cur.fetchall():
@@ -97,7 +108,7 @@ def _buscar_integridade_matriz_pg(periodo: str) -> dict | None:
                 return rj
 
         cur.execute(
-            "SELECT resultado_json FROM historico_matriz_integridade WHERE periodo = %s ORDER BY id DESC LIMIT 5",
+            "SELECT resultado_json FROM historico_matriz_integridade WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 5",
             (periodo,),
         )
         for (raw,) in cur.fetchall():
@@ -110,7 +121,7 @@ def _buscar_integridade_matriz_pg(periodo: str) -> dict | None:
                 }
 
         cur.execute(
-            "SELECT resultado_json FROM historico_integridade_matriz WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            "SELECT resultado_json FROM historico_integridade_matriz WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (periodo,),
         )
         row = cur.fetchone()
@@ -120,7 +131,7 @@ def _buscar_integridade_matriz_pg(periodo: str) -> dict | None:
                 return rj
 
         cur.execute(
-            "SELECT resultado_json FROM historico_integridade WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            "SELECT resultado_json FROM historico_integridade WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (periodo,),
         )
         row = cur.fetchone()
@@ -135,7 +146,7 @@ def _buscar_integridade_matriz_pg(periodo: str) -> dict | None:
 
 
 @router.get("/api/integridade_matriz/{periodo}")
-async def api_integridade_matriz_calcular(periodo: str):
+async def api_integridade_matriz_calcular(periodo: str, request: Request = None):
     try:
         dados = _buscar_integridade_matriz_pg(periodo)
         if dados:
@@ -147,6 +158,7 @@ async def api_integridade_matriz_calcular(periodo: str):
 
 @router.post("/api/integridade_matriz/{periodo}/salvar")
 async def salvar_integridade_matriz(periodo: str, request: Request):
+    __ent_id = resolver_entidade_id(request)
     from datetime import datetime
     
     # Definição local para garantir que a variável exista no escopo
@@ -178,7 +190,7 @@ async def salvar_integridade_matriz(periodo: str, request: Request):
         """)
         
         cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
         )
         conn.commit()
@@ -216,7 +228,7 @@ async def salvar_integridade_matriz(periodo: str, request: Request):
         """)
         
         cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
         )
         conn.commit()
@@ -249,7 +261,7 @@ async def salvar_integridade_matriz(periodo: str, request: Request):
         """)
         
         cursor.execute(
-            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json) VALUES (%s, %s, %s)",
+            "INSERT INTO historico_integridade_matriz (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
             (periodo, data_agora, json.dumps(dados_matriz, ensure_ascii=False))
         )
         conn.commit()
@@ -261,13 +273,14 @@ async def salvar_integridade_matriz(periodo: str, request: Request):
         return {"erro": True, "mensagem": str(e)}
 
 @router.get("/historico_integridade_matriz")
-def listar_integridade_matriz():
+def listar_integridade_matriz(request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     
         
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_integridade_matriz ORDER BY id DESC")
+        cursor.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_integridade_matriz WHERE (%s IS NULL OR entidade_id = %s) ORDER BY id DESC", (__ent_id, __ent_id))
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -288,7 +301,8 @@ def listar_integridade_matriz():
         return Response(content=json.dumps({"erro": True, "mensagem": str(e)}), media_type="application/json")
 
 @router.get("/historico_integridade_matriz/{id}")
-async def buscar_integridade_matriz(id: int):
+async def buscar_integridade_matriz(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     
     # Definição local para garantir que a variável exista
         
@@ -309,6 +323,7 @@ async def buscar_integridade_matriz(id: int):
 
 @router.post("/excluir_multiplos_integridade_matriz")
 async def excluir_integridade_matriz(request: Request):
+    __ent_id = resolver_entidade_id(request)
     try:
         body = await request.json()
         ids = body.get("ids", [])
@@ -330,7 +345,8 @@ async def excluir_integridade_matriz(request: Request):
         return {"ok": False, "mensagem": str(e)}
 
 @router.get("/gerar_pdf_integridade_matriz/{check_id}")
-def gerar_pdf_integridade_matriz(check_id: int):
+def gerar_pdf_integridade_matriz(check_id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     from fastapi.responses import Response
     from fpdf import FPDF
     from fpdf.enums import XPos, YPos
@@ -423,5 +439,5 @@ def gerar_pdf_integridade_matriz(check_id: int):
         return {"erro": True, "mensagem": str(e)}
 
 @router.get("/gerar_pdf_integridade/{id}")
-def gerar_pdf_integridade_espelho(id: int):
+def gerar_pdf_integridade_espelho(id: int, request: Request = None):
     return gerar_pdf_integridade_matriz(check_id=id)

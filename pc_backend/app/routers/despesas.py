@@ -9,6 +9,7 @@ import os
 import json
 import datetime
 from fastapi import APIRouter, Request, Response
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from fastapi.responses import FileResponse, HTMLResponse
 
 # Caminhos absolutos
@@ -19,7 +20,7 @@ router = APIRouter()
 
 from pc_backend.app.db_memoria import salvar_contas_memoria, carregar_contas_memoria, _slug_conta
 
-def _persistir_despesas_memoria(periodo: str, dados: dict) -> None:
+def _persistir_despesas_memoria(periodo: str, dados: dict, request: Request = None) -> None:
     if not periodo or not isinstance(dados, dict):
         return
     itens = [{
@@ -56,7 +57,7 @@ def _persistir_despesas_memoria(periodo: str, dados: dict) -> None:
     except Exception as e:
         print(f"[DESPESAS] Aviso ao salvar memoria PG: {e}")
 
-def _carregar_despesas_memoria(periodo: str) -> dict | None:
+def _carregar_despesas_memoria(periodo: str, request: Request = None) -> dict | None:
     mem = carregar_contas_memoria("COMPARATIVO_DESPESAS", periodo)
     if not mem:
         return None
@@ -86,7 +87,8 @@ def _carregar_despesas_memoria(periodo: str) -> dict | None:
     return dados
 
 
-def _buscar_despesas_pg(periodo_str: str) -> dict | None:
+def _buscar_despesas_pg(periodo_str: str, request: Request = None) -> dict | None:
+    __ent_id = resolver_entidade_id(request)
     if not periodo_str:
         return None
     mem = _carregar_despesas_memoria(periodo_str)
@@ -97,13 +99,13 @@ def _buscar_despesas_pg(periodo_str: str) -> dict | None:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT dados_json FROM historico_comparativo_despesas WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            "SELECT dados_json FROM historico_comparativo_despesas WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (periodo_str,),
         )
         row = cur.fetchone()
         if not row:
             cur.execute(
-                "SELECT dados_json FROM historico_comparativo_despesas WHERE periodo ILIKE %s ORDER BY id DESC LIMIT 1",
+                "SELECT dados_json FROM historico_comparativo_despesas WHERE (periodo ILIKE %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
                 (f"%{periodo_str}%",),
             )
             row = cur.fetchone()
@@ -131,7 +133,7 @@ def _buscar_despesas_pg(periodo_str: str) -> dict | None:
         conn.close()
 
 
-def api_comparativo_despesas_v2(periodo: str):
+def api_comparativo_despesas_v2(periodo: str, request: Request = None):
     atual = _buscar_despesas_pg(periodo)
     if not atual:
         return {"erro": True, "mensagem": f"Dados de despesas n?o encontrados no PostgreSQL para o per?odo {periodo}."}
@@ -171,10 +173,11 @@ def api_comparativo_despesas_v2(periodo: str):
 
 
 @router.get("/historico_comparativo_despesas")
-def get_historico_comparativo_despesas():
+def get_historico_comparativo_despesas(request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, dados_json FROM historico_comparativo_despesas WHERE (%s IS NULL OR entidade_id = %s) ORDER BY id DESC", (__ent_id, __ent_id))
     rows = cur.fetchall()
     conn.close()
     
@@ -192,7 +195,8 @@ def get_historico_comparativo_despesas():
 
 
 @router.get("/historico_comparativo_despesas/{id}")
-def get_historico_comparativo_despesas_id(id: int):
+def get_historico_comparativo_despesas_id(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
     cur.execute("SELECT periodo, data_geracao, dados_json FROM historico_comparativo_despesas WHERE id = %s", (id,))
@@ -211,6 +215,7 @@ def get_historico_comparativo_despesas_id(id: int):
 
 @router.post("/excluir_multiplos_comparativo_despesas")
 async def excluir_multiplos_comparativo_despesas(request: Request):
+    __ent_id = resolver_entidade_id(request)
     import psycopg2
     from psycopg2.extras import RealDictCursor
     
@@ -238,6 +243,7 @@ async def excluir_multiplos_comparativo_despesas(request: Request):
 
 @router.get("/gerar_pdf_comparativo_despesas")
 def gerar_pdf_comparativo_despesas(request: Request, periodo: str = "2026-TRIMESTRE-3", historico_id: int = None):
+    __ent_id = resolver_entidade_id(request)
     import os
     import time
     from fastapi import HTTPException
@@ -269,4 +275,5 @@ def gerar_pdf_comparativo_despesas(request: Request, periodo: str = "2026-TRIMES
 
 @router.get("/gerar_pdf_comparativo_despesas/{historico_id}")
 def gerar_pdf_comparativo_despesas_por_id(request: Request, historico_id: int, periodo: str = "2026-TRIMESTRE-3"):
+    __ent_id = resolver_entidade_id(request)
     return gerar_pdf_comparativo_despesas(request=request, periodo=periodo, historico_id=historico_id)

@@ -55,6 +55,7 @@
             #declaracao-conformidade { page-break-before: always; }
         }
     </style>
+    <script src="/js/auth_entidade.js"></script>
 </head>
 <body>
 <div class="container">
@@ -196,7 +197,10 @@ function formatarCRC(crc, uf) {
 
 function carregarHistorico() {
     fetch('/historico_notas_explicativas')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(data => {
             const div = document.getElementById('lista-historico');
             if (!data || data.length === 0) {
@@ -212,6 +216,10 @@ function carregarHistorico() {
                 </div>`;
             });
             div.innerHTML = html;
+        })
+        .catch(err => {
+            const div = document.getElementById('lista-historico');
+            if (div) div.innerHTML = '<p style="font-size:13px; color:#c00; text-align:center;">Erro ao carregar hist?rico: ' + err.message + '</p>';
         });
 }
 
@@ -239,6 +247,8 @@ function carregarNotas(id) {
             carregarDadosContador();
         });
 }
+
+carregarHistorico();
 
 function renderizarNotas(notas) {
     let html = '';
@@ -297,109 +307,38 @@ function salvarDados() {
         .then(data => {
             if (data.ok) {
                 alert('Notas Explicativas salvas com sucesso!');
-                
+                carregarHistorico();
+            } else {
+                alert('Erro ao salvar: ' + (data.mensagem || data.detail || 'Falha ao salvar'));
+            }
+        })
+        .catch(err => alert('Erro ao salvar: ' + err.message));
+}
+
 function excluirSelecionadosMultiplos() {
     const checkboxes = document.querySelectorAll('.check-historico:checked');
     if (checkboxes.length === 0) {
-        alert('Selecione pelo menos um histórico para excluir.');
+        alert('Selecione pelo menos um hist?rico para excluir.');
         return;
     }
-    if (!confirm('Excluir ' + checkboxes.length + ' histórico(s) selecionado(s)?')) return;
-    
+    if (!confirm('Excluir ' + checkboxes.length + ' hist?rico(s) selecionado(s)?')) return;
+
     const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
     let promises = ids.map(id => fetch('/excluir_notas_explicativas/' + id, { method: 'DELETE' }));
-    
+
     Promise.all(promises).then(() => {
-        alert('Históricos excluídos com sucesso!');
-        
-
-
-
-function atualizarSelecaoCheckbox(checkbox) {
-    if (checkbox.checked) {
-        historicoSelecionado = parseInt(checkbox.value);
-        document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-        checkbox.closest('.historico-item').classList.add('ativo');
-    } else {
-        const outroMarcado = document.querySelector('.check-historico:checked');
-        if (outroMarcado) {
-            historicoSelecionado = parseInt(outroMarcado.value);
-            document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-            outroMarcado.closest('.historico-item').classList.add('ativo');
-        } else {
-            historicoSelecionado = null;
-        }
-    }
-}
-
-
-function abrirInclusao() {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro para adicionar uma nota.');
-        return;
-    }
-    document.getElementById('incluir-titulo').value = '';
-    document.getElementById('incluir-texto').value = '';
-    document.getElementById('modal-incluir').style.display = 'flex';
-}
-
-function salvarNovaNota() {
-    const titulo = document.getElementById('incluir-titulo').value.trim();
-    const texto = document.getElementById('incluir-texto').value.trim();
-    if (!titulo || !texto) {
-        alert('Preencha o título e o texto.');
-        return;
-    }
-    fetch('/api/incluir_nota/' + relatorioIdAtual, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo, texto })
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota incluída com sucesso!');
-            fecharModal('modal-incluir');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-
-
-
-
-function excluirNota(index) {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro.');
-        return;
-    }
-    if (!confirm('Excluir esta nota?')) return;
-    
-    fetch('/api/excluir_nota/' + relatorioIdAtual + '/' + index, {
-        method: 'DELETE'
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota excluída!');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-carregarHistorico();
-        document.getElementById('conteudo').innerHTML = '<p style="text-align:center; color:#666;">Selecione um histórico ou verifique dados.</p>';
-        document.getElementById('declaracao-conformidade').style.display = 'none';
+        alert('Hist?ricos exclu?dos com sucesso!');
+        historicoSelecionado = null;
+        relatorioIdAtual = null;
+        carregarHistorico();
+        document.getElementById('conteudo').innerHTML = '<p style="text-align:center; color:#666;">Selecione um hist?rico ou verifique dados.</p>';
+        const decl = document.getElementById('declaracao-conformidade');
+        if (decl) decl.style.display = 'none';
     }).catch(err => {
         alert('Erro ao excluir: ' + err.message);
     });
 }
 
-
-
-
-
 function atualizarSelecaoCheckbox(checkbox) {
     if (checkbox.checked) {
         historicoSelecionado = parseInt(checkbox.value);
@@ -417,10 +356,9 @@ function atualizarSelecaoCheckbox(checkbox) {
     }
 }
 
-
 function abrirInclusao() {
     if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro para adicionar uma nota.');
+        alert('Selecione um hist?rico primeiro para adicionar uma nota.');
         return;
     }
     document.getElementById('incluir-titulo').value = '';
@@ -432,7 +370,7 @@ function salvarNovaNota() {
     const titulo = document.getElementById('incluir-titulo').value.trim();
     const texto = document.getElementById('incluir-texto').value.trim();
     if (!titulo || !texto) {
-        alert('Preencha o título e o texto.');
+        alert('Preencha o t?tulo e o texto.');
         return;
     }
     fetch('/api/incluir_nota/' + relatorioIdAtual, {
@@ -441,243 +379,57 @@ function salvarNovaNota() {
         body: JSON.stringify({ titulo, texto })
     }).then(r => r.json()).then(data => {
         if (data.ok) {
-            alert('Nota incluída com sucesso!');
+            alert('Nota inclu?da com sucesso!');
             fecharModal('modal-incluir');
             carregarNotas(relatorioIdAtual);
         } else {
-            alert('Erro: ' + data.mensagem);
+            alert('Erro: ' + (data.mensagem || data.detail || 'Falha ao incluir nota'));
         }
-    });
+    }).catch(err => alert('Erro ao incluir nota: ' + err.message));
 }
-
-
-
-
 
 function excluirNota(index) {
     if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro.');
+        alert('Selecione um hist?rico primeiro.');
         return;
     }
     if (!confirm('Excluir esta nota?')) return;
-    
+
     fetch('/api/excluir_nota/' + relatorioIdAtual + '/' + index, {
         method: 'DELETE'
     }).then(r => r.json()).then(data => {
         if (data.ok) {
-            alert('Nota excluída!');
+            alert('Nota exclu?da!');
             carregarNotas(relatorioIdAtual);
         } else {
-            alert('Erro: ' + data.mensagem);
+            alert('Erro: ' + (data.mensagem || data.detail || 'Falha ao excluir nota'));
         }
-    });
-}
-
-carregarHistorico();
-            } else {
-                alert('Erro ao salvar: ' + data.mensagem);
-            }
-        });
+    }).catch(err => alert('Erro ao excluir nota: ' + err.message));
 }
 
 function exibirSelecionado() {
-    if (!historicoSelecionado) { alert('Selecione um histórico primeiro.'); return; }
+    if (!historicoSelecionado) { alert('Selecione um hist?rico primeiro.'); return; }
     carregarNotas(historicoSelecionado);
 }
 
 function gerarPDFHistorico() {
-    if (!historicoSelecionado) { alert('Selecione um histórico primeiro.'); return; }
+    if (!historicoSelecionado) { alert('Selecione um hist?rico primeiro.'); return; }
     window.open('/gerar_pdf_notas/' + historicoSelecionado, '_blank');
 }
 
 function excluirSelecionado() {
-    if (!historicoSelecionado) { alert('Selecione um histórico.'); return; }
-    if (!confirm('Excluir este histórico?')) return;
+    if (!historicoSelecionado) { alert('Selecione um hist?rico.'); return; }
+    if (!confirm('Excluir este hist?rico?')) return;
     fetch('/excluir_notas_explicativas/' + historicoSelecionado, { method: 'DELETE' })
         .then(r => r.json())
-        .then(() => { 
-            historicoSelecionado = null; 
-            relatorioIdAtual = null; 
-            
-function excluirSelecionadosMultiplos() {
-    const checkboxes = document.querySelectorAll('.check-historico:checked');
-    if (checkboxes.length === 0) {
-        alert('Selecione pelo menos um histórico para excluir.');
-        return;
-    }
-    if (!confirm('Excluir ' + checkboxes.length + ' histórico(s) selecionado(s)?')) return;
-    
-    const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
-    let promises = ids.map(id => fetch('/excluir_notas_explicativas/' + id, { method: 'DELETE' }));
-    
-    Promise.all(promises).then(() => {
-        alert('Históricos excluídos com sucesso!');
-        
-
-
-
-function atualizarSelecaoCheckbox(checkbox) {
-    if (checkbox.checked) {
-        historicoSelecionado = parseInt(checkbox.value);
-        document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-        checkbox.closest('.historico-item').classList.add('ativo');
-    } else {
-        const outroMarcado = document.querySelector('.check-historico:checked');
-        if (outroMarcado) {
-            historicoSelecionado = parseInt(outroMarcado.value);
-            document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-            outroMarcado.closest('.historico-item').classList.add('ativo');
-        } else {
+        .then(() => {
             historicoSelecionado = null;
-        }
-    }
-}
-
-
-function abrirInclusao() {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro para adicionar uma nota.');
-        return;
-    }
-    document.getElementById('incluir-titulo').value = '';
-    document.getElementById('incluir-texto').value = '';
-    document.getElementById('modal-incluir').style.display = 'flex';
-}
-
-function salvarNovaNota() {
-    const titulo = document.getElementById('incluir-titulo').value.trim();
-    const texto = document.getElementById('incluir-texto').value.trim();
-    if (!titulo || !texto) {
-        alert('Preencha o título e o texto.');
-        return;
-    }
-    fetch('/api/incluir_nota/' + relatorioIdAtual, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo, texto })
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota incluída com sucesso!');
-            fecharModal('modal-incluir');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-
-
-
-
-function excluirNota(index) {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro.');
-        return;
-    }
-    if (!confirm('Excluir esta nota?')) return;
-    
-    fetch('/api/excluir_nota/' + relatorioIdAtual + '/' + index, {
-        method: 'DELETE'
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota excluída!');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-carregarHistorico();
-        document.getElementById('conteudo').innerHTML = '<p style="text-align:center; color:#666;">Selecione um histórico ou verifique dados.</p>';
-        document.getElementById('declaracao-conformidade').style.display = 'none';
-    }).catch(err => {
-        alert('Erro ao excluir: ' + err.message);
-    });
-}
-
-
-
-
-
-function atualizarSelecaoCheckbox(checkbox) {
-    if (checkbox.checked) {
-        historicoSelecionado = parseInt(checkbox.value);
-        document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-        checkbox.closest('.historico-item').classList.add('ativo');
-    } else {
-        const outroMarcado = document.querySelector('.check-historico:checked');
-        if (outroMarcado) {
-            historicoSelecionado = parseInt(outroMarcado.value);
-            document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-            outroMarcado.closest('.historico-item').classList.add('ativo');
-        } else {
-            historicoSelecionado = null;
-        }
-    }
-}
-
-
-function abrirInclusao() {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro para adicionar uma nota.');
-        return;
-    }
-    document.getElementById('incluir-titulo').value = '';
-    document.getElementById('incluir-texto').value = '';
-    document.getElementById('modal-incluir').style.display = 'flex';
-}
-
-function salvarNovaNota() {
-    const titulo = document.getElementById('incluir-titulo').value.trim();
-    const texto = document.getElementById('incluir-texto').value.trim();
-    if (!titulo || !texto) {
-        alert('Preencha o título e o texto.');
-        return;
-    }
-    fetch('/api/incluir_nota/' + relatorioIdAtual, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo, texto })
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota incluída com sucesso!');
-            fecharModal('modal-incluir');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-
-
-
-
-function excluirNota(index) {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro.');
-        return;
-    }
-    if (!confirm('Excluir esta nota?')) return;
-    
-    fetch('/api/excluir_nota/' + relatorioIdAtual + '/' + index, {
-        method: 'DELETE'
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota excluída!');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-carregarHistorico(); 
-            document.getElementById('conteudo').innerHTML = '<p style="text-align:center; color:#666;">Histórico excluído.</p>'; 
-            document.getElementById('declaracao-conformidade').style.display = 'none';
-        });
+            relatorioIdAtual = null;
+            carregarHistorico();
+            document.getElementById('conteudo').innerHTML = '<p style="text-align:center; color:#666;">Hist?rico exclu?do.</p>';
+            const decl = document.getElementById('declaracao-conformidade');
+            if (decl) decl.style.display = 'none';
+        }).catch(err => alert('Erro ao excluir: ' + err.message));
 }
 
 function abrirObservacoes() {
@@ -763,189 +515,23 @@ function carregarDadosContador() {
     fetch('/api/configuracoes/entidade')
         .then(r => r.json())
         .then(data => {
-            if (data.contador_nome) document.getElementById('nome-contador').innerText = data.contador_nome;
-            if (data.contador_crc) document.getElementById('crc-contador').innerText = formatarCRC(data.contador_crc, data.contador_uf);
-            if (data.contador_cpf) document.getElementById('cpf-contador').innerText = formatarCPF(data.contador_cpf);
+            const nomeEl = document.getElementById('nome-contador');
+            const crcEl = document.getElementById('crc-contador');
+            const cpfEl = document.getElementById('cpf-contador');
+            if (nomeEl) nomeEl.innerText = data.contador_nome ? data.contador_nome : 'Contador n?o configurado';
+            if (crcEl) crcEl.innerText = data.contador_crc ? formatarCRC(data.contador_crc, data.contador_uf) : 'N?o informado';
+            if (cpfEl) cpfEl.innerText = data.contador_cpf ? formatarCPF(data.contador_cpf) : 'N?o informado';
+        })
+        .catch(() => {
+            const nomeEl = document.getElementById('nome-contador');
+            const crcEl = document.getElementById('crc-contador');
+            const cpfEl = document.getElementById('cpf-contador');
+            if (nomeEl) nomeEl.innerText = 'Contador n?o configurado';
+            if (crcEl) crcEl.innerText = 'N?o informado';
+            if (cpfEl) cpfEl.innerText = 'N?o informado';
         });
 }
 
-
-function excluirSelecionadosMultiplos() {
-    const checkboxes = document.querySelectorAll('.check-historico:checked');
-    if (checkboxes.length === 0) {
-        alert('Selecione pelo menos um histórico para excluir.');
-        return;
-    }
-    if (!confirm('Excluir ' + checkboxes.length + ' histórico(s) selecionado(s)?')) return;
-    
-    const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
-    let promises = ids.map(id => fetch('/excluir_notas_explicativas/' + id, { method: 'DELETE' }));
-    
-    Promise.all(promises).then(() => {
-        alert('Históricos excluídos com sucesso!');
-        
-
-
-
-function atualizarSelecaoCheckbox(checkbox) {
-    if (checkbox.checked) {
-        historicoSelecionado = parseInt(checkbox.value);
-        document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-        checkbox.closest('.historico-item').classList.add('ativo');
-    } else {
-        const outroMarcado = document.querySelector('.check-historico:checked');
-        if (outroMarcado) {
-            historicoSelecionado = parseInt(outroMarcado.value);
-            document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-            outroMarcado.closest('.historico-item').classList.add('ativo');
-        } else {
-            historicoSelecionado = null;
-        }
-    }
-}
-
-
-function abrirInclusao() {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro para adicionar uma nota.');
-        return;
-    }
-    document.getElementById('incluir-titulo').value = '';
-    document.getElementById('incluir-texto').value = '';
-    document.getElementById('modal-incluir').style.display = 'flex';
-}
-
-function salvarNovaNota() {
-    const titulo = document.getElementById('incluir-titulo').value.trim();
-    const texto = document.getElementById('incluir-texto').value.trim();
-    if (!titulo || !texto) {
-        alert('Preencha o título e o texto.');
-        return;
-    }
-    fetch('/api/incluir_nota/' + relatorioIdAtual, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo, texto })
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota incluída com sucesso!');
-            fecharModal('modal-incluir');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-
-
-
-
-function excluirNota(index) {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro.');
-        return;
-    }
-    if (!confirm('Excluir esta nota?')) return;
-    
-    fetch('/api/excluir_nota/' + relatorioIdAtual + '/' + index, {
-        method: 'DELETE'
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota excluída!');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-carregarHistorico();
-        document.getElementById('conteudo').innerHTML = '<p style="text-align:center; color:#666;">Selecione um histórico ou verifique dados.</p>';
-        document.getElementById('declaracao-conformidade').style.display = 'none';
-    }).catch(err => {
-        alert('Erro ao excluir: ' + err.message);
-    });
-}
-
-
-
-
-
-function atualizarSelecaoCheckbox(checkbox) {
-    if (checkbox.checked) {
-        historicoSelecionado = parseInt(checkbox.value);
-        document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-        checkbox.closest('.historico-item').classList.add('ativo');
-    } else {
-        const outroMarcado = document.querySelector('.check-historico:checked');
-        if (outroMarcado) {
-            historicoSelecionado = parseInt(outroMarcado.value);
-            document.querySelectorAll('.historico-item').forEach(i => i.classList.remove('ativo'));
-            outroMarcado.closest('.historico-item').classList.add('ativo');
-        } else {
-            historicoSelecionado = null;
-        }
-    }
-}
-
-
-function abrirInclusao() {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro para adicionar uma nota.');
-        return;
-    }
-    document.getElementById('incluir-titulo').value = '';
-    document.getElementById('incluir-texto').value = '';
-    document.getElementById('modal-incluir').style.display = 'flex';
-}
-
-function salvarNovaNota() {
-    const titulo = document.getElementById('incluir-titulo').value.trim();
-    const texto = document.getElementById('incluir-texto').value.trim();
-    if (!titulo || !texto) {
-        alert('Preencha o título e o texto.');
-        return;
-    }
-    fetch('/api/incluir_nota/' + relatorioIdAtual, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo, texto })
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota incluída com sucesso!');
-            fecharModal('modal-incluir');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-
-
-
-
-function excluirNota(index) {
-    if (!relatorioIdAtual) {
-        alert('Selecione um histórico primeiro.');
-        return;
-    }
-    if (!confirm('Excluir esta nota?')) return;
-    
-    fetch('/api/excluir_nota/' + relatorioIdAtual + '/' + index, {
-        method: 'DELETE'
-    }).then(r => r.json()).then(data => {
-        if (data.ok) {
-            alert('Nota excluída!');
-            carregarNotas(relatorioIdAtual);
-        } else {
-            alert('Erro: ' + data.mensagem);
-        }
-    });
-}
-
-carregarHistorico();
 </script>
 
 <!-- Modal Incluir Item -->

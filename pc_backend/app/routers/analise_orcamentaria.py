@@ -8,6 +8,7 @@ import os
 import json
 import datetime
 from fastapi import APIRouter, Request, Response, HTTPException
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 from fastapi.responses import FileResponse, HTMLResponse
 from pc_backend.app.config import PG_CONFIG
 import psycopg2
@@ -24,10 +25,11 @@ router = APIRouter()
 # =========================================================
 
 @router.get("/historico_analise_orcamentaria")
-def get_historico_analise_orcamentaria():
+def get_historico_analise_orcamentaria(request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_orcamentaria ORDER BY id DESC")
+    cur.execute("SELECT id, periodo, data_geracao, resultado_json FROM historico_analise_orcamentaria WHERE (%s IS NULL OR entidade_id = %s) ORDER BY id DESC", (__ent_id, __ent_id))
     rows = cur.fetchall()
     conn.close()
     
@@ -43,7 +45,8 @@ def get_historico_analise_orcamentaria():
     return resultado
 
 @router.get("/historico_analise_orcamentaria/{id}")
-async def get_analise_orcamentaria_id(id: int):
+async def get_analise_orcamentaria_id(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
     cur.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id=%s", (id,))
@@ -52,7 +55,8 @@ async def get_analise_orcamentaria_id(id: int):
     return json.loads(row[1])
 
 @router.post("/salvar_analise_orcamentaria/{periodo}")
-async def salvar_analise_orcamentaria(periodo: str):
+async def salvar_analise_orcamentaria(periodo: str, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     atual = await api_analise_orcamentaria_bo(periodo)
     if atual.get("erro"):
         raise HTTPException(status_code=400, detail=atual.get("mensagem"))
@@ -67,21 +71,23 @@ async def salvar_analise_orcamentaria(periodo: str):
 
         id SERIAL PRIMARY KEY, periodo TEXT, data_geracao TEXT, resultado_json TEXT)""")
     data_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    cur.execute("INSERT INTO historico_analise_orcamentaria (periodo, data_geracao, resultado_json) VALUES (%s,%s,%s)",
+    cur.execute("INSERT INTO historico_analise_orcamentaria (periodo, data_geracao, resultado_json, entidade_id) VALUES (%s, %s, %s, %s)",
                 (periodo, data_agora, json.dumps(dados)))
     conn.commit(); conn.close()
     return {"mensagem": "Salvo"}
 
 @router.delete("/excluir_analise_orcamentaria/{id}")
-async def excluir_analise_orcamentaria(id: int):
+async def excluir_analise_orcamentaria(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
-    cur.execute("DELETE FROM historico_analise_orcamentaria WHERE id=%s", (id,))
+    cur.execute("DELETE FROM historico_analise_orcamentaria WHERE (id=%s) AND (%s IS NULL OR entidade_id = %s)", (id,))
     conn.commit(); conn.close()
     return {"mensagem": "Excluido"}
 
 @router.get("/gerar_pdf_analise_orcamentaria/{id}")
-def gerar_pdf_analise_orcamentaria(id: int):
+def gerar_pdf_analise_orcamentaria(id: int, request: Request = None):
+    __ent_id = resolver_entidade_id(request)
     try:
         from fastapi.responses import Response
         from fpdf import FPDF
@@ -153,7 +159,7 @@ def gerar_pdf_analise_orcamentaria(id: int):
         pdf.cell(30, 8, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_text_color(0, 0, 0)
         pdf.set_font(f_family, "", 9)
-        def fmt(v): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        def fmt(v, request: Request = None): return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         # Indicadores na ordem que queremos
         # Calcula os percentuais na hora para garantir precisão
         rec_orc = a.get("receita_orcada", 0) or 0
@@ -214,21 +220,22 @@ def gerar_pdf_analise_orcamentaria(id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analise_orcamentaria")
-async def serve_analise_orcamentaria():
+async def serve_analise_orcamentaria(request: Request = None):
     caminho = os.path.join(FRONTEND_DIR, "analise_orcamentaria.html")
     return FileResponse(caminho)
 
 
 
 # === ROTA RESGATADA: CÁLCULO DO BALANÇO ORÇAMENTÁRIO ===
-def _buscar_orcamentaria_pg(periodo_str: str) -> dict | None:
+def _buscar_orcamentaria_pg(periodo_str: str, request: Request = None) -> dict | None:
+    __ent_id = resolver_entidade_id(request)
     if not periodo_str:
         return None
     conn = psycopg2.connect(**PG_CONFIG)
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT resultado_json FROM historico_analise_orcamentaria WHERE periodo = %s ORDER BY id DESC LIMIT 1",
+            "SELECT resultado_json FROM historico_analise_orcamentaria WHERE (periodo = %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (periodo_str,),
         )
         row = cur.fetchone()
@@ -242,7 +249,7 @@ def _buscar_orcamentaria_pg(periodo_str: str) -> dict | None:
                     return out
 
         cur.execute(
-            "SELECT resultado_json FROM historico_analise_orcamentaria WHERE resultado_json LIKE %s ORDER BY id DESC LIMIT 1",
+            "SELECT resultado_json FROM historico_analise_orcamentaria WHERE (resultado_json LIKE %s) AND (%s IS NULL OR entidade_id = %s) ORDER BY id DESC LIMIT 1",
             (f'%"{periodo_str}"%',),
         )
         row = cur.fetchone()
@@ -267,7 +274,7 @@ def _buscar_orcamentaria_pg(periodo_str: str) -> dict | None:
 
 
 @router.get("/api/analise_orcamentaria_bo/{periodo}")
-async def api_analise_orcamentaria_bo(periodo: str):
+async def api_analise_orcamentaria_bo(periodo: str, request: Request = None):
     try:
         dados = _buscar_orcamentaria_pg(periodo)
         if not dados:

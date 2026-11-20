@@ -7,7 +7,8 @@ import json
 import os
 import traceback
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Request
+from pc_backend.app.core.entidade_context import resolver_entidade_id
 import psycopg2
 from pc_backend.app.config import PG_CONFIG
 from pc_backend.app.services.pdf_dvp import desenhar_tabela_dvp, fmt_brl
@@ -75,7 +76,7 @@ def _recalcular_indicadores(dados: dict) -> dict:
     return base
 
 
-def buscar_dvp_postgresql(periodo: str | None = None):
+def buscar_dvp_postgresql(periodo: str | None = None, entidade_id: int | None = None):
     """
     Busca dados do DVP diretamente no PostgreSQL (historico_analise_dvp / demonstracao_resumo).
     """
@@ -89,6 +90,7 @@ def buscar_dvp_postgresql(periodo: str | None = None):
                 SELECT periodo, resultado_json
                 FROM historico_analise_dvp
                 WHERE periodo ILIKE %s
+                """ + (" AND (entidade_id = %s OR entidade_id IS NULL)" if entidade_id is not None else "") + """
                 ORDER BY id DESC
                 LIMIT 1
                 """,
@@ -224,9 +226,9 @@ def processar_dvp(caminho=None):
 
 
 @router.post("/salvar/{periodo}/{periodo_anterior}")
-def salvar_analise_dvp(periodo: str, periodo_anterior: str):
+def salvar_analise_dvp(periodo: str, periodo_anterior: str, request: Request = None):
     try:
-        res_pg = buscar_dvp_postgresql(periodo)
+        res_pg = buscar_dvp_postgresql(periodo, resolver_entidade_id(request))
         if not res_pg:
             return {"ok": False, "mensagem": f"Dados do DVP n?o encontrados no PostgreSQL para {periodo}"}
 
@@ -240,8 +242,8 @@ def salvar_analise_dvp(periodo: str, periodo_anterior: str):
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO historico_analise_dvp (periodo, data_geracao, resultado_json)
-            VALUES (%s, NOW(), %s) RETURNING id
+            INSERT INTO historico_analise_dvp (periodo, data_geracao, resultado_json, entidade_id)
+            VALUES (%s, NOW(), %s, %s) RETURNING id
             """,
             (periodo_label, json.dumps(dados_json, ensure_ascii=False)),
         )
@@ -256,11 +258,15 @@ def salvar_analise_dvp(periodo: str, periodo_anterior: str):
 
 
 @router.get("/historico")
-def get_historico_dvp():
+def get_historico_dvp(request: Request = None):
     try:
         conn = psycopg2.connect(**PG_CONFIG)
         cur = conn.cursor()
-        cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dvp ORDER BY id DESC")
+        ent_id = resolver_entidade_id(request, conn=conn)
+        if ent_id is not None:
+            cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dvp WHERE entidade_id = %s ORDER BY id DESC", (ent_id,))
+        else:
+            cur.execute("SELECT id, periodo, data_geracao FROM historico_analise_dvp ORDER BY id DESC")
         rows = cur.fetchall()
         conn.close()
         return [{"id": r[0], "periodo": r[1], "data_geracao": str(r[2])} for r in rows]
@@ -382,7 +388,7 @@ def gerar_pdf_analise_dvp(id: int):
 
 
 @router.get("/{periodo}")
-async def api_analise_patrimonial(periodo: str):
+async def api_analise_patrimonial(periodo: str, request: Request = None):
     try:
         res_pg = buscar_dvp_postgresql(periodo)
         if res_pg:
