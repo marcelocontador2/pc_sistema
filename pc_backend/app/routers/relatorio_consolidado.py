@@ -54,20 +54,20 @@ async def api_relatorio_consolidado_novo(periodo: str, request: Request = None):
     }
 
     nomes_amigaveis = {
-        "analise_bp": "An?lise BP",
-        "analise_dfc": "An?lise DFC",
+        "analise_bp": "Análise BP",
+        "analise_dfc": "Análise DFC",
         "analise_patrimonial": "An?lise Patrimonial (DVP)",
-        "analise_orcamentaria": "An?lise Or?ament?ria (BO)",
+        "analise_orcamentaria": "Análise Orçamentária (BO)",
         "analise_financeira_bf": "An?lise Financeira (BF)",
         "comparativo_receitas": "Comparativo de Receitas",
         "comparativo_despesas": "Comparativo de Despesas",
         "panorama": "Panorama de Resultados",
         "liquidez": "Índices de Liquidez",
-        "integridade": "Integridade entre Demonstra??es",
-        "conferencia": "Confer?ncia das Demonstra??es",
+        "integridade": "Integridade entre Demonstrações",
+        "conferencia": "Conferência das Demonstrações",
         "custo_pessoal": "Custo de Pessoal",
-        "centro_custos": "An?lise por Centro de Custos",
-        "dmpl": "Demonstra??o das Muta??es do PL (DMPL)",
+        "centro_custos": "Análise por Centro de Custos",
+        "dmpl": "Demonstração das Mutações do PL (DMPL)",
     }
 
     encontrados = []
@@ -93,7 +93,7 @@ async def api_relatorio_consolidado_novo(periodo: str, request: Request = None):
                 if row:
                     encontrados.append({
                         "nome": nomes_amigaveis.get(chave, chave),
-                        "data_geracao": row[1] if len(row) > 1 and row[1] else "Dispon?vel",
+                        "data_geracao": row[1] if len(row) > 1 and row[1] else "Disponível",
                         "id": row[0],
                     })
                 else:
@@ -114,7 +114,7 @@ async def api_relatorio_consolidado_novo(periodo: str, request: Request = None):
     except Exception as e:
         return {
             "status": "erro",
-            "mensagem": f"Erro de conex?o com o PostgreSQL: {str(e)}",
+            "mensagem": f"Erro de conexão com o PostgreSQL: {str(e)}",
         }
 
 
@@ -123,12 +123,12 @@ async def salvar_relatorio_consolidado_novo(periodo: str, request: Request = Non
     try:
         dados_api = await api_relatorio_consolidado_novo(periodo, request)
         if dados_api.get("status") == "erro":
-            return {"ok": False, "mensagem": dados_api.get("mensagem", "Erro ao consultar m?dulos no PostgreSQL.")}
+            return {"ok": False, "mensagem": dados_api.get("mensagem", "Erro ao consultar módulos no PostgreSQL.")}
 
         if dados_api.get("status") == "faltando" and len(dados_api.get("faltando", [])) > 0:
             return {
                 "ok": False,
-                "mensagem": f"Faltam {len(dados_api['faltando'])} m?dulo(s) para consolidar.",
+                "mensagem": f"Faltam {len(dados_api['faltando'])} módulo(s) para consolidar.",
                 "faltando": dados_api["faltando"],
             }
 
@@ -141,13 +141,21 @@ async def salvar_relatorio_consolidado_novo(periodo: str, request: Request = Non
 
         conn = _get_conn()
         cursor = conn.cursor()
+        ent_id = None
+        try:
+            if "resolver_entidade_id" in globals() and request is not None:
+                ent_id = resolver_entidade_id(request)
+        except Exception:
+            ent_id = None
+        if ent_id is None:
+            ent_id = 24
         cursor.execute(
             """
             INSERT INTO historico_relatorio_consolidado (periodo, data_geracao, resultado_json, entidade_id)
             VALUES (%s, %s, %s, %s)
             RETURNING id
             """,
-            (periodo, data_agora, json.dumps(dados_consolidados, ensure_ascii=False)),
+            (periodo, data_agora, json.dumps(dados_consolidados, ensure_ascii=False), ent_id),
         )
         novo_id = cursor.fetchone()[0]
         conn.commit()
@@ -157,7 +165,7 @@ async def salvar_relatorio_consolidado_novo(periodo: str, request: Request = Non
         return {
             "ok": True,
             "id": novo_id,
-            "mensagem": "Relat?rio salvo com sucesso no PostgreSQL!",
+            "mensagem": "Relatório salvo com sucesso no PostgreSQL!",
         }
     except Exception as e:
         return {"ok": False, "mensagem": str(e)}
