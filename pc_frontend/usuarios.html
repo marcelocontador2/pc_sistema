@@ -202,44 +202,36 @@
 
         async function salvarUsuario() {
             const id = document.getElementById('user-id').value;
-            const nome = document.getElementById('user-nome').value;
-            const email = document.getElementById('user-email').value;
+            const nome = document.getElementById('user-nome').value.trim();
+            const usuario = document.getElementById('user-usuario').value.trim();
+            const email = document.getElementById('user-email').value.trim();
             const senha = document.getElementById('user-senha').value;
             const perfil = document.getElementById('user-perfil').value;
             const entidade_id = document.getElementById('user-entidade').value || null;
 
-            if (!nome || !email) {
-                mostrarMsg('Nome e e-mail são obrigatórios.', 'erro');
+            if (!nome || !usuario || !email) {
+                mostrarMsg('Nome, usu?rio e e-mail s?o obrigat?rios.', 'erro');
                 return;
             }
-            if (!id && !senha) {
-                mostrarMsg('Senha é obrigatória para novos usuários.', 'erro');
-                return;
-            }
-
-            const payload = { nome, email, senha, perfil, entidade_id };
-            if (id) payload.id = id;
 
             try {
                 const r = await fetch('/api/usuarios', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ id: id || null, nome, usuario, email, senha, perfil, entidade_id })
                 });
                 const data = await r.json();
-
                 if (data.ok) {
-                    mostrarMsg(data.mensagem, 'ok');
+                    mostrarMsg(data.mensagem || 'Usu?rio salvo com sucesso!', 'ok');
                     fecharFormulario();
                     carregarUsuarios();
                 } else {
-                    mostrarMsg(data.mensagem, 'erro');
+                    mostrarMsg(data.mensagem || 'Erro ao salvar usu?rio.', 'erro');
                 }
             } catch (e) {
-                mostrarMsg('Erro de conexão: ' + e.message, 'erro');
+                mostrarMsg('Erro de conex?o com o servidor.', 'erro');
             }
         }
-
         // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
             carregarEntidades();
