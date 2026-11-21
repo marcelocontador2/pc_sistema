@@ -30,12 +30,135 @@ function carregar() {
         });
 }
 
+function parseValorBrl(v) {
+    if (typeof v === 'number') return isNaN(v) ? 0 : v;
+    if (!v) return 0;
+    var s = String(v).replace(/R\$/g, '').replace(/\s+/g, '').trim();
+    if (!s || s === '-') return 0;
+    if (s.indexOf(',') !== -1) {
+        s = s.replace(/\./g, '').replace(',', '.');
+    }
+    var n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+}
+
+function matrizParaLinhas(matriz) {
+    if (!Array.isArray(matriz) || !matriz.length) return [];
+    var saida = [];
+    for (var i = 0; i < matriz.length; i++) {
+        var row = matriz[i];
+        if (!Array.isArray(row)) continue;
+        var cols = row.map(function(c) { return (c === null || c === undefined) ? '' : String(c).trim(); });
+        var naoVazios = cols.filter(function(c) { return c !== ''; });
+        if (!naoVazios.length) continue;
+
+        var desc = cols[0] || naoVazios[0] || '';
+        var upper = desc.toUpperCase();
+        if (upper.indexOf('CONSELHO FEDERAL') !== -1) continue;
+        if (upper.indexOf('COFEN') !== -1) continue;
+        if (upper.indexOf('CNPJ') !== -1) continue;
+        if (upper.indexOf('DEMONSTRAÇÃO DAS MUTAÇÕES') !== -1 || upper.indexOf('DEMONSTRACAO DAS MUTACOES') !== -1) continue;
+        if (upper.indexOf('PERÍODO:') === 0 || upper.indexOf('PERIODO:') === 0) continue;
+        if (upper === 'PATRIMÔNIO SOCIAL E CAPITAL SOCIAL' && cols.indexOf('TOTAL') !== -1) continue;
+        if (upper.indexOf('BRASÍLIA-DF') !== -1 || upper.indexOf('BRASILIA-DF') !== -1) continue;
+        if (upper.indexOf('MARCELO RIBEIRO MEDEIROS') !== -1) continue;
+        if (upper === 'CONTADOR') continue;
+        if (upper.indexOf('CRC-') !== -1) continue;
+        if (upper.indexOf('PÁGINA:') === 0 || upper.indexOf('PAGINA:') === 0) continue;
+
+        var valores = [];
+        for (var cIdx = 1; cIdx < cols.length; cIdx++) {
+            valores.push(parseValorBrl(cols[cIdx]));
+        }
+        if (!valores.length) {
+            valores = [parseValorBrl(naoVazios[naoVazios.length - 1])];
+        }
+        saida.push({ descricao: desc, valores: valores });
+    }
+    return saida;
+}
+
+function parseValorBrl(v) {
+    if (typeof v === 'number') return isNaN(v) ? 0 : v;
+    if (!v) return 0;
+    var s = String(v).replace(/R\$/g, '').replace(/\s+/g, '').trim();
+    if (!s || s === '-') return 0;
+    if (s.indexOf(',') !== -1) {
+        s = s.replace(/\./g, '').replace(',', '.');
+    }
+    var n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+}
+
+function matrizParaLinhas(matriz) {
+    if (!Array.isArray(matriz) || !matriz.length) return [];
+    var saida = [];
+    for (var i = 0; i < matriz.length; i++) {
+        var row = matriz[i];
+        if (!Array.isArray(row)) continue;
+        var cols = row.map(function(c) { return (c === null || c === undefined) ? '' : String(c).trim(); });
+        var naoVazios = cols.filter(function(c) { return c !== ''; });
+        if (!naoVazios.length) continue;
+
+        var desc = cols[0] || naoVazios[0] || '';
+        var upper = desc.toUpperCase();
+        if (upper.indexOf('CONSELHO FEDERAL') !== -1) continue;
+        if (upper.indexOf('COFEN') !== -1) continue;
+        if (upper.indexOf('CNPJ') !== -1) continue;
+        if (upper.indexOf('DEMONSTRAÇÃO DAS MUTAÇÕES') !== -1 || upper.indexOf('DEMONSTRACAO DAS MUTACOES') !== -1) continue;
+        if (upper.indexOf('PERÍODO:') === 0 || upper.indexOf('PERIODO:') === 0) continue;
+        if (upper === 'PATRIMÔNIO SOCIAL E CAPITAL SOCIAL' && cols.indexOf('TOTAL') !== -1) continue;
+
+        var valores = [];
+        for (var cIdx = 1; cIdx < cols.length; cIdx++) {
+            valores.push(parseValorBrl(cols[cIdx]));
+        }
+        if (!valores.length) {
+            valores = [parseValorBrl(naoVazios[naoVazios.length - 1])];
+        }
+        saida.push({ descricao: desc, valores: valores });
+    }
+    return saida;
+}
+
+function movimentacoesParaLinhas(payload) {
+    if (!payload || typeof payload !== 'object') return [];
+    var saida = [];
+    if (Array.isArray(payload.movimentacoes)) {
+        payload.movimentacoes.forEach(function(m) {
+            if (!m || typeof m !== 'object') return;
+            var desc = m.especificacao || m.descricao || m.conta || m.movimentacao || '';
+            if (!desc) return;
+            var val = parseValorBrl(m.total !== undefined ? m.total : (m.valor !== undefined ? m.valor : 0));
+            saida.push({ descricao: String(desc), valores: [val] });
+        });
+    }
+    if (payload.resultado_periodo && typeof payload.resultado_periodo === 'object') {
+        var resAtual = payload.resultado_periodo.atual;
+        if (resAtual !== undefined && resAtual !== null) {
+            saida.push({
+                descricao: 'Resultado do Período (Atual)',
+                valores: [parseValorBrl(resAtual)]
+            });
+        }
+    }
+    return saida;
+}
+
 function renderizarDados(dados) {
     var payload = dados;
-    if (dados && dados.dados && dados.dados.linhas) payload = dados.dados;
-    else if (dados && dados.linhas) payload = dados;
+    if (dados && dados.dados !== undefined) payload = dados.dados;
+    if (payload && payload.dados !== undefined && !payload.linhas && !payload.movimentacoes) payload = payload.dados;
 
-    var linhas = payload.linhas || [];
+    var linhas = [];
+    if (Array.isArray(payload)) {
+        linhas = matrizParaLinhas(payload);
+    } else if (payload && Array.isArray(payload.linhas)) {
+        linhas = payload.linhas;
+    } else if (payload && (Array.isArray(payload.movimentacoes) || payload.resultado_periodo)) {
+        linhas = movimentacoesParaLinhas(payload);
+    }
+
     var tbody = document.querySelector('#tab tbody') || document.querySelector('table tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
@@ -45,16 +168,19 @@ function renderizarDados(dados) {
         return;
     }
 
-    // Filtra apenas linhas de cabeçalho (COFEN/BR, CNPJ, etc.)
     var linhasFiltradas = linhas.filter(function(linha) {
         var desc = (linha.descricao || '').trim().toUpperCase();
-        // Remove linhas vazias, COFEN, CNPJ, "DEMONSTRA", "BRASILIA"
         if (!desc) return false;
         if (desc.indexOf('COFEN') !== -1) return false;
         if (desc.indexOf('CNPJ') !== -1) return false;
         if (desc.indexOf('DEMONSTRA') !== -1) return false;
         if (desc.indexOf('BRASILIA') !== -1) return false;
         if (desc.indexOf('CONSELHO FEDERAL') !== -1) return false;
+        if (desc.indexOf('BRASÍLIA-DF') !== -1 || desc.indexOf('BRASILIA-DF') !== -1) return false;
+        if (desc.indexOf('MARCELO RIBEIRO MEDEIROS') !== -1) return false;
+        if (desc === 'CONTADOR') return false;
+        if (desc.indexOf('CRC-') !== -1) return false;
+        if (desc.indexOf('PÁGINA:') === 0 || desc.indexOf('PAGINA:') === 0) return false;
         return true;
     });
 
@@ -63,19 +189,28 @@ function renderizarDados(dados) {
         return;
     }
 
-    // Encontra o total geral (última linha com valor não zero)
     var totalGeral = 0;
     for (var i = linhasFiltradas.length - 1; i >= 0; i--) {
-        var vals = linhasFiltradas[i].valores || [];
-        var t = vals[vals.length - 1] || 0;
-        if (t !== 0) { totalGeral = t; break; }
+        var descUpper = (linhasFiltradas[i].descricao || '').toUpperCase();
+        if (descUpper.indexOf('SALDOS FINAIS') !== -1 || descUpper.indexOf('TOTAL') !== -1) {
+            var valsSaldos = linhasFiltradas[i].valores || [];
+            var tSaldos = valsSaldos.length ? (valsSaldos[valsSaldos.length - 1] || 0) : 0;
+            if (tSaldos !== 0) { totalGeral = tSaldos; break; }
+        }
+    }
+    if (totalGeral === 0) {
+        for (var j = linhasFiltradas.length - 1; j >= 0; j--) {
+            var vals = linhasFiltradas[j].valores || [];
+            var t = vals.length ? (vals[vals.length - 1] || 0) : 0;
+            if (t !== 0) { totalGeral = t; break; }
+        }
     }
 
     linhasFiltradas.forEach(function(linha) {
         var tr = document.createElement('tr');
         var desc = linha.descricao || '';
         var valores = linha.valores || [];
-        var total = valores[valores.length - 1] || 0;
+        var total = valores.length ? (valores[valores.length - 1] || 0) : 0;
 
         var negrito = desc.toLowerCase().indexOf('saldos') !== -1 ||
                       desc.toLowerCase().indexOf('resultado') !== -1 ||
@@ -147,12 +282,36 @@ function salvar() {
 }
 
 function excluirSelecionado() {
-    var sel = document.querySelector('.hist-item input:checked');
-    if (!sel) { alert('Selecione um item.'); return; }
-    if (!confirm('Excluir?')) return;
-    fetch('/api/analise_dmpl/excluir/' + sel.value, { method: 'DELETE' })
-        .then(function(r) { return r.json(); })
-        .then(function(j) { if (j.ok) carregarHistorico(); });
+    var checks = Array.prototype.slice.call(document.querySelectorAll('.hist-item input[type="checkbox"]:checked'));
+    if (!checks.length) { alert('Selecione ao menos um item no historico.'); return; }
+    var ids = checks.map(function(cb) { return parseInt(cb.value, 10); }).filter(function(n) { return !isNaN(n); });
+    if (!ids.length) { alert('Nenhum ID valido selecionado.'); return; }
+
+    var msg = ids.length === 1
+        ? 'Deseja excluir o item selecionado do historico da DMPL?'
+        : 'Deseja excluir os ' + ids.length + ' itens selecionados do historico da DMPL?';
+    if (!confirm(msg)) return;
+
+    fetch('/api/analise_dmpl/excluir_multiplos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids })
+    })
+        .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(function(j) {
+            if (j && j.ok) {
+                carregarHistorico();
+            } else {
+                alert('Erro ao excluir: ' + ((j && j.mensagem) || 'Falha desconhecida'));
+            }
+        })
+        .catch(function(e) {
+            console.error('[DMPL] Erro excluir_multiplos:', e);
+            alert('Erro ao excluir itens: ' + e.message);
+        });
 }
 
 function gerarPDF() {

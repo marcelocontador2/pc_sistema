@@ -106,53 +106,55 @@ def _montar_dmpl_da_memoria(periodo: str) -> dict | None:
 
 def buscar_dmpl_postgresql(periodo: str | None = None, entidade_id: int | None = None):
     """
-    Busca dados do DMPL diretamente no PostgreSQL (historico_analise_dmpl -> db_memoria).
+    Busca dados do DMPL diretamente no PostgreSQL (historico_analise_dmpl) pelo periodo e entidade_id,
+    retornando o id do registro persistido apos a importacao (sem leitura de CSV fora do import).
     """
     conn = psycopg2.connect(**PG_CONFIG)
     try:
         cur = conn.cursor()
         row = None
         if periodo:
+            padrao = f"%{periodo}%"
             if entidade_id is not None:
                 cur.execute(
                     """
-                    SELECT periodo, resultado_json
+                    SELECT id, periodo, resultado_json
                     FROM historico_analise_dmpl
-                    WHERE periodo ILIKE %s AND entidade_id = %s
-                    ORDER BY id DESC
+                    WHERE (periodo = %s OR periodo ILIKE %s)
+                      AND (entidade_id = %s OR entidade_id IS NULL)
+                    ORDER BY CASE WHEN entidade_id = %s THEN 0 ELSE 1 END, id DESC
                     LIMIT 1
                     """,
-                    (f"%{periodo}%", entidade_id),
+                    (periodo, padrao, entidade_id, entidade_id),
                 )
             else:
                 cur.execute(
                     """
-                    SELECT periodo, resultado_json
+                    SELECT id, periodo, resultado_json
                     FROM historico_analise_dmpl
-                    WHERE periodo ILIKE %s
+                    WHERE periodo = %s OR periodo ILIKE %s
                     ORDER BY id DESC
                     LIMIT 1
                     """,
-                    (f"%{periodo}%",),
+                    (periodo, padrao),
                 )
             row = cur.fetchone()
-
-        if not row:
+        else:
             if entidade_id is not None:
                 cur.execute(
                     """
-                    SELECT periodo, resultado_json
+                    SELECT id, periodo, resultado_json
                     FROM historico_analise_dmpl
-                    WHERE entidade_id = %s
-                    ORDER BY id DESC
+                    WHERE entidade_id = %s OR entidade_id IS NULL
+                    ORDER BY CASE WHEN entidade_id = %s THEN 0 ELSE 1 END, id DESC
                     LIMIT 1
                     """,
-                    (entidade_id,),
+                    (entidade_id, entidade_id),
                 )
             else:
                 cur.execute(
                     """
-                    SELECT periodo, resultado_json
+                    SELECT id, periodo, resultado_json
                     FROM historico_analise_dmpl
                     ORDER BY id DESC
                     LIMIT 1
@@ -160,21 +162,17 @@ def buscar_dmpl_postgresql(periodo: str | None = None, entidade_id: int | None =
                 )
             row = cur.fetchone()
 
-        if row and row[1]:
-            dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
+        if row and row[2]:
+            dados = row[2] if isinstance(row[2], dict) else json.loads(row[2])
             return {
                 "erro": False,
+                "id": row[0],
                 "fonte": "postgresql:historico_analise_dmpl",
-                "periodo": row[0],
+                "periodo": row[1],
                 "dados": dados,
             }
     finally:
         conn.close()
-
-    if periodo:
-        mem_dados = _montar_dmpl_da_memoria(periodo)
-        if mem_dados is not None:
-            return {"erro": False, "fonte": "postgresql_memoria", "periodo": periodo, "dados": mem_dados}
 
     return None
 
@@ -287,6 +285,60 @@ def excluir_dmpl(id: int):
         conn.commit()
         conn.close()
         return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "mensagem": str(e)}
+
+
+@router.post("/excluir_multiplos")
+async def excluir_multiplos_dmpl(request: Request):
+    try:
+        dados = await request.json()
+        raw_ids = dados.get("ids") if isinstance(dados, dict) else []
+        ids = []
+        for x in (raw_ids or []):
+            try:
+                ids.append(int(x))
+            except (TypeError, ValueError):
+                continue
+        if not ids:
+            return {"ok": False, "mensagem": "Nenhum ID valido selecionado."}
+
+        conn = psycopg2.connect(**PG_CONFIG)
+        try:
+            cur = conn.cursor()
+            ent_id = None
+            try:
+                ent_id = resolver_entidade_id(request, conn=conn)
+            except TypeError:
+                try:
+                    ent_id = resolver_entidade_id(request)
+                except Exception:
+                    ent_id = None
+            except Exception:
+                ent_id = None
+
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'historico_analise_dmpl'
+                """
+            )
+            cols = {r[0] for r in cur.fetchall()}
+
+            if "entidade_id" in cols and ent_id is not None:
+                cur.execute(
+                    "DELETE FROM historico_analise_dmpl WHERE id = ANY(%s) AND (entidade_id = %s OR entidade_id IS NULL)",
+                    (ids, ent_id),
+                )
+            else:
+                cur.execute("DELETE FROM historico_analise_dmpl WHERE id = ANY(%s)", (ids,))
+
+            excluidos = cur.rowcount
+            conn.commit()
+            return {"ok": True, "excluidos": excluidos}
+        finally:
+            conn.close()
     except Exception as e:
         return {"ok": False, "mensagem": str(e)}
 
