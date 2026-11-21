@@ -32,6 +32,48 @@
         .pos { color: #28a745; }
         .neg { color: #dc3545; }
         .bold-row { font-weight: bold; background: #f8f9fa; }
+    
+        .dfc-grafico-box {
+            width: 100%;
+            margin-top: 22px;
+            padding: 14px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: #ffffff;
+            box-sizing: border-box;
+            page-break-inside: avoid;
+        }
+        .dfc-grafico-titulo {
+            font-size: 13px;
+            font-weight: 700;
+            color: #003366;
+            margin-bottom: 8px;
+        }
+        .dfc-legenda {
+            display: flex;
+            gap: 18px;
+            font-size: 11px;
+            color: #374151;
+            margin-bottom: 10px;
+        }
+        .dfc-leg-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dfc-leg-cor {
+            width: 11px;
+            height: 11px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+        @media print {
+            .top-bar, .filtros, .sidebar, button, select, input { display: none !important; }
+            .layout { display: block !important; }
+            .main-content { box-shadow: none !important; padding: 0 !important; }
+            .tabela-wrapper, .dfc-grafico-box { width: 100% !important; }
+        }
+
     </style>
     <script src="/js/auth_entidade.js"></script>
 </head>
@@ -93,6 +135,19 @@
                         <tr><td colspan="4" style="text-align:center;">Clique em Verificar para carregar os dados.</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="dfc-grafico-box" id="dfc-grafico-box">
+                <div class="dfc-grafico-titulo">Comparativo Gráfico da DFC — Principais Fluxos (Período Atual x Anterior)</div>
+                <div class="dfc-legenda">
+                    <span class="dfc-leg-item"><span class="dfc-leg-cor" style="background:#003366;"></span>Período Atual</span>
+                    <span class="dfc-leg-item"><span class="dfc-leg-cor" style="background:#60a5fa;"></span>Período Anterior</span>
+                </div>
+                <div id="dfc-grafico-svg">
+                    <div style="text-align:center; color:#6b7280; font-size:12px; padding:16px 0;">Carregue ou exiba uma análise para visualizar o gráfico.</div>
+                </div>
+            </div>
+
             </div>
         </div>
     </div>
@@ -184,7 +239,89 @@
             html += line('Caixa e Equivalentes Final', at.caixa.final.atual, at.caixa.final.anterior, true);
 
             tb.innerHTML = html;
+            renderGraficoDFC(at);
         }
+
+        function renderGraficoDFC(at) {
+            const box = document.getElementById('dfc-grafico-svg');
+            console.log('[DFC-GRAF] box:', !!box, 'at:', at);
+            if (!box || !at) return;
+
+            const safeNum = (obj, k) => {
+                if (!obj || typeof obj !== 'object') return 0;
+                const v = Number(obj[k]);
+                return Number.isFinite(v) ? v : 0;
+            };
+
+            const itens = [
+                {
+                    label: 'Cx. Operacional',
+                    at: safeNum(at.operacional && at.operacional.liquido, 'atual'),
+                    ant: safeNum(at.operacional && at.operacional.liquido, 'anterior')
+                },
+                {
+                    label: 'Cx. Investimento',
+                    at: safeNum(at.investimento && at.investimento.liquido, 'atual'),
+                    ant: safeNum(at.investimento && at.investimento.liquido, 'anterior')
+                },
+                {
+                    label: 'Cx. Financiamento',
+                    at: safeNum(at.financiamento && at.financiamento.liquido, 'atual'),
+                    ant: safeNum(at.financiamento && at.financiamento.liquido, 'anterior')
+                },
+                {
+                    label: 'Geração Líquida',
+                    at: safeNum(at.caixa && at.caixa.geracao, 'atual'),
+                    ant: safeNum(at.caixa && at.caixa.geracao, 'anterior')
+                },
+                {
+                    label: 'Caixa Final',
+                    at: safeNum(at.caixa && at.caixa.final, 'atual'),
+                    ant: safeNum(at.caixa && at.caixa.final, 'anterior')
+                }
+            ];
+
+            const maxAbs = Math.max(1, ...itens.flatMap(i => [Math.abs(i.at), Math.abs(i.ant)]));
+            const W = 720, H = 220;
+            const padL = 20, padR = 20, padT = 24, padB = 34;
+            const plotH = H - padT - padB;
+            const baseY = padT + plotH;
+            const slotW = (W - padL - padR) / itens.length;
+            const barW = Math.min(34, slotW * 0.26);
+            const gap = 6;
+
+            let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" style="display:block;font-family:'Segoe UI',Arial,sans-serif;">`;
+            svg += `<line x1="${padL}" y1="${baseY}" x2="${W - padR}" y2="${baseY}" stroke="#9ca3af" stroke-width="1"/>`;
+
+            itens.forEach((it, idx) => {
+                const cx = padL + slotW * idx + slotW / 2;
+                const hAt = it.at !== 0 ? Math.max(2, (Math.abs(it.at) / maxAbs) * (plotH - 18)) : 0;
+                const hAnt = it.ant !== 0 ? Math.max(2, (Math.abs(it.ant) / maxAbs) * (plotH - 18)) : 0;
+
+                const xAt = cx - barW - gap / 2;
+                const yAt = baseY - hAt;
+                const xAnt = cx + gap / 2;
+                const yAnt = baseY - hAnt;
+
+                const corAt = it.at < 0 ? '#b91c1c' : '#003366';
+                const corAnt = it.ant < 0 ? '#f87171' : '#60a5fa';
+
+                if (hAt > 0) {
+                    svg += `<rect x="${xAt.toFixed(1)}" y="${yAt.toFixed(1)}" width="${barW.toFixed(1)}" height="${hAt.toFixed(1)}" rx="3" fill="${corAt}"/>`;
+                }
+                if (hAnt > 0) {
+                    svg += `<rect x="${xAnt.toFixed(1)}" y="${yAnt.toFixed(1)}" width="${barW.toFixed(1)}" height="${hAnt.toFixed(1)}" rx="3" fill="${corAnt}"/>`;
+                }
+
+                svg += `<text x="${(xAt + barW/2).toFixed(1)}" y="${Math.max(11, yAt - 4).toFixed(1)}" text-anchor="middle" font-size="8" fill="#111827">${fmt(it.at)}</text>`;
+                svg += `<text x="${(xAnt + barW/2).toFixed(1)}" y="${Math.max(11, yAnt - 4).toFixed(1)}" text-anchor="middle" font-size="8" fill="#4b5563">${fmt(it.ant)}</text>`;
+                svg += `<text x="${cx.toFixed(1)}" y="${(baseY + 16).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="bold" fill="#1f2937">${it.label}</text>`;
+            });
+
+            svg += `</svg>`;
+            box.innerHTML = svg;
+        }
+
 
         function salvar() {
             const btn = document.getElementById('btn-salvar');
@@ -236,13 +373,13 @@
         function excluirSelecionado() {
             const selecionados = document.querySelectorAll(".check-hist:checked");
             if (selecionados.length === 0) {
-                alert("Selecione pelo menos um item no historico para excluir.");
+                alert("Selecione pelo menos um item no histórico para excluir.");
                 return;
             }
             
             const msg = selecionados.length === 1 
-                ? "Tem certeza que deseja excluir este historico?" 
-                : "Tem certeza que deseja excluir os " + selecionados.length + " historicos selecionados?";
+                ? "Tem certeza que deseja excluir este histórico?" 
+                : "Tem certeza que deseja excluir os " + selecionados.length + " históricos selecionados?";
             
             if (!confirm(msg)) return;
 
@@ -264,9 +401,9 @@
 
             Promise.all(promessas).then(() => {
                 if (erros > 0) {
-                    alert("Concluido: " + excluidos + " excluidos, " + erros + " com erro.");
+                    alert("Concluído: " + excluidos + " excluídos, " + erros + " com erro.");
                 } else {
-                    alert(excluidos + " item(ns) excluido(s) com sucesso!");
+                    alert(excluidos + " item(ns) excluído(s) com sucesso!");
                 }
                 carregarHistorico();
             });
@@ -275,7 +412,7 @@
         async function exibirSelecionado() {
             const sel = document.querySelector('.check-hist:checked');
             if (!sel) {
-                alert("Selecione um item no historico.");
+                alert("Selecione um item no histórico.");
                 return;
             }
 
@@ -286,12 +423,12 @@
                 const d = dados.dados?.dados || dados.dados || dados;
 
                 if (typeof render === 'function') {
-                    render(d);
+                    render(d, d);
                 } else {
-                    alert("Funcao de renderizacao nao encontrada.");
+                    alert("Função de renderização não encontrada.");
                 }
             } catch (e) {
-                alert("Erro ao carregar o historico: " + e.message);
+                alert("Erro ao carregar o histórico: " + e.message);
                 console.error(e);
             }
         }
@@ -299,7 +436,7 @@
         function gerarPDF() {
             const sel = document.querySelector(".check-hist:checked");
             if (!sel) {
-                alert("Selecione um item no historico para gerar o PDF.");
+                alert("Selecione um item no histórico para gerar o PDF.");
                 return;
             }
             window.open('/api/analise_dfc/gerar_pdf/' + sel.value, '_blank');

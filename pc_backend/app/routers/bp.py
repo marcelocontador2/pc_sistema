@@ -61,7 +61,7 @@ def processar_bp(caminho):
         dados = {
             "ativo_circulante": campo("Ativo Circulante"),
             "caixa": campo("Caixa e Equivalentes"),
-            "superavit_financeiro": campo("Superavit Financeiro"),
+            "superavit_financeiro": campo("Superávit Financeiro"),
             "estoques": campo("Estoques"),
             "creditos": campo("Creditos a Curto Prazo"),
             "ativo_nao_circulante": campo("Ativo Nao Circulante"),
@@ -77,7 +77,7 @@ def processar_bp(caminho):
                 "atual": resultado["totais"]["passivo_total_2026"],
                 "anterior": resultado["totais"]["passivo_total_2025"]
             },
-            "patrimonio_liquido": campo("Patrimonio Liquido"),
+            "patrimonio_liquido": campo("Patrimônio Líquido"),
             "total_passivo": {
                 "atual": resultado["totais"]["ativo_total_2026"],
                 "anterior": resultado["totais"]["ativo_total_2025"]
@@ -204,7 +204,7 @@ def excluir_bp(id: int):
 
 
 @router.get("/gerar_pdf/{id}")
-def gerar_pdf_analise_bp(id: int):
+def gerar_pdf_analise_bp(id: int, request: Request = None):
     try:
         from playwright.sync_api import sync_playwright
         import time
@@ -218,7 +218,10 @@ def gerar_pdf_analise_bp(id: int):
         if not row:
             return Response(content=b"Registro nao encontrado", media_type="text/plain", status_code=404)
         
-        url = "http://127.0.0.1:994/analise_bp?id=" + str(id) + "&_t=" + str(int(time.time()))
+        base_url = "http://127.0.0.1:8000"
+        if request is not None and getattr(request, "base_url", None):
+            base_url = str(request.base_url).rstrip("/")
+        url = f"{base_url}/analise_bp?id={id}&_t={int(time.time())}"
         
         with sync_playwright() as p:
             browser = p.chromium.launch()

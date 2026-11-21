@@ -78,9 +78,9 @@ def desenhar_tabela_dvp(
     pdf.set_xy(x0 + 3, y + 2.5)
     pdf.cell(90, 4, "Indicador")
     pdf.set_xy(x0 + 95, y + 2.5)
-    pdf.cell(40, 4, "Periodo Atual", align="R")
+    pdf.cell(40, 4, "Período Atual", align="R")
     pdf.set_xy(x0 + 145, y + 2.5)
-    pdf.cell(30, 4, "Periodo Anterior", align="R")
+    pdf.cell(30, 4, "Período Anterior", align="R")
     y += 9
 
     # Linhas

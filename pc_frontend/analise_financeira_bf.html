@@ -2,7 +2,9 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><title>Análise Financeira-BF</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js">function exibirSelecionado() {
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function exibirSelecionado() {
             const check = document.querySelector(".check-hist:checked");
             if (!check) { alert("Selecione um item no histórico."); return; }
             fetch('/historico_analise_financeira_bf/' + check.value)
@@ -303,8 +305,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;mar
 .side h3{margin-top:0;font-size:15px}
 #historico-lista{list-style:none;padding:0;margin:0}
 #historico-lista li{margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px;font-size:13px}
-.main{flex:1;min-width:0;display:flex;gap:20px;align-items:flex-start}
-.esq{flex:1.2;min-width:0}.dir{flex:1;min-width:0;background:#fff;padding:20px;border-radius:6px;border:1px solid #cbd5e1}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:24px;align-items:stretch}
+.esq{width:100%;min-width:0}.dir{width:100%;min-width:0;background:#fff;padding:20px;border-radius:6px;border:1px solid #cbd5e1}
 .tab{background:#fff;border-radius:6px;border:1px solid #cbd5e1;overflow:hidden}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:#003366;color:#fff;padding:12px;text-align:center;border:1px solid #002244;font-size:12px}

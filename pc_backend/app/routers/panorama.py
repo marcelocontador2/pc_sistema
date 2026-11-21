@@ -121,7 +121,7 @@ def calcular_superavit_financeiro(linhas_bp, request: Request = None):
             continue
         col0 = str(linha[0]).upper().strip()
         col2 = str(linha[2]).upper().strip() if len(linha) > 2 else ""
-        # Tenta pegar direto da linha "Superavit Financeiro"
+        # Tenta pegar direto da linha "Superávit Financeiro"
         if "SUPERAVIT FINANCEIRO" in col0 or "SUPERAVIT/DEFICIT FINANCEIRO" in col0:
             for val in reversed(linha[1:]):
                 if val and str(val).strip():
@@ -231,15 +231,24 @@ async def gerar_pdf_panorama(id: str, request: Request = None):
         # PDF moderno
         pdf = FPDF()
         pdf.add_page()
+        _font_p = "C:/Windows/Fonts/arial.ttf"
+        _font_b = "C:/Windows/Fonts/arialbd.ttf"
+        _font_i = "C:/Windows/Fonts/ariali.ttf"
+        _use_arial = Path(_font_p).exists() and Path(_font_b).exists() and Path(_font_i).exists()
+        if _use_arial:
+            pdf.add_font("Arial", "", _font_p)
+            pdf.add_font("Arial", "B", _font_b)
+            pdf.add_font("Arial", "I", _font_i)
+        _fam = "Arial" if _use_arial else "Helvetica"
         pdf.set_auto_page_break(auto=False)
         # Cabecalho azul escuro
         pdf.set_fill_color(0, 51, 102)
         pdf.rect(0, 0, 210, 35, "F")
-        pdf.set_font("Helvetica", "B", 22)
+        pdf.set_font(_fam, "B", 22)
         pdf.set_text_color(255, 255, 255)
         pdf.set_xy(15, 8)
         pdf.cell(180, 10, "PANORAMA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 13)
+        pdf.set_font(_fam, "", 13)
         pdf.set_xy(15, 20)
         pdf.cell(180, 8, f"Resultados Gerais - {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         # Linha amarela de destaque
@@ -257,12 +266,12 @@ async def gerar_pdf_panorama(id: str, request: Request = None):
             ("Caixa e Equivalente de Caixa (BP)", caixa),
             ("Ativo Total", bp["ativo_total"]),
             ("Passivo Total", bp["passivo_total"]),
-            ("Patrimonio Liquido", bp["patrimonio_liquido"]),
+            ("Patrimônio Líquido", bp["patrimonio_liquido"]),
             ("Receitas Realizadas (BO)", bo["receita_realizada"]),
             ("Despesas Empenhadas (BO)", bo["despesa_empenhada"]),
-            ("Superavit/Deficit Orcamentario", superavit_orc),
-            ("Superavit Patrimonial (DVP)", superavit_patrimonial),
-            ("Superavit Financeiro (BP)", superavit_financeiro),
+            ("Superávit/Déficit Orçamentário", superavit_orc),
+            ("Superávit Patrimonial (DVP)", superavit_patrimonial),
+            ("Superávit Financeiro (BP)", superavit_financeiro),
         ]
         # Grid 3x3 de cards
         x_start = 15
@@ -281,12 +290,12 @@ async def gerar_pdf_panorama(id: str, request: Request = None):
             pdf.rect(x, y, card_w, card_h, "F")
             # Valor em azul escuro
             pdf.set_text_color(0, 51, 102)
-            pdf.set_font("Helvetica", "B", 14)
+            pdf.set_font(_fam, "B", 14)
             pdf.set_xy(x + 2, y + 4)
             pdf.cell(card_w - 4, 8, fmt_mi(valor), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             # Label em cinza escuro
             pdf.set_text_color(80, 80, 80)
-            pdf.set_font("Helvetica", "", 8)
+            pdf.set_font(_fam, "", 8)
             pdf.set_xy(x + 2, y + 18)
             pdf.multi_cell(card_w - 4, 3.5, nome)
         # Rodape
@@ -294,9 +303,9 @@ async def gerar_pdf_panorama(id: str, request: Request = None):
         pdf.set_line_width(0.3)
         pdf.line(15, 285, 195, 285)
         pdf.set_text_color(120, 120, 120)
-        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_font(_fam, "I", 8)
         pdf.set_xy(15, 287)
-        pdf.cell(90, 5, "Cofen - Analise das Demonstracoes Contabeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
+        pdf.cell(90, 5, "Cofen - Análise das Demonstrações Contábeis", new_x=XPos.RIGHT, new_y=YPos.TOP)
         from datetime import datetime
         pdf.set_xy(135, 287)
         pdf.cell(60, 5, f"Gerado em: {datetime.now():%d/%m/%Y %H:%M}", align="R")

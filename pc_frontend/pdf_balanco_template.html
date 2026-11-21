@@ -99,6 +99,41 @@
             font-weight: 700 !important;
         }
 
+    
+        /* Grafico abaixo da tabela no PDF */
+        .chart-section {
+            margin-top: 20px;
+            padding: 12px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #ffffff;
+            page-break-inside: avoid;
+        }
+        .chart-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e3a8a;
+            margin-bottom: 8px;
+        }
+        .chart-legend {
+            display: flex;
+            gap: 18px;
+            font-size: 9px;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
     </style>
     <script src="/js/auth_entidade.js"></script>
 </head>
@@ -164,5 +199,14 @@
             <tr class="total-geral"><td>TOTAL DE DISPÊNDIOS</td><td class="valor">R$ {{TOTAL_DISPENDIOS}}</td><td class="valor">R$ {{TOTAL_DISPENDIOS_ANT}}</td></tr>
         </tbody>
     </table>
+
+    <div class="chart-section">
+        <div class="chart-title">Comparativo Gráfico — Principais Indicadores (Atual x Anterior)</div>
+        <div class="chart-legend">
+            <span class="legend-item"><span class="legend-swatch" style="background:#003366;"></span>Período Atual</span>
+            <span class="legend-item"><span class="legend-swatch" style="background:#60a5fa;"></span>Período Anterior</span>
+        </div>
+        {{GRAFICO_SVG}}
+    </div>
 </body>
 </html>

@@ -84,7 +84,7 @@ def processar_dfc(caminho=None, periodo: str | None = None):
     res_pg = buscar_dfc_postgresql(periodo, resolver_entidade_id(request))
     if res_pg:
         return res_pg
-    return {"erro": "faltando", "mensagem": "Dados da DFC nao encontrados no PostgreSQL."}
+    return {"erro": "faltando", "mensagem": "Dados da DFC não encontrados no PostgreSQL."}
 
 
 @router.get("/analise_dfc")
@@ -96,7 +96,7 @@ async def serve_analise_dfc():
     )
     if os.path.exists(caminho):
         return FileResponse(caminho, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
-    return {"erro": "Arquivo HTML nao encontrado", "caminho": caminho}
+    return {"erro": "Arquivo HTML não encontrado", "caminho": caminho}
 
 
 @router.post("/salvar/{periodo}/{periodo_anterior}")
@@ -104,10 +104,10 @@ async def salvar_analise_dfc(periodo: str, periodo_anterior: str, request: Reque
     try:
         res_pg = buscar_dfc_postgresql(periodo, resolver_entidade_id(request))
         if not res_pg:
-            return {"ok": False, "mensagem": f"Dados da DFC n?o encontrados no PostgreSQL para {periodo}"}
+            return {"ok": False, "mensagem": f"Dados da DFC não encontrados no PostgreSQL para {periodo}"}
 
         if not res_pg or res_pg.get("erro"):
-            return {"ok": False, "mensagem": (res_pg or {}).get("mensagem", "Dados da DFC n?o encontrados no PostgreSQL")}
+            return {"ok": False, "mensagem": (res_pg or {}).get("mensagem", "Dados da DFC não encontrados no PostgreSQL")}
 
         dados_json = res_pg["dados"]
         periodo_label = f"{periodo} vs {periodo_anterior}"
@@ -145,7 +145,7 @@ async def get_historico_dfc(request: Request = None):
         conn.close()
         return [{"id": r[0], "periodo": r[1], "data_geracao": str(r[2])} for r in rows]
     except Exception as e:
-        print(f"[DFC] Erro ao listar historico: {e}")
+        print(f"[DFC] Erro ao listar histórico: {e}")
         return []
 
 
@@ -158,7 +158,7 @@ async def get_historico_dfc_id(id: int):
         row = cur.fetchone()
         conn.close()
         if not row:
-            return {"erro": True, "mensagem": "Nao encontrado"}
+            return {"erro": True, "mensagem": "Não encontrado"}
         dados = row[1] if isinstance(row[1], dict) else json.loads(row[1])
         return {"erro": False, "periodo": row[0], "dados": dados}
     except Exception as e:
@@ -190,9 +190,9 @@ def gerar_pdf_analise_dfc(id: int, request: Request = None):
         conn.close()
 
         if not row:
-            return Response(content=b"Registro nao encontrado", media_type="text/plain", status_code=404)
+            return Response(content="Registro não encontrado".encode("utf-8"), media_type="text/plain", status_code=404)
 
-        url = (str(request.base_url).rstrip("/") if request and "testserver" not in str(request.base_url) else os.getenv("PC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")) + "/analise_dfc?id=" + str(id) + "&_t=" + str(int(time.time()))
+        url = (str(request.base_url).rstrip("/") if request and "testserver" not in str(request.base_url) else os.getenv("PC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")) + "/api/analise_dfc/analise_dfc?id=" + str(id) + "&_t=" + str(int(time.time()))
 
         with sync_playwright() as p:
             browser = p.chromium.launch()
@@ -201,7 +201,8 @@ def gerar_pdf_analise_dfc(id: int, request: Request = None):
             page.wait_for_timeout(4000)
             page.evaluate("() => { const el = document.querySelector('.top-bar, .filtros, .sidebar, .btn'); if (el) el.style.display = 'none'; }")
             page.add_style_tag(content="button, select, .top-bar, .filtros, .sidebar { display: none !important; }")
-            page.wait_for_timeout(1000)
+            page.wait_for_function("() => { const box = document.getElementById('dfc-grafico-svg'); return box && box.innerHTML.includes('<svg'); }", timeout=8000)
+            page.wait_for_timeout(500)
             pdf_bytes = page.pdf(format="A4", print_background=True, margin={"top": "10mm", "bottom": "10mm", "left": "10mm", "right": "10mm"})
             browser.close()
 
@@ -223,7 +224,7 @@ def api_analise_dfc(periodo: str, request: Request = None):
         if res_pg:
             return res_pg
 
-        return {"erro": "faltando", "mensagem": f"Dados da DFC n?o encontrados no PostgreSQL para {periodo}"}
+        return {"erro": "faltando", "mensagem": f"Dados da DFC não encontrados no PostgreSQL para {periodo}"}
     except Exception as e:
         tb = traceback.format_exc()
         print(f"[DFC] ERRO: {e}\n{tb}")

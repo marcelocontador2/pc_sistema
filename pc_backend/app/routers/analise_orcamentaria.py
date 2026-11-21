@@ -104,14 +104,14 @@ def gerar_pdf_analise_orcamentaria(id: int, request: Request = None):
         cursor.execute("SELECT periodo, resultado_json FROM historico_analise_orcamentaria WHERE id = %s", (id,))
         row = cursor.fetchone()
         conn.close()
-        if not row: raise HTTPException(status_code=404, detail="Historico nao encontrado")
+        if not row: raise HTTPException(status_code=404, detail="Histórico não encontrado")
         periodo, d_json = row
         d = json.loads(d_json)
         # Estrutura esperada: { atual: {...}, anterior: {...} }
         a = d.get("atual", {})
         b = d.get("anterior", {})
         # --- 1. GERA O GRíFICO (Atual primeiro) ---
-        labels = ["Receita Realizada", "Despesa Empenhada", "Superavit"]
+        labels = ["Receita Realizada", "Despesa Empenhada", "Superávit"]
         ant = [b.get("receita_realizada", 0), b.get("despesa_empenhada", 0), b.get("superavit", 0)]
         atu = [a.get("receita_realizada", 0), a.get("despesa_empenhada", 0), a.get("superavit", 0)]
         fig, ax = plt.subplots(figsize=(6, 2.8), dpi=150)
@@ -144,18 +144,18 @@ def gerar_pdf_analise_orcamentaria(id: int, request: Request = None):
             f_family = "helvetica"
         pdf.set_font(f_family, "B", 16)
         pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 10, "Analise Orcamentaria Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.cell(0, 10, "Análise Orçamentária Comparativa", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         pdf.set_font(f_family, "", 10)
         pdf.set_text_color(100, 100, 100)
-        pdf.cell(0, 5, f"Periodo de Referencia: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
+        pdf.cell(0, 5, f"Período de Referência: {periodo}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
         pdf.ln(8)
-        # Tabela: Indicador | Periodo Atual | Periodo Anterior | Var (%)
+        # Tabela: Indicador | Período Atual | Período Anterior | Var (%)
         pdf.set_fill_color(0, 51, 102)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font(f_family, "B", 10)
         pdf.cell(80, 8, "Indicador", border=1, fill=True, align="C")
-        pdf.cell(45, 8, "Periodo Atual", border=1, fill=True, align="C")
-        pdf.cell(45, 8, "Periodo Anterior", border=1, fill=True, align="C")
+        pdf.cell(45, 8, "Período Atual", border=1, fill=True, align="C")
+        pdf.cell(45, 8, "Período Anterior", border=1, fill=True, align="C")
         pdf.cell(30, 8, "Var. (%)", border=1, fill=True, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_text_color(0, 0, 0)
         pdf.set_font(f_family, "", 9)
@@ -181,12 +181,12 @@ def gerar_pdf_analise_orcamentaria(id: int, request: Request = None):
         ind = [
             ("Receita Realizada", rec_real, rec_real_ant, 1e6),
             ("Despesas Empenhadas", desp_emp, desp_emp_ant, 1e6),
-            ("Superavit Orcamentario", a.get("superavit", 0), b.get("superavit", 0), 1e6),
+            ("Superávit Orçamentário", a.get("superavit", 0), b.get("superavit", 0), 1e6),
             ("Restos a Pagar Inscritos", a.get("restos_pagar", 0), b.get("restos_pagar", 0), 1e6),
-            ("Receitas Orcadas", rec_orc, rec_orc_ant, 1e6),
-            ("Despesas Orcadas", desp_orc, desp_orc_ant, 1e6),
-            ("% de Realizacao das Receitas", pct_rec, pct_rec_ant, 1),
-            ("% de Realizacao das Despesas", pct_desp, pct_desp_ant, 1),
+            ("Receitas Orçadas", rec_orc, rec_orc_ant, 1e6),
+            ("Despesas Orçadas", desp_orc, desp_orc_ant, 1e6),
+            ("% de Realização das Receitas", pct_rec, pct_rec_ant, 1),
+            ("% de Realização das Despesas", pct_desp, pct_desp_ant, 1),
         ]
 
         for nome, va, vb, m in ind:
@@ -205,10 +205,10 @@ def gerar_pdf_analise_orcamentaria(id: int, request: Request = None):
         # Conclusao no lado direito
         pdf.set_xy(150, y_atual)
         pdf.set_font(f_family, "B", 10)
-        pdf.cell(0, 6, "Principais conclusoes:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(0, 6, "Principais conclusões:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_x(150)
         pdf.set_font(f_family, "", 8)
-        txt_conclusao = f"A receita realizada representa {a.get('pct_receita', 0):.2f}% da previsao atualizada, enquanto as despesas empenhadas representam {a.get('pct_despesa', 0):.2f}% da dotacao atualizada."
+        txt_conclusao = f"A receita realizada representa {a.get('pct_receita', 0):.2f}% da previsão atualizada, enquanto as despesas empenhadas representam {a.get('pct_despesa', 0):.2f}% da dotação atualizada."
         pdf.multi_cell(90, 4, txt_conclusao)
         pdf_bytes = bytes(pdf.output())
         return Response(content=pdf_bytes, media_type="application/pdf", headers={

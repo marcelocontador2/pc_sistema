@@ -71,7 +71,7 @@ def api_analise_financeira_bf(periodo: str, periodo_anterior: str = None, reques
 
         dados = _buscar_balanco_pg(periodo_atual, ant)
         if not dados:
-            return {"erro": True, "mensagem": "Balanco Financeiro nao encontrado no PostgreSQL para " + periodo_atual}
+            return {"erro": True, "mensagem": "Balanço Financeiro não encontrado no PostgreSQL para " + periodo_atual}
 
         return {"erro": False, "dados": dados}
     except Exception as e:
@@ -231,6 +231,52 @@ def gerar_pdf_analise_financeira_bf(id: int, request: Request = None):
         get_val("caixa.saldo_seguinte", "anterior")
     )
 
+
+    def gerar_grafico_svg_bf():
+        categorias = [
+            ("Receitas", float(get_val("receitas.total", "atual") or 0), float(get_val("receitas.total", "anterior") or 0)),
+            ("Despesas", float(get_val("despesas.total", "atual") or 0), float(get_val("despesas.total", "anterior") or 0)),
+            ("Saldo Ant.", float(get_val("caixa.saldo_anterior", "atual") or 0), float(get_val("caixa.saldo_anterior", "anterior") or 0)),
+            ("Saldo Seg.", float(get_val("caixa.saldo_seguinte", "atual") or 0), float(get_val("caixa.saldo_seguinte", "anterior") or 0)),
+        ]
+        max_val = max([max(abs(v_at), abs(v_ant)) for _, v_at, v_ant in categorias] + [1.0])
+        width, height = 680, 210
+        pad_left, pad_right, pad_top, pad_bottom = 24, 24, 24, 34
+        plot_h = height - pad_top - pad_bottom
+        base_y = pad_top + plot_h
+        slot_w = (width - pad_left - pad_right) / len(categorias)
+        bar_w = min(38.0, slot_w * 0.28)
+        gap = 6.0
+
+        parts = [
+            f'<svg viewBox="0 0 {width} {height}" width="100%" height="210" xmlns="http://www.w3.org/2000/svg" style="display:block;font-family:Arial,sans-serif;">',
+            f'<line x1="{pad_left}" y1="{base_y}" x2="{width - pad_right}" y2="{base_y}" stroke="#9ca3af" stroke-width="1"/>'
+        ]
+
+        for idx, (rotulo, v_at, v_ant) in enumerate(categorias):
+            cx = pad_left + slot_w * idx + slot_w / 2.0
+            h_at = max(2.0, (abs(v_at) / max_val) * (plot_h - 18)) if v_at != 0 else 0.0
+            h_ant = max(2.0, (abs(v_ant) / max_val) * (plot_h - 18)) if v_ant != 0 else 0.0
+
+            x_at = cx - bar_w - gap / 2.0
+            y_at = base_y - h_at
+            x_ant = cx + gap / 2.0
+            y_ant = base_y - h_ant
+
+            if h_at > 0:
+                parts.append(f'<rect x="{x_at:.1f}" y="{y_at:.1f}" width="{bar_w:.1f}" height="{h_at:.1f}" rx="3" fill="#003366"/>')
+            if h_ant > 0:
+                parts.append(f'<rect x="{x_ant:.1f}" y="{y_ant:.1f}" width="{bar_w:.1f}" height="{h_ant:.1f}" rx="3" fill="#60a5fa"/>')
+
+            lbl_at = fmt(v_at)
+            lbl_ant = fmt(v_ant)
+            parts.append(f'<text x="{x_at + bar_w/2:.1f}" y="{max(12.0, y_at - 4):.1f}" text-anchor="middle" font-size="8" fill="#111827">{lbl_at}</text>')
+            parts.append(f'<text x="{x_ant + bar_w/2:.1f}" y="{max(12.0, y_ant - 4):.1f}" text-anchor="middle" font-size="8" fill="#374151">{lbl_ant}</text>')
+            parts.append(f'<text x="{cx:.1f}" y="{base_y + 16:.1f}" text-anchor="middle" font-size="10" font-weight="bold" fill="#1f2937">{rotulo}</text>')
+
+        parts.append("</svg>")
+        return "".join(parts)
+
     # Monta os valores do template
     valores = {
         "{{PERIODO}}": periodo_label,
@@ -262,6 +308,7 @@ def gerar_pdf_analise_financeira_bf(id: int, request: Request = None):
         "{{TOTAL_INGRESSOS_ANT}}": fmt(total_ingressos_ant),
         "{{TOTAL_DISPENDIOS}}": fmt(total_dispendios_atual),
         "{{TOTAL_DISPENDIOS_ANT}}": fmt(total_dispendios_ant),
+        "{{GRAFICO_SVG}}": gerar_grafico_svg_bf(),
     }
 
     # Carrega o template e substitui os valores

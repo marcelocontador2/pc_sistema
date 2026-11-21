@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Rota do DVP (An?lise Patrimonial) - PostgreSQL-first.
+Rota do DVP (Análise Patrimonial) - PostgreSQL-first.
 """
 import csv
 import json
@@ -57,9 +57,9 @@ def _recalcular_indicadores(dados: dict) -> dict:
 
     def _classificar(val):
         if val > 0:
-            return "Super?vit Patrimonial"
+            return "Superávit Patrimonial"
         if val < 0:
-            return "D?ficit Patrimonial"
+            return "Déficit Patrimonial"
         return "Nulo"
 
     tipo_ant = (base.get("tipo_resultado") or {}).get("anterior") or (_classificar(res_ant) if (vpa_ant != 0.0 or vpd_ant != 0.0) else "")
@@ -119,7 +119,7 @@ def buscar_dvp_postgresql(periodo: str | None = None, entidade_id: int | None = 
             """
             SELECT grupo_demonstrativo, valor_atual
             FROM demonstracao_resumo
-            WHERE grupo_demonstrativo ILIKE ANY (ARRAY['%VPA%', '%VPD%', '%Superavit%'])
+            WHERE grupo_demonstrativo ILIKE ANY (ARRAY['%VPA%', '%VPD%', '%Superávit%'])
             ORDER BY id DESC
             """
         )
@@ -371,7 +371,7 @@ def gerar_pdf_analise_dvp(id: int):
         pdf.cell(0, 7, fmt_brl(res))
         pdf.set_font("Arial", "B", 10)
         pdf.set_xy(20, 73)
-        pdf.cell(0, 5, "Super?vit Patrimonial")
+        pdf.cell(0, 5, "Superávit Patrimonial")
 
         desenhar_tabela_dvp(pdf, dados, y_inicial=92)
 

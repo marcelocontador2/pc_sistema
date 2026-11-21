@@ -64,7 +64,7 @@ async def serve_liquidez(request: Request = None):
 async def api_calcular_liquidez(periodo: str, request: Request = None):
     dados = _calc_liquidez(periodo, request)
     if not dados:
-        return {"erro": True, "mensagem": "Balanco Patrimonial nao encontrado para este periodo."}
+        return {"erro": True, "mensagem": "Balanço Patrimonial não encontrado para este periodo."}
     return dados
 
 

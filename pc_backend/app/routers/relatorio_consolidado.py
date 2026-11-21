@@ -56,9 +56,9 @@ async def api_relatorio_consolidado_novo(periodo: str, request: Request = None):
     nomes_amigaveis = {
         "analise_bp": "Análise BP",
         "analise_dfc": "Análise DFC",
-        "analise_patrimonial": "An?lise Patrimonial (DVP)",
+        "analise_patrimonial": "Análise Patrimonial (DVP)",
         "analise_orcamentaria": "Análise Orçamentária (BO)",
-        "analise_financeira_bf": "An?lise Financeira (BF)",
+        "analise_financeira_bf": "Análise Financeira (BF)",
         "comparativo_receitas": "Comparativo de Receitas",
         "comparativo_despesas": "Comparativo de Despesas",
         "panorama": "Panorama de Resultados",
@@ -1314,7 +1314,7 @@ def gerar_pdf_relatorio_consolidado(id: int, request: Request = None):
                     html_parts.append(f"<div class='pano-pill vermelho'><div class='label'>Despesa Empenhada</div><div class='value'>{fmt_pano(despesa)}</div></div>")
                     html_parts.append("</div>")
                     html_parts.append("<div class='pano-row'>")
-                    # Superavits com cor condicional
+                    # Superávits com cor condicional
                     def cor_superavit(v):
                         n = num(v)
                         return "verde" if n >= 0 else "vermelho"

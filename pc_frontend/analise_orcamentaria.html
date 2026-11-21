@@ -2,60 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><title>Análise Orçamentária Comparativa</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js">function exibirSelecionado() {
-            const check = document.querySelector(".check-hist:checked");
-            if (!check) { alert("Selecione um item no histórico."); return; }
-            // Busca o período no banco usando o ID
-            fetch('/historico_analise_orcamentaria/' + check.value)
-                .then(r => r.json())
-                .then(resp => {
-                    // O backend retorna {periodo: "...", dados: {...}} ou similar
-                    // Vamos extrair o período de qualquer campo disponível
-                    let periodo = resp.periodo || resp.periodo_atual || resp.periodo_anterior;
-                    if (!periodo) {
-                        // Fallback: pega do JSON se existir
-                        if (resp.dados && resp.dados.periodo_atual) {
-                            periodo = resp.dados.periodo_atual;
-                        }
-                    }
-                    if (!periodo) {
-                        // Último fallback: usa o select atual
-                        periodo = document.getElementById('periodo').value;
-                    }
-                    if (periodo) {
-                        // Define o select e chama a função de carregar
-                        document.getElementById('periodo').value = periodo;
-                        carregar();
-                    } else {
-                        alert("Não foi possível identificar o período do histórico.");
-                    }
-                })
-                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
-        }
-
-        
-    
-    
-        function gerarPDFHistorico() {
-            // CORRECAO: Busca a classe correta '.check-hist' em vez do nome errado 'historico'
-            const sel = document.querySelector('.check-hist:checked');
-            if (!sel) {
-                alert("Atenção: Selecione um item do Histórico Salvo antes de gerar o PDF.");
-                return;
-            }
-            // CORRECAO: URL usando o padrao de rota definido no backend /{id}
-            window.open('/gerar_pdf_analise_orcamentaria/' + sel.value, '_blank');
-        }
-            const url = `/gerar_pdf_analise_orcamentaria?historico_id=${sel.value}`;
-            const a = document.createElement('a');
-            a.href = url;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-    </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:20px;margin:0;color:#333}
 .btn{padding:8px 18px;border:none;border-radius:4px;color:#fff;font-weight:bold;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px}
@@ -122,15 +69,20 @@ tr:nth-child(even){background:#f8fbff}
 </div>
 <script>
 let chart=null;
+let reqSeq=0;
 function carregar(){
-const p=document.getElementById('periodo').value;
+  const seq=++reqSeq;
+  const p=document.getElementById('periodo').value;
   const pa=p.replace('2026','2025');
   const tb=document.querySelector('#tab tbody');
+  const conclEl=document.getElementById('concl');
+  if(conclEl){conclEl.style.display='none';conclEl.innerHTML='';}
   tb.innerHTML='<tr><td colspan="4" style="text-align:center">Buscando...</td></tr>';
   Promise.all([
     fetch('/api/analise_orcamentaria_bo/'+p).then(r=>r.json()),
     fetch('/api/analise_orcamentaria_bo/'+pa).then(r=>r.json())
   ]).then(([a,b])=>{
+        if(seq!==reqSeq) return;
         // === CARD: demonstrativos faltando ===
         const conclEl = document.getElementById("concl");
         if (conclEl) { conclEl.style.display = "none"; conclEl.innerHTML = ""; }
@@ -241,34 +193,29 @@ function gerarPDF() {
     }
 document.addEventListener('DOMContentLoaded',carregarHistorico);
 function exibirSelecionado() {
-            const check = document.querySelector(".check-hist:checked");
-            if (!check) { alert("Selecione um item no histórico."); return; }
-            // Busca o período no banco usando o ID
-            fetch('/historico_analise_orcamentaria/' + check.value)
-                .then(r => r.json())
-                .then(resp => {
-                    // O backend retorna {periodo: "...", dados: {...}} ou similar
-                    // Vamos extrair o período de qualquer campo disponível
-                    let periodo = resp.periodo || resp.periodo_atual || resp.periodo_anterior;
-                    if (!periodo) {
-                        // Fallback: pega do JSON se existir
-                        if (resp.dados && resp.dados.periodo_atual) {
-                            periodo = resp.dados.periodo_atual;
-                        }
-                    }
-                    if (!periodo) {
-                        // Último fallback: usa o select atual
-                        periodo = document.getElementById('periodo').value;
-                    }
-                    if (periodo) {
-                        // Define o select e chama a função de carregar
-                        document.getElementById('periodo').value = periodo;
-                        carregar();
-                    } else {
-                        alert("Não foi possível identificar o período do histórico.");
-                    }
-                })
-                .catch(e => alert("Erro ao carregar o histórico: " + e.message));
-        }
+    const check = document.querySelector(".check-hist:checked");
+    if (!check) { alert("Selecione um item no histórico."); return; }
+    fetch('/historico_analise_orcamentaria/' + check.value)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(resp => {
+            let periodo = resp.periodo || resp.periodo_atual || resp.periodo_anterior;
+            if (!periodo && resp.dados && resp.dados.periodo_atual) {
+                periodo = resp.dados.periodo_atual;
+            }
+            if (!periodo) {
+                periodo = document.getElementById('periodo').value;
+            }
+            if (periodo) {
+                const sel = document.getElementById('periodo');
+                if ([...sel.options].some(o => o.value === periodo)) {
+                    sel.value = periodo;
+                }
+                carregar();
+            } else {
+                alert("Não foi possível identificar o período do histórico.");
+            }
+        })
+        .catch(e => alert("Erro ao carregar o histórico: " + e.message));
+}
 </script>
 </body></html>
