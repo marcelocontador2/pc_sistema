@@ -164,6 +164,199 @@ def get_historico_analise_patrimonial(request: Request):
     return _listar_historico_json_pg("historico_analise_patrimonial", request, "resultado_json")
 
 
+@router.api_route("/salvar_analise_patrimonial/{periodo}", methods=["GET", "POST"])
+def salvar_analise_patrimonial_compat(periodo: str, request: Request = None):
+    import json as _json
+    from datetime import datetime
+    import psycopg2
+    from pc_backend.app.config import PG_CONFIG
+    from pc_backend.app.routers.dvp import buscar_dvp_postgresql
+
+    ent_id = resolver_entidade_id(request)
+    res_pg = buscar_dvp_postgresql(periodo, ent_id)
+    if not res_pg or res_pg.get("erro"):
+        return {
+            "ok": False,
+            "erro": True,
+            "mensagem": (res_pg or {}).get("mensagem") or f"Dados do DVP não encontrados para {periodo}.",
+        }
+
+    dados = res_pg.get("dados") if isinstance(res_pg, dict) and isinstance(res_pg.get("dados"), dict) else res_pg
+    if not isinstance(dados, dict) or not dados:
+        return {"ok": False, "erro": True, "mensagem": "Estrutura de dados do DVP vazia."}
+
+    payload_json = _json.dumps(dados, ensure_ascii=False)
+    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+        new_id = None
+        for tab in ("historico_analise_patrimonial", "historico_analise_dvp"):
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = %s
+                """,
+                (tab,),
+            )
+            cols = {r[0] for r in cur.fetchall()}
+            if not cols:
+                continue
+
+            insert_cols = ["periodo", "resultado_json"]
+            insert_vals = [periodo, payload_json]
+
+            if "data_geracao" in cols:
+                insert_cols.append("data_geracao")
+                insert_vals.append(agora_str)
+            if "entidade_id" in cols:
+                insert_cols.append("entidade_id")
+                insert_vals.append(ent_id)
+
+            placeholders = ", ".join(["%s"] * len(insert_cols))
+            cols_sql = ", ".join(insert_cols)
+            cur.execute(
+                f"INSERT INTO {tab} ({cols_sql}) VALUES ({placeholders}) RETURNING id",
+                tuple(insert_vals),
+            )
+            row_id = cur.fetchone()
+            if tab == "historico_analise_patrimonial" and row_id:
+                new_id = row_id[0]
+            elif new_id is None and row_id:
+                new_id = row_id[0]
+
+        conn.commit()
+        return {"ok": True, "id": new_id, "periodo": periodo, "data_geracao": agora_str, "mensagem": "Relatório salvo!"}
+    except Exception as e:
+        conn.rollback()
+        return {"ok": False, "erro": True, "mensagem": str(e)}
+    finally:
+        conn.close()
+
+
+@router.get("/historico_analise_patrimonial/{item_id}")
+def get_historico_analise_patrimonial_item(item_id: int, request: Request = None):
+    import json as _json
+    from fastapi import HTTPException
+    from pc_backend.app.config import PG_CONFIG
+    import psycopg2
+
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+        for tab in ("historico_analise_patrimonial", "historico_analise_dvp"):
+            cur.execute(f"SELECT id, periodo, data_geracao, resultado_json FROM {tab} WHERE id = %s", (item_id,))
+            row = cur.fetchone()
+            if row:
+                raw = row[3]
+                dados = raw if isinstance(raw, dict) else _json.loads(raw or "{}")
+                if isinstance(dados, dict) and isinstance(dados.get("dados"), dict):
+                    dados = dados["dados"]
+                return {
+                    "id": row[0],
+                    "periodo": row[1],
+                    "data_geracao": str(row[2]) if row[2] is not None else "",
+                    "dados": dados,
+                }
+        raise HTTPException(status_code=404, detail="Registro de histórico não encontrado")
+    finally:
+        conn.close()
+
+
+@router.get("/gerar_pdf_analise_patrimonial/{id}")
+def gerar_pdf_analise_patrimonial(id: int, request: Request = None):
+    import json as _json
+    from fastapi import Response
+    from pc_backend.app.config import PG_CONFIG
+    from pc_backend.app.services.pdf_dvp import _sanitizar_pdf, desenhar_grafico_dvp_pdf, desenhar_tabela_dvp, fmt_brl
+    from pc_backend.core.pdf_utils import novo_pdf
+    import psycopg2
+
+    conn = psycopg2.connect(**PG_CONFIG)
+    try:
+        cur = conn.cursor()
+        row = None
+        for tab in ("historico_analise_patrimonial", "historico_analise_dvp"):
+            cur.execute(f"SELECT periodo, resultado_json FROM {tab} WHERE id = %s", (id,))
+            row = cur.fetchone()
+            if row:
+                break
+        if not row:
+            return Response(content="Registro nao encontrado", media_type="text/plain", status_code=404)
+
+        periodo_label = _sanitizar_pdf(row[0])
+        raw = row[1]
+        dados = raw if isinstance(raw, dict) else _json.loads(raw or "{}")
+        if isinstance(dados, dict) and isinstance(dados.get("dados"), dict):
+            dados = dados["dados"]
+
+        pdf = novo_pdf(orientation="P", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        W = pdf.w
+
+        pdf.set_fill_color(0, 51, 102)
+        pdf.rect(0, 0, W, 30, style="F")
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 15)
+        pdf.set_xy(15, 8)
+        pdf.cell(0, 8, _sanitizar_pdf("DVP - Demonstração das Variações Patrimoniais"))
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_xy(15, 18)
+        pdf.cell(0, 6, _sanitizar_pdf(f"Período: {periodo_label}"))
+
+        vpa = (dados.get("total_vpa") or {}).get("atual", 0)
+        vpd = (dados.get("total_vpd") or {}).get("atual", 0)
+        res = (dados.get("resultado") or {}).get("atual", 0)
+        tipo_res = (dados.get("tipo_resultado") or {}).get("atual") or ("Superávit Patrimonial" if float(res or 0) >= 0 else "Déficit Patrimonial")
+
+        pdf.set_fill_color(227, 242, 253)
+        pdf.rect(15, 40, 85, 15, style="F")
+        pdf.set_text_color(0, 51, 102)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_xy(20, 43)
+        pdf.cell(0, 6, fmt_brl(vpa))
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(102, 102, 102)
+        pdf.set_xy(20, 50)
+        pdf.cell(0, 4, _sanitizar_pdf("Total VPA (Variações Aumentativas)"))
+
+        pdf.set_fill_color(255, 235, 238)
+        pdf.rect(110, 40, 85, 15, style="F")
+        pdf.set_text_color(220, 53, 69)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_xy(115, 43)
+        pdf.cell(0, 6, fmt_brl(vpd))
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(102, 102, 102)
+        pdf.set_xy(115, 50)
+        pdf.cell(0, 4, _sanitizar_pdf("Total VPD (Variações Diminutivas)"))
+
+        pdf.set_fill_color(232, 245, 233)
+        pdf.rect(15, 62, 180, 18, style="F")
+        pdf.set_text_color(0, 51, 102)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.set_xy(20, 66)
+        pdf.cell(0, 7, fmt_brl(res))
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_xy(20, 73)
+        pdf.cell(0, 5, _sanitizar_pdf(str(tipo_res)))
+
+        y_apos_tabela = desenhar_tabela_dvp(pdf, dados, y_inicial=90)
+        desenhar_grafico_dvp_pdf(pdf, dados, y_inicial=y_apos_tabela, altura=50.0)
+
+        pdf_bytes = bytes(pdf.output())
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=DVP_{id}.pdf"},
+        )
+    finally:
+        conn.close()
+
+
 @router.get("/historico_composicao_receitas_despesas")
 def get_historico_composicao_receitas_despesas(request: Request):
     return _listar_historico_json_pg("historico_composicao_receitas_despesas", request, "resultado_json")

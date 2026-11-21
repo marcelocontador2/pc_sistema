@@ -3,33 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <title>Análise Patrimonial</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js">
-        
-    
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; color: #333; margin: 0; padding: 20px; }
-        .top-bar { margin-bottom: 20px; display: flex; gap: 10px; }
+        .top-bar { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
         .btn-voltar { background: #ff8c00; }
         .btn-exibir { background: #28a745; }
         .btn-excluir { background: #dc3545; }
         .btn-pdf { background: #003366; }
-        .filtros { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 15px; align-items: flex-end; }
-        .filtros select { padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
         .btn-verificar { background: #003366; }
         .btn-salvar { background: #28a745; }
-        .layout { display: flex; gap: 20px; }
-        .esq { flex: 1.5; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; }
-        .dir { flex: 1; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; }
+        .filtros { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
+        .filtros select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .flex-layout { display: flex; gap: 20px; align-items: flex-start; }
+        .sidebar { width: 240px; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px; flex-shrink: 0; }
+        .painel-principal { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+        .box-card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #003366; color: white; padding: 10px; text-align: center; font-size: 13px; }
         td { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; }
         .neg { color: #dc3545; font-weight: bold; }
         .pos { color: #28a745; font-weight: bold; }
-        .margem-card { background: #003366; color: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
-        .sidebar { width: 220px; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px; }
-        .flex-layout { display: flex; gap: 20px; }
+        .resultado-box { background: #fff; border-radius: 8px; padding: 20px; border: 1px solid #e5e7eb; border-top: 4px solid #003366; }
+        .resultado-grid { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .grafico-box { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; }
+        .grafico-wrap { position: relative; height: 320px; width: 100%; }
     </style>
     <script src="/js/auth_entidade.js"></script>
 </head>
@@ -40,10 +39,12 @@
         <button class="btn btn-excluir" onclick="excluirSelecionado()">Excluir Selecionado</button>
         <button class="btn btn-pdf" onclick="gerarPDFHistorico()">Gerar PDF</button>
     </div>
+
     <div style="margin-bottom: 20px;">
         <div style="color: #a0aec0; font-size: 12px; text-transform: uppercase;">Análise Patrimonial</div>
-        <h1 style="color: #003366; margin: 5px 0 20px 0; font-size: 26px;">Demonstração das Variações Patrimoniais (DVP)</h1>
+        <h1 style="color: #003366; margin: 5px 0 10px 0; font-size: 26px;">Demonstração das Variações Patrimoniais (DVP)</h1>
     </div>
+
     <div class="filtros">
         <div>
             <label style="display:block; font-size:12px; margin-bottom:5px;">Período:</label>
@@ -54,6 +55,7 @@
         <button class="btn btn-verificar" onclick="carregar()">Verificar Patrimônio</button>
         <button class="btn btn-salvar" id="btn-salvar" onclick="salvar()" style="display:none;">Confirmar e Salvar</button>
     </div>
+
     <div class="flex-layout">
         <div class="sidebar">
             <h3 style="font-size: 14px; margin-top: 0;">Histórico Salvo</h3>
@@ -61,38 +63,187 @@
                 <li>Carregando...</li>
             </ul>
         </div>
-        <div style="flex: 1;">
-            <div class="layout">
-                <div class="esq">
-                    <table id="tab">
-                        <thead>
-                            <tr>
-                                <th style="text-align:left;">Indicador</th>
-                                <th>Período Atual (R$)</th>
-                                <th>Período Anterior (R$)</th>
-                                <th>Var. (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td colspan="4" style="text-align:center;">Clique em "Verificar Patrimônio"</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="dir">
-                    <canvas id="graf" style="max-height: 350px;"></canvas>
-                    <div id="concl" class="margem-card" style="display:none;"></div>
+
+        <div class="painel-principal">
+            <div class="box-card">
+                <table id="tab">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;">Indicador</th>
+                            <th>Período Atual (R$)</th>
+                            <th>Período Anterior (R$)</th>
+                            <th>Var. (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="4" style="text-align:center;">Clique em "Verificar Patrimônio"</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="concl" style="display:none;"></div>
+
+            <div class="grafico-box" id="box-grafico">
+                <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #003366;">Comparativo Gráfico — VPA, VPD e Resultado Patrimonial</h3>
+                <div class="grafico-wrap">
+                    <canvas id="graf"></canvas>
                 </div>
             </div>
         </div>
     </div>
+
     <script>
         let chart = null;
-        function fmt(v) { return (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
-        function fmtPct(v) { return (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%'; }
-        function desenharTela(d, periodo) {
+
+        function fmt(v) {
+            return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function fmtPct(v) {
+            return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+        }
+
+        function renderConclusao(d) {
+            const concl = document.getElementById('concl');
+            if (!d || !d.resultado) {
+                concl.style.display = 'none';
+                return;
+            }
+            const resAtual = Number((d.resultado && d.resultado.atual) || 0);
+            const resAnt = Number((d.resultado && d.resultado.anterior) || 0);
+            const vpaAtual = Number((d.total_vpa && d.total_vpa.atual) || 0);
+            const vpaAnt = Number((d.total_vpa && d.total_vpa.anterior) || 0);
+
+            const tipoAtual = (d.tipo_resultado && d.tipo_resultado.atual) || (resAtual >= 0 ? 'Superávit Patrimonial' : 'Déficit Patrimonial');
+            const tipoAnt = (d.tipo_resultado && d.tipo_resultado.anterior) || (resAnt >= 0 ? 'Superávit Patrimonial' : 'Déficit Patrimonial');
+            const corTipo = tipoAtual.includes('Superávit') ? '#003366' : '#dc3545';
+
+            const margemAtualRaw = d.margem_resultado && d.margem_resultado.atual;
+            const margemAtual = margemAtualRaw !== undefined && margemAtualRaw !== null
+                ? Number(margemAtualRaw)
+                : (vpaAtual !== 0 ? (resAtual / Math.abs(vpaAtual)) * 100 : 0);
+
+            const margemAntRaw = d.margem_resultado && d.margem_resultado.anterior;
+            const margemAnt = (margemAntRaw !== undefined && margemAntRaw !== null && Number(margemAntRaw) !== 0)
+                ? Number(margemAntRaw)
+                : (vpaAnt !== 0 ? (resAnt / Math.abs(vpaAnt)) * 100 : 0);
+
+            concl.innerHTML =
+                '<div class="resultado-box" style="border-top-color:' + corTipo + ';">' +
+                    '<div class="resultado-grid">' +
+                        '<div>' +
+                            '<div style="color:#666; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">Resultado Patrimonial (Período Atual)</div>' +
+                            '<div style="font-weight:bold; font-size:15px; color:' + corTipo + '; margin-top:4px;">' + tipoAtual + '</div>' +
+                            '<div style="font-size:28px; font-weight:bold; color:#003366; margin-top:4px;">R$ ' + fmt(resAtual) + '</div>' +
+                            '<div style="font-size:12px; color:#888; margin-top:2px;">(Total VPA - Total VPD)</div>' +
+                        '</div>' +
+                        '<div style="min-width:290px; background:#f8fafc; padding:14px 16px; border-radius:6px; border:1px solid #e2e8f0;">' +
+                            '<div style="font-size:11px; font-weight:bold; color:#003366; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:10px;">Comparativo de Resultado e Margem</div>' +
+                            '<div style="display:flex; justify-content:space-between; margin-bottom:6px;">' +
+                                '<span style="color:#555; font-size:13px;">Resultado Anterior (' + tipoAnt + '):</span>' +
+                                '<span style="font-weight:bold; color:#334155; font-size:13px;">R$ ' + fmt(resAnt) + '</span>' +
+                            '</div>' +
+                            '<div style="display:flex; justify-content:space-between; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #e2e8f0;">' +
+                                '<span style="color:#555; font-size:13px;">Margem — Período Anterior:</span>' +
+                                '<span style="font-weight:bold; color:#334155; font-size:14px;">' + fmtPct(margemAnt) + '</span>' +
+                            '</div>' +
+                            '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+                                '<span style="color:#555; font-size:13px;">Margem — Período Atual:</span>' +
+                                '<span style="font-weight:bold; font-size:16px; color:' + corTipo + ';">' + fmtPct(margemAtual) + '</span>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            concl.style.display = 'block';
+        }
+
+        function renderGraficoDVP(d) {
+            const canvas = document.getElementById('graf');
+            if (!canvas || typeof Chart === 'undefined') return;
+            if (chart) {
+                chart.destroy();
+                chart = null;
+            }
+            const vpaAt = Number(((d && d.total_vpa) || {}).atual || 0);
+            const vpaAnt = Number(((d && d.total_vpa) || {}).anterior || 0);
+            const vpdAt = Number(((d && d.total_vpd) || {}).atual || 0);
+            const vpdAnt = Number(((d && d.total_vpd) || {}).anterior || 0);
+            const resAt = Number(((d && d.resultado) || {}).atual || 0);
+            const resAnt = Number(((d && d.resultado) || {}).anterior || 0);
+
+            chart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Total VPA', 'Total VPD', 'Resultado Patrimonial'],
+                    datasets: [
+                        {
+                            label: 'Período Atual',
+                            data: [vpaAt, vpdAt, resAt],
+                            backgroundColor: '#003366',
+                            hoverBackgroundColor: '#002244',
+                            borderRadius: 3,
+                            barPercentage: 0.72,
+                            categoryPercentage: 0.42,
+                            maxBarThickness: 54
+                        },
+                        {
+                            label: 'Período Anterior',
+                            data: [vpaAnt, vpdAnt, resAnt],
+                            backgroundColor: '#6c8ebf',
+                            hoverBackgroundColor: '#5477a8',
+                            borderRadius: 3,
+                            barPercentage: 0.72,
+                            categoryPercentage: 0.42,
+                            maxBarThickness: 54
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: { padding: { top: 8, right: 16, left: 4, bottom: 0 } },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            align: 'end',
+                            labels: { boxWidth: 12, boxHeight: 12, font: { size: 12 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const val = Number(ctx.parsed.y || 0);
+                                    return ' ' + ctx.dataset.label + ': R$ ' + fmt(val);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#334155', font: { size: 12, weight: '600' } }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#eef2f6' },
+                            border: { display: false },
+                            ticks: {
+                                color: '#64748b',
+                                font: { size: 11 },
+                                callback: function(value) {
+                                    if (Math.abs(value) >= 1000000) {
+                                        return 'R$ ' + (value / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'M';
+                                    }
+                                    return 'R$ ' + fmt(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function desenharTela(d) {
             const tb = document.querySelector('#tab tbody');
-            const fmt = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            const fmtPct = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
             const calcVar = (at, ant) => ant !== 0 ? ((at - ant) / Math.abs(ant)) * 100 : 0;
             const varTd = (at, ant) => {
                 const v = calcVar(at, ant);
@@ -101,77 +252,39 @@
                 return '<td class="' + cls + '" style="text-align:right;">' + sg + fmtPct(v) + '</td>';
             };
             const fmtTd = v => '<td style="text-align:right;">' + fmt(v) + '</td>';
+
+            const g = (k, lado) => Number(((d && d[k]) || {})[lado] || 0);
+
             let out = '';
-            // BLOCO VPA
             out += '<tr style="background:#e8f4f8; font-weight:bold;"><td colspan="4" style="color:#003366;">VPA - VARIAÇÕES PATRIMONIAIS AUMENTATIVAS</td></tr>';
-            out += '<tr><td>VPA Financeiras</td>' + fmtTd(d.vpa_financeiras.atual) + fmtTd(d.vpa_financeiras.anterior) + varTd(d.vpa_financeiras.atual, d.vpa_financeiras.anterior) + '</tr>';
-            out += '<tr><td>Transferências Recebidas</td>' + fmtTd(d.transf_recebidas.atual) + fmtTd(d.transf_recebidas.anterior) + varTd(d.transf_recebidas.atual, d.transf_recebidas.anterior) + '</tr>';
-            out += '<tr><td>Outras Variações Patrimoniais Aumentativas</td>' + fmtTd(d.outras_vpa.atual) + fmtTd(d.outras_vpa.anterior) + varTd(d.outras_vpa.atual, d.outras_vpa.anterior) + '</tr>';
-            out += '<tr><td>Reversão de Provisões e Ajustes de Perdas</td>' + fmtTd(d.reversao_provisoes.atual) + fmtTd(d.reversao_provisoes.anterior) + varTd(d.reversao_provisoes.atual, d.reversao_provisoes.anterior) + '</tr>';
-            out += '<tr style="font-weight:bold; border-top:1px solid #ccc;"><td>TOTAL VPA</td>' + fmtTd(d.total_vpa.atual) + fmtTd(d.total_vpa.anterior) + varTd(d.total_vpa.atual, d.total_vpa.anterior) + '</tr>';
-            // BLOCO VPD
+            out += '<tr><td>VPA Financeiras</td>' + fmtTd(g('vpa_financeiras', 'atual')) + fmtTd(g('vpa_financeiras', 'anterior')) + varTd(g('vpa_financeiras', 'atual'), g('vpa_financeiras', 'anterior')) + '</tr>';
+            out += '<tr><td>Transferências Recebidas</td>' + fmtTd(g('transf_recebidas', 'atual')) + fmtTd(g('transf_recebidas', 'anterior')) + varTd(g('transf_recebidas', 'atual'), g('transf_recebidas', 'anterior')) + '</tr>';
+            out += '<tr><td>Outras Variações Patrimoniais Aumentativas</td>' + fmtTd(g('outras_vpa', 'atual')) + fmtTd(g('outras_vpa', 'anterior')) + varTd(g('outras_vpa', 'atual'), g('outras_vpa', 'anterior')) + '</tr>';
+            out += '<tr><td>Reversão de Provisões e Ajustes de Perdas</td>' + fmtTd(g('reversao_provisoes', 'atual')) + fmtTd(g('reversao_provisoes', 'anterior')) + varTd(g('reversao_provisoes', 'atual'), g('reversao_provisoes', 'anterior')) + '</tr>';
+            out += '<tr style="font-weight:bold; border-top:1px solid #ccc;"><td>TOTAL VPA</td>' + fmtTd(g('total_vpa', 'atual')) + fmtTd(g('total_vpa', 'anterior')) + varTd(g('total_vpa', 'atual'), g('total_vpa', 'anterior')) + '</tr>';
+
             out += '<tr style="background:#f8e8e8; font-weight:bold;"><td colspan="4" style="color:#dc3545;">VPD - VARIAÇÕES PATRIMONIAIS DIMINUTIVAS</td></tr>';
-            out += '<tr><td>VPD Financeiras</td>' + fmtTd(d.vpd_financeiras.atual) + fmtTd(d.vpd_financeiras.anterior) + varTd(d.vpd_financeiras.atual, d.vpd_financeiras.anterior) + '</tr>';
-            out += '<tr><td>Pessoal e Encargos</td>' + fmtTd(d.pessoal_encargos.atual) + fmtTd(d.pessoal_encargos.anterior) + varTd(d.pessoal_encargos.atual, d.pessoal_encargos.anterior) + '</tr>';
-            out += '<tr><td>Uso de Material de Consumo</td>' + fmtTd(d.uso_material_consumo.atual) + fmtTd(d.uso_material_consumo.anterior) + varTd(d.uso_material_consumo.atual, d.uso_material_consumo.anterior) + '</tr>';
-            out += '<tr><td>Serviços</td>' + fmtTd(d.servicos.atual) + fmtTd(d.servicos.anterior) + varTd(d.servicos.atual, d.servicos.anterior) + '</tr>';
-            out += '<tr><td>Depreciação</td>' + fmtTd(d.depreciacao.atual) + fmtTd(d.depreciacao.anterior) + varTd(d.depreciacao.atual, d.depreciacao.anterior) + '</tr>';
-            out += '<tr><td>Amortização</td>' + fmtTd(d.amortizacao.atual) + fmtTd(d.amortizacao.anterior) + varTd(d.amortizacao.atual, d.amortizacao.anterior) + '</tr>';
-            out += '<tr><td>Transferências e Delegações Concedidas</td>' + fmtTd(d.transf_concedidas.atual) + fmtTd(d.transf_concedidas.anterior) + varTd(d.transf_concedidas.atual, d.transf_concedidas.anterior) + '</tr>';
-            out += '<tr><td>Outras Variações Patrimoniais Diminutivas</td>' + fmtTd(d.outras_vpd.atual) + fmtTd(d.outras_vpd.anterior) + varTd(d.outras_vpd.atual, d.outras_vpd.anterior) + '</tr>';
-            out += '<tr><td>Tributárias</td>' + fmtTd(d.tributarias.atual) + fmtTd(d.tributarias.anterior) + varTd(d.tributarias.atual, d.tributarias.anterior) + '</tr>';
-            out += '<tr style="font-weight:bold; border-top:1px solid #ccc;"><td>TOTAL VPD</td>' + fmtTd(d.total_vpd.atual) + fmtTd(d.total_vpd.anterior) + varTd(d.total_vpd.atual, d.total_vpd.anterior) + '</tr>';
-            // BLOCO RESULTADO
-            const tipo = d.tipo_resultado.atual;
-            const cor = tipo.includes("Superávit") ? "#003366" : "#dc3545";
+            out += '<tr><td>VPD Financeiras</td>' + fmtTd(g('vpd_financeiras', 'atual')) + fmtTd(g('vpd_financeiras', 'anterior')) + varTd(g('vpd_financeiras', 'atual'), g('vpd_financeiras', 'anterior')) + '</tr>';
+            out += '<tr><td>Pessoal e Encargos</td>' + fmtTd(g('pessoal_encargos', 'atual')) + fmtTd(g('pessoal_encargos', 'anterior')) + varTd(g('pessoal_encargos', 'atual'), g('pessoal_encargos', 'anterior')) + '</tr>';
+            out += '<tr><td>Uso de Material de Consumo</td>' + fmtTd(g('uso_material_consumo', 'atual')) + fmtTd(g('uso_material_consumo', 'anterior')) + varTd(g('uso_material_consumo', 'atual'), g('uso_material_consumo', 'anterior')) + '</tr>';
+            out += '<tr><td>Serviços</td>' + fmtTd(g('servicos', 'atual')) + fmtTd(g('servicos', 'anterior')) + varTd(g('servicos', 'atual'), g('servicos', 'anterior')) + '</tr>';
+            out += '<tr><td>Depreciação</td>' + fmtTd(g('depreciacao', 'atual')) + fmtTd(g('depreciacao', 'anterior')) + varTd(g('depreciacao', 'atual'), g('depreciacao', 'anterior')) + '</tr>';
+            out += '<tr><td>Amortização</td>' + fmtTd(g('amortizacao', 'atual')) + fmtTd(g('amortizacao', 'anterior')) + varTd(g('amortizacao', 'atual'), g('amortizacao', 'anterior')) + '</tr>';
+            out += '<tr><td>Transferências e Delegações Concedidas</td>' + fmtTd(g('transf_concedidas', 'atual')) + fmtTd(g('transf_concedidas', 'anterior')) + varTd(g('transf_concedidas', 'atual'), g('transf_concedidas', 'anterior')) + '</tr>';
+            out += '<tr><td>Outras Variações Patrimoniais Diminutivas</td>' + fmtTd(g('outras_vpd', 'atual')) + fmtTd(g('outras_vpd', 'anterior')) + varTd(g('outras_vpd', 'atual'), g('outras_vpd', 'anterior')) + '</tr>';
+            out += '<tr><td>Tributárias</td>' + fmtTd(g('tributarias', 'atual')) + fmtTd(g('tributarias', 'anterior')) + varTd(g('tributarias', 'atual'), g('tributarias', 'anterior')) + '</tr>';
+            out += '<tr style="font-weight:bold; border-top:1px solid #ccc;"><td>TOTAL VPD</td>' + fmtTd(g('total_vpd', 'atual')) + fmtTd(g('total_vpd', 'anterior')) + varTd(g('total_vpd', 'atual'), g('total_vpd', 'anterior')) + '</tr>';
+
+            const tipo = (d.tipo_resultado && d.tipo_resultado.atual) || 'RESULTADO PATRIMONIAL';
+            const cor = tipo.includes('Superávit') ? '#003366' : '#dc3545';
             out += '<tr style="background:#eef5e8; font-weight:bold;"><td colspan="4" style="color:' + cor + ';">RESULTADO PATRIMONIAL</td></tr>';
-            out += '<tr style="font-weight:bold;"><td>' + tipo + '</td>' + fmtTd(d.resultado.atual) + fmtTd(d.resultado.anterior) + varTd(d.resultado.atual, d.resultado.anterior) + '</tr>';
+            out += '<tr style="font-weight:bold;"><td>' + tipo + '</td>' + fmtTd(g('resultado', 'atual')) + fmtTd(g('resultado', 'anterior')) + varTd(g('resultado', 'atual'), g('resultado', 'anterior')) + '</tr>';
             tb.innerHTML = out;
-            // Card de resultado
-            const tipoAtual = d.tipo_resultado.atual;
-            const corTipo = tipoAtual.includes("Superávit") ? "#003366" : "#dc3545";
-            document.getElementById('concl').innerHTML = 
-                '<div style="background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); padding:24px; border-top:5px solid ' + corTipo + '; height:100%;">' +
-                    '<div style="color:#666; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Resultado Patrimonial</div>' +
-                    '<div style="font-weight:bold; font-size:16px; color:' + corTipo + '; margin-bottom:5px;">' + tipoAtual + '</div>' +
-                    '<div style="font-size:32px; font-weight:bold; color:#003366; margin-bottom:15px;">R$ ' + fmt(d.resultado.atual) + '</div>' +
-                    '<div style="font-size:12px; color:#888; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:15px;">' +
-                        '(Total VPA - Total VPD)' +
-                    '</div>' +
-                    '<div style="display:flex; justify-content:space-between; margin-bottom:10px;">' +
-                        '<span style="color:#666; font-size:13px;">Período Anterior:</span>' +
-                        '<span style="font-weight:bold; color:#444; font-size:13px;">R$ ' + fmt(d.resultado.anterior) + '</span>' +
-                    '</div>' +
-                    '<div style="display:flex; justify-content:space-between; align-items:center;">' +
-                        '<span style="color:#666; font-size:13px;">Margem do Resultado:</span>' +
-                        '<span style="font-weight:bold; font-size:16px; color:' + corTipo + ';">' + fmtPct(d.margem_resultado.atual) + '</span>' +
-                    '</div>' +
-                '</div>';document.getElementById('concl').style.display = 'block';
-            // Grafico de barras
-            const ctx = document.getElementById('grafico');
-            if (window.chart) window.chart.destroy();
-            window.chart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Total VPA', 'Total VPD', 'Resultado'],
-                    datasets: [
-                        {
-                            label: 'Período Atual',
-                            data: [d.total_vpa.atual, d.total_vpd.atual, d.resultado.atual],
-                            backgroundColor: ['#003366', '#dc3545', '#28a745'],
-                            borderRadius: 4
-                        },
-                        {
-                            label: 'Período Anterior',
-                            data: [d.total_vpa.anterior, d.total_vpd.anterior, d.resultado.anterior],
-                            backgroundColor: ['#4a90e2', '#e68a8a', '#7ec87e'],
-                            borderRadius: 4
-                        }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+
+            renderConclusao(d);
+            renderGraficoDVP(d);
         }
+
         function carregar() {
             const p = document.getElementById('periodo').value;
             const tb = document.querySelector('#tab tbody');
@@ -181,16 +294,15 @@
             fetch('/api/analise_patrimonial/' + p)
                 .then(r => r.json())
                 .then(resp => {
-                    if (resp.erro === "faltando") {
+                    if (resp.erro === 'faltando') {
                         let htmlAmarelo = '<div style="background:#fff3cd;border-left:5px solid #ffc107;padding:20px;border-radius:8px;">';
                         htmlAmarelo += '<h3 style="color:#856404;margin:0 0 10px 0;">⚠️ Demonstrativos Faltando</h3>';
                         htmlAmarelo += '<p style="color:#856404;">Os seguintes demonstrativos não foram importados:</p><ul style="color:#856404;">';
-                        [...new Set(resp.pecas || [])].forEach(p => { htmlAmarelo += '<li>' + p + '</li>'; });
+                        [...new Set(resp.pecas || [])].forEach(peca => { htmlAmarelo += '<li>' + peca + '</li>'; });
                         htmlAmarelo += '</ul></div>';
                         tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#856404;">Aguardando importação.</td></tr>';
                         document.getElementById('concl').innerHTML = htmlAmarelo;
                         document.getElementById('concl').style.display = 'block';
-                        document.getElementById('concl').style.background = 'transparent';
                         if (chart) { chart.destroy(); chart = null; }
                         return;
                     }
@@ -199,219 +311,97 @@
                         return;
                     }
                     document.getElementById('btn-salvar').style.display = 'inline-block';
-                    desenharTela(resp.dados, p);
+                    desenharTela(resp.dados || resp);
                 })
-                .catch(e => { tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:red;">Erro de conexão.</td></tr>'; });
+                .catch(() => {
+                    tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:red;">Erro de conexão.</td></tr>';
+                });
         }
+
         function salvar() {
             const p = document.getElementById('periodo').value;
             const btn = document.getElementById('btn-salvar');
-            btn.innerText = 'Salvando...'; btn.disabled = true;
+            btn.innerText = 'Salvando...';
+            btn.disabled = true;
             fetch('/salvar_analise_patrimonial/' + p)
                 .then(r => r.json())
-                .then(d => { alert('Relatório salvo!'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; carregarHistorico(); })
-                .catch(e => { alert('Erro ao salvar.'); btn.innerText = 'Confirmar e Salvar'; btn.disabled = false; });
+                .then(() => {
+                    alert('Relatório salvo!');
+                    btn.innerText = 'Confirmar e Salvar';
+                    btn.disabled = false;
+                    carregarHistorico();
+                })
+                .catch(() => {
+                    alert('Erro ao salvar.');
+                    btn.innerText = 'Confirmar e Salvar';
+                    btn.disabled = false;
+                });
         }
+
         async function exibirSelecionado() {
-    const check = document.querySelector(".check-historico:checked");
-    if (!check) { alert("Selecione um item no histórico."); return; }
-    
-    try {
-        const r = await fetch('/historico_analise_patrimonial/' + check.value);
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        const resp = await r.json();
-        
-        const d = resp.dados?.dados || resp.dados || resp;
-        const periodo = resp.periodo || '2026-TRIMESTRE-3';
-
-        // 1. Preencher a Tabela de forma generica e segura
-        let html = '';
-        let labels = [];
-        let dadosAtual = [];
-        let dadosAnterior = [];
-
-        for (const [key, val] of Object.entries(d)) {
-            if (val && typeof val === 'object' && val.atual !== undefined) {
-                // Formata o nome da chave
-                const nome = key.replace(/_/g, ' ').toUpperCase();
-                
-                // Pega os valores com seguranca
-                const vAtual = Number(val.atual || 0);
-                const vAnterior = Number(val.anterior || 0);
-                
-                // Calcula a variacao
-                const variacao = vAnterior !== 0 ? ((vAtual - vAnterior) / Math.abs(vAnterior)) * 100 : 0;
-                const corVar = variacao >= 0 ? '#28a745' : '#dc3545';
-                const sinal = variacao >= 0 ? '+' : '';
-
-                html += `<tr>
-                    <td>${nome}</td>
-                    <td style="text-align:right;">${vAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    <td style="text-align:right;">${vAnterior.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    <td style="text-align:right; color:${corVar}; font-weight:bold;">${sinal}${variacao.toFixed(2)}%</td>
-                </tr>`;
-
-                // Guarda para o grafico (vamos pegar apenas os 4 primeiros para nao poluir)
-                if (labels.length < 4) {
-                    labels.push(nome);
-                    dadosAtual.push(vAtual);
-                    dadosAnterior.push(vAnterior);
-                }
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) {
+                alert('Selecione um item no histórico.');
+                return;
+            }
+            try {
+                const r = await fetch('/historico_analise_patrimonial/' + check.value);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const resp = await r.json();
+                const d = (resp.dados && resp.dados.dados) || resp.dados || resp;
+                desenharTela(d);
+            } catch (e) {
+                alert('Erro ao carregar o histórico: ' + e.message);
             }
         }
 
-        const tb = document.querySelector('#tab tbody');
-        if (tb) tb.innerHTML = html || '<tr><td colspan="4" style="text-align:center">Nenhum dado encontrado.</td></tr>';
-
-        // 2. Desenhar o Grafico do zero
-        const canvas = document.getElementById('graf');
-        if (canvas && labels.length > 0) {
-            if (window.chart) window.chart.destroy();
-            window.chart = new Chart(canvas.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Atual', data: dadosAtual, backgroundColor: '#003366', borderRadius: 4 },
-                        { label: 'Anterior', data: dadosAnterior, backgroundColor: '#5b9bd5', borderRadius: 4 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-        }
-
-    } catch (e) {
-        alert("Erro ao carregar o histórico: " + e.message);
-    }
-}
-
-
-
-
-
         function excluirSelecionado() {
-            const selecionados = document.querySelectorAll(".check-historico:checked");
-            if (selecionados.length === 0) { alert("Selecione pelo menos um item."); return; }
-            if (!confirm("Excluir " + selecionados.length + " itens?")) return;
-            let promessas = [];
-            selecionados.forEach(check => {
-                promessas.push(fetch("/excluir_analise_patrimonial/" + check.value, { method: "DELETE" }).then(r => r.ok).catch(() => false));
-            });
+            const selecionados = document.querySelectorAll('.check-historico:checked');
+            if (selecionados.length === 0) {
+                alert('Selecione pelo menos um item.');
+                return;
+            }
+            if (!confirm('Excluir ' + selecionados.length + ' itens?')) return;
+            const promessas = Array.from(selecionados).map(check =>
+                fetch('/excluir_analise_patrimonial/' + check.value, { method: 'DELETE' }).then(r => r.ok).catch(() => false)
+            );
             Promise.all(promessas).then(resultados => {
-                if (resultados.some(r => r === true)) { alert("Excluído!"); carregarHistorico(); }
+                if (resultados.some(r => r === true)) {
+                    alert('Excluído!');
+                    carregarHistorico();
+                }
             });
         }
-        function gerarPDF() {
-            const check = document.querySelector(".check-historico:checked");
-            if (!check) { alert("Marque um relatório no histórico para gerar o PDF!"); return; }
+
+        function gerarPDFHistorico() {
+            const check = document.querySelector('.check-historico:checked');
+            if (!check) {
+                alert('Marque um relatório no histórico para gerar o PDF!');
+                return;
+            }
             window.open('/gerar_pdf_analise_patrimonial/' + check.value, '_blank');
         }
+
         function carregarHistorico() {
             fetch('/historico_analise_patrimonial')
                 .then(r => r.json())
                 .then(data => {
                     let html = '';
-                    if(!data || data.length === 0) html = '<li>Nenhum histórico.</li>';
-                    else { 
-                        data.forEach(item => { 
+                    if (!data || data.length === 0) {
+                        html = '<li>Nenhum histórico.</li>';
+                    } else {
+                        data.forEach(item => {
                             html += '<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px; display:flex; align-items:center; gap:8px;">';
                             html += '<input type="checkbox" class="check-historico" value="' + item.id + '" style="width:16px; height:16px; cursor:pointer;">';
                             html += '<div><strong>' + item.periodo + '</strong><br><span style="font-size:11px; color:#888;">' + item.data_geracao + '</span></div>';
                             html += '</li>';
-                        }); 
+                        });
                     }
                     document.getElementById('historico-lista').innerHTML = html;
                 });
         }
-        document.addEventListener("DOMContentLoaded", carregarHistorico);
+
+        document.addEventListener('DOMContentLoaded', carregarHistorico);
     </script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Procura qualquer botão na tela que tenha o texto "Gerar PDF"
-            const botoes = Array.from(document.querySelectorAll('button, a'));
-            const btnPdf = botoes.find(b => b.innerText.includes('Gerar PDF'));
-            
-            if (btnPdf) {
-                // Garante o visual azul (caso o backup estivesse sem estilo)
-                btnPdf.style.background = '#3182ce';
-                btnPdf.style.color = 'white';
-                btnPdf.style.padding = '8px 16px';
-                btnPdf.style.border = 'none';
-                btnPdf.style.borderRadius = '4px';
-                btnPdf.style.fontWeight = 'bold';
-                btnPdf.style.cursor = 'pointer';
-                
-                // Remove o clique antigo quebrado
-                btnPdf.removeAttribute('onclick');
-                
-                // Adiciona a regra de negócio correta
-                btnPdf.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const sel = document.querySelector('input[type="checkbox"]:checked') || 
-                                document.querySelector('input[type="radio"]:checked');
-                    
-                    if (!sel) {
-                        alert("Atenção: Selecione um item do Histórico Salvo (marque a caixinha) antes de gerar o PDF.");
-                        return;
-                    }
-                    
-                    let id = sel.value;
-                    if (!id || id === "on") {
-                        id = sel.id.replace('check-', '').replace('hist-', '');
-                        if (!id) id = sel.getAttribute('data-id');
-                    }
-                    
-                    const url = `/gerar_pdf_analise_patrimonial/${id}`;
-                    console.log("[DEBUG] Abrindo PDF Patrimonial via JS:", url);
-                    
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.target = '_blank';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                });
-            }
-        });
-    </script>
-
-
-<script>
-// CORRECAO_BOTAO_PDF
-document.addEventListener('DOMContentLoaded', function() {
-    // Procura o botão "Gerar PDF" de qualquer forma
-    const botoes = Array.from(document.querySelectorAll('button, a, .btn'));
-    const btnPdf = botoes.find(b => b.innerText.includes('Gerar PDF'));
-    
-    if (btnPdf) {
-        // Remove o onclick antigo
-        btnPdf.removeAttribute('onclick');
-        
-        // Adiciona o novo listener
-        btnPdf.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Procura radio OU checkbox marcado
-            let sel = document.querySelector('input[type="radio"]:checked');
-            if (!sel) {
-                sel = document.querySelector('input[type="checkbox"]:checked');
-            }
-            
-            if (!sel) {
-                alert('Selecione um relatório no histórico primeiro.');
-                return;
-            }
-            
-            const id = sel.value;
-            const url = '/gerar_pdf_analise_patrimonial/' + id;
-            console.log('[DEBUG] Abrindo PDF DVP:', url);
-            window.open(url, '_blank');
-        });
-    }
-});
-</script>
 </body>
-
 </html>

@@ -85,17 +85,17 @@ def buscar_dvp_postgresql(periodo: str | None = None, entidade_id: int | None = 
         cur = conn.cursor()
         row = None
         if periodo:
-            cur.execute(
-                """
+            sql_periodo = """
                 SELECT periodo, resultado_json
                 FROM historico_analise_dvp
                 WHERE periodo ILIKE %s
-                """ + (" AND (entidade_id = %s OR entidade_id IS NULL)" if entidade_id is not None else "") + """
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                (f"%{periodo}%",),
-            )
+            """
+            params_periodo = [f"%{periodo}%"]
+            if entidade_id is not None:
+                sql_periodo += " AND (entidade_id = %s OR entidade_id IS NULL)"
+                params_periodo.append(entidade_id)
+            sql_periodo += " ORDER BY id DESC LIMIT 1"
+            cur.execute(sql_periodo, tuple(params_periodo))
             row = cur.fetchone()
 
         if not row:
@@ -235,6 +235,7 @@ def salvar_analise_dvp(periodo: str, periodo_anterior: str, request: Request = N
         if not res_pg or res_pg.get("erro"):
             return {"ok": False, "mensagem": (res_pg or {}).get("mensagem", "Dados do DVP n?o encontrados no PostgreSQL")}
 
+        ent_id = resolver_entidade_id(request)
         dados_json = res_pg["dados"]
         periodo_label = f"{periodo} vs {periodo_anterior}"
 
@@ -245,7 +246,7 @@ def salvar_analise_dvp(periodo: str, periodo_anterior: str, request: Request = N
             INSERT INTO historico_analise_dvp (periodo, data_geracao, resultado_json, entidade_id)
             VALUES (%s, NOW(), %s, %s) RETURNING id
             """,
-            (periodo_label, json.dumps(dados_json, ensure_ascii=False)),
+            (periodo_label, json.dumps(dados_json, ensure_ascii=False), ent_id),
         )
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -305,6 +306,7 @@ def excluir_dvp(id: int):
 
 
 @router.get("/gerar_pdf_novo/{id}")
+@router.get("/gerar_pdf/{id}")
 def gerar_pdf_analise_dvp(id: int):
     """Gera PDF do DVP com acentos corretos (usa novo_pdf)."""
     try:

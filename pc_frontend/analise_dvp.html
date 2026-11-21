@@ -251,8 +251,19 @@
             const sel = document.querySelector('.hist-item input:checked');
             if (!sel) { alert('Selecione um item no histórico.'); return; }
             fetch('/api/analise_patrimonial/historico/' + sel.value)
-                .then(r => r.json())
-                .then(j => { if (j.dados) render(j.dados, j.dados); });
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(j => {
+                    if (j.erro) {
+                        alert('Erro ao exibir: ' + (j.mensagem || 'Registro não encontrado'));
+                        return;
+                    }
+                    const payload = j.dados || j;
+                    render(payload, payload);
+                })
+                .catch(e => {
+                    console.error('[DVP] Erro ao exibir:', e);
+                    alert('Erro ao carregar item do histórico: ' + e.message);
+                });
         }
 
         function excluirSelecionado() {
